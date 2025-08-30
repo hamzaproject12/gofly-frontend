@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import { mkdir } from 'fs/promises';
-import { prisma } from '@/lib/prisma';
 import { v4 as uuidv4 } from 'uuid';
 
 // Définition des catégories de fichiers autorisées
@@ -41,17 +40,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Vérifier si la réservation existe
-    const reservation = await prisma.reservation.findUnique({
-      where: { id: parseInt(reservationId) }
-    });
-
-    if (!reservation) {
-      return NextResponse.json(
-        { error: 'Réservation non trouvée' },
-        { status: 404 }
-      );
-    }
+    // Note: Database validation will be handled by the backend
+    // This is a frontend-only deployment, so we'll just handle file upload
 
     // Créer le répertoire pour la catégorie de fichier s'il n'existe pas
     const uploadDir = join(process.cwd(), 'public', 'uploads', fileCategory);
@@ -67,25 +57,14 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(bytes);
     await writeFile(filePath, buffer);
 
-    // Insérer le fichier dans la base de données
-    const fileRecord = await prisma.fichier.create({
-      data: {
-        reservationId: parseInt(reservationId),
-        fileName: file.name,
-        storedName: storedName,
-        fileType: fileType,
-        fileCategory: fileCategory,
-        filePath: `/uploads/${fileCategory}/${storedName}`,
-        uploadedAt: new Date().toISOString()
-      },
-    });
-
+    // Return success response (database operations will be handled by backend)
     return NextResponse.json({
-      fileId: fileRecord.id,
-      url: fileRecord.filePath,
-      fileType: fileRecord.fileType,
-      fileCategory: fileRecord.fileCategory,
-      message: 'Fichier uploadé avec succès',
+      fileName: file.name,
+      storedName: storedName,
+      fileType: fileType,
+      fileCategory: fileCategory,
+      filePath: `/uploads/${fileCategory}/${storedName}`,
+      message: 'Fichier uploadé avec succès (frontend only - backend will handle database)',
     });
   } catch (error) {
     console.error('Erreur lors de l\'upload:', error);

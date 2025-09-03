@@ -10,10 +10,11 @@
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc && prisma generate",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && prisma db push",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:seed": "prisma db seed",
+    "prisma:migrate": "prisma migrate deploy",
     "railway:deploy": "npm run build && npm start"
   },
   "keywords": [],

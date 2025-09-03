@@ -107,7 +107,8 @@ router.post('/', upload.any(), async (req, res) => {
     }
     if (!req.body.reservationId) {
       // Supprimer les fichiers uploadés si les informations requises sont manquantes
-      for (const file of req.files) {
+      const files = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
+      for (const file of files) {
         if (file.path) {
           fs.unlinkSync(file.path);
         }
@@ -116,7 +117,8 @@ router.post('/', upload.any(), async (req, res) => {
     }
     const reservationId = parseInt(req.body.reservationId);
     if (isNaN(reservationId)) {
-      for (const file of req.files) {
+      const files = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
+      for (const file of files) {
         if (file.path) {
           fs.unlinkSync(file.path);
         }
@@ -128,7 +130,8 @@ router.post('/', upload.any(), async (req, res) => {
       where: { id: reservationId }
     });
     if (!reservation) {
-      for (const file of req.files) {
+      const files = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
+      for (const file of files) {
         if (file.path) {
           fs.unlinkSync(file.path);
         }
@@ -137,7 +140,8 @@ router.post('/', upload.any(), async (req, res) => {
     }
     // Insérer chaque fichier dans la base de données
     const results = [];
-    for (const file of req.files) {
+    const files = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
+    for (const file of files) {
       let relativePath = 'uploads/';
       let fileTypeForDb = file.fieldname;
       switch (file.fieldname) {

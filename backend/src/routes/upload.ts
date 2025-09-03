@@ -198,7 +198,8 @@ router.post('/', upload.any(), async (req, res) => {
     console.error('Erreur serveur:', error)
     // Supprimer le fichier uploadé en cas d'erreur
     if (req.files) {
-      for (const file of req.files) {
+      const files = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
+      for (const file of files) {
         try {
           fs.unlinkSync(file.path);
         } catch (unlinkError) {

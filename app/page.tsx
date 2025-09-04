@@ -15,6 +15,7 @@ import {
   Search,
 } from "lucide-react"
 import Link from "next/link"
+import { api } from "@/lib/api"
 
 // Add types for our API data
 type Program = {
@@ -107,53 +108,69 @@ type TransformedReservation = {
 
 // Add async function to fetch data
 async function getData() {
-  const [programsRes, reservationsRes, expensesRes] = await Promise.all([
-    fetch('http://localhost:5000/api/programs'),
-    fetch('http://localhost:5000/api/reservations'),
-    fetch('http://localhost:5000/api/expenses')
-  ]);
+  try {
+    const [programsRes, reservationsRes, expensesRes] = await Promise.all([
+      fetch(api.url(api.endpoints.programs)),
+      fetch(api.url(api.endpoints.reservations)),
+      fetch(api.url(api.endpoints.expenses))
+    ]);
 
-  const programs = await programsRes.json();
-  const reservations = await reservationsRes.json();
-  const expenses = await expensesRes.json();
+    const programs = await programsRes.json();
+    const reservations = await reservationsRes.json();
+    const expenses = await expensesRes.json();
 
-  // Calculate stats
-  const totalExpenses = expenses.reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
-  const totalPayments = reservations.reduce((sum: number, res: Reservation) => sum + res.paidAmount, 0);
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-  
-  const monthlyExpenses = expenses
-    .filter((exp: Expense) => {
-      const expDate = new Date(exp.date);
-      return expDate.getMonth() === currentMonth && expDate.getFullYear() === currentYear;
-    })
-    .reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
+    // Calculate stats
+    const totalExpenses = expenses.reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
+    const totalPayments = reservations.reduce((sum: number, res: Reservation) => sum + res.paidAmount, 0);
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    
+    const monthlyExpenses = expenses
+      .filter((exp: Expense) => {
+        const expDate = new Date(exp.date);
+        return expDate.getMonth() === currentMonth && expDate.getFullYear() === currentYear;
+      })
+      .reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
 
-  const monthlyPayments = reservations
-    .filter((res: Reservation) => {
-      const resDate = new Date(res.dateReservation);
-      return resDate.getMonth() === currentMonth && resDate.getFullYear() === currentYear;
-    })
-    .reduce((sum: number, res: Reservation) => sum + res.paidAmount, 0);
+    const monthlyPayments = reservations
+      .filter((res: Reservation) => {
+        const resDate = new Date(res.dateReservation);
+        return resDate.getMonth() === currentMonth && resDate.getFullYear() === currentYear;
+      })
+      .reduce((sum: number, res: Reservation) => sum + res.paidAmount, 0);
 
-  const monthlyReservations = reservations
-    .filter((res: Reservation) => {
-      const resDate = new Date(res.dateReservation);
-      return resDate.getMonth() === currentMonth && resDate.getFullYear() === currentYear;
-    }).length;
+    const monthlyReservations = reservations
+      .filter((res: Reservation) => {
+        const resDate = new Date(res.dateReservation);
+        return resDate.getMonth() === currentMonth && resDate.getFullYear() === currentYear;
+      }).length;
 
-  return {
-    programs,
-    reservations,
-    expenses,
-    stats: {
-      soldeCaisse: totalPayments - totalExpenses,
-      paiementsMois: monthlyPayments,
-      depensesMois: monthlyExpenses,
-      reservationsMois: monthlyReservations,
-    }
-  };
+    return {
+      programs,
+      reservations,
+      expenses,
+      stats: {
+        soldeCaisse: totalPayments - totalExpenses,
+        paiementsMois: monthlyPayments,
+        depensesMois: monthlyExpenses,
+        reservationsMois: monthlyReservations,
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    // Return fallback data for build time
+    return {
+      programs: [],
+      reservations: [],
+      expenses: [],
+      stats: {
+        soldeCaisse: 0,
+        paiementsMois: 0,
+        depensesMois: 0,
+        reservationsMois: 0,
+      }
+    };
+  }
 }
 
 export default async function Dashboard() {

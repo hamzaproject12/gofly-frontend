@@ -1,6 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { api } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -250,9 +251,9 @@ export default function ReservationsPage() {
       });
       
       const [reservationsRes, programsRes, statsRes] = await Promise.all([
-        fetch(`http://localhost:5000/api/reservations?${params}`),
-        fetch('http://localhost:5000/api/programs'),
-        fetch(`http://localhost:5000/api/reservations/stats?${params}`)
+        fetch(api.url(`/api/reservations?${params}`)),
+        fetch(api.url(api.endpoints.programs)),
+        fetch(api.url(`/api/reservations/stats?${params}`))
       ]);
 
       if (!reservationsRes.ok || !programsRes.ok || !statsRes.ok) {
@@ -485,7 +486,7 @@ export default function ReservationsPage() {
   const handleDeleteReservation = async (id: number) => {
     setDeleteDialogOpen(false);
     try {
-      const res = await fetch(`http://localhost:5000/api/reservations/${id}`, {
+      const res = await fetch(api.url(`/api/reservations/${id}`), {
         method: 'DELETE',
       });
       if (!res.ok) {

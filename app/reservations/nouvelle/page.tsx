@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useMemo, useEffect } from "react"
+import { api } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -240,7 +241,7 @@ export default function NouvelleReservation() {
   useEffect(() => {
     const fetchPrograms = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/programs');
+        const response = await fetch(api.url(api.endpoints.programs));
         if (!response.ok) {
           throw new Error('Erreur lors de la récupération des programmes');
         }
@@ -265,7 +266,7 @@ export default function NouvelleReservation() {
   const fetchProgramDetails = async (programId: string) => {
     try {
       console.log('🔄 Chargement des détails du programme:', programId);
-      const response = await fetch(`http://localhost:5000/api/programs/${programId}`);
+      const response = await fetch(api.url(`/api/programs/${programId}`));
       if (!response.ok) {
         throw new Error('Erreur lors de la récupération des détails du programme');
       }
@@ -976,7 +977,7 @@ export default function NouvelleReservation() {
       };
 
       // 1. Créer d'abord la réservation
-      const reservationResponse = await fetch("http://localhost:5000/api/reservations", {
+      const reservationResponse = await fetch(api.url(api.endpoints.reservations), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1024,7 +1025,7 @@ export default function NouvelleReservation() {
         formDataPassport.append("passport", documents.passport);
         formDataPassport.append("reservationId", reservationId.toString());
         fileUploadPromises.push(
-          fetch("http://localhost:5000/api/upload", {
+          fetch(api.url(api.endpoints.upload), {
             method: "POST",
             body: formDataPassport,
           }).then(async (response) => {
@@ -1045,7 +1046,7 @@ export default function NouvelleReservation() {
         formDataVisa.append("visa", documents.visa);
         formDataVisa.append("reservationId", reservationId.toString());
         fileUploadPromises.push(
-          fetch("http://localhost:5000/api/upload", {
+          fetch(api.url(api.endpoints.upload), {
             method: "POST",
             body: formDataVisa,
           }).then(async (response) => {
@@ -1068,7 +1069,7 @@ export default function NouvelleReservation() {
         formDataBillet.append("flightBooked", documents.flightBooked);
         formDataBillet.append("reservationId", reservationId.toString());
         fileUploadPromises.push(
-          fetch("http://localhost:5000/api/upload", {
+          fetch(api.url(api.endpoints.upload), {
             method: "POST",
             body: formDataBillet,
           }).then(async (response) => {
@@ -1091,7 +1092,7 @@ export default function NouvelleReservation() {
         formDataHotel.append("hotelBooked", documents.hotelBooked);
         formDataHotel.append("reservationId", reservationId.toString());
         fileUploadPromises.push(
-          fetch("http://localhost:5000/api/upload", {
+          fetch(api.url(api.endpoints.upload), {
             method: "POST",
             body: formDataHotel,
           }).then(async (response) => {
@@ -1119,7 +1120,7 @@ export default function NouvelleReservation() {
           formDataPaiement.append("payment", file);
           formDataPaiement.append("reservationId", reservationId.toString());
 
-          const response = await fetch("http://localhost:5000/api/upload", {
+                        const response = await fetch(api.url(api.endpoints.upload), {
             method: "POST",
             body: formDataPaiement,
           });
@@ -1139,7 +1140,7 @@ export default function NouvelleReservation() {
                 paiements,
                 documentsPayment: documents.payment
               });
-              const paymentResponse = await fetch('http://localhost:5000/api/payments', {
+              const paymentResponse = await fetch(api.url(api.endpoints.payments), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1296,7 +1297,7 @@ export default function NouvelleReservation() {
       await Promise.all(expensesToCreate.map(async (expense, index) => {
         console.log(`Création de l'expense ${index + 1}:`, expense);
         
-        const expenseResponse = await fetch('http://localhost:5000/api/expenses', {
+        const expenseResponse = await fetch(api.url(api.endpoints.expenses), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(expense)
@@ -1324,7 +1325,7 @@ export default function NouvelleReservation() {
       }
 
       // PATCH la réservation pour mettre à jour les statuts
-      await fetch(`http://localhost:5000/api/reservations/${reservationId}`, {
+      await fetch(api.url(`/api/reservations/${reservationId}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

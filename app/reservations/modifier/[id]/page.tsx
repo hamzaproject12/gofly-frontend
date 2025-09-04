@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { api } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -38,14 +39,14 @@ export default function EditReservation() {
 
   useEffect(() => {
     // Charger la liste des programmes
-    fetch('http://localhost:5000/api/programs')
+    fetch(api.url(api.endpoints.programs))
       .then(res => res.json())
       .then(data => setPrograms(data))
       .catch(() => setPrograms([]))
     // Charger la réservation
     if (!reservationId) return;
     setLoading(true);
-    fetch(`http://localhost:5000/api/reservations/${reservationId}`)
+    fetch(api.url(`/api/reservations/${reservationId}`))
       .then(res => res.json())
       .then(data => {
         setForm({
@@ -122,7 +123,7 @@ export default function EditReservation() {
         paiements: paiements.map(p => ({ montant: p.montant, type: p.type, date: p.date, recu: p.recu })),
         // documents: ... (à compléter pour upload/remplacement)
       };
-      const res = await fetch(`http://localhost:5000/api/reservations/${reservationId}`, {
+      const res = await fetch(api.url(`/api/reservations/${reservationId}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)

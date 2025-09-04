@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +48,7 @@ export default function ReservationDetails() {
     if (typeof window !== 'undefined') {
       const parts = window.location.pathname.split('/');
       const id = parts[parts.length - 1];
-      fetch(`http://localhost:5000/api/reservations/${id}`)
+      fetch(api.url(`/api/reservations/${id}`))
         .then(res => res.json())
         .then(data => {
           setReservation({
@@ -192,7 +193,7 @@ export default function ReservationDetails() {
                     const recuUrl = paiement.recu
                       ? paiement.recu.startsWith('http')
                         ? paiement.recu
-                        : `http://localhost:5000${paiement.recu.startsWith('/') ? paiement.recu : '/' + paiement.recu}`
+                        : `${api.url('')}${paiement.recu.startsWith('/') ? paiement.recu : '/' + paiement.recu}`
                       : '';
                     return (
                       <div key={index} className="p-4 border border-orange-200 rounded-lg bg-white/60">
@@ -245,7 +246,7 @@ export default function ReservationDetails() {
                     const url = doc.url
                       ? doc.url.startsWith('http')
                         ? doc.url
-                        : `http://localhost:5000${doc.url.startsWith('/') ? doc.url : '/' + doc.url}`
+                        : `${api.url('')}${doc.url.startsWith('/') ? doc.url : '/' + doc.url}`
                       : '';
                     return (
                       <div

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { api } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -92,8 +93,8 @@ export default function NouveauProgramme() {
     const fetchHotels = async () => {
       try {
         const [madinaResponse, makkahResponse] = await Promise.all([
-          fetch('http://localhost:5000/api/hotels/available?city=Madina'),
-          fetch('http://localhost:5000/api/hotels/available?city=Makkah')
+          fetch(api.url('/api/hotels/available?city=Madina')),
+          fetch(api.url('/api/hotels/available?city=Makkah'))
         ]);
 
         if (!madinaResponse.ok || !makkahResponse.ok) {
@@ -253,7 +254,7 @@ export default function NouveauProgramme() {
         hotelsMakkah: formData.hotelsMakkah
       }
 
-      const response = await fetch('http://localhost:5000/api/programs', {
+      const response = await fetch(api.url(api.endpoints.programs), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

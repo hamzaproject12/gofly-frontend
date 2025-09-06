@@ -1,5 +1,6 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
+import { ProgramOverviewController } from '../controllers/programOverviewController';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -305,5 +306,16 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({ error: 'Error deleting program' });
   }
 });
+
+// ===== NOUVELLES ROUTES POUR LA GESTION DES PROGRAMMES =====
+
+// Récupérer un programme avec toutes ses statistiques détaillées
+router.get('/:id/overview', ProgramOverviewController.getProgramOverview);
+
+// Récupérer tous les programmes avec leurs statistiques
+router.get('/overview/all', ProgramOverviewController.getAllProgramsOverview);
+
+// Récupérer les statistiques globales de tous les programmes
+router.get('/stats/global', ProgramOverviewController.getGlobalStats);
 
 export default router; 

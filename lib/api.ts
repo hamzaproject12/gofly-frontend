@@ -13,6 +13,10 @@ export const api = {
     payments: '/api/payments',
     health: '/health',
     test: '/api/test',
+    // Program overview endpoints
+    programOverview: (id: number) => `/api/programs/${id}/overview`,
+    allProgramsOverview: '/api/programs/overview/all',
+    globalStats: '/api/programs/stats/global',
     // Add other endpoints as needed
   }
 };

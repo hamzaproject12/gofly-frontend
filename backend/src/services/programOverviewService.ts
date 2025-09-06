@@ -31,11 +31,31 @@ export interface ProgramOverview {
   
   // Réservations par chambre
   reservationsByRoom: {
-    couple: number;
-    three: number;
-    four: number;
-    five: number;
-    total: number;
+    couple: {
+      occupied: number;
+      available: number;
+      total: number;
+    };
+    three: {
+      occupied: number;
+      available: number;
+      total: number;
+    };
+    four: {
+      occupied: number;
+      available: number;
+      total: number;
+    };
+    five: {
+      occupied: number;
+      available: number;
+      total: number;
+    };
+    total: {
+      occupied: number;
+      available: number;
+      total: number;
+    };
   };
   
   // Statistiques financières
@@ -181,37 +201,52 @@ export class ProgramOverviewService {
 
   private static calculateReservationsByRoom(rooms: any[]) {
     const stats = {
-      couple: 0,
-      three: 0,
-      four: 0,
-      five: 0,
-      total: 0
+      couple: { occupied: 0, available: 0, total: 0 },
+      three: { occupied: 0, available: 0, total: 0 },
+      four: { occupied: 0, available: 0, total: 0 },
+      five: { occupied: 0, available: 0, total: 0 },
+      total: { occupied: 0, available: 0, total: 0 }
     };
 
     rooms.forEach(room => {
       const occupiedPlaces = room.nbrPlaceTotal - room.nbrPlaceRestantes;
-      const reservationsCount = room.listeIdsReservation.length;
+      const availablePlaces = room.nbrPlaceRestantes;
+      const totalPlaces = room.nbrPlaceTotal;
       
       switch (room.roomType) {
         case 'SINGLE':
-          stats.couple += reservationsCount;
+          stats.couple.occupied += occupiedPlaces;
+          stats.couple.available += availablePlaces;
+          stats.couple.total += totalPlaces;
           break;
         case 'DOUBLE':
-          stats.couple += reservationsCount;
+          stats.couple.occupied += occupiedPlaces;
+          stats.couple.available += availablePlaces;
+          stats.couple.total += totalPlaces;
           break;
         case 'TRIPLE':
-          stats.three += reservationsCount;
+          stats.three.occupied += occupiedPlaces;
+          stats.three.available += availablePlaces;
+          stats.three.total += totalPlaces;
           break;
         case 'QUAD':
-          stats.four += reservationsCount;
+          stats.four.occupied += occupiedPlaces;
+          stats.four.available += availablePlaces;
+          stats.four.total += totalPlaces;
           break;
         case 'QUINT':
-          stats.five += reservationsCount;
+          stats.five.occupied += occupiedPlaces;
+          stats.five.available += availablePlaces;
+          stats.five.total += totalPlaces;
           break;
       }
     });
 
-    stats.total = stats.couple + stats.three + stats.four + stats.five;
+    // Calculer les totaux
+    stats.total.occupied = stats.couple.occupied + stats.three.occupied + stats.four.occupied + stats.five.occupied;
+    stats.total.available = stats.couple.available + stats.three.available + stats.four.available + stats.five.available;
+    stats.total.total = stats.couple.total + stats.three.total + stats.four.total + stats.five.total;
+
     return stats;
   }
 

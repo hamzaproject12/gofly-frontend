@@ -134,11 +134,12 @@ export default function ProgrammesPage() {
 
   // Fonction pour formater les dépenses pour l'affichage
   const getExpensesForDisplay = (programme: ProgramOverview) => {
+    const breakdown = programme.expensesBreakdown || { hotel: 0, flight: 0, visa: 0, other: 0 }
     return [
-      { type: "hotel", montant: programme.expensesBreakdown.hotel },
-      { type: "vol", montant: programme.expensesBreakdown.flight },
-      { type: "visa", montant: programme.expensesBreakdown.visa },
-      { type: "autre", montant: programme.expensesBreakdown.other },
+      { type: "hotel", montant: breakdown.hotel || 0 },
+      { type: "vol", montant: breakdown.flight || 0 },
+      { type: "visa", montant: breakdown.visa || 0 },
+      { type: "autre", montant: breakdown.other || 0 },
     ].filter(expense => expense.montant > 0)
   }
 
@@ -315,7 +316,7 @@ export default function ProgrammesPage() {
               <div>
                 <p className="text-sm text-gray-500">Total Réservations</p>
                 <p className="text-2xl font-bold">
-                  {filteredProgrammes.reduce((sum, p) => sum + p.totalReservations, 0)}
+                  {filteredProgrammes.reduce((sum, p) => sum + (p.totalReservations || 0), 0)}
                 </p>
               </div>
             </CardContent>
@@ -329,7 +330,7 @@ export default function ProgrammesPage() {
               <div>
                 <p className="text-sm text-gray-500">Revenus Total</p>
                 <p className="text-2xl font-bold">
-                  {filteredProgrammes.reduce((sum, p) => sum + p.totalRevenue, 0).toLocaleString()} DH
+                  {filteredProgrammes.reduce((sum, p) => sum + (p.totalRevenue || 0), 0).toLocaleString()} DH
                 </p>
               </div>
             </CardContent>
@@ -362,9 +363,9 @@ export default function ProgrammesPage() {
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold text-yellow-600">
-                      {programme.totalRevenue.toLocaleString()} DH
+                      {(programme.totalRevenue || 0).toLocaleString()} DH
                     </div>
-                    <p className="text-sm text-blue-700">{programme.totalReservations} réservations</p>
+                    <p className="text-sm text-blue-700">{programme.totalReservations || 0} réservations</p>
                   </div>
                 </div>
               </CardHeader>
@@ -436,12 +437,12 @@ export default function ProgrammesPage() {
                                 <div
                                   className="bg-blue-600 h-2 rounded-full"
                                   style={{
-                                    width: `${programme.totalReservations > 0 ? (programme.reservationsByRoom.couple / programme.totalReservations) * 100 : 0}%`,
+                                    width: `${(programme.totalReservations || 0) > 0 ? ((programme.reservationsByRoom?.couple || 0) / (programme.totalReservations || 1)) * 100 : 0}%`,
                                   }}
                                 ></div>
                               </div>
                               <Badge variant="outline" className="bg-blue-50 border-blue-200">
-                                {programme.reservationsByRoom.couple}
+                                {programme.reservationsByRoom?.couple || 0}
                               </Badge>
                             </div>
                           </div>
@@ -452,12 +453,12 @@ export default function ProgrammesPage() {
                                 <div
                                   className="bg-blue-600 h-2 rounded-full"
                                   style={{
-                                    width: `${programme.totalReservations > 0 ? (programme.reservationsByRoom.three / programme.totalReservations) * 100 : 0}%`,
+                                    width: `${(programme.totalReservations || 0) > 0 ? ((programme.reservationsByRoom?.three || 0) / (programme.totalReservations || 1)) * 100 : 0}%`,
                                   }}
                                 ></div>
                               </div>
                               <Badge variant="outline" className="bg-blue-50 border-blue-200">
-                                {programme.reservationsByRoom.three}
+                                {programme.reservationsByRoom?.three || 0}
                               </Badge>
                             </div>
                           </div>
@@ -468,12 +469,12 @@ export default function ProgrammesPage() {
                                 <div
                                   className="bg-blue-600 h-2 rounded-full"
                                   style={{
-                                    width: `${programme.totalReservations > 0 ? (programme.reservationsByRoom.four / programme.totalReservations) * 100 : 0}%`,
+                                    width: `${(programme.totalReservations || 0) > 0 ? ((programme.reservationsByRoom?.four || 0) / (programme.totalReservations || 1)) * 100 : 0}%`,
                                   }}
                                 ></div>
                               </div>
                               <Badge variant="outline" className="bg-blue-50 border-blue-200">
-                                {programme.reservationsByRoom.four}
+                                {programme.reservationsByRoom?.four || 0}
                               </Badge>
                             </div>
                           </div>
@@ -484,12 +485,12 @@ export default function ProgrammesPage() {
                                 <div
                                   className="bg-blue-600 h-2 rounded-full"
                                   style={{
-                                    width: `${programme.totalReservations > 0 ? (programme.reservationsByRoom.five / programme.totalReservations) * 100 : 0}%`,
+                                    width: `${(programme.totalReservations || 0) > 0 ? ((programme.reservationsByRoom?.five || 0) / (programme.totalReservations || 1)) * 100 : 0}%`,
                                   }}
                                 ></div>
                               </div>
                               <Badge variant="outline" className="bg-blue-50 border-blue-200">
-                                {programme.reservationsByRoom.five}
+                                {programme.reservationsByRoom?.five || 0}
                               </Badge>
                             </div>
                           </div>
@@ -513,9 +514,9 @@ export default function ProgrammesPage() {
                                 {getDateStatus(programme.visaDeadline).text}
                               </Badge>
                               {programme.visaDeadline && (
-                                <p className="text-xs text-gray-500 mt-1">
+                              <p className="text-xs text-gray-500 mt-1">
                                   {new Date(programme.visaDeadline).toLocaleDateString("fr-FR")}
-                                </p>
+                              </p>
                               )}
                             </div>
                           </div>
@@ -529,9 +530,9 @@ export default function ProgrammesPage() {
                                 {getDateStatus(programme.hotelDeadline).text}
                               </Badge>
                               {programme.hotelDeadline && (
-                                <p className="text-xs text-gray-500 mt-1">
+                              <p className="text-xs text-gray-500 mt-1">
                                   {new Date(programme.hotelDeadline).toLocaleDateString("fr-FR")}
-                                </p>
+                              </p>
                               )}
                             </div>
                           </div>
@@ -545,9 +546,9 @@ export default function ProgrammesPage() {
                                 {getDateStatus(programme.flightDeadline).text}
                               </Badge>
                               {programme.flightDeadline && (
-                                <p className="text-xs text-gray-500 mt-1">
+                              <p className="text-xs text-gray-500 mt-1">
                                   {new Date(programme.flightDeadline).toLocaleDateString("fr-FR")}
-                                </p>
+                              </p>
                               )}
                             </div>
                           </div>
@@ -579,22 +580,22 @@ export default function ProgrammesPage() {
                             <div className="flex items-center gap-2">
                               <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
                               <span className="text-sm">Couple</span>
-                              <span className="text-sm font-medium ml-auto">{programme.reservationsByRoom.couple}</span>
+                              <span className="text-sm font-medium ml-auto">{programme.reservationsByRoom?.couple || 0}</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
                               <span className="text-sm">3 personnes</span>
-                              <span className="text-sm font-medium ml-auto">{programme.reservationsByRoom.three}</span>
+                              <span className="text-sm font-medium ml-auto">{programme.reservationsByRoom?.three || 0}</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
                               <span className="text-sm">4 personnes</span>
-                              <span className="text-sm font-medium ml-auto">{programme.reservationsByRoom.four}</span>
+                              <span className="text-sm font-medium ml-auto">{programme.reservationsByRoom?.four || 0}</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
                               <span className="text-sm">5 personnes</span>
-                              <span className="text-sm font-medium ml-auto">{programme.reservationsByRoom.five}</span>
+                              <span className="text-sm font-medium ml-auto">{programme.reservationsByRoom?.five || 0}</span>
                             </div>
                           </div>
                         </div>
@@ -604,12 +605,12 @@ export default function ProgrammesPage() {
                           <div className="grid grid-cols-2 gap-4">
                             <div className="text-center p-3 bg-blue-50 rounded-lg">
                               <p className="text-sm text-gray-500">Total</p>
-                              <p className="text-xl font-bold text-blue-700">{programme.totalReservations}</p>
+                              <p className="text-xl font-bold text-blue-700">{programme.totalReservations || 0}</p>
                             </div>
                             <div className="text-center p-3 bg-green-50 rounded-lg">
                               <p className="text-sm text-gray-500">Montant</p>
                               <p className="text-xl font-bold text-green-700">
-                                {programme.montantTotal.toLocaleString()} DH
+                                {(programme.totalRevenue || 0).toLocaleString()} DH
                               </p>
                             </div>
                           </div>
@@ -624,7 +625,7 @@ export default function ProgrammesPage() {
                         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
                           <h4 className="text-sm font-medium text-gray-500 mb-2">Revenus</h4>
                           <p className="text-2xl font-bold text-green-600">
-                            {programme.totalRevenue.toLocaleString()} DH
+                            {(programme.totalRevenue || 0).toLocaleString()} DH
                           </p>
                           <p className="text-xs text-gray-500">Total des paiements</p>
                         </div>
@@ -632,7 +633,7 @@ export default function ProgrammesPage() {
                         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
                           <h4 className="text-sm font-medium text-gray-500 mb-2">Dépenses</h4>
                           <p className="text-2xl font-bold text-red-600">
-                            {programme.totalExpenses.toLocaleString()} DH
+                            {(programme.totalExpenses || 0).toLocaleString()} DH
                           </p>
                           <p className="text-xs text-gray-500">Total des coûts</p>
                         </div>
@@ -640,7 +641,7 @@ export default function ProgrammesPage() {
                         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
                           <h4 className="text-sm font-medium text-gray-500 mb-2">Bénéfice</h4>
                           <p className="text-2xl font-bold text-blue-600">
-                            {programme.netProfit.toLocaleString()} DH
+                            {(programme.netProfit || 0).toLocaleString()} DH
                           </p>
                           <p className="text-xs text-gray-500">Revenus - Dépenses</p>
                         </div>
@@ -671,7 +672,7 @@ export default function ProgrammesPage() {
                                             : "bg-gray-600"
                                     } h-2 rounded-full`}
                                     style={{
-                                      width: `${programme.totalExpenses > 0 ? (depense.montant / programme.totalExpenses) * 100 : 0}%`,
+                                      width: `${(programme.totalExpenses || 0) > 0 ? (depense.montant / (programme.totalExpenses || 1)) * 100 : 0}%`,
                                     }}
                                   ></div>
                                 </div>

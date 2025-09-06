@@ -55,11 +55,31 @@ interface ProgramOverview {
   }>;
   
   reservationsByRoom: {
-    couple: number;
-    three: number;
-    four: number;
-    five: number;
-    total: number;
+    couple: {
+      occupied: number;
+      available: number;
+      total: number;
+    };
+    three: {
+      occupied: number;
+      available: number;
+      total: number;
+    };
+    four: {
+      occupied: number;
+      available: number;
+      total: number;
+    };
+    five: {
+      occupied: number;
+      available: number;
+      total: number;
+    };
+    total: {
+      occupied: number;
+      available: number;
+      total: number;
+    };
   };
   
   totalExpenses: number;
@@ -143,6 +163,52 @@ export default function ProgrammesPage() {
     ].filter(expense => expense.montant > 0)
   }
 
+  // Composant pour afficher les places avec animation
+  const RoomCapacityDisplay = ({ 
+    roomType, 
+    data, 
+    index 
+  }: { 
+    roomType: string; 
+    data: { occupied: number; available: number; total: number }; 
+    index: number;
+  }) => {
+    const occupiedPercentage = data.total > 0 ? (data.occupied / data.total) * 100 : 0;
+    const availablePercentage = data.total > 0 ? (data.available / data.total) * 100 : 0;
+    
+    return (
+      <div className="flex justify-between items-center animate-fadeInUp" style={{ animationDelay: `${index * 100}ms` }}>
+        <span className="text-sm font-medium text-gray-700">{roomType}</span>
+        <div className="flex items-center gap-3">
+          <div className="w-32 bg-gray-200 rounded-full h-3 overflow-hidden">
+            <div className="h-full flex">
+              <div 
+                className="bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-1000 ease-out"
+                style={{ width: `${occupiedPercentage}%` }}
+              ></div>
+              <div 
+                className="bg-gradient-to-r from-green-400 to-green-500 transition-all duration-1000 ease-out"
+                style={{ width: `${availablePercentage}%` }}
+              ></div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+              <span className="text-blue-700 font-medium">{data.occupied}</span>
+            </div>
+            <span className="text-gray-400">/</span>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <span className="text-green-700 font-medium">{data.available}</span>
+            </div>
+            <span className="text-gray-500">({data.total})</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // Affichage de chargement
   if (loading) {
     return (
@@ -172,6 +238,23 @@ export default function ProgrammesPage() {
   }
 
   return (
+    <>
+      <style jsx>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeInUp {
+          animation: fadeInUp 0.6s ease-out forwards;
+          opacity: 0;
+        }
+      `}</style>
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       {/* Navigation moderne */}
       <nav className="bg-white/95 backdrop-blur-lg shadow-xl border-b border-blue-100 sticky top-0 z-50">
@@ -316,7 +399,7 @@ export default function ProgrammesPage() {
               <div>
                 <p className="text-sm text-gray-500">Total Réservations</p>
                 <p className="text-2xl font-bold">
-                  {filteredProgrammes.reduce((sum, p) => sum + (p.totalReservations || 0), 0)}
+                  {filteredProgrammes.reduce((sum, p) => sum + (p.reservationsByRoom?.total?.occupied || 0), 0)}
                 </p>
               </div>
             </CardContent>
@@ -365,7 +448,7 @@ export default function ProgrammesPage() {
                     <div className="text-2xl font-bold text-yellow-600">
                       {(programme.totalRevenue || 0).toLocaleString()} DH
                     </div>
-                    <p className="text-sm text-blue-700">{programme.totalReservations || 0} réservations</p>
+                    <p className="text-sm text-blue-700">{programme.reservationsByRoom?.total?.occupied || 0} réservations</p>
                   </div>
                 </div>
               </CardHeader>
@@ -429,71 +512,27 @@ export default function ProgrammesPage() {
                           <Users className="h-5 w-5" />
                           Réservations par chambre
                         </h4>
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm">Couple</span>
-                            <div className="flex items-center gap-2">
-                              <div className="w-24 bg-gray-200 rounded-full h-2">
-                                <div
-                                  className="bg-blue-600 h-2 rounded-full"
-                                  style={{
-                                    width: `${(programme.totalReservations || 0) > 0 ? ((programme.reservationsByRoom?.couple || 0) / (programme.totalReservations || 1)) * 100 : 0}%`,
-                                  }}
-                                ></div>
-                              </div>
-                              <Badge variant="outline" className="bg-blue-50 border-blue-200">
-                                {programme.reservationsByRoom?.couple || 0}
-                              </Badge>
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm">3 personnes</span>
-                            <div className="flex items-center gap-2">
-                              <div className="w-24 bg-gray-200 rounded-full h-2">
-                                <div
-                                  className="bg-blue-600 h-2 rounded-full"
-                                  style={{
-                                    width: `${(programme.totalReservations || 0) > 0 ? ((programme.reservationsByRoom?.three || 0) / (programme.totalReservations || 1)) * 100 : 0}%`,
-                                  }}
-                                ></div>
-                              </div>
-                              <Badge variant="outline" className="bg-blue-50 border-blue-200">
-                                {programme.reservationsByRoom?.three || 0}
-                              </Badge>
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm">4 personnes</span>
-                            <div className="flex items-center gap-2">
-                              <div className="w-24 bg-gray-200 rounded-full h-2">
-                                <div
-                                  className="bg-blue-600 h-2 rounded-full"
-                                  style={{
-                                    width: `${(programme.totalReservations || 0) > 0 ? ((programme.reservationsByRoom?.four || 0) / (programme.totalReservations || 1)) * 100 : 0}%`,
-                                  }}
-                                ></div>
-                              </div>
-                              <Badge variant="outline" className="bg-blue-50 border-blue-200">
-                                {programme.reservationsByRoom?.four || 0}
-                              </Badge>
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm">5 personnes</span>
-                            <div className="flex items-center gap-2">
-                              <div className="w-24 bg-gray-200 rounded-full h-2">
-                                <div
-                                  className="bg-blue-600 h-2 rounded-full"
-                                  style={{
-                                    width: `${(programme.totalReservations || 0) > 0 ? ((programme.reservationsByRoom?.five || 0) / (programme.totalReservations || 1)) * 100 : 0}%`,
-                                  }}
-                                ></div>
-                              </div>
-                              <Badge variant="outline" className="bg-blue-50 border-blue-200">
-                                {programme.reservationsByRoom?.five || 0}
-                              </Badge>
-                            </div>
-                          </div>
+                        <div className="space-y-4">
+                          <RoomCapacityDisplay 
+                            roomType="Couple" 
+                            data={programme.reservationsByRoom?.couple || { occupied: 0, available: 0, total: 0 }} 
+                            index={0}
+                          />
+                          <RoomCapacityDisplay 
+                            roomType="3 personnes" 
+                            data={programme.reservationsByRoom?.three || { occupied: 0, available: 0, total: 0 }} 
+                            index={1}
+                          />
+                          <RoomCapacityDisplay 
+                            roomType="4 personnes" 
+                            data={programme.reservationsByRoom?.four || { occupied: 0, available: 0, total: 0 }} 
+                            index={2}
+                          />
+                          <RoomCapacityDisplay 
+                            roomType="5 personnes" 
+                            data={programme.reservationsByRoom?.five || { occupied: 0, available: 0, total: 0 }} 
+                            index={3}
+                          />
                         </div>
                       </div>
 
@@ -576,27 +615,27 @@ export default function ProgrammesPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
                           <h4 className="text-sm font-medium text-gray-500 mb-3">Par type de chambre</h4>
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                              <span className="text-sm">Couple</span>
-                              <span className="text-sm font-medium ml-auto">{programme.reservationsByRoom?.couple || 0}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                              <span className="text-sm">3 personnes</span>
-                              <span className="text-sm font-medium ml-auto">{programme.reservationsByRoom?.three || 0}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                              <span className="text-sm">4 personnes</span>
-                              <span className="text-sm font-medium ml-auto">{programme.reservationsByRoom?.four || 0}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                              <span className="text-sm">5 personnes</span>
-                              <span className="text-sm font-medium ml-auto">{programme.reservationsByRoom?.five || 0}</span>
-                            </div>
+                          <div className="space-y-3">
+                            <RoomCapacityDisplay 
+                              roomType="Couple" 
+                              data={programme.reservationsByRoom?.couple || { occupied: 0, available: 0, total: 0 }} 
+                              index={0}
+                            />
+                            <RoomCapacityDisplay 
+                              roomType="3 personnes" 
+                              data={programme.reservationsByRoom?.three || { occupied: 0, available: 0, total: 0 }} 
+                              index={1}
+                            />
+                            <RoomCapacityDisplay 
+                              roomType="4 personnes" 
+                              data={programme.reservationsByRoom?.four || { occupied: 0, available: 0, total: 0 }} 
+                              index={2}
+                            />
+                            <RoomCapacityDisplay 
+                              roomType="5 personnes" 
+                              data={programme.reservationsByRoom?.five || { occupied: 0, available: 0, total: 0 }} 
+                              index={3}
+                            />
                           </div>
                         </div>
 
@@ -605,7 +644,7 @@ export default function ProgrammesPage() {
                           <div className="grid grid-cols-2 gap-4">
                             <div className="text-center p-3 bg-blue-50 rounded-lg">
                               <p className="text-sm text-gray-500">Total</p>
-                              <p className="text-xl font-bold text-blue-700">{programme.totalReservations || 0}</p>
+                              <p className="text-xl font-bold text-blue-700">{programme.reservationsByRoom?.total?.occupied || 0}</p>
                             </div>
                             <div className="text-center p-3 bg-green-50 rounded-lg">
                               <p className="text-sm text-gray-500">Montant</p>
@@ -722,5 +761,6 @@ export default function ProgrammesPage() {
         </div>
       </div>
     </div>
+    </>
   )
 }

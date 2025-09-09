@@ -1,0 +1,5 @@
+[33me55fddc[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m feat: Implémentation complète du système d'authentification sécurisé
+[33m22b6e23[m Add animated room capacity display with occupied/available places
+[33meaed2aa[m Add detailed room capacity data with occupied/available places
+[33m3d0e8da[m Fix undefined property errors by adding null checks and fallback values
+[33m63cb04c[m Update programmes page to use dynamic API data instead of static data

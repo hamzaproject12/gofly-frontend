@@ -20,7 +20,9 @@ export default function RootLayout({
     <html lang="fr">
       <body className={inter.className} suppressHydrationWarning>
         <AuthNav />
-        {children}
+        <ProtectedRoute>
+          {children}
+        </ProtectedRoute>
       </body>
     </html>
   )

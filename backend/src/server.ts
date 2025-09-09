@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import cookieParser from 'cookie-parser';
 import { PrismaClient } from '@prisma/client';
 
 // Routes
@@ -10,6 +11,7 @@ import expenseRoutes from './routes/expenses';
 import uploadRouter from './routes/upload';
 import hotelsRouter from './routes/hotels';
 import paymentsRouter from './routes/payments';
+import authRoutes from './routes/auth';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -33,6 +35,7 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // Configuration pour servir les fichiers statiques
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -59,6 +62,7 @@ async function testDatabaseConnection() {
 }
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/programs', programRoutes);
 app.use('/api/reservations', reservationRoutes);
 app.use('/api/expenses', expenseRoutes);
@@ -129,6 +133,7 @@ app.listen(PORT, async () => {
   await testDatabaseConnection();
   
   console.log('📋 Routes disponibles:');
+  console.log('- /api/auth (login, register, logout, profile)');
   console.log('- /api/programs');
   console.log('- /api/reservations');
   console.log('- /api/expenses');

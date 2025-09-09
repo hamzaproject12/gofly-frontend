@@ -10,15 +10,21 @@ export const authenticateToken = (
   res: Response,
   next: NextFunction
 ) => {
+  // Try to get token from Authorization header first
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  let token = authHeader && authHeader.split(' ')[1];
+
+  // If no token in header, try to get from cookies
+  if (!token) {
+    token = req.cookies?.authToken;
+  }
 
   if (!token) {
     return res.status(401).json({ error: 'Access token required' });
   }
 
   try {
-    const user = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const user = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
     req.user = user;
     next();
   } catch (error) {

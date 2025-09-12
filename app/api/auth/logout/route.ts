@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const response = await fetch(`${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/logout`, {
+    const response = await fetch(`${process.env.BACKEND_URL || 'https://gofly-backend-production.up.railway.app'}/api/auth/logout`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

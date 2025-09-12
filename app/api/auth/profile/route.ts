@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
-    const response = await fetch(`${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/profile`, {
+    const response = await fetch(`${process.env.BACKEND_URL || 'https://gofly-backend-production.up.railway.app'}/api/auth/profile`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

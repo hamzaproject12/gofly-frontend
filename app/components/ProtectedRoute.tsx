@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 interface Agent {
   id: number;
@@ -19,10 +19,19 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Pages qui ne nécessitent pas d'authentification
+  const publicPages = ['/login', '/register'];
+  const isPublicPage = publicPages.includes(pathname);
 
   useEffect(() => {
+    if (isPublicPage) {
+      setLoading(false);
+      return;
+    }
     checkAuthStatus();
-  }, []);
+  }, [isPublicPage]);
 
   const checkAuthStatus = async () => {
     try {
@@ -44,6 +53,11 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       setLoading(false);
     }
   };
+
+  // Pour les pages publiques, afficher directement le contenu
+  if (isPublicPage) {
+    return <>{children}</>;
+  }
 
   if (loading) {
     return (

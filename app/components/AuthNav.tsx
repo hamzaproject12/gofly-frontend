@@ -16,6 +16,7 @@ export default function AuthNav() {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [showProfile, setShowProfile] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -106,9 +107,58 @@ export default function AuthNav() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <h1 className="text-xl font-semibold text-gray-900">GoodFly</h1>
+            <Link href="/" className="text-xl font-semibold text-gray-900">
+              GoodFly
+            </Link>
           </div>
+          
+          {/* Navigation links for authenticated users */}
+          <div className="hidden md:flex items-center space-x-8">
+            <Link
+              href="/reservations/nouvelle"
+              className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+            >
+              Nouvelle Réservation
+            </Link>
+            <Link
+              href="/"
+              className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/reservations"
+              className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+            >
+              Réservations
+            </Link>
+            <Link
+              href="/programmes"
+              className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+            >
+              Programmes
+            </Link>
+            <Link
+              href="/solde"
+              className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+            >
+              Solde Caisse
+            </Link>
+          </div>
+
           <div className="flex items-center space-x-4">
+            {/* Mobile menu button */}
+            <div className="md:hidden">
+              <button
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 p-2"
+              >
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            </div>
+
             <div className="relative">
               <button
                 onClick={() => setShowProfile(!showProfile)}
@@ -119,7 +169,7 @@ export default function AuthNav() {
                     {agent.nom.charAt(0).toUpperCase()}
                   </span>
                 </div>
-                <span className="ml-2 text-gray-700">{agent.nom}</span>
+                <span className="ml-2 text-gray-700 hidden sm:block">{agent.nom}</span>
                 <svg className="ml-1 h-4 w-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                 </svg>
@@ -143,6 +193,49 @@ export default function AuthNav() {
           </div>
         </div>
       </div>
+
+      {/* Mobile menu */}
+      {showMobileMenu && (
+        <div className="md:hidden">
+          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-gray-50 border-t">
+            <Link
+              href="/reservations/nouvelle"
+              className="text-gray-700 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
+              onClick={() => setShowMobileMenu(false)}
+            >
+              Nouvelle Réservation
+            </Link>
+            <Link
+              href="/"
+              className="text-gray-700 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
+              onClick={() => setShowMobileMenu(false)}
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/reservations"
+              className="text-gray-700 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
+              onClick={() => setShowMobileMenu(false)}
+            >
+              Réservations
+            </Link>
+            <Link
+              href="/programmes"
+              className="text-gray-700 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
+              onClick={() => setShowMobileMenu(false)}
+            >
+              Programmes
+            </Link>
+            <Link
+              href="/solde"
+              className="text-gray-700 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
+              onClick={() => setShowMobileMenu(false)}
+            >
+              Solde Caisse
+            </Link>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

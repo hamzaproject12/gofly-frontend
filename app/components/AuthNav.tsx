@@ -8,6 +8,7 @@ interface Agent {
   id: number;
   nom: string;
   email: string;
+  role: 'ADMIN' | 'AGENT';
   isActive: boolean;
   createdAt: string;
 }
@@ -139,11 +140,28 @@ export default function AuthNav() {
               Programmes
             </Link>
             <Link
-              href="/solde"
+              href="/depenses"
               className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
             >
-              Solde Caisse
+              Dépenses
             </Link>
+            {/* Admin only links */}
+            {agent.role === 'ADMIN' && (
+              <>
+                <Link
+                  href="/solde"
+                  className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                >
+                  Solde Caisse
+                </Link>
+                <Link
+                  href="/admin/utilisateurs"
+                  className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                >
+                  Gestion Utilisateurs
+                </Link>
+              </>
+            )}
           </div>
 
           <div className="flex items-center space-x-4">
@@ -227,12 +245,31 @@ export default function AuthNav() {
               Programmes
             </Link>
             <Link
-              href="/solde"
+              href="/depenses"
               className="text-gray-700 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
               onClick={() => setShowMobileMenu(false)}
             >
-              Solde Caisse
+              Dépenses
             </Link>
+            {/* Admin only links */}
+            {agent.role === 'ADMIN' && (
+              <>
+                <Link
+                  href="/solde"
+                  className="text-gray-700 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
+                  onClick={() => setShowMobileMenu(false)}
+                >
+                  Solde Caisse
+                </Link>
+                <Link
+                  href="/admin/utilisateurs"
+                  className="text-gray-700 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
+                  onClick={() => setShowMobileMenu(false)}
+                >
+                  Gestion Utilisateurs
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}

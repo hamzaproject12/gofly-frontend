@@ -12,6 +12,7 @@ import uploadRouter from './routes/upload';
 import hotelsRouter from './routes/hotels';
 import paymentsRouter from './routes/payments';
 import authRoutes from './routes/auth';
+import adminRoutes from './routes/admin';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -63,6 +64,7 @@ async function testDatabaseConnection() {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/programs', programRoutes);
 app.use('/api/reservations', reservationRoutes);
 app.use('/api/expenses', expenseRoutes);
@@ -134,6 +136,7 @@ app.listen(PORT, async () => {
   
   console.log('📋 Routes disponibles:');
   console.log('- /api/auth (login, register, logout, profile)');
+  console.log('- /api/admin (gestion des utilisateurs - Admin seulement)');
   console.log('- /api/programs');
   console.log('- /api/reservations');
   console.log('- /api/expenses');

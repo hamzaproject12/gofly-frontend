@@ -42,12 +42,14 @@ export const register = async (req: Request, res: Response) => {
         nom,
         email,
         motDePasse: hashedPassword,
+        role: 'AGENT',
         isActive: true
       },
       select: {
         id: true,
         nom: true,
         email: true,
+        role: true,
         isActive: true,
         createdAt: true
       }
@@ -130,7 +132,8 @@ export const login = async (req: Request, res: Response) => {
       { 
         agentId: agent.id, 
         email: agent.email,
-        nom: agent.nom 
+        nom: agent.nom,
+        role: agent.role
       },
       process.env.JWT_SECRET || 'fallback-secret',
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as SignOptions
@@ -150,6 +153,7 @@ export const login = async (req: Request, res: Response) => {
         id: agent.id,
         nom: agent.nom,
         email: agent.email,
+        role: agent.role,
         isActive: agent.isActive,
         createdAt: agent.createdAt
       },
@@ -198,6 +202,7 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
         id: true,
         nom: true,
         email: true,
+        role: true,
         isActive: true,
         createdAt: true,
         updatedAt: true
@@ -322,6 +327,225 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
     console.error('Change password error:', error);
     res.status(500).json({ 
       error: 'Erreur lors du changement de mot de passe' 
+    });
+  }
+};
+
+// ===== ADMIN FUNCTIONS =====
+
+// Middleware to check if user is admin
+export const requireAdmin = async (req: AuthRequest, res: Response, next: any) => {
+  try {
+    const agentId = req.user?.agentId;
+    
+    if (!agentId) {
+      return res.status(401).json({ error: 'Non authentifié' });
+    }
+
+    const agent = await prisma.agent.findUnique({
+      where: { id: agentId },
+      select: { role: true, isActive: true }
+    });
+
+    if (!agent || agent.role !== 'ADMIN' || !agent.isActive) {
+      return res.status(403).json({ error: 'Accès refusé. Droits administrateur requis.' });
+    }
+
+    next();
+  } catch (error) {
+    console.error('Admin check error:', error);
+    res.status(500).json({ error: 'Erreur de vérification des droits' });
+  }
+};
+
+// Get all agents (Admin only)
+export const getAllAgents = async (req: AuthRequest, res: Response) => {
+  try {
+    const agents = await prisma.agent.findMany({
+      select: {
+        id: true,
+        nom: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({ agents });
+  } catch (error) {
+    console.error('Get all agents error:', error);
+    res.status(500).json({ 
+      error: 'Erreur lors de la récupération des agents' 
+    });
+  }
+};
+
+// Create new agent (Admin only)
+export const createAgent = async (req: Request, res: Response) => {
+  try {
+    const { nom, email, motDePasse, role = 'AGENT' } = req.body;
+
+    // Validation
+    if (!nom || !email || !motDePasse) {
+      return res.status(400).json({ 
+        error: 'Nom, email et mot de passe sont requis' 
+      });
+    }
+
+    // Check if agent already exists
+    const existingAgent = await prisma.agent.findUnique({
+      where: { email }
+    });
+
+    if (existingAgent) {
+      return res.status(400).json({ 
+        error: 'Un agent avec cet email existe déjà' 
+      });
+    }
+
+    // Hash password
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(motDePasse, saltRounds);
+
+    // Create agent
+    const agent = await prisma.agent.create({
+      data: {
+        nom,
+        email,
+        motDePasse: hashedPassword,
+        role: role as 'ADMIN' | 'AGENT',
+        isActive: true
+      },
+      select: {
+        id: true,
+        nom: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true
+      }
+    });
+
+    res.status(201).json({
+      message: 'Agent créé avec succès',
+      agent
+    });
+
+  } catch (error) {
+    console.error('Create agent error:', error);
+    res.status(500).json({ 
+      error: 'Erreur lors de la création de l\'agent' 
+    });
+  }
+};
+
+// Update agent (Admin only)
+export const updateAgent = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { nom, email, role, isActive } = req.body;
+
+    // Check if agent exists
+    const existingAgent = await prisma.agent.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!existingAgent) {
+      return res.status(404).json({ error: 'Agent non trouvé' });
+    }
+
+    // Check if email is already taken by another agent
+    if (email && email !== existingAgent.email) {
+      const emailTaken = await prisma.agent.findUnique({
+        where: { email }
+      });
+
+      if (emailTaken) {
+        return res.status(400).json({ 
+          error: 'Cet email est déjà utilisé par un autre agent' 
+        });
+      }
+    }
+
+    // Update agent
+    const updatedAgent = await prisma.agent.update({
+      where: { id: parseInt(id) },
+      data: {
+        ...(nom && { nom }),
+        ...(email && { email }),
+        ...(role && { role: role as 'ADMIN' | 'AGENT' }),
+        ...(isActive !== undefined && { isActive })
+      },
+      select: {
+        id: true,
+        nom: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+
+    res.json({
+      message: 'Agent mis à jour avec succès',
+      agent: updatedAgent
+    });
+
+  } catch (error) {
+    console.error('Update agent error:', error);
+    res.status(500).json({ 
+      error: 'Erreur lors de la mise à jour de l\'agent' 
+    });
+  }
+};
+
+// Delete agent (Admin only)
+export const deleteAgent = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const agentId = parseInt(id);
+
+    // Check if agent exists
+    const existingAgent = await prisma.agent.findUnique({
+      where: { id: agentId }
+    });
+
+    if (!existingAgent) {
+      return res.status(404).json({ error: 'Agent non trouvé' });
+    }
+
+    // Check if trying to delete the last admin
+    if (existingAgent.role === 'ADMIN') {
+      const adminCount = await prisma.agent.count({
+        where: { 
+          role: 'ADMIN',
+          isActive: true
+        }
+      });
+
+      if (adminCount <= 1) {
+        return res.status(400).json({ 
+          error: 'Impossible de supprimer le dernier administrateur actif' 
+        });
+      }
+    }
+
+    // Soft delete (deactivate)
+    await prisma.agent.update({
+      where: { id: agentId },
+      data: { isActive: false }
+    });
+
+    res.json({ message: 'Agent désactivé avec succès' });
+
+  } catch (error) {
+    console.error('Delete agent error:', error);
+    res.status(500).json({ 
+      error: 'Erreur lors de la suppression de l\'agent' 
     });
   }
 };

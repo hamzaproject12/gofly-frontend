@@ -7,19 +7,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  ADMIN
+  AGENT
+}
+
 model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   password  String
   name      String
-  role      Role     @default(USER)
+  role      Role     @default(AGENT)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-enum Role {
-  ADMIN
-  AGENT
 }
 
 model Agent {
@@ -192,9 +192,4 @@ enum Status {
 enum City {
   Madina
   Makkah
-}
-
-enum Role {
-  USER
-  ADMIN
 }

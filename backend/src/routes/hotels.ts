@@ -216,4 +216,101 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Update a hotel
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, city } = req.body;
+
+    console.log(`🏗️ Mise à jour de l'hôtel ${id} avec body:`, req.body);
+
+    if (!name || !city) {
+      console.log('❌ Données manquantes:', { name, city });
+      return res.status(400).json({ error: 'Name and city are required' });
+    }
+
+    if (!VALID_CITIES.includes(city as City)) {
+      console.log('❌ Ville invalide:', city);
+      return res.status(400).json({ error: 'Invalid city. Use Madina or Makkah' });
+    }
+
+    // Check if hotel exists
+    const existingHotel = await prisma.hotel.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!existingHotel) {
+      console.log('❌ Hôtel non trouvé:', id);
+      return res.status(404).json({ error: 'Hotel not found' });
+    }
+
+    console.log('✅ Mise à jour de l\'hôtel:', { id, name, city });
+    
+    const hotel = await prisma.hotel.update({
+      where: { id: parseInt(id) },
+      data: {
+        name,
+        city: city as City
+      }
+    });
+
+    console.log('✅ Hôtel mis à jour avec succès:', hotel);
+    res.json(hotel);
+  } catch (error) {
+    console.error('❌ Erreur lors de la mise à jour de l\'hôtel:', error);
+    res.status(500).json({ error: 'Error updating hotel' });
+  }
+});
+
+// Delete a hotel
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log(`🗑️ Suppression de l'hôtel ${id}`);
+
+    // Check if hotel exists
+    const existingHotel = await prisma.hotel.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!existingHotel) {
+      console.log('❌ Hôtel non trouvé:', id);
+      return res.status(404).json({ error: 'Hotel not found' });
+    }
+
+    // Check if hotel is used in any programs
+    const programsMadina = await prisma.programHotelMadina.count({
+      where: { hotelId: parseInt(id) }
+    });
+
+    const programsMakkah = await prisma.programHotelMakkah.count({
+      where: { hotelId: parseInt(id) }
+    });
+
+    if (programsMadina > 0 || programsMakkah > 0) {
+      console.log('❌ Hôtel utilisé dans des programmes:', { programsMadina, programsMakkah });
+      return res.status(400).json({ 
+        error: 'Cannot delete hotel. It is used in programs.',
+        details: {
+          programsMadina,
+          programsMakkah
+        }
+      });
+    }
+
+    console.log('✅ Suppression de l\'hôtel:', id);
+    
+    await prisma.hotel.delete({
+      where: { id: parseInt(id) }
+    });
+
+    console.log('✅ Hôtel supprimé avec succès');
+    res.json({ message: 'Hotel deleted successfully' });
+  } catch (error) {
+    console.error('❌ Erreur lors de la suppression de l\'hôtel:', error);
+    res.status(500).json({ error: 'Error deleting hotel' });
+  }
+});
+
 export default router; 

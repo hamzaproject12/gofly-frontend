@@ -18,10 +18,31 @@ export default function AuthNav() {
   const [loading, setLoading] = useState(true);
   const [showProfile, setShowProfile] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showCommercialMenu, setShowCommercialMenu] = useState(false);
+  const [showFinancesMenu, setShowFinancesMenu] = useState(false);
+  const [showAdminMenu, setShowAdminMenu] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     checkAuthStatus();
+  }, []);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.dropdown-menu')) {
+        setShowCommercialMenu(false);
+        setShowFinancesMenu(false);
+        setShowAdminMenu(false);
+        setShowProfile(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   const checkAuthStatus = async () => {
@@ -114,53 +135,125 @@ export default function AuthNav() {
           </div>
           
           {/* Navigation links for authenticated users */}
-          <div className="hidden md:flex items-center space-x-8">
-            <Link
-              href="/reservations/nouvelle"
-              className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-            >
-              Nouvelle Réservation
-            </Link>
+          <div className="hidden md:flex items-center space-x-6">
+            {/* Dashboard - Direct link */}
             <Link
               href="/"
               className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
             >
               Dashboard
             </Link>
-            <Link
-              href="/reservations"
-              className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-            >
-              Réservations
-            </Link>
-            <Link
-              href="/programmes"
-              className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-            >
-              Programmes
-            </Link>
-            <Link
-              href="/depenses"
-              className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-            >
-              Dépenses
-            </Link>
-            {/* Admin only links */}
+
+            {/* Commercial Dropdown */}
+            <div className="relative dropdown-menu">
+              <button
+                onClick={() => setShowCommercialMenu(!showCommercialMenu)}
+                className="flex items-center text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                Commercial
+                <svg className="ml-1 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+              {showCommercialMenu && (
+                <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 dropdown-menu">
+                  <Link
+                    href="/reservations/nouvelle"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setShowCommercialMenu(false)}
+                  >
+                    Nouvelle Réservation
+                  </Link>
+                  <Link
+                    href="/reservations"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setShowCommercialMenu(false)}
+                  >
+                    Réservations
+                  </Link>
+                  <Link
+                    href="/programmes"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setShowCommercialMenu(false)}
+                  >
+                    Programmes
+                  </Link>
+                  <Link
+                    href="/hotels"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setShowCommercialMenu(false)}
+                  >
+                    Hôtels
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {/* Finances Dropdown */}
+            <div className="relative dropdown-menu">
+              <button
+                onClick={() => setShowFinancesMenu(!showFinancesMenu)}
+                className="flex items-center text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                Finances
+                <svg className="ml-1 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+              {showFinancesMenu && (
+                <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 dropdown-menu">
+                  <Link
+                    href="/depenses"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setShowFinancesMenu(false)}
+                  >
+                    Dépenses
+                  </Link>
+                  <Link
+                    href="/paiements"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setShowFinancesMenu(false)}
+                  >
+                    Paiements
+                  </Link>
+                  {/* Admin only - Solde Caisse */}
+                  {agent.role === 'ADMIN' && (
+                    <Link
+                      href="/solde"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setShowFinancesMenu(false)}
+                    >
+                      Solde Caisse
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Admin Dropdown - Admin only */}
             {agent.role === 'ADMIN' && (
-              <>
-                <Link
-                  href="/solde"
-                  className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+              <div className="relative dropdown-menu">
+                <button
+                  onClick={() => setShowAdminMenu(!showAdminMenu)}
+                  className="flex items-center text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
                 >
-                  Solde Caisse
-                </Link>
-                <Link
-                  href="/admin/utilisateurs"
-                  className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-                >
-                  Gestion Utilisateurs
-                </Link>
-              </>
+                  Administration
+                  <svg className="ml-1 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+                {showAdminMenu && (
+                  <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 dropdown-menu">
+                    <Link
+                      href="/admin/utilisateurs"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setShowAdminMenu(false)}
+                    >
+                      Gestion Utilisateurs
+                    </Link>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -216,13 +309,7 @@ export default function AuthNav() {
       {showMobileMenu && (
         <div className="md:hidden">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-gray-50 border-t">
-            <Link
-              href="/reservations/nouvelle"
-              className="text-gray-700 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
-              onClick={() => setShowMobileMenu(false)}
-            >
-              Nouvelle Réservation
-            </Link>
+            {/* Dashboard */}
             <Link
               href="/"
               className="text-gray-700 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
@@ -230,45 +317,87 @@ export default function AuthNav() {
             >
               Dashboard
             </Link>
-            <Link
-              href="/reservations"
-              className="text-gray-700 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
-              onClick={() => setShowMobileMenu(false)}
-            >
-              Réservations
-            </Link>
-            <Link
-              href="/programmes"
-              className="text-gray-700 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
-              onClick={() => setShowMobileMenu(false)}
-            >
-              Programmes
-            </Link>
-            <Link
-              href="/depenses"
-              className="text-gray-700 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
-              onClick={() => setShowMobileMenu(false)}
-            >
-              Dépenses
-            </Link>
-            {/* Admin only links */}
-            {agent.role === 'ADMIN' && (
-              <>
+
+            {/* Commercial Section */}
+            <div className="border-t border-gray-200 pt-2">
+              <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Commercial
+              </div>
+              <Link
+                href="/reservations/nouvelle"
+                className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
+                onClick={() => setShowMobileMenu(false)}
+              >
+                Nouvelle Réservation
+              </Link>
+              <Link
+                href="/reservations"
+                className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
+                onClick={() => setShowMobileMenu(false)}
+              >
+                Réservations
+              </Link>
+              <Link
+                href="/programmes"
+                className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
+                onClick={() => setShowMobileMenu(false)}
+              >
+                Programmes
+              </Link>
+              <Link
+                href="/hotels"
+                className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
+                onClick={() => setShowMobileMenu(false)}
+              >
+                Hôtels
+              </Link>
+            </div>
+
+            {/* Finances Section */}
+            <div className="border-t border-gray-200 pt-2">
+              <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Finances
+              </div>
+              <Link
+                href="/depenses"
+                className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
+                onClick={() => setShowMobileMenu(false)}
+              >
+                Dépenses
+              </Link>
+              <Link
+                href="/paiements"
+                className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
+                onClick={() => setShowMobileMenu(false)}
+              >
+                Paiements
+              </Link>
+              {/* Admin only - Solde Caisse */}
+              {agent.role === 'ADMIN' && (
                 <Link
                   href="/solde"
-                  className="text-gray-700 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
+                  className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
                   onClick={() => setShowMobileMenu(false)}
                 >
                   Solde Caisse
                 </Link>
+              )}
+            </div>
+
+            {/* Admin Section - Admin only */}
+            {agent.role === 'ADMIN' && (
+              <div className="border-t border-gray-200 pt-2">
+                <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Administration
+                </div>
                 <Link
                   href="/admin/utilisateurs"
-                  className="text-gray-700 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
+                  className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
                   onClick={() => setShowMobileMenu(false)}
                 >
                   Gestion Utilisateurs
                 </Link>
-              </>
+              </div>
             )}
           </div>
         </div>

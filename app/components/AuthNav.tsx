@@ -64,18 +64,31 @@ export default function AuthNav() {
 
   const handleLogout = async () => {
     try {
+      console.log('Déconnexion en cours...');
       const response = await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include',
       });
 
+      console.log('Réponse de déconnexion:', response.status, response.ok);
+
       if (response.ok) {
+        console.log('Déconnexion réussie, redirection...');
         setAgent(null);
-        router.push('/login');
-        router.refresh();
+        setShowProfile(false);
+        // Forcer la redirection
+        window.location.href = '/login';
+      } else {
+        console.error('Erreur de déconnexion:', response.status);
+        const errorData = await response.json();
+        console.error('Détails de l\'erreur:', errorData);
       }
     } catch (error) {
       console.error('Erreur de déconnexion:', error);
+      // Même en cas d'erreur, on force la déconnexion côté client
+      setAgent(null);
+      setShowProfile(false);
+      window.location.href = '/login';
     }
   };
 

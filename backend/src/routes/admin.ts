@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { authenticateToken } from '../middleware/auth';
 import { 
   requireAdmin, 
   getAllAgents, 
@@ -9,7 +10,8 @@ import {
 
 const router = Router();
 
-// All routes require admin privileges
+// All routes require authentication first, then admin privileges
+router.use(authenticateToken);
 router.use(requireAdmin);
 
 // Get all agents

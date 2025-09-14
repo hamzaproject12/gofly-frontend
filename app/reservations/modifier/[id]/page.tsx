@@ -174,50 +174,6 @@ export default function EditReservation() {
 
   return (
     <>
-      <nav className="bg-white shadow sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-yellow-500 rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-lg">G</span>
-              </div>
-              <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-700 to-blue-900 bg-clip-text text-transparent">
-                  GoodFly
-                </h1>
-                <p className="text-xs text-gray-500">Modifier la Réservation</p>
-              </div>
-            </div>
-            <div className="hidden md:flex items-center space-x-1">
-              <Link href="/">
-                <Button variant="ghost" className="font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all rounded-xl px-4 py-2">
-                  <Calendar className="h-4 w-4 mr-2" /> Dashboard
-                </Button>
-              </Link>
-              <Link href="/reservations">
-                <Button variant="ghost" className="font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all rounded-xl px-4 py-2">
-                  <Users className="h-4 w-4 mr-2" /> Réservations
-                </Button>
-              </Link>
-              <Link href="/programmes">
-                <Button variant="ghost" className="font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all rounded-xl px-4 py-2">
-                  <Calendar className="h-4 w-4 mr-2" /> Programmes
-                </Button>
-              </Link>
-              <Link href="/solde">
-                <Button variant="ghost" className="font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all rounded-xl px-4 py-2">
-                  <Wallet className="h-4 w-4 mr-2" /> Solde Caisse
-                </Button>
-              </Link>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Button variant="ghost" size="sm" className="rounded-xl"><Search className="h-4 w-4" /></Button>
-              <Button variant="ghost" size="sm" className="rounded-xl"><Bell className="h-4 w-4" /></Button>
-              <Button variant="ghost" size="sm" className="rounded-xl"><Settings className="h-4 w-4" /></Button>
-            </div>
-          </div>
-        </div>
-      </nav>
       <form onSubmit={handleSubmit} className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

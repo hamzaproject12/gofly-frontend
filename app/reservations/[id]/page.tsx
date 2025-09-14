@@ -96,31 +96,6 @@ export default function ReservationDetails() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      {/* Navigation moderne */}
-      <nav className="bg-white/95 backdrop-blur-lg shadow-xl border-b border-blue-100 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-yellow-500 rounded-xl flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">G</span>
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold bg-gradient-to-r from-blue-700 to-blue-900 bg-clip-text text-transparent">
-                    GoodFly
-                  </h1>
-                  <p className="text-xs text-gray-500">Détail Réservation</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Link href="/reservations">
-                <Button variant="outline" size="sm">Retour</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
           <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm h-full">

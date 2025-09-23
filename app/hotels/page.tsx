@@ -149,9 +149,14 @@ export default function GestionHotelsPage() {
 
       if (response.ok) {
         setHotels(hotels.filter(h => h.id !== hotel.id));
+        setError(''); // Clear any previous errors
       } else {
         const errorData = await response.json();
-        setError(errorData.error || 'Erreur lors de la suppression');
+        if (errorData.error === 'Cannot delete hotel. It is used in programs.') {
+          setError('Impossible de supprimer cet hôtel car il est utilisé dans des programmes.');
+        } else {
+          setError(errorData.error || 'Erreur lors de la suppression');
+        }
       }
     } catch (error) {
       console.error('Erreur:', error);

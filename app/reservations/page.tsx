@@ -179,10 +179,10 @@ export default function ReservationsPage() {
   // Fonction pour mapper les types de chambre en nombre de personnes
   const mapRoomTypeToPersons = (roomType: string): string => {
     const mapping: { [key: string]: string } = {
-      'SINGLE': '2 personnes',
-      'DOUBLE': '3 personnes', 
-      'TRIPLE': '4 personnes',
-      'QUAD': '5 personnes'
+      'SINGLE': '1 personne',
+      'DOUBLE': '2 personnes', 
+      'TRIPLE': '3 personnes',
+      'QUAD': '4 personnes'
     };
     return mapping[roomType] || roomType;
   };
@@ -224,8 +224,7 @@ export default function ReservationsPage() {
   // Fonction de recherche et filtrage
   const handleSearch = (query: string) => {
     setFilters(prev => ({ ...prev, search: query }));
-    setCurrentPage(1); // Retour à la première page
-    fetchData(1);
+    // Ne pas appeler fetchData immédiatement, attendre que l'utilisateur arrête de taper
   };
 
   const handleDateFilter = (from: string, to: string) => {
@@ -278,7 +277,7 @@ export default function ReservationsPage() {
       setHasPrevPage(pagination.hasPrevPage);
 
       // Transform reservations data
-      const transformedReservations = reservationsData.map(reservation => {
+      const transformedReservations = reservationsData.map((reservation: any) => {
         // Si la réservation est déjà complète, ne jamais la mettre en urgent
         if (reservation.status === "Complet") {
           return {
@@ -397,6 +396,18 @@ export default function ReservationsPage() {
       fetchData()
     }
   }, [mounted, fetchData])
+
+  // Debounce pour la recherche
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (filters.search !== '') {
+        setCurrentPage(1);
+        fetchData(1);
+      }
+    }, 500); // Attendre 500ms après que l'utilisateur arrête de taper
+
+    return () => clearTimeout(timeoutId);
+  }, [filters.search, fetchData]);
 
   // Filtrage côté client après transformation
   const filteredReservations = useMemo(() => {
@@ -544,77 +555,6 @@ export default function ReservationsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      {/* Navigation moderne */}
-      <nav className="bg-white/95 backdrop-blur-lg shadow-xl border-b border-blue-100 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-yellow-500 rounded-xl flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">G</span>
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold bg-gradient-to-r from-blue-700 to-blue-900 bg-clip-text text-transparent">
-                    GoFly
-                  </h1>
-                  <p className="text-xs text-gray-500">Gestion Réservations</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="hidden md:flex items-center space-x-1">
-              <Link href="/">
-                <Button
-                  variant="ghost"
-                  className="font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all rounded-xl px-4 py-2"
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Dashboard
-                </Button>
-              </Link>
-              <Link href="/programmes">
-                <Button
-                  variant="ghost"
-                  className="font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all rounded-xl px-4 py-2"
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Programmes
-                </Button>
-              </Link>
-              <Link href="/depenses">
-                <Button
-                  variant="ghost"
-                  className="font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all rounded-xl px-4 py-2"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Dépenses
-                </Button>
-              </Link>
-              <Link href="/solde">
-                <Button
-                  variant="ghost"
-                  className="font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all rounded-xl px-4 py-2"
-                >
-                  <Wallet className="h-4 w-4 mr-2" />
-                  Solde Caisse
-                </Button>
-              </Link>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <Button variant="ghost" size="sm" className="rounded-xl">
-                <Search className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm" className="rounded-xl">
-                <Bell className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm" className="rounded-xl">
-                <Settings className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </nav>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* En-tête */}
@@ -715,7 +655,7 @@ export default function ReservationsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-            <form onSubmit={handleFilterChange} className="grid grid-cols-1 md:grid-cols-6 gap-4">
+            <form onSubmit={handleFilterChange} className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
@@ -765,22 +705,6 @@ export default function ReservationsPage() {
                   <SelectItem value="QUAD">5 personnes</SelectItem>
                 </SelectContent>
               </Select>
-
-              <Input
-                type="date"
-                placeholder="Date de début"
-                value={filters.dateFrom}
-                onChange={(e) => handleDateFilter(e.target.value, filters.dateTo)}
-                className="h-12 border-2 focus:border-blue-500"
-              />
-
-              <Input
-                type="date"
-                placeholder="Date de fin"
-                value={filters.dateTo}
-                onChange={(e) => handleDateFilter(filters.dateFrom, e.target.value)}
-                className="h-12 border-2 focus:border-blue-500"
-              />
             </form>
           </CardContent>
         </Card>
@@ -812,7 +736,7 @@ export default function ReservationsPage() {
                 return (
                   <div key={reservation.id} className="mx-2 mb-3">
                     <div className={`relative group transition-all duration-300 rounded-xl shadow border hover:scale-[1.01] hover:shadow-xl ${getRowColor(reservation)} ${urgentBg}`}> 
-                      {/* Premier niveau : NOM, PROGRAMME, TYPE DE CHAMBRE, STATUT */}
+                      {/* Premier niveau : NOM, PROGRAMME, TYPE DE CHAMBRE, NUMERO, STATUT */}
                       <div className="flex flex-col md:flex-row md:items-center gap-2 p-3 border-b border-blue-100">
                         <div className="flex-1 flex flex-col md:flex-row md:items-center gap-3 min-w-[180px]">
                           <span className="font-bold text-xl text-blue-900 tracking-tight uppercase">{reservation.nom} {reservation.prenom}</span>
@@ -821,6 +745,9 @@ export default function ReservationsPage() {
                           </span>
                           <span className="inline-flex items-center gap-1 text-base font-semibold text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-3 py-1">
                             <Users className="h-5 w-5 text-yellow-400" /> {mapRoomTypeToPersons(reservation.chambre)}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-base font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded px-3 py-1">
+                            <FileText className="h-5 w-5 text-purple-400" /> #{reservation.id}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 ml-auto">

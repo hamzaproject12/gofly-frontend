@@ -1,270 +1,271 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Plane,
-  Building,
-  Receipt,
-  Save,
-  ArrowLeft,
-  Sparkles,
-  CheckCircle,
-  Bell,
-  Settings,
-  Search,
-  Calendar,
-  Users,
-  FileText,
-} from "lucide-react"
+import { Plus, ArrowLeft, Receipt, Calendar, DollarSign, Building, Plane } from "lucide-react"
 import Link from "next/link"
+import { api } from "@/lib/api"
+import { useToast } from "@/hooks/use-toast"
 
-export default function NouvelleDepense() {
+type Program = {
+  id: number
+  name: string
+}
+
+export default function NouvelleDepensePage() {
+  const router = useRouter()
+  const { toast } = useToast()
+  const [loading, setLoading] = useState(false)
+  const [programmes, setProgrammes] = useState<Program[]>([])
+
   const [formData, setFormData] = useState({
-    programme: "",
-    type: "",
-    description: "",
-    montant: "",
-    date: new Date().toISOString().split("T")[0],
+    description: '',
+    amount: '',
+    type: '',
+    programId: '',
+    date: new Date().toISOString().split('T')[0]
   })
 
-  // Programmes disponibles
-  const programmes = ["Omra Ramadan 2024", "Omra Février 2024", "Omra Décembre 2023", "Autre"]
+  // Charger les programmes
+  useState(() => {
+    const fetchPrograms = async () => {
+      try {
+        const response = await fetch(api.url(api.endpoints.programs))
+        if (response.ok) {
+          const data = await response.json()
+          setProgrammes(data)
+        }
+      } catch (error) {
+        console.error('Error fetching programs:', error)
+      }
+    }
+    fetchPrograms()
+  }, [])
 
-  const typesDepense = [
-    { value: "hotel", label: "Hôtel", icon: Building, color: "yellow", description: "Réservations et frais d'hôtels" },
-    { value: "vol", label: "Vol", icon: Plane, color: "blue", description: "Billets d'avion et frais de transport" },
-    { value: "autre", label: "Autre", icon: Receipt, color: "gray", description: "Autres frais et dépenses diverses" },
-  ]
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Nouvelle dépense:", formData)
+    setLoading(true)
+
+    try {
+      const response = await fetch(api.url('/api/expenses'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          amount: parseFloat(formData.amount),
+          programId: formData.programId ? parseInt(formData.programId) : null
+        }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Succès",
+          description: "La dépense a été créée avec succès.",
+        })
+        router.push('/depenses')
+      } else {
+        const errorData = await response.json()
+        toast({
+          title: "Erreur",
+          description: errorData.error || "Erreur lors de la création de la dépense",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error creating expense:', error)
+      toast({
+        title: "Erreur",
+        description: "Erreur de connexion au serveur",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const typeSelectionne = typesDepense.find((t) => t.value === formData.type)
-  const isFormValid = formData.programme && formData.type && formData.description && formData.montant
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case "Vol":
+        return <Plane className="h-4 w-4" />
+      case "Hôtel":
+        return <Building className="h-4 w-4" />
+      default:
+        return <Receipt className="h-4 w-4" />
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-140px)]">
-          {/* Colonne gauche - Formulaire principal */}
-          <div className="lg:col-span-2 space-y-4">
-            <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm h-full">
-              <CardHeader className="bg-gradient-to-r from-red-600 to-red-700 text-white">
-                <CardTitle className="text-xl flex items-center gap-3">
-                  <Sparkles className="h-5 w-5" />
-                  Informations de la dépense
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-6">
-                {/* Informations de base */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="date" className="text-gray-700 font-medium">
-                      Date *
-                    </Label>
-                    <Input
-                      id="date"
-                      type="date"
-                      value={formData.date}
-                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                      className="h-11 border-2 border-gray-200 focus:border-red-500 rounded-lg"
-                      required
-                    />
-                  </div>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* En-tête */}
+        <div className="flex items-center gap-4 mb-8">
+          <Link href="/depenses">
+            <Button variant="outline" size="sm">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Retour
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Nouvelle Dépense</h1>
+            <p className="text-gray-600">Ajouter une nouvelle dépense au système</p>
+          </div>
+        </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="programme" className="text-gray-700 font-medium">
-                      Programme *
-                    </Label>
-                    <Select
-                      value={formData.programme}
-                      onValueChange={(value) => setFormData({ ...formData, programme: value })}
-                    >
-                      <SelectTrigger className="h-11 border-2 border-gray-200 focus:border-red-500 rounded-lg">
-                        <SelectValue placeholder="Sélectionner un programme" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {programmes.map((programme) => (
-                          <SelectItem key={programme} value={programme}>
-                            {programme}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Type de dépense */}
-                <div className="space-y-3">
-                  <Label className="text-gray-700 font-medium">Type de dépense *</Label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {typesDepense.map((type) => (
-                      <label
-                        key={type.value}
-                        className={`group cursor-pointer p-4 rounded-xl border-2 transition-all duration-300 ${
-                          formData.type === type.value
-                            ? `border-${type.color}-400 bg-${type.color}-50 shadow-md`
-                            : "border-gray-200 bg-white hover:border-gray-300"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="type"
-                          value={type.value}
-                          checked={formData.type === type.value}
-                          onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                          className="sr-only"
-                        />
-                        <div className="text-center">
-                          <type.icon
-                            className={`h-6 w-6 mx-auto mb-2 ${formData.type === type.value ? `text-${type.color}-600` : "text-gray-400"}`}
-                          />
-                          <h4
-                            className={`font-medium text-sm ${formData.type === type.value ? `text-${type.color}-800` : "text-gray-700"}`}
-                          >
-                            {type.label}
-                          </h4>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
+        <Card className="border-none shadow-lg">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200">
+            <CardTitle className="flex items-center gap-2 text-blue-900">
+              <Receipt className="h-5 w-5" />
+              Informations de la dépense
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Description */}
+                <div className="md:col-span-2 space-y-2">
+                  <Label htmlFor="description" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Receipt className="h-4 w-4" />
+                    Description
+                  </Label>
+                  <Textarea
+                    id="description"
+                    required
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="min-h-[100px] text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm"
+                    placeholder="Ex: Réservation hôtel pour groupe de 15 personnes"
+                  />
                 </div>
 
                 {/* Montant */}
                 <div className="space-y-2">
-                  <Label htmlFor="montant" className="text-gray-700 font-medium">
-                    Montant (DH) *
+                  <Label htmlFor="amount" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Montant (DH)
                   </Label>
-                  <div className="relative">
-                    <Input
-                      id="montant"
-                      type="number"
-                      value={formData.montant}
-                      onChange={(e) => setFormData({ ...formData, montant: e.target.value })}
-                      placeholder="0"
-                      className="h-12 text-lg font-semibold border-2 border-gray-200 focus:border-green-500 rounded-lg pl-4 pr-12"
-                      required
-                    />
-                    <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-green-600 font-medium">
-                      DH
-                    </span>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <div className="space-y-2">
-                  <Label htmlFor="description" className="text-gray-700 font-medium">
-                    Description *
-                  </Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Description détaillée de la dépense"
-                    rows={4}
-                    className="border-2 border-gray-200 focus:border-blue-500 rounded-lg resize-none"
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
                     required
+                    value={formData.amount}
+                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                    className="h-12 text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm"
+                    placeholder="0.00"
                   />
                 </div>
-              </CardContent>
-            </Card>
-          </div>
 
-          {/* Colonne droite - Récapitulatif et actions */}
-          <div className="space-y-4">
-            {/* Récapitulatif */}
-            <Card
-              className={`border-0 shadow-xl transition-all ${isFormValid ? "bg-gradient-to-br from-green-50 to-green-100 border-green-200" : "bg-white"}`}
-            >
-              <CardHeader
-                className={`${isFormValid ? "bg-gradient-to-r from-green-600 to-green-700" : "bg-gradient-to-r from-gray-600 to-gray-700"} text-white rounded-t-xl`}
-              >
-                <CardTitle className="text-lg flex items-center gap-2">
-                  {isFormValid ? <CheckCircle className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
-                  Récapitulatif
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Programme:</span>
-                    <span className="font-medium text-sm">{formData.programme || "Non défini"}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Type:</span>
-                    <span className="font-medium text-sm">
-                      {typeSelectionne ? typeSelectionne.label : "Non défini"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Date:</span>
-                    <span className="font-medium text-sm">
-                      {formData.date ? new Date(formData.date).toLocaleDateString("fr-FR") : "Non définie"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center border-t pt-3">
-                    <span className="text-sm text-gray-600">Montant:</span>
-                    <span className="font-bold text-lg text-green-600">
-                      {formData.montant ? `${Number.parseFloat(formData.montant).toLocaleString()} DH` : "0 DH"}
-                    </span>
-                  </div>
+                {/* Type */}
+                <div className="space-y-2">
+                  <Label htmlFor="type" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Receipt className="h-4 w-4" />
+                    Type de dépense
+                  </Label>
+                  <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
+                    <SelectTrigger className="h-12 text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm">
+                      <SelectValue placeholder="Sélectionner un type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Vol">
+                        <div className="flex items-center gap-2">
+                          <Plane className="h-4 w-4" />
+                          Vol
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Hôtel">
+                        <div className="flex items-center gap-2">
+                          <Building className="h-4 w-4" />
+                          Hôtel
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Autre">
+                        <div className="flex items-center gap-2">
+                          <Receipt className="h-4 w-4" />
+                          Autre
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                {formData.description && (
-                  <div className="border-t pt-3">
-                    <span className="text-sm text-gray-600">Description:</span>
-                    <p className="text-sm text-gray-800 mt-1 italic bg-gray-50 p-2 rounded">
-                      {formData.description.substring(0, 100)}
-                      {formData.description.length > 100 && "..."}
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                {/* Programme */}
+                <div className="space-y-2">
+                  <Label htmlFor="program" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Programme (optionnel)
+                  </Label>
+                  <Select value={formData.programId} onValueChange={(value) => setFormData({ ...formData, programId: value })}>
+                    <SelectTrigger className="h-12 text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm">
+                      <SelectValue placeholder="Sélectionner un programme" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Aucun programme</SelectItem>
+                      {programmes.map((program) => (
+                        <SelectItem key={program.id} value={program.id.toString()}>
+                          {program.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            {/* Actions */}
-            <Card className="border-0 shadow-xl bg-white">
-              <CardContent className="p-6 space-y-4">
-                <Button
-                  onClick={handleSubmit}
-                  disabled={!isFormValid}
-                  className="w-full h-12 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Save className="mr-2 h-5 w-5" />
-                  Enregistrer la dépense
-                </Button>
+                {/* Date */}
+                <div className="space-y-2">
+                  <Label htmlFor="date" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Date
+                  </Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    required
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    className="h-12 text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Boutons */}
+              <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
                 <Link href="/depenses">
-                  <Button variant="outline" className="w-full h-12 border-2 border-gray-300 hover:border-gray-400">
-                    <ArrowLeft className="mr-2 h-5 w-5" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 px-6 border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 rounded-xl font-medium transition-all duration-200"
+                  >
                     Annuler
                   </Button>
                 </Link>
-              </CardContent>
-            </Card>
-
-            {/* Aide */}
-            <Card className="border-0 shadow-xl bg-blue-50">
-              <CardContent className="p-4">
-                <h4 className="font-medium text-blue-800 mb-2">💡 Conseils</h4>
-                <ul className="text-xs text-blue-700 space-y-1">
-                  <li>• Soyez précis dans la description</li>
-                  <li>• Vérifiez le montant avant validation</li>
-                  <li>• Associez la dépense au bon programme</li>
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="h-11 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Création...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Créer la dépense
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

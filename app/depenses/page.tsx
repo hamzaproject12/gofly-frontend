@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -8,109 +8,104 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Search, Plane, Building, Receipt, Bell, Settings, Calendar, Users, Wallet, CheckCircle, AlertCircle } from "lucide-react"
 import Link from "next/link"
+import { api } from "@/lib/api"
+
+// Types
+type Expense = {
+  id: number
+  date: string
+  programme: string
+  type: string
+  description: string
+  montant: number
+  statut: string
+  reservation?: {
+    id: number
+    nom: string
+  }
+}
+
+type Program = {
+  id: number
+  name: string
+}
+
+type Stats = {
+  total: number
+  count: number
+  byType: {
+    Vol: number
+    Hôtel: number
+    Autre: number
+  }
+}
 
 export default function DepensesPage() {
+  // États pour les données
+  const [depenses, setDepenses] = useState<Expense[]>([])
+  const [programmes, setProgrammes] = useState<Program[]>([])
+  const [stats, setStats] = useState<Stats>({
+    total: 0,
+    count: 0,
+    byType: { Vol: 0, Hôtel: 0, Autre: 0 }
+  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   // États pour les filtres
   const [searchQuery, setSearchQuery] = useState("")
   const [programmeFilter, setProgrammeFilter] = useState("tous")
   const [typeFilter, setTypeFilter] = useState("tous")
 
-  // Données simulées
-  const depenses = [
-    {
-      id: 1,
-      date: "2024-01-20",
-      programme: "Omra Ramadan 15/03 - 02/04",
-      type: "Hôtel",
-      description: "Réservation Groupe Imane - Madina",
-      montant: 25000,
-      statut: "payé",
-    },
-    {
-      id: 2,
-      date: "2024-01-18",
-      programme: "Omra Ramadan 15/03 - 02/04",
-      type: "Vol",
-      description: "Billets d'avion groupe 15 personnes",
-      montant: 45000,
-      statut: "payé",
-    },
-    {
-      id: 3,
-      date: "2024-06-15",
-      programme: "Omra Mawlid Nabawi 02/09 - 16/09",
-      type: "Hôtel",
-      description: "Réservation Swissôtel Al Maqam - Makkah",
-      montant: 18000,
-      statut: "en_attente",
-    },
-    {
-      id: 4,
-      date: "2024-01-12",
-      programme: "Autre",
-      type: "Autre",
-      description: "Frais de visa consulat",
-      montant: 3500,
-      statut: "payé",
-    },
-    {
-      id: 5,
-      date: "2024-05-10",
-      programme: "Omra Aout 05/08 - 19/08",
-      type: "Vol",
-      description: "Modification billets d'avion",
-      montant: 2800,
-      statut: "payé",
-    },
-    {
-      id: 6,
-      date: "2024-06-20",
-      programme: "Omra Mawlid Nabawi 16/09 - 30/09",
-      type: "Hôtel",
-      description: "Réservation Borj Al Deafah - Makkah",
-      montant: 32000,
-      statut: "payé",
-    },
-    {
-      id: 7,
-      date: "2024-04-25",
-      programme: "Omra Juillet 03/07 - 16/07",
-      type: "Vol",
-      description: "Billets d'avion groupe 20 personnes",
-      montant: 60000,
-      statut: "en_attente",
-    },
-    {
-      id: 8,
-      date: "2024-05-30",
-      programme: "Omra Aout 12/08 - 26/08",
-      type: "Hôtel",
-      description: "Réservation Emaar Grand - Makkah",
-      montant: 28000,
-      statut: "payé",
-    },
-  ]
-
-  // Liste des programmes pour le filtre
-  const programmes = [
-    "Tous",
-    "Omra Ramadan 15/03 - 02/04",
-    "Omra Mawlid Nabawi 02/09 - 16/09",
-    "Omra Mawlid Nabawi 16/09 - 30/09",
-    "Omra Mawlid Nabawi 12/10 - 28/10",
-    "Omra Mawlid Nabawi 16/10 - 30/10",
-    "Omra Aout 05/08 - 19/08",
-    "Omra Aout 12/08 - 26/08",
-    "Omra Aout 26/08 - 09/09",
-    "Omra Juillet 03/07 - 16/07",
-    "Omra Juillet 15/07 - 29/07",
-    "Omra Juillet 29/07 - 12/08",
-    "Autre",
-  ]
-
   const typesDepense = ["Tous", "Vol", "Hôtel", "Autre"]
 
-  // Filtrage des dépenses
+  // Fonction pour charger les données
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Construire les paramètres de requête
+      const params = new URLSearchParams({
+        search: searchQuery,
+        program: programmeFilter,
+        type: typeFilter,
+        page: '1',
+        limit: '100' // Charger toutes les dépenses pour l'instant
+      })
+
+      const [expensesRes, programsRes, statsRes] = await Promise.all([
+        fetch(api.url(`/api/expenses?${params}`)),
+        fetch(api.url(api.endpoints.programs)),
+        fetch(api.url(`/api/expenses/stats?${params}`))
+      ])
+
+      if (!expensesRes.ok || !programsRes.ok || !statsRes.ok) {
+        throw new Error('Failed to fetch data')
+      }
+
+      const expensesData = await expensesRes.json()
+      const programsData = await programsRes.json()
+      const statsData = await statsRes.json()
+
+      setDepenses(expensesData.expenses)
+      setProgrammes(programsData)
+      setStats(statsData)
+
+    } catch (err) {
+      console.error('Error fetching data:', err)
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }, [searchQuery, programmeFilter, typeFilter])
+
+  // Charger les données au montage du composant
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  // Filtrage des dépenses (maintenant côté client pour la recherche instantanée)
   const filteredDepenses = depenses.filter((depense) => {
     const searchMatch =
       depense.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -123,18 +118,18 @@ export default function DepensesPage() {
     return searchMatch && programmeMatch && typeMatch
   })
 
-  const totalDepenses = filteredDepenses.reduce((sum, depense) => sum + depense.montant, 0)
+  // Utiliser les statistiques de l'API ou calculer côté client
+  const totalDepenses = stats.total || filteredDepenses.reduce((sum, depense) => sum + depense.montant, 0)
+  const depensesVol = stats.byType.Vol || filteredDepenses.filter((d) => d.type === "Vol").reduce((sum, d) => sum + d.montant, 0)
+  const depensesHotel = stats.byType.Hôtel || filteredDepenses.filter((d) => d.type === "Hôtel").reduce((sum, d) => sum + d.montant, 0)
+  const depensesAutre = stats.byType.Autre || filteredDepenses.filter((d) => d.type === "Autre").reduce((sum, d) => sum + d.montant, 0)
+
   const depensesPayees = filteredDepenses
     .filter((d) => d.statut === "payé")
     .reduce((sum, depense) => sum + depense.montant, 0)
   const depensesEnAttente = filteredDepenses
     .filter((d) => d.statut === "en_attente")
     .reduce((sum, depense) => sum + depense.montant, 0)
-
-  // Calculs pour les nouvelles stats
-  const depensesVol = filteredDepenses.filter((d) => d.type === "Vol").reduce((sum, d) => sum + d.montant, 0)
-  const depensesHotel = filteredDepenses.filter((d) => d.type === "Hôtel").reduce((sum, d) => sum + d.montant, 0)
-  const depensesAutre = filteredDepenses.filter((d) => d.type === "Autre").reduce((sum, d) => sum + d.montant, 0)
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -167,6 +162,37 @@ export default function DepensesPage() {
       default:
         return "bg-gray-100 text-gray-800"
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Chargement des dépenses...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center text-red-600">
+            <p>Erreur: {error}</p>
+            <Button 
+              onClick={() => fetchData()} 
+              className="mt-4"
+            >
+              Réessayer
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -276,9 +302,10 @@ export default function DepensesPage() {
                     <SelectValue placeholder="Tous les programmes" />
                   </SelectTrigger>
                   <SelectContent>
-                    {programmes.map((programme, index) => (
-                      <SelectItem key={index} value={index === 0 ? "tous" : programme}>
-                        {programme}
+                    <SelectItem value="tous">Tous les programmes</SelectItem>
+                    {programmes.map((programme) => (
+                      <SelectItem key={programme.id} value={programme.name}>
+                        {programme.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -320,7 +347,27 @@ export default function DepensesPage() {
               <div className="text-right">Montant & Statut</div>
             </div>
             <div className="divide-y">
-              {filteredDepenses.map((depense) => (
+              {filteredDepenses.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-gray-100 mb-4">
+                    <Receipt className="h-6 w-6 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Aucune dépense trouvée</h3>
+                  <p className="text-gray-500 mb-4">
+                    {searchQuery || programmeFilter !== "tous" || typeFilter !== "tous" 
+                      ? "Aucune dépense ne correspond aux filtres appliqués."
+                      : "Commencez par ajouter une nouvelle dépense."
+                    }
+                  </p>
+                  <Link href="/depenses/nouvelle">
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Ajouter une dépense
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                filteredDepenses.map((depense) => (
                 <div key={depense.id} className="mx-2 mb-3">
                   <div className="relative group transition-all duration-300 rounded-xl shadow border hover:scale-[1.01] hover:shadow-xl bg-white grid grid-cols-1 md:grid-cols-5 gap-2 p-4 items-center">
                     {/* Date */}
@@ -349,7 +396,8 @@ export default function DepensesPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+                ))
+              )}
             </div>
           </CardContent>
         </Card>

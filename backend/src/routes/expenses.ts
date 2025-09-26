@@ -103,13 +103,17 @@ router.get('/', async (req, res) => {
     // Calculer les totaux par type
     const totalByType = {
       Vol: 0,
-      Hôtel: 0,
+      'Hôtel Madina': 0,
+      'Hôtel Makkah': 0,
+      Visa: 0,
       Autre: 0
     };
 
     statsByType.forEach(stat => {
       if (stat.type === 'Vol') totalByType.Vol = stat._sum.amount || 0;
-      else if (stat.type === 'Hôtel') totalByType.Hôtel = stat._sum.amount || 0;
+      else if (stat.type === 'Hôtel Madina') totalByType['Hôtel Madina'] = stat._sum.amount || 0;
+      else if (stat.type === 'Hôtel Makkah') totalByType['Hôtel Makkah'] = stat._sum.amount || 0;
+      else if (stat.type === 'Visa') totalByType.Visa = stat._sum.amount || 0;
       else totalByType.Autre += stat._sum.amount || 0;
     });
 
@@ -187,13 +191,17 @@ router.get('/stats', async (req, res) => {
     // Calculer les totaux par type
     const totalByType = {
       Vol: 0,
-      Hôtel: 0,
+      'Hôtel Madina': 0,
+      'Hôtel Makkah': 0,
+      Visa: 0,
       Autre: 0
     };
 
     statsByType.forEach(stat => {
       if (stat.type === 'Vol') totalByType.Vol = stat._sum.amount || 0;
-      else if (stat.type === 'Hôtel') totalByType.Hôtel = stat._sum.amount || 0;
+      else if (stat.type === 'Hôtel Madina') totalByType['Hôtel Madina'] = stat._sum.amount || 0;
+      else if (stat.type === 'Hôtel Makkah') totalByType['Hôtel Makkah'] = stat._sum.amount || 0;
+      else if (stat.type === 'Visa') totalByType.Visa = stat._sum.amount || 0;
       else totalByType.Autre += stat._sum.amount || 0;
     });
 

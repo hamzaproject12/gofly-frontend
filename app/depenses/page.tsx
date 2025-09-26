@@ -35,7 +35,9 @@ type Stats = {
   count: number
   byType: {
     Vol: number
-    Hôtel: number
+    'Hôtel Madina': number
+    'Hôtel Makkah': number
+    Visa: number
     Autre: number
   }
 }
@@ -47,7 +49,7 @@ export default function DepensesPage() {
   const [stats, setStats] = useState<Stats>({
     total: 0,
     count: 0,
-    byType: { Vol: 0, Hôtel: 0, Autre: 0 }
+    byType: { Vol: 0, 'Hôtel Madina': 0, 'Hôtel Makkah': 0, Visa: 0, Autre: 0 }
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -57,7 +59,7 @@ export default function DepensesPage() {
   const [programmeFilter, setProgrammeFilter] = useState("tous")
   const [typeFilter, setTypeFilter] = useState("tous")
 
-  const typesDepense = ["Tous", "Vol", "Hôtel", "Autre"]
+  const typesDepense = ["Tous", "Vol", "Hôtel Madina", "Hôtel Makkah", "Visa", "Autre"]
 
   // Fonction pour charger les données
   const fetchData = useCallback(async () => {
@@ -120,9 +122,11 @@ export default function DepensesPage() {
 
   // Utiliser les statistiques de l'API ou calculer côté client
   const totalDepenses = stats.total || filteredDepenses.reduce((sum, depense) => sum + depense.montant, 0)
-  const depensesVol = stats.byType.Vol || filteredDepenses.filter((d) => d.type === "Vol").reduce((sum, d) => sum + d.montant, 0)
-  const depensesHotel = stats.byType.Hôtel || filteredDepenses.filter((d) => d.type === "Hôtel").reduce((sum, d) => sum + d.montant, 0)
-  const depensesAutre = stats.byType.Autre || filteredDepenses.filter((d) => d.type === "Autre").reduce((sum, d) => sum + d.montant, 0)
+  const depensesVol = stats.byType?.Vol || filteredDepenses.filter((d) => d.type === "Vol").reduce((sum, d) => sum + d.montant, 0)
+  const depensesHotelMadina = stats.byType?.['Hôtel Madina'] || filteredDepenses.filter((d) => d.type === "Hôtel Madina").reduce((sum, d) => sum + d.montant, 0)
+  const depensesHotelMakkah = stats.byType?.['Hôtel Makkah'] || filteredDepenses.filter((d) => d.type === "Hôtel Makkah").reduce((sum, d) => sum + d.montant, 0)
+  const depensesVisa = stats.byType?.Visa || filteredDepenses.filter((d) => d.type === "Visa").reduce((sum, d) => sum + d.montant, 0)
+  const depensesAutre = stats.byType?.Autre || filteredDepenses.filter((d) => d.type === "Autre").reduce((sum, d) => sum + d.montant, 0)
 
   const depensesPayees = filteredDepenses
     .filter((d) => d.statut === "payé")
@@ -135,8 +139,11 @@ export default function DepensesPage() {
     switch (type) {
       case "Vol":
         return <Plane className="h-4 w-4" />
-      case "Hôtel":
+      case "Hôtel Madina":
+      case "Hôtel Makkah":
         return <Building className="h-4 w-4" />
+      case "Visa":
+        return <Receipt className="h-4 w-4" />
       default:
         return <Receipt className="h-4 w-4" />
     }
@@ -146,8 +153,12 @@ export default function DepensesPage() {
     switch (type) {
       case "Vol":
         return "bg-blue-100 text-blue-800"
-      case "Hôtel":
+      case "Hôtel Madina":
         return "bg-green-100 text-green-800"
+      case "Hôtel Makkah":
+        return "bg-emerald-100 text-emerald-800"
+      case "Visa":
+        return "bg-purple-100 text-purple-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
@@ -209,8 +220,8 @@ export default function DepensesPage() {
           </Link>
         </div>
 
-        {/* Statistiques - 4 cards : Total, Vol, Hôtel, Autre */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        {/* Statistiques - 6 cards : Total, Vol, Hôtel Madina, Hôtel Makkah, Visa, Autre */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
           <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 text-white transform hover:scale-105 transition-all duration-300">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-12 -translate-x-12"></div>
@@ -252,12 +263,46 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-4">
                 <Building className="h-8 w-8 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{depensesHotel.toLocaleString()} DH</div>
-                  <div className="text-xs text-white/80">hôtel</div>
+                  <div className="text-2xl font-bold">{depensesHotelMadina.toLocaleString()} DH</div>
+                  <div className="text-xs text-white/80">Madina</div>
                 </div>
               </div>
               <div>
-                <h3 className="font-semibold text-lg">Dépenses Hôtels</h3>
+                <h3 className="font-semibold text-lg">Hôtel Madina</h3>
+                <p className="text-xs text-white/80">Filtres appliqués</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 text-white transform hover:scale-105 transition-all duration-300">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-12 -translate-x-12"></div>
+            <CardContent className="relative p-6">
+              <div className="flex items-center justify-between mb-4">
+                <Building className="h-8 w-8 text-white/90" />
+                <div className="text-right">
+                  <div className="text-2xl font-bold">{depensesHotelMakkah.toLocaleString()} DH</div>
+                  <div className="text-xs text-white/80">Makkah</div>
+                </div>
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg">Hôtel Makkah</h3>
+                <p className="text-xs text-white/80">Filtres appliqués</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-purple-500 via-purple-600 to-purple-700 text-white transform hover:scale-105 transition-all duration-300">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-12 -translate-x-12"></div>
+            <CardContent className="relative p-6">
+              <div className="flex items-center justify-between mb-4">
+                <Receipt className="h-8 w-8 text-white/90" />
+                <div className="text-right">
+                  <div className="text-2xl font-bold">{depensesVisa.toLocaleString()} DH</div>
+                  <div className="text-xs text-white/80">visa</div>
+                </div>
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg">Dépenses Visa</h3>
                 <p className="text-xs text-white/80">Filtres appliqués</p>
               </div>
             </CardContent>
@@ -281,22 +326,10 @@ export default function DepensesPage() {
           </Card>
         </div>
 
-        {/* Filtres et recherche */}
+        {/* Filtres */}
         <Card className="mb-6">
           <CardContent className="pt-6">
-            <div className="grid grid-cols-1 gap-4">
-              <div className="w-full">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Rechercher par programme, description..."
-                    className="pl-10"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Select value={programmeFilter} onValueChange={(value) => setProgrammeFilter(value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Tous les programmes" />
@@ -322,7 +355,6 @@ export default function DepensesPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -344,7 +376,7 @@ export default function DepensesPage() {
               <div className="flex items-center gap-1"><Users className="h-4 w-4" /> Programme</div>
               <div className="flex items-center gap-1"><Receipt className="h-4 w-4" /> Type</div>
               <div>Description</div>
-              <div className="text-right">Montant & Statut</div>
+              <div className="text-right">Montant</div>
             </div>
             <div className="divide-y">
               {filteredDepenses.length === 0 ? (
@@ -389,10 +421,9 @@ export default function DepensesPage() {
                     <div className="flex-1 min-w-[180px]">
                       <span className="text-gray-900 font-medium text-base">{depense.description}</span>
                     </div>
-                    {/* Montant et Statut */}
+                    {/* Montant */}
                     <div className="flex flex-col items-end min-w-[120px]">
                       <span className="font-bold text-xl text-blue-900">{depense.montant.toLocaleString()} DH</span>
-                      <span className={`mt-1 px-3 py-1 rounded-full text-xs font-semibold ${depense.statut === "payé" ? "bg-green-100 text-green-800 border border-green-200" : "bg-yellow-100 text-yellow-800 border border-yellow-200"}`}>{depense.statut === "payé" ? "Payé" : "En attente"}</span>
                     </div>
                   </div>
                 </div>

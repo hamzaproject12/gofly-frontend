@@ -2,6 +2,24 @@
 
 import { useState, useEffect } from 'react';
 import RoleProtectedRoute from '../../components/RoleProtectedRoute';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Users, 
+  Mail, 
+  Shield, 
+  X,
+  Check,
+  AlertCircle,
+  UserCheck,
+  UserX
+} from 'lucide-react';
 
 interface Agent {
   id: number;
@@ -206,100 +224,143 @@ export default function GestionUtilisateursPage() {
           </div>
 
           {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
-              <div className="text-sm text-red-700">{error}</div>
+            <div className="mb-6 bg-red-50 border-2 border-red-200 rounded-xl p-4 shadow-sm">
+              <div className="flex items-center gap-2 text-sm text-red-700">
+                <AlertCircle className="h-4 w-4 text-red-500" />
+                {error}
+              </div>
             </div>
           )}
 
           <div className="bg-white shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-medium text-gray-900">Liste des Utilisateurs</h2>
-                <button
+                <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
+                  <Users className="h-5 w-5 text-blue-600" />
+                  Liste des Utilisateurs
+                </h2>
+                <Button
                   onClick={() => setShowCreateForm(!showCreateForm)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200"
                 >
+                  <Plus className="h-4 w-4 mr-2" />
                   {showCreateForm ? 'Annuler' : 'Nouvel Utilisateur'}
-                </button>
+                </Button>
               </div>
 
               {/* Create/Edit Form */}
               {(showCreateForm || editingAgent) && (
-                <form onSubmit={editingAgent ? handleUpdateAgent : handleCreateAgent} className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">
-                    {editingAgent ? 'Modifier l\'utilisateur' : 'Créer un nouvel utilisateur'}
-                  </h3>
+                <Card className="mb-6 border-2 border-blue-100 shadow-lg">
+                  <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200">
+                    <CardTitle className="flex items-center gap-2 text-blue-900">
+                      <Users className="h-5 w-5" />
+                      {editingAgent ? 'Modifier l\'utilisateur' : 'Créer un nouvel utilisateur'}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <form onSubmit={editingAgent ? handleUpdateAgent : handleCreateAgent} className="space-y-6">
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Nom</label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.nom}
-                        onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Email</label>
-                      <input
-                        type="email"
-                        required
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Mot de passe {editingAgent && '(laisser vide pour ne pas changer)'}
-                      </label>
-                      <input
-                        type="password"
-                        required={!editingAgent}
-                        value={formData.motDePasse}
-                        onChange={(e) => setFormData({ ...formData, motDePasse: e.target.value })}
-                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Rôle</label>
-                      <select
-                        value={formData.role}
-                        onChange={(e) => setFormData({ ...formData, role: e.target.value as 'ADMIN' | 'AGENT' })}
-                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                      >
-                        <option value="AGENT">Agent</option>
-                        <option value="ADMIN">Admin</option>
-                      </select>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-4 flex justify-end space-x-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowCreateForm(false);
-                        setEditingAgent(null);
-                        setFormData({ nom: '', email: '', motDePasse: '', role: 'AGENT' });
-                      }}
-                      className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                      Annuler
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-                    >
-                      {loading ? 'En cours...' : (editingAgent ? 'Mettre à jour' : 'Créer')}
-                    </button>
-                  </div>
-                </form>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label htmlFor="user-name" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                            <Users className="h-4 w-4" />
+                            Nom
+                          </Label>
+                          <Input
+                            id="user-name"
+                            type="text"
+                            required
+                            value={formData.nom}
+                            onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
+                            className="h-12 text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm"
+                            placeholder="Ex: Jean Dupont"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="user-email" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                            <Mail className="h-4 w-4" />
+                            Email
+                          </Label>
+                          <Input
+                            id="user-email"
+                            type="email"
+                            required
+                            value={formData.email}
+                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            className="h-12 text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm"
+                            placeholder="Ex: jean.dupont@example.com"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="user-password" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                            <Shield className="h-4 w-4" />
+                            Mot de passe {editingAgent && '(laisser vide pour ne pas changer)'}
+                          </Label>
+                          <Input
+                            id="user-password"
+                            type="password"
+                            required={!editingAgent}
+                            value={formData.motDePasse}
+                            onChange={(e) => setFormData({ ...formData, motDePasse: e.target.value })}
+                            className="h-12 text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm"
+                            placeholder="••••••••"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="user-role" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                            <Shield className="h-4 w-4" />
+                            Rôle
+                          </Label>
+                          <select
+                            id="user-role"
+                            value={formData.role}
+                            onChange={(e) => setFormData({ ...formData, role: e.target.value as 'ADMIN' | 'AGENT' })}
+                            className="h-12 w-full text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm bg-white px-3"
+                          >
+                            <option value="AGENT">Agent</option>
+                            <option value="ADMIN">Admin</option>
+                          </select>
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-end space-x-3 pt-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setShowCreateForm(false);
+                            setEditingAgent(null);
+                            setFormData({ nom: '', email: '', motDePasse: '', role: 'AGENT' });
+                          }}
+                          className="h-11 px-6 border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 rounded-xl font-medium transition-all duration-200"
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Annuler
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={loading}
+                          className="h-11 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50"
+                        >
+                          {loading ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              En cours...
+                            </>
+                          ) : (
+                            <>
+                              <Check className="h-4 w-4 mr-2" />
+                              {editingAgent ? 'Mettre à jour' : 'Créer'}
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
               )}
 
               {/* Users Table */}
@@ -325,49 +386,81 @@ export default function GestionUtilisateursPage() {
                           {agent.email}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            agent.role === 'ADMIN' 
-                              ? 'bg-purple-100 text-purple-800' 
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
+                          <Badge 
+                            variant="secondary" 
+                            className={`inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full ${
+                              agent.role === 'ADMIN' 
+                                ? 'bg-purple-100 text-purple-800' 
+                                : 'bg-blue-100 text-blue-800'
+                            } border-0`}
+                          >
+                            <Shield className="h-3 w-3 mr-1" />
                             {agent.role}
-                          </span>
+                          </Badge>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            agent.isActive 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-red-100 text-red-800'
-                          }`}>
+                          <Badge 
+                            variant="secondary" 
+                            className={`inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full ${
+                              agent.isActive 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-red-100 text-red-800'
+                            } border-0`}
+                          >
+                            {agent.isActive ? (
+                              <UserCheck className="h-3 w-3 mr-1" />
+                            ) : (
+                              <UserX className="h-3 w-3 mr-1" />
+                            )}
                             {agent.isActive ? 'Actif' : 'Inactif'}
-                          </span>
+                          </Badge>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(agent.createdAt).toLocaleDateString('fr-FR')}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                          <button
-                            onClick={() => startEdit(agent)}
-                            className="text-indigo-600 hover:text-indigo-900"
-                          >
-                            Modifier
-                          </button>
-                          <button
-                            onClick={() => handleToggleActive(agent)}
-                            className={`${
-                              agent.isActive 
-                                ? 'text-red-600 hover:text-red-900' 
-                                : 'text-green-600 hover:text-green-900'
-                            }`}
-                          >
-                            {agent.isActive ? 'Désactiver' : 'Activer'}
-                          </button>
-                          <button
-                            onClick={() => handleDeleteAgent(agent)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Supprimer
-                          </button>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              onClick={() => startEdit(agent)}
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-3 text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300 rounded-lg font-medium transition-all duration-200"
+                            >
+                              <Edit className="h-3 w-3 mr-1" />
+                              Modifier
+                            </Button>
+                            <Button
+                              onClick={() => handleToggleActive(agent)}
+                              variant="outline"
+                              size="sm"
+                              className={`h-8 px-3 rounded-lg font-medium transition-all duration-200 ${
+                                agent.isActive 
+                                  ? 'text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300' 
+                                  : 'text-green-600 border-green-200 hover:bg-green-50 hover:border-green-300'
+                              }`}
+                            >
+                              {agent.isActive ? (
+                                <>
+                                  <UserX className="h-3 w-3 mr-1" />
+                                  Désactiver
+                                </>
+                              ) : (
+                                <>
+                                  <UserCheck className="h-3 w-3 mr-1" />
+                                  Activer
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              onClick={() => handleDeleteAgent(agent)}
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-3 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 rounded-lg font-medium transition-all duration-200"
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Supprimer
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}

@@ -747,7 +747,7 @@ export default function ReservationsPage() {
                             <Users className="h-5 w-5 text-yellow-400" /> {mapRoomTypeToPersons(reservation.chambre)}
                           </span>
                           <span className="inline-flex items-center gap-1 text-base font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded px-3 py-1">
-                            <FileText className="h-5 w-5 text-purple-400" /> #{reservation.id}
+                            <FileText className="h-5 w-5 text-purple-400" /> {reservation.telephone}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 ml-auto">

@@ -4,13 +4,210 @@ import { PrismaClient } from '@prisma/client';
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Get all expenses
+// Get all expenses with filters and pagination
 router.get('/', async (req, res) => {
   try {
-    const expenses = await prisma.expense.findMany();
-    res.json(expenses);
+    const { search, program, type, status, page = '1', limit = '10' } = req.query;
+
+    // Construire les filtres
+    const where: any = {};
+
+    // Filtre par recherche
+    if (search) {
+      where.OR = [
+        { description: { contains: search as string, mode: 'insensitive' } },
+        { program: { name: { contains: search as string, mode: 'insensitive' } } },
+        { type: { contains: search as string, mode: 'insensitive' } }
+      ];
+    }
+
+    // Filtre par programme
+    if (program && program !== 'tous') {
+      where.program = { name: program as string };
+    }
+
+    // Filtre par type
+    if (type && type !== 'tous') {
+      where.type = type as string;
+    }
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+
+    // Récupérer les dépenses avec pagination
+    const [expenses, totalCount] = await Promise.all([
+      prisma.expense.findMany({
+        where,
+        include: {
+          program: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          reservation: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true
+            }
+          }
+        },
+        orderBy: {
+          date: 'desc'
+        },
+        skip: (pageNum - 1) * limitNum,
+        take: limitNum
+      }),
+      prisma.expense.count({ where })
+    ]);
+
+    // Calculer les statistiques
+    const stats = await prisma.expense.aggregate({
+      where,
+      _sum: {
+        amount: true
+      },
+      _count: {
+        id: true
+      }
+    });
+
+    // Statistiques par type
+    const statsByType = await prisma.expense.groupBy({
+      by: ['type'],
+      where,
+      _sum: {
+        amount: true
+      },
+      _count: {
+        id: true
+      }
+    });
+
+    // Transformer les données pour le frontend
+    const transformedExpenses = expenses.map(expense => ({
+      id: expense.id,
+      date: expense.date.toISOString().split('T')[0],
+      programme: expense.program?.name || 'Autre',
+      type: expense.type,
+      description: expense.description,
+      montant: expense.amount,
+      statut: 'payé', // Pour l'instant, toutes les dépenses sont considérées comme payées
+      reservation: expense.reservation ? {
+        id: expense.reservation.id,
+        nom: `${expense.reservation.firstName} ${expense.reservation.lastName}`
+      } : null
+    }));
+
+    // Calculer les totaux par type
+    const totalByType = {
+      Vol: 0,
+      Hôtel: 0,
+      Autre: 0
+    };
+
+    statsByType.forEach(stat => {
+      if (stat.type === 'Vol') totalByType.Vol = stat._sum.amount || 0;
+      else if (stat.type === 'Hôtel') totalByType.Hôtel = stat._sum.amount || 0;
+      else totalByType.Autre += stat._sum.amount || 0;
+    });
+
+    const totalPages = Math.ceil(totalCount / limitNum);
+
+    res.json({
+      expenses: transformedExpenses,
+      pagination: {
+        currentPage: pageNum,
+        totalPages,
+        totalCount,
+        hasNextPage: pageNum < totalPages,
+        hasPrevPage: pageNum > 1
+      },
+      stats: {
+        total: stats._sum.amount || 0,
+        count: stats._count.id || 0,
+        byType: totalByType
+      }
+    });
+
   } catch (error) {
+    console.error('Error fetching expenses:', error);
     res.status(500).json({ error: 'Error fetching expenses' });
+  }
+});
+
+// Get expense statistics
+router.get('/stats', async (req, res) => {
+  try {
+    const { search, program, type } = req.query;
+
+    // Construire les filtres
+    const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { description: { contains: search as string, mode: 'insensitive' } },
+        { program: { name: { contains: search as string, mode: 'insensitive' } } },
+        { type: { contains: search as string, mode: 'insensitive' } }
+      ];
+    }
+
+    if (program && program !== 'tous') {
+      where.program = { name: program as string };
+    }
+
+    if (type && type !== 'tous') {
+      where.type = type as string;
+    }
+
+    // Statistiques générales
+    const totalStats = await prisma.expense.aggregate({
+      where,
+      _sum: {
+        amount: true
+      },
+      _count: {
+        id: true
+      }
+    });
+
+    // Statistiques par type
+    const statsByType = await prisma.expense.groupBy({
+      by: ['type'],
+      where,
+      _sum: {
+        amount: true
+      },
+      _count: {
+        id: true
+      }
+    });
+
+    // Calculer les totaux par type
+    const totalByType = {
+      Vol: 0,
+      Hôtel: 0,
+      Autre: 0
+    };
+
+    statsByType.forEach(stat => {
+      if (stat.type === 'Vol') totalByType.Vol = stat._sum.amount || 0;
+      else if (stat.type === 'Hôtel') totalByType.Hôtel = stat._sum.amount || 0;
+      else totalByType.Autre += stat._sum.amount || 0;
+    });
+
+    res.json({
+      total: {
+        amount: totalStats._sum.amount || 0,
+        count: totalStats._count.id || 0
+      },
+      byType: totalByType
+    });
+
+  } catch (error) {
+    console.error('Error fetching expense stats:', error);
+    res.status(500).json({ error: 'Error fetching expense statistics' });
   }
 });
 

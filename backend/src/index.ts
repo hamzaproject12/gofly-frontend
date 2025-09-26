@@ -5,6 +5,7 @@ import reservationsRouter from './routes/reservations';
 import hotelsRouter from './routes/hotels';
 import uploadRouter from './routes/upload';
 import paymentsRouter from './routes/payments';
+import expensesRouter from './routes/expenses';
 import path from 'path';
 import morgan from 'morgan';
 
@@ -68,6 +69,13 @@ try {
   console.error('Erreur lors du chargement de /api/payments:', error);
 }
 
+try {
+  app.use('/api/expenses', expensesRouter);
+  console.log('Route /api/expenses chargée');
+} catch (error) {
+  console.error('Erreur lors du chargement de /api/expenses:', error);
+}
+
 // Gestion des erreurs
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error(err.stack);
@@ -82,4 +90,5 @@ app.listen(port, () => {
   console.log('- /api/hotels');
   console.log('- /api/upload');
   console.log('- /api/payments');
+  console.log('- /api/expenses');
 }); 

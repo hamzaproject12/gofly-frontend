@@ -121,7 +121,7 @@ export default function DepensesPage() {
   })
 
   // Utiliser les statistiques de l'API ou calculer côté client
-  const totalDepenses = stats.total || filteredDepenses.reduce((sum, depense) => sum + depense.montant, 0)
+  const totalDepenses = (typeof stats.total === 'number' ? stats.total : (stats.total as any)?.amount) || filteredDepenses.reduce((sum, depense) => sum + depense.montant, 0)
   const depensesVol = stats.byType?.Vol || filteredDepenses.filter((d) => d.type === "Vol").reduce((sum, d) => sum + d.montant, 0)
   const depensesHotelMadina = stats.byType?.['Hotel Madina'] || filteredDepenses.filter((d) => d.type === "Hotel Madina").reduce((sum, d) => sum + d.montant, 0)
   const depensesHotelMakkah = stats.byType?.['Hotel Makkah'] || filteredDepenses.filter((d) => d.type === "Hotel Makkah").reduce((sum, d) => sum + d.montant, 0)

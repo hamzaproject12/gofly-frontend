@@ -1205,7 +1205,7 @@ export default function NouvelleReservation() {
       // 1. Expense pour le service de vol (si activé)
       if (customization.includeAvion && programInfo) {
         const volExpense = {
-          description: `Service de vol pour la réservation ${reservationId}`,
+          description: `Service de vol pour ${formData.prenom} ${formData.nom}`,
           amount: programInfo.prixAvionDH, // Montant en Dirhams
           date: new Date().toISOString(),
           type: 'Vol',
@@ -1220,7 +1220,7 @@ export default function NouvelleReservation() {
       // 2. Expense pour le service de visa (si activé)
       if (customization.includeVisa && programInfo) {
         const visaExpense = {
-          description: `Service de visa pour la réservation ${reservationId}`,
+          description: `Service de visa pour ${formData.prenom} ${formData.nom}`,
           amount: programInfo.prixVisaRiyal * programInfo.exchange, // Montant en Dirhams (Riyal * exchange)
           date: new Date().toISOString(),
           type: 'Visa',
@@ -1248,7 +1248,7 @@ export default function NouvelleReservation() {
           const montantHotelMadina = (roomMadina.prixRoom / nbPersonnes) * customization.joursMadina;
           
           const hotelMadinaExpense = {
-            description: `Service hôtel Madina pour la réservation ${reservationId}`,
+            description: `Service hôtel Madina pour ${formData.prenom} ${formData.nom}`,
             amount: montantHotelMadina * programInfo.exchange, // Montant en Dirhams (Riyal * exchange)
             date: new Date().toISOString(),
             type: 'Hotel Madina',
@@ -1277,7 +1277,7 @@ export default function NouvelleReservation() {
           const montantHotelMakkah = (roomMakkah.prixRoom / nbPersonnes) * customization.joursMakkah;
           
           const hotelMakkahExpense = {
-            description: `Service hôtel Makkah pour la réservation ${reservationId}`,
+            description: `Service hôtel Makkah pour ${formData.prenom} ${formData.nom}`,
             amount: montantHotelMakkah * programInfo.exchange, // Montant en Dirhams (Riyal * exchange)
             date: new Date().toISOString(),
             type: 'Hotel Makkah',

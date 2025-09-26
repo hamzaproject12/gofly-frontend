@@ -180,16 +180,16 @@ export default function NouvelleDepensePage() {
                           Vol
                         </div>
                       </SelectItem>
-                      <SelectItem value="Hôtel Madina">
+                      <SelectItem value="Hotel Madina">
                         <div className="flex items-center gap-2">
                           <Building className="h-4 w-4" />
-                          Hôtel Madina
+                          Hotel Madina
                         </div>
                       </SelectItem>
-                      <SelectItem value="Hôtel Makkah">
+                      <SelectItem value="Hotel Makkah">
                         <div className="flex items-center gap-2">
                           <Building className="h-4 w-4" />
-                          Hôtel Makkah
+                          Hotel Makkah
                         </div>
                       </SelectItem>
                       <SelectItem value="Visa">

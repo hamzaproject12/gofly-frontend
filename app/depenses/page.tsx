@@ -35,8 +35,8 @@ type Stats = {
   count: number
   byType: {
     Vol: number
-    'Hôtel Madina': number
-    'Hôtel Makkah': number
+    'Hotel Madina': number
+    'Hotel Makkah': number
     Visa: number
     Autre: number
   }
@@ -49,7 +49,7 @@ export default function DepensesPage() {
   const [stats, setStats] = useState<Stats>({
     total: 0,
     count: 0,
-    byType: { Vol: 0, 'Hôtel Madina': 0, 'Hôtel Makkah': 0, Visa: 0, Autre: 0 }
+    byType: { Vol: 0, 'Hotel Madina': 0, 'Hotel Makkah': 0, Visa: 0, Autre: 0 }
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -59,7 +59,7 @@ export default function DepensesPage() {
   const [programmeFilter, setProgrammeFilter] = useState("tous")
   const [typeFilter, setTypeFilter] = useState("tous")
 
-  const typesDepense = ["Tous", "Vol", "Hôtel Madina", "Hôtel Makkah", "Visa", "Autre"]
+  const typesDepense = ["Tous", "Vol", "Hotel Madina", "Hotel Makkah", "Visa", "Autre"]
 
   // Fonction pour charger les données
   const fetchData = useCallback(async () => {
@@ -123,8 +123,8 @@ export default function DepensesPage() {
   // Utiliser les statistiques de l'API ou calculer côté client
   const totalDepenses = stats.total || filteredDepenses.reduce((sum, depense) => sum + depense.montant, 0)
   const depensesVol = stats.byType?.Vol || filteredDepenses.filter((d) => d.type === "Vol").reduce((sum, d) => sum + d.montant, 0)
-  const depensesHotelMadina = stats.byType?.['Hôtel Madina'] || filteredDepenses.filter((d) => d.type === "Hôtel Madina").reduce((sum, d) => sum + d.montant, 0)
-  const depensesHotelMakkah = stats.byType?.['Hôtel Makkah'] || filteredDepenses.filter((d) => d.type === "Hôtel Makkah").reduce((sum, d) => sum + d.montant, 0)
+  const depensesHotelMadina = stats.byType?.['Hotel Madina'] || filteredDepenses.filter((d) => d.type === "Hotel Madina").reduce((sum, d) => sum + d.montant, 0)
+  const depensesHotelMakkah = stats.byType?.['Hotel Makkah'] || filteredDepenses.filter((d) => d.type === "Hotel Makkah").reduce((sum, d) => sum + d.montant, 0)
   const depensesVisa = stats.byType?.Visa || filteredDepenses.filter((d) => d.type === "Visa").reduce((sum, d) => sum + d.montant, 0)
   const depensesAutre = stats.byType?.Autre || filteredDepenses.filter((d) => d.type === "Autre").reduce((sum, d) => sum + d.montant, 0)
 
@@ -139,8 +139,8 @@ export default function DepensesPage() {
     switch (type) {
       case "Vol":
         return <Plane className="h-4 w-4" />
-      case "Hôtel Madina":
-      case "Hôtel Makkah":
+      case "Hotel Madina":
+      case "Hotel Makkah":
         return <Building className="h-4 w-4" />
       case "Visa":
         return <Receipt className="h-4 w-4" />
@@ -153,9 +153,9 @@ export default function DepensesPage() {
     switch (type) {
       case "Vol":
         return "bg-blue-100 text-blue-800"
-      case "Hôtel Madina":
+      case "Hotel Madina":
         return "bg-green-100 text-green-800"
-      case "Hôtel Makkah":
+      case "Hotel Makkah":
         return "bg-emerald-100 text-emerald-800"
       case "Visa":
         return "bg-purple-100 text-purple-800"

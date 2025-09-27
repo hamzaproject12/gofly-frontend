@@ -103,52 +103,81 @@ export default function NouvelleDepensePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* En-tête */}
-        <div className="flex items-center gap-4 mb-8">
-          <Link href="/depenses">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Retour
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Nouvelle Dépense</h1>
-            <p className="text-gray-600">Ajouter une nouvelle dépense au système</p>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50">
+      {/* Header avec gradient */}
+      <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 shadow-xl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <Link href="/depenses">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Retour
+                </Button>
+              </Link>
+              <div>
+                <h1 className="text-3xl font-bold text-white mb-2">Nouvelle Dépense</h1>
+                <p className="text-indigo-100 text-lg">Ajouter une nouvelle dépense au système</p>
+              </div>
+            </div>
+            <div className="hidden md:block">
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
+                <div className="flex items-center gap-3">
+                  <div className="bg-white/20 rounded-full p-3">
+                    <Receipt className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-white font-semibold">Gestion des Dépenses</p>
+                    <p className="text-indigo-100 text-sm">Système de suivi</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
 
-        <Card className="border-none shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200">
-            <CardTitle className="flex items-center gap-2 text-blue-900">
-              <Receipt className="h-5 w-5" />
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <Card className="border-none shadow-2xl bg-white/80 backdrop-blur-sm">
+          <CardHeader className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
+            <CardTitle className="flex items-center gap-3 text-xl">
+              <div className="bg-white/20 rounded-full p-2">
+                <Receipt className="h-6 w-6" />
+              </div>
               Informations de la dépense
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-6">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <CardContent className="p-8">
+            <form onSubmit={handleSubmit} className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Description */}
-                <div className="md:col-span-2 space-y-2">
-                  <Label htmlFor="description" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                    <Receipt className="h-4 w-4" />
-                    Description
+                <div className="md:col-span-2 space-y-3">
+                  <Label htmlFor="description" className="text-base font-bold text-gray-800 flex items-center gap-3">
+                    <div className="bg-indigo-100 p-2 rounded-lg">
+                      <Receipt className="h-5 w-5 text-indigo-600" />
+                    </div>
+                    Description de la dépense
                   </Label>
                   <Textarea
                     id="description"
                     required
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="min-h-[100px] text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm"
-                    placeholder="Ex: Réservation hôtel pour groupe de 15 personnes"
+                    className="min-h-[120px] text-base border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-300 shadow-lg hover:shadow-xl bg-white"
+                    placeholder="Ex: Réservation hôtel pour groupe de 15 personnes, Service de visa pour M. Ahmed..."
                   />
                 </div>
 
                 {/* Montant */}
-                <div className="space-y-2">
-                  <Label htmlFor="amount" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" />
+                <div className="space-y-3">
+                  <Label htmlFor="amount" className="text-base font-bold text-gray-800 flex items-center gap-3">
+                    <div className="bg-green-100 p-2 rounded-lg">
+                      <DollarSign className="h-5 w-5 text-green-600" />
+                    </div>
                     Montant (DH)
                   </Label>
                   <Input
@@ -158,50 +187,62 @@ export default function NouvelleDepensePage() {
                     required
                     value={formData.amount}
                     onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                    className="h-12 text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm"
+                    className="h-14 text-lg font-semibold border-2 border-gray-200 rounded-2xl focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-300 shadow-lg hover:shadow-xl bg-white"
                     placeholder="0.00"
                   />
                 </div>
 
                 {/* Type */}
-                <div className="space-y-2">
-                  <Label htmlFor="type" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                    <Receipt className="h-4 w-4" />
+                <div className="space-y-3">
+                  <Label htmlFor="type" className="text-base font-bold text-gray-800 flex items-center gap-3">
+                    <div className="bg-purple-100 p-2 rounded-lg">
+                      <Receipt className="h-5 w-5 text-purple-600" />
+                    </div>
                     Type de dépense
                   </Label>
                   <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
-                    <SelectTrigger className="h-12 text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm">
-                      <SelectValue placeholder="Sélectionner un type" />
+                    <SelectTrigger className="h-14 text-base font-medium border-2 border-gray-200 rounded-2xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-300 shadow-lg hover:shadow-xl bg-white">
+                      <SelectValue placeholder="Sélectionner un type de dépense" />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Vol">
-                        <div className="flex items-center gap-2">
-                          <Plane className="h-4 w-4" />
-                          Vol
+                    <SelectContent className="rounded-2xl border-2 shadow-xl">
+                      <SelectItem value="Vol" className="rounded-xl">
+                        <div className="flex items-center gap-3 py-2">
+                          <div className="bg-blue-100 p-1 rounded-lg">
+                            <Plane className="h-4 w-4 text-blue-600" />
+                          </div>
+                          <span className="font-medium">Vol</span>
                         </div>
                       </SelectItem>
-                      <SelectItem value="Hotel Madina">
-                        <div className="flex items-center gap-2">
-                          <Building className="h-4 w-4" />
-                          Hotel Madina
+                      <SelectItem value="Hotel Madina" className="rounded-xl">
+                        <div className="flex items-center gap-3 py-2">
+                          <div className="bg-green-100 p-1 rounded-lg">
+                            <Building className="h-4 w-4 text-green-600" />
+                          </div>
+                          <span className="font-medium">Hotel Madina</span>
                         </div>
                       </SelectItem>
-                      <SelectItem value="Hotel Makkah">
-                        <div className="flex items-center gap-2">
-                          <Building className="h-4 w-4" />
-                          Hotel Makkah
+                      <SelectItem value="Hotel Makkah" className="rounded-xl">
+                        <div className="flex items-center gap-3 py-2">
+                          <div className="bg-emerald-100 p-1 rounded-lg">
+                            <Building className="h-4 w-4 text-emerald-600" />
+                          </div>
+                          <span className="font-medium">Hotel Makkah</span>
                         </div>
                       </SelectItem>
-                      <SelectItem value="Visa">
-                        <div className="flex items-center gap-2">
-                          <Receipt className="h-4 w-4" />
-                          Visa
+                      <SelectItem value="Visa" className="rounded-xl">
+                        <div className="flex items-center gap-3 py-2">
+                          <div className="bg-orange-100 p-1 rounded-lg">
+                            <Receipt className="h-4 w-4 text-orange-600" />
+                          </div>
+                          <span className="font-medium">Visa</span>
                         </div>
                       </SelectItem>
-                      <SelectItem value="Autre">
-                        <div className="flex items-center gap-2">
-                          <Receipt className="h-4 w-4" />
-                          Autre
+                      <SelectItem value="Autre" className="rounded-xl">
+                        <div className="flex items-center gap-3 py-2">
+                          <div className="bg-gray-100 p-1 rounded-lg">
+                            <Receipt className="h-4 w-4 text-gray-600" />
+                          </div>
+                          <span className="font-medium">Autre</span>
                         </div>
                       </SelectItem>
                     </SelectContent>
@@ -209,20 +250,34 @@ export default function NouvelleDepensePage() {
                 </div>
 
                 {/* Programme */}
-                <div className="space-y-2">
-                  <Label htmlFor="program" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
+                <div className="space-y-3">
+                  <Label htmlFor="program" className="text-base font-bold text-gray-800 flex items-center gap-3">
+                    <div className="bg-blue-100 p-2 rounded-lg">
+                      <Calendar className="h-5 w-5 text-blue-600" />
+                    </div>
                     Programme (optionnel)
                   </Label>
                   <Select value={formData.programId} onValueChange={(value) => setFormData({ ...formData, programId: value })}>
-                    <SelectTrigger className="h-12 text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm">
+                    <SelectTrigger className="h-14 text-base font-medium border-2 border-gray-200 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-300 shadow-lg hover:shadow-xl bg-white">
                       <SelectValue placeholder="Sélectionner un programme" />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Aucun programme</SelectItem>
+                    <SelectContent className="rounded-2xl border-2 shadow-xl">
+                      <SelectItem value="none" className="rounded-xl">
+                        <div className="flex items-center gap-3 py-2">
+                          <div className="bg-gray-100 p-1 rounded-lg">
+                            <Calendar className="h-4 w-4 text-gray-600" />
+                          </div>
+                          <span className="font-medium">Aucun programme</span>
+                        </div>
+                      </SelectItem>
                       {programmes.map((program) => (
-                        <SelectItem key={program.id} value={program.id.toString()}>
-                          {program.name}
+                        <SelectItem key={program.id} value={program.id.toString()} className="rounded-xl">
+                          <div className="flex items-center gap-3 py-2">
+                            <div className="bg-blue-100 p-1 rounded-lg">
+                              <Calendar className="h-4 w-4 text-blue-600" />
+                            </div>
+                            <span className="font-medium">{program.name}</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -230,10 +285,12 @@ export default function NouvelleDepensePage() {
                 </div>
 
                 {/* Date */}
-                <div className="space-y-2">
-                  <Label htmlFor="date" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Date
+                <div className="space-y-3">
+                  <Label htmlFor="date" className="text-base font-bold text-gray-800 flex items-center gap-3">
+                    <div className="bg-cyan-100 p-2 rounded-lg">
+                      <Calendar className="h-5 w-5 text-cyan-600" />
+                    </div>
+                    Date de la dépense
                   </Label>
                   <Input
                     id="date"
@@ -241,39 +298,52 @@ export default function NouvelleDepensePage() {
                     required
                     value={formData.date}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="h-12 text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm"
+                    className="h-14 text-base font-medium border-2 border-gray-200 rounded-2xl focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 transition-all duration-300 shadow-lg hover:shadow-xl bg-white"
                   />
                 </div>
               </div>
 
               {/* Boutons */}
-              <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-                <Link href="/depenses">
+              <div className="flex justify-between items-center pt-8 border-t-2 border-gray-100">
+                <div className="flex items-center gap-3 text-gray-600">
+                  <div className="bg-gray-100 p-2 rounded-lg">
+                    <Receipt className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">Prêt à créer la dépense ?</p>
+                    <p className="text-sm">Vérifiez toutes les informations avant de continuer</p>
+                  </div>
+                </div>
+                
+                <div className="flex gap-4">
+                  <Link href="/depenses">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-12 px-8 border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 rounded-2xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Annuler
+                    </Button>
+                  </Link>
                   <Button
-                    type="button"
-                    variant="outline"
-                    className="h-11 px-6 border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 rounded-xl font-medium transition-all duration-200"
+                    type="submit"
+                    disabled={loading}
+                    className="h-12 px-8 bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 hover:from-indigo-700 hover:via-purple-700 hover:to-blue-700 text-white rounded-2xl font-semibold shadow-xl hover:shadow-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
                   >
-                    Annuler
+                    {loading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                        Création en cours...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-5 w-5 mr-3" />
+                        Créer la dépense
+                      </>
+                    )}
                   </Button>
-                </Link>
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="h-11 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50"
-                >
-                  {loading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Création...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Créer la dépense
-                    </>
-                  )}
-                </Button>
+                </div>
               </div>
             </form>
           </CardContent>

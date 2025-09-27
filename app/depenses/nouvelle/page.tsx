@@ -61,7 +61,7 @@ export default function NouvelleDepensePage() {
         body: JSON.stringify({
           ...formData,
           amount: parseFloat(formData.amount),
-          programId: formData.programId ? parseInt(formData.programId) : null
+          programId: formData.programId && formData.programId !== "none" ? parseInt(formData.programId) : null
         }),
       })
 
@@ -219,7 +219,7 @@ export default function NouvelleDepensePage() {
                       <SelectValue placeholder="Sélectionner un programme" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Aucun programme</SelectItem>
+                      <SelectItem value="none">Aucun programme</SelectItem>
                       {programmes.map((program) => (
                         <SelectItem key={program.id} value={program.id.toString()}>
                           {program.name}

@@ -237,7 +237,7 @@ export default function SoldeCaissePage() {
       ])
 
       // Construire les données de balance côté client
-      const balanceData = buildBalanceDataFromExistingAPIs(paymentsData, expensesData, dateDebut, dateFin, programmeFilter, periodeFilter)
+      const balanceData = buildBalanceDataFromExistingAPIs(paymentsData, expensesData.expenses, dateDebut, dateFin, programmeFilter, periodeFilter)
       
       setBalanceData(balanceData)
       setProgrammes(programsData)

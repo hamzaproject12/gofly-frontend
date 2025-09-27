@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Plus, ArrowLeft, Receipt, Calendar, DollarSign, Building, Plane } from "lucide-react"
 import Link from "next/link"
 import { api } from "@/lib/api"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 
 type Program = {
   id: number
@@ -33,7 +33,7 @@ export default function NouvelleDepensePage() {
   })
 
   // Charger les programmes
-  useState(() => {
+  useEffect(() => {
     const fetchPrograms = async () => {
       try {
         const response = await fetch(api.url(api.endpoints.programs))

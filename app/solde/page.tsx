@@ -87,10 +87,26 @@ function buildBalanceDataFromExistingAPIs(paymentsData: any[], expensesData: any
     filteredExpenses = filteredExpenses.filter(e => e.program?.name === programmeFilter)
   }
 
-  // Calculer les statistiques globales
-  const totalPaiements = filteredPayments.reduce((sum, p) => sum + p.amount, 0)
-  const totalDepenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0)
+  // Calculer les statistiques globales avec vérifications
+  const totalPaiements = filteredPayments.reduce((sum, p) => {
+    const amount = parseFloat(p.amount) || 0
+    return sum + amount
+  }, 0)
+  
+  const totalDepenses = filteredExpenses.reduce((sum, e) => {
+    const amount = parseFloat(e.amount) || 0
+    return sum + amount
+  }, 0)
+  
   const soldeFinal = totalPaiements - totalDepenses
+
+  console.log('Calculs:', {
+    totalPaiements,
+    totalDepenses,
+    soldeFinal,
+    filteredPaymentsCount: filteredPayments.length,
+    filteredExpensesCount: filteredExpenses.length
+  })
 
   // Calculer les données par mois
   const moisData = calculateMonthlyData(filteredPayments, filteredExpenses, periodeFilter)
@@ -151,8 +167,16 @@ function calculateMonthlyData(payments: any[], expenses: any[], periode: string)
       return expenseDate >= monthStart && expenseDate <= monthEnd
     })
     
-    const totalPaiementsMois = paiementsMois.reduce((sum, p) => sum + p.amount, 0)
-    const totalDepensesMois = depensesMois.reduce((sum, e) => sum + e.amount, 0)
+    const totalPaiementsMois = paiementsMois.reduce((sum, p) => {
+      const amount = parseFloat(p.amount) || 0
+      return sum + amount
+    }, 0)
+    
+    const totalDepensesMois = depensesMois.reduce((sum, e) => {
+      const amount = parseFloat(e.amount) || 0
+      return sum + amount
+    }, 0)
+    
     const soldeMois = totalPaiementsMois - totalDepensesMois
     
     moisData.push({
@@ -177,7 +201,7 @@ function createTransactionDetails(payments: any[], expenses: any[]) {
       date: payment.paymentDate,
       type: 'paiement',
       description: `Paiement - ${payment.reservation?.firstName || 'N/A'} ${payment.reservation?.lastName || 'N/A'}`,
-      montant: payment.amount,
+      montant: parseFloat(payment.amount) || 0,
       programme: payment.reservation?.program?.name || 'Programme non spécifié',
       reservationId: payment.reservationId
     })
@@ -190,7 +214,7 @@ function createTransactionDetails(payments: any[], expenses: any[]) {
       date: expense.date,
       type: 'depense',
       description: expense.description,
-      montant: -expense.amount, // Négatif pour les dépenses
+      montant: -(parseFloat(expense.amount) || 0), // Négatif pour les dépenses
       programme: expense.program?.name || 'Programme non spécifié',
       programId: expense.programId
     })
@@ -235,6 +259,11 @@ export default function SoldeCaissePage() {
         expensesResponse.json(),
         programsResponse.json()
       ])
+
+      // Debug: Vérifier la structure des données
+      console.log('Payments data:', paymentsData)
+      console.log('Expenses data:', expensesData)
+      console.log('Expenses array:', expensesData.expenses)
 
       // Construire les données de balance côté client
       const balanceData = buildBalanceDataFromExistingAPIs(paymentsData, expensesData.expenses, dateDebut, dateFin, programmeFilter, periodeFilter)

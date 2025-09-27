@@ -62,6 +62,17 @@ type Program = {
 
 // Fonction pour construire les données de balance à partir des APIs existantes
 function buildBalanceDataFromExistingAPIs(paymentsData: any[], expensesData: any[], dateDebut: string, dateFin: string, programmeFilter: string, periodeFilter: string): BalanceData {
+  console.log('Building balance data with:', {
+    paymentsCount: paymentsData.length,
+    expensesCount: expensesData.length,
+    paymentsSample: paymentsData.slice(0, 2),
+    expensesSample: expensesData.slice(0, 2),
+    dateDebut,
+    dateFin,
+    programmeFilter,
+    periodeFilter
+  })
+  
   // Appliquer les filtres de date
   let filteredPayments = paymentsData
   let filteredExpenses = expensesData
@@ -244,9 +255,10 @@ export default function SoldeCaissePage() {
       setError(null)
       
       // Utiliser les APIs existantes temporairement
+      // Pour les dépenses, récupérer toutes les données (pas de pagination)
       const [paymentsResponse, expensesResponse, programsResponse] = await Promise.all([
         fetch(api.url('/api/payments')),
-        fetch(api.url('/api/expenses')),
+        fetch(api.url('/api/expenses?limit=1000')), // Récupérer toutes les dépenses
         fetch(api.url(api.endpoints.programs))
       ])
 
@@ -262,11 +274,14 @@ export default function SoldeCaissePage() {
 
       // Debug: Vérifier la structure des données
       console.log('Payments data:', paymentsData)
-      console.log('Expenses data:', expensesData)
+      console.log('Expenses data structure:', expensesData)
       console.log('Expenses array:', expensesData.expenses)
+      console.log('Expenses count:', expensesData.expenses?.length || 0)
 
       // Construire les données de balance côté client
-      const balanceData = buildBalanceDataFromExistingAPIs(paymentsData, expensesData.expenses, dateDebut, dateFin, programmeFilter, periodeFilter)
+      // Assurer que nous avons bien un tableau d'expenses
+      const expensesArray = Array.isArray(expensesData.expenses) ? expensesData.expenses : []
+      const balanceData = buildBalanceDataFromExistingAPIs(paymentsData, expensesArray, dateDebut, dateFin, programmeFilter, periodeFilter)
       
       setBalanceData(balanceData)
       setProgrammes(programsData)

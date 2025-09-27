@@ -60,6 +60,146 @@ type Program = {
   name: string
 }
 
+// Fonction pour construire les données de balance à partir des APIs existantes
+function buildBalanceDataFromExistingAPIs(paymentsData: any[], expensesData: any[], dateDebut: string, dateFin: string, programmeFilter: string, periodeFilter: string): BalanceData {
+  // Appliquer les filtres de date
+  let filteredPayments = paymentsData
+  let filteredExpenses = expensesData
+
+  if (dateDebut || dateFin) {
+    const startDate = dateDebut ? new Date(dateDebut) : null
+    const endDate = dateFin ? new Date(dateFin) : null
+
+    filteredPayments = paymentsData.filter(p => {
+      const paymentDate = new Date(p.paymentDate)
+      return (!startDate || paymentDate >= startDate) && (!endDate || paymentDate <= endDate)
+    })
+
+    filteredExpenses = expensesData.filter(e => {
+      const expenseDate = new Date(e.date)
+      return (!startDate || expenseDate >= startDate) && (!endDate || expenseDate <= endDate)
+    })
+  }
+
+  // Appliquer le filtre de programme
+  if (programmeFilter !== 'tous') {
+    filteredPayments = filteredPayments.filter(p => p.reservation?.program?.name === programmeFilter)
+    filteredExpenses = filteredExpenses.filter(e => e.program?.name === programmeFilter)
+  }
+
+  // Calculer les statistiques globales
+  const totalPaiements = filteredPayments.reduce((sum, p) => sum + p.amount, 0)
+  const totalDepenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0)
+  const soldeFinal = totalPaiements - totalDepenses
+
+  // Calculer les données par mois
+  const moisData = calculateMonthlyData(filteredPayments, filteredExpenses, periodeFilter)
+
+  // Créer les détails des transactions
+  const detailsData = createTransactionDetails(filteredPayments, filteredExpenses)
+
+  // Trouver le mois avec le plus grand bénéfice
+  const moisMaxBenefice = moisData.reduce((max, item) => (item.solde > max.solde ? item : max), { mois: "", solde: 0 })
+
+  // Calculer les totaux pour le résumé
+  const totalPaiementsMois = moisData.reduce((sum, item) => sum + item.paiements, 0)
+  const totalDepensesMois = moisData.reduce((sum, item) => sum + item.depenses, 0)
+  const soldeTotalMois = moisData.reduce((sum, item) => sum + item.solde, 0)
+
+  return {
+    statistics: {
+      totalPaiements,
+      totalDepenses,
+      soldeFinal
+    },
+    moisData,
+    detailsData,
+    moisMaxBenefice,
+    summary: {
+      totalPaiements: totalPaiementsMois,
+      totalDepenses: totalDepensesMois,
+      soldeTotal: soldeTotalMois
+    }
+  }
+}
+
+// Fonction pour calculer les données par mois
+function calculateMonthlyData(payments: any[], expenses: any[], periode: string) {
+  const moisData: any[] = []
+  
+  // Déterminer le nombre de mois à analyser
+  const monthsToAnalyze = periode === 'trimestre' ? 3 : periode === 'annee' ? 12 : 6
+  
+  // Générer les mois à analyser (les X derniers mois)
+  const currentDate = new Date()
+  for (let i = monthsToAnalyze - 1; i >= 0; i--) {
+    const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1)
+    const mois = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+    const moisCapitalized = mois.charAt(0).toUpperCase() + mois.slice(1)
+    
+    // Filtrer les paiements pour ce mois
+    const monthStart = new Date(date.getFullYear(), date.getMonth(), 1)
+    const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59)
+    
+    const paiementsMois = payments.filter(p => {
+      const paymentDate = new Date(p.paymentDate)
+      return paymentDate >= monthStart && paymentDate <= monthEnd
+    })
+    
+    const depensesMois = expenses.filter(e => {
+      const expenseDate = new Date(e.date)
+      return expenseDate >= monthStart && expenseDate <= monthEnd
+    })
+    
+    const totalPaiementsMois = paiementsMois.reduce((sum, p) => sum + p.amount, 0)
+    const totalDepensesMois = depensesMois.reduce((sum, e) => sum + e.amount, 0)
+    const soldeMois = totalPaiementsMois - totalDepensesMois
+    
+    moisData.push({
+      mois: moisCapitalized,
+      paiements: totalPaiementsMois,
+      depenses: totalDepensesMois,
+      solde: soldeMois
+    })
+  }
+  
+  return moisData
+}
+
+// Fonction pour créer les détails des transactions
+function createTransactionDetails(payments: any[], expenses: any[]) {
+  const details: any[] = []
+  
+  // Ajouter les paiements
+  payments.forEach(payment => {
+    details.push({
+      id: `payment_${payment.id}`,
+      date: payment.paymentDate,
+      type: 'paiement',
+      description: `Paiement - ${payment.reservation?.firstName || 'N/A'} ${payment.reservation?.lastName || 'N/A'}`,
+      montant: payment.amount,
+      programme: payment.reservation?.program?.name || 'Programme non spécifié',
+      reservationId: payment.reservationId
+    })
+  })
+  
+  // Ajouter les dépenses
+  expenses.forEach(expense => {
+    details.push({
+      id: `expense_${expense.id}`,
+      date: expense.date,
+      type: 'depense',
+      description: expense.description,
+      montant: -expense.amount, // Négatif pour les dépenses
+      programme: expense.program?.name || 'Programme non spécifié',
+      programId: expense.programId
+    })
+  })
+  
+  // Trier par date (plus récent en premier)
+  return details.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+}
+
 export default function SoldeCaissePage() {
   // États pour les filtres
   const [dateDebut, setDateDebut] = useState("")
@@ -79,27 +219,26 @@ export default function SoldeCaissePage() {
       setLoading(true)
       setError(null)
       
-      // Construire les paramètres de requête
-      const params = new URLSearchParams()
-      if (dateDebut) params.append('dateDebut', dateDebut)
-      if (dateFin) params.append('dateFin', dateFin)
-      if (programmeFilter !== 'tous') params.append('programme', programmeFilter)
-      if (periodeFilter) params.append('periode', periodeFilter)
-      
-      const [balanceResponse, programsResponse] = await Promise.all([
-        fetch(`${api.url('/api/balance')}?${params}`),
+      // Utiliser les APIs existantes temporairement
+      const [paymentsResponse, expensesResponse, programsResponse] = await Promise.all([
+        fetch(api.url('/api/payments')),
+        fetch(api.url('/api/expenses')),
         fetch(api.url(api.endpoints.programs))
       ])
 
-      if (!balanceResponse.ok || !programsResponse.ok) {
+      if (!paymentsResponse.ok || !expensesResponse.ok || !programsResponse.ok) {
         throw new Error('Erreur lors du chargement des données')
       }
 
-      const [balanceData, programsData] = await Promise.all([
-        balanceResponse.json(),
+      const [paymentsData, expensesData, programsData] = await Promise.all([
+        paymentsResponse.json(),
+        expensesResponse.json(),
         programsResponse.json()
       ])
 
+      // Construire les données de balance côté client
+      const balanceData = buildBalanceDataFromExistingAPIs(paymentsData, expensesData, dateDebut, dateFin, programmeFilter, periodeFilter)
+      
       setBalanceData(balanceData)
       setProgrammes(programsData)
     } catch (err) {

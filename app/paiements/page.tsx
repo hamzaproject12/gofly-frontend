@@ -42,7 +42,7 @@ type Payment = {
     firstName: string
     lastName: string
     phone: string
-    program?: {
+    program: {
       id: number
       name: string
     }
@@ -114,7 +114,7 @@ export default function PaiementsPage() {
   // Calcul des statistiques
   const totalPaiements = paiements.reduce((sum, p) => sum + p.amount, 0)
   const paiementsParCarte = paiements.filter(p => p.paymentMethod === "Carte").reduce((sum, p) => sum + p.amount, 0)
-  const paiementsParEspeces = paiements.filter(p => p.paymentMethod === "Espèces").reduce((sum, p) => sum + p.amount, 0)
+  const paiementsParEspeces = paiements.filter(p => p.paymentMethod === "especes").reduce((sum, p) => sum + p.amount, 0)
   const paiementsParVirement = paiements.filter(p => p.paymentMethod === "Virement").reduce((sum, p) => sum + p.amount, 0)
   const paiementsParCheque = paiements.filter(p => p.paymentMethod === "Chèque").reduce((sum, p) => sum + p.amount, 0)
 
@@ -122,7 +122,7 @@ export default function PaiementsPage() {
     switch (method) {
       case "Carte":
         return <CreditCard className="h-4 w-4" />
-      case "Espèces":
+      case "especes":
         return <DollarSign className="h-4 w-4" />
       case "Virement":
         return <FileText className="h-4 w-4" />
@@ -137,7 +137,7 @@ export default function PaiementsPage() {
     switch (method) {
       case "Carte":
         return "bg-blue-100 text-blue-800"
-      case "Espèces":
+      case "especes":
         return "bg-green-100 text-green-800"
       case "Virement":
         return "bg-purple-100 text-purple-800"
@@ -306,7 +306,7 @@ export default function PaiementsPage() {
                   <SelectContent>
                     <SelectItem value="tous">Toutes les méthodes</SelectItem>
                     <SelectItem value="Carte">Carte</SelectItem>
-                    <SelectItem value="Espèces">Espèces</SelectItem>
+                    <SelectItem value="especes">Espèces</SelectItem>
                     <SelectItem value="Virement">Virement</SelectItem>
                     <SelectItem value="Chèque">Chèque</SelectItem>
                   </SelectContent>
@@ -364,7 +364,7 @@ export default function PaiementsPage() {
                         </h3>
                         <p className="text-sm text-gray-600">{paiement.reservation.phone}</p>
                         <p className="text-sm text-gray-500">
-                          {paiement.reservation.program?.name || "Programme non spécifié"}
+                          {paiement.reservation.program.name}
                         </p>
                       </div>
                     </div>
@@ -385,19 +385,23 @@ export default function PaiementsPage() {
                             variant="outline"
                             size="sm"
                             className="border-green-200 text-green-700 hover:bg-green-50"
+                            onClick={() => window.open(`http://localhost:5000/uploads/${paiement.fichier.filePath}`, '_blank')}
                           >
                             <Download className="h-4 w-4 mr-1" />
                             Reçu
                           </Button>
                         )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="border-blue-200 text-blue-700 hover:bg-blue-50"
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Voir
-                        </Button>
+                        {paiement.fichier && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                            onClick={() => window.open(`http://localhost:5000/uploads/${paiement.fichier.filePath}`, '_blank')}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Voir
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>

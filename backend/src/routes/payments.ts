@@ -50,7 +50,11 @@ router.get('/', async (req, res) => {
     const payments = await prisma.payment.findMany({
       include: {
         fichier: true,
-        reservation: true
+        reservation: {
+          include: {
+            program: true
+          }
+        }
       }
     });
     res.json(payments);

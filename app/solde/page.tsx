@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
+import { api } from "@/lib/api"
 import RoleProtectedRoute from "../components/RoleProtectedRoute"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -23,6 +24,42 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
+type BalanceData = {
+  statistics: {
+    totalPaiements: number
+    totalDepenses: number
+    soldeFinal: number
+  }
+  moisData: Array<{
+    mois: string
+    paiements: number
+    depenses: number
+    solde: number
+  }>
+  detailsData: Array<{
+    id: string
+    date: string
+    type: string
+    description: string
+    montant: number
+    programme: string
+  }>
+  moisMaxBenefice: {
+    mois: string
+    solde: number
+  }
+  summary: {
+    totalPaiements: number
+    totalDepenses: number
+    soldeTotal: number
+  }
+}
+
+type Program = {
+  id: number
+  name: string
+}
+
 export default function SoldeCaissePage() {
   // États pour les filtres
   const [dateDebut, setDateDebut] = useState("")
@@ -30,80 +67,103 @@ export default function SoldeCaissePage() {
   const [programmeFilter, setProgrammeFilter] = useState("tous")
   const [periodeFilter, setPeriodeFilter] = useState("mois")
 
-  // Données simulées
-  const programmes = ["Tous", "Omra Ramadan 2024", "Omra Février 2024", "Omra Décembre 2023"]
+  // États pour les données
+  const [balanceData, setBalanceData] = useState<BalanceData | null>(null)
+  const [programmes, setProgrammes] = useState<Program[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const moisData = [
-    { mois: "Janvier 2024", paiements: 120000, depenses: 80000, solde: 40000 },
-    { mois: "Février 2024", paiements: 180000, depenses: 110000, solde: 70000 },
-    { mois: "Mars 2024", paiements: 150000, depenses: 90000, solde: 60000 },
-    { mois: "Avril 2024", paiements: 200000, depenses: 130000, solde: 70000 },
-    { mois: "Mai 2024", paiements: 160000, depenses: 100000, solde: 60000 },
-    { mois: "Juin 2024", paiements: 140000, depenses: 85000, solde: 55000 },
-  ]
+  // Fonction pour récupérer les données
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      // Construire les paramètres de requête
+      const params = new URLSearchParams()
+      if (dateDebut) params.append('dateDebut', dateDebut)
+      if (dateFin) params.append('dateFin', dateFin)
+      if (programmeFilter !== 'tous') params.append('programme', programmeFilter)
+      if (periodeFilter) params.append('periode', periodeFilter)
+      
+      const [balanceResponse, programsResponse] = await Promise.all([
+        fetch(`${api.url('/api/balance')}?${params}`),
+        fetch(api.url(api.endpoints.programs))
+      ])
 
-  const detailsData = [
-    {
-      date: "2024-06-01",
-      type: "paiement",
-      description: "Réservation Omra Ramadan - Ahmed Benali",
-      montant: 30000,
-      programme: "Omra Ramadan 2024",
-    },
-    {
-      date: "2024-06-02",
-      type: "paiement",
-      description: "Réservation Omra Ramadan - Fatima Alaoui",
-      montant: 25000,
-      programme: "Omra Ramadan 2024",
-    },
-    {
-      date: "2024-06-03",
-      type: "depense",
-      description: "Réservation Hôtel Médine - Groupe Imane",
-      montant: -45000,
-      programme: "Omra Ramadan 2024",
-    },
-    {
-      date: "2024-06-05",
-      type: "paiement",
-      description: "Réservation Omra Février - Mohamed Tazi",
-      montant: 28000,
-      programme: "Omra Février 2024",
-    },
-    {
-      date: "2024-06-07",
-      type: "depense",
-      description: "Billets d'avion - Groupe 15 personnes",
-      montant: -120000,
-      programme: "Omra Ramadan 2024",
-    },
-    {
-      date: "2024-06-10",
-      type: "paiement",
-      description: "Réservation Omra Février - Aicha Bennani",
-      montant: 32000,
-      programme: "Omra Février 2024",
-    },
-  ]
+      if (!balanceResponse.ok || !programsResponse.ok) {
+        throw new Error('Erreur lors du chargement des données')
+      }
 
-  // Calcul des totaux
-  const totalPaiements = detailsData
-    .filter((item) => item.type === "paiement")
-    .reduce((sum, item) => sum + item.montant, 0)
-  const totalDepenses = detailsData
-    .filter((item) => item.type === "depense")
-    .reduce((sum, item) => sum + item.montant, 0)
-  const soldeFinal = totalPaiements + totalDepenses // Les dépenses sont déjà négatives
+      const [balanceData, programsData] = await Promise.all([
+        balanceResponse.json(),
+        programsResponse.json()
+      ])
 
-  // Filtrage des données
-  const filteredDetails = detailsData.filter((item) => {
-    const programmeMatch = programmeFilter === "tous" || item.programme === programmeFilter
-    return programmeMatch
-  })
+      setBalanceData(balanceData)
+      setProgrammes(programsData)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+    } finally {
+      setLoading(false)
+    }
+  }, [dateDebut, dateFin, programmeFilter, periodeFilter])
 
-  // Trouver le mois avec le plus grand bénéfice
-  const moisMaxBenefice = moisData.reduce((max, item) => (item.solde > max.solde ? item : max), { mois: "", solde: 0 })
+  // Charger les données au montage et quand les filtres changent
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  // Données par défaut si pas encore chargées
+  const data = balanceData || {
+    statistics: { totalPaiements: 0, totalDepenses: 0, soldeFinal: 0 },
+    moisData: [],
+    detailsData: [],
+    moisMaxBenefice: { mois: "", solde: 0 },
+    summary: { totalPaiements: 0, totalDepenses: 0, soldeTotal: 0 }
+  }
+
+  const { statistics, moisData, detailsData, moisMaxBenefice, summary } = data
+  const { totalPaiements, totalDepenses, soldeFinal } = statistics
+
+  // Filtrage des données par programme (fait côté serveur maintenant)
+  const filteredDetails = detailsData
+
+  if (loading) {
+    return (
+      <RoleProtectedRoute allowedRoles={['ADMIN']}>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Chargement du solde de caisse...</p>
+          </div>
+        </div>
+      </RoleProtectedRoute>
+    )
+  }
+
+  if (error) {
+    return (
+      <RoleProtectedRoute allowedRoles={['ADMIN']}>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+          <Card className="max-w-md mx-auto">
+            <CardHeader>
+              <CardTitle className="text-red-600 flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Erreur
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-600 mb-4">{error}</p>
+              <Button onClick={fetchData} className="w-full">
+                Réessayer
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </RoleProtectedRoute>
+    )
+  }
 
   return (
     <RoleProtectedRoute allowedRoles={['ADMIN']}>
@@ -203,9 +263,10 @@ export default function SoldeCaissePage() {
                     <SelectValue placeholder="Tous les programmes" />
                   </SelectTrigger>
                   <SelectContent>
-                    {programmes.map((programme, index) => (
-                      <SelectItem key={index} value={index === 0 ? "tous" : programme}>
-                        {programme}
+                    <SelectItem value="tous">Tous les programmes</SelectItem>
+                    {programmes.map((programme) => (
+                      <SelectItem key={programme.id} value={programme.name}>
+                        {programme.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -306,21 +367,21 @@ export default function SoldeCaissePage() {
                   <div className="bg-green-50 p-4 rounded-lg">
                     <h3 className="text-sm font-medium text-green-700 mb-2">Total des paiements</h3>
                     <p className="text-2xl font-bold text-green-700">
-                      {moisData.reduce((sum, item) => sum + item.paiements, 0).toLocaleString()} DH
+                      {summary.totalPaiements.toLocaleString()} DH
                     </p>
                   </div>
 
                   <div className="bg-red-50 p-4 rounded-lg">
                     <h3 className="text-sm font-medium text-red-700 mb-2">Total des dépenses</h3>
                     <p className="text-2xl font-bold text-red-700">
-                      {moisData.reduce((sum, item) => sum + item.depenses, 0).toLocaleString()} DH
+                      {summary.totalDepenses.toLocaleString()} DH
                     </p>
                   </div>
 
                   <div className="bg-yellow-50 p-4 rounded-lg">
                     <h3 className="text-sm font-medium text-yellow-700 mb-2">Solde total</h3>
                     <p className="text-2xl font-bold text-yellow-700">
-                      {moisData.reduce((sum, item) => sum + item.solde, 0).toLocaleString()} DH
+                      {summary.soldeTotal.toLocaleString()} DH
                     </p>
                   </div>
                 </div>

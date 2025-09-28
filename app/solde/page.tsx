@@ -25,33 +25,75 @@ import {
 import Link from "next/link"
 
 type BalanceData = {
+  // 📊 Statistiques principales
   statistics: {
     totalPaiements: number
     totalDepenses: number
     soldeFinal: number
+    countPaiements: number
+    countDepenses: number
   }
-  moisData: Array<{
+
+  // 📈 Données par mois
+  parMois: Array<{
     mois: string
     paiements: number
     depenses: number
     solde: number
   }>
-  detailsData: Array<{
+
+  // 🏆 Statistiques détaillées
+  parMethodePaiement: Array<{
+    methode: string
+    total: number
+    count: number
+  }>
+
+  parTypeDepense: Array<{
+    type: string
+    total: number
+    count: number
+  }>
+
+  parAgent: Array<{
+    agentId: number
+    agentName: string
+    total: number
+    count: number
+  }>
+
+  // 📋 Détails des transactions
+  details: Array<{
     id: string
     date: string
     type: string
     description: string
     montant: number
     programme: string
+    reservationId?: number
+    programId?: number
+    methodePaiement?: string
+    typeDepense?: string
   }>
-  moisMaxBenefice: {
-    mois: string
-    solde: number
-  }
+
+  // 🏆 Résumé et métriques
   summary: {
+    moisMaxBenefice: {
+      mois: string
+      solde: number
+    }
     totalPaiements: number
     totalDepenses: number
     soldeTotal: number
+  }
+
+  // 🔧 Métadonnées
+  metadata: {
+    periode: string
+    dateDebut: string | null
+    dateFin: string | null
+    programme: string
+    generatedAt: string
   }
 }
 
@@ -60,8 +102,8 @@ type Program = {
   name: string
 }
 
-// Fonction pour construire les données de balance à partir des APIs existantes
-function buildBalanceDataFromExistingAPIs(paymentsData: any[], expensesData: any[], dateDebut: string, dateFin: string, programmeFilter: string, periodeFilter: string): BalanceData {
+// 🎯 Plus besoin de fonctions côté client - tout est géré par l'API Balance optimisée !
+/*function buildBalanceDataFromExistingAPIs(paymentsData: any[], expensesData: any[], dateDebut: string, dateFin: string, programmeFilter: string, periodeFilter: string): BalanceData {
   console.log('Building balance data with:', {
     paymentsCount: paymentsData.length,
     expensesCount: expensesData.length,
@@ -148,9 +190,9 @@ function buildBalanceDataFromExistingAPIs(paymentsData: any[], expensesData: any
       soldeTotal: soldeTotalMois
     }
   }
-}
+}*/
 
-// Fonction pour calculer les données par mois
+/*// Fonction pour calculer les données par mois
 function calculateMonthlyData(payments: any[], expenses: any[], periode: string) {
   const moisData: any[] = []
   
@@ -199,9 +241,9 @@ function calculateMonthlyData(payments: any[], expenses: any[], periode: string)
   }
   
   return moisData
-}
+}*/
 
-// Fonction pour créer les détails des transactions
+/*// Fonction pour créer les détails des transactions
 function createTransactionDetails(payments: any[], expenses: any[]) {
   const details: any[] = []
   
@@ -233,7 +275,7 @@ function createTransactionDetails(payments: any[], expenses: any[]) {
   
   // Trier par date (plus récent en premier)
   return details.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-}
+}*/
 
 export default function SoldeCaissePage() {
   // États pour les filtres
@@ -248,44 +290,40 @@ export default function SoldeCaissePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fonction pour récupérer les données
+  // 🎯 Fonction optimisée pour récupérer les données via l'API Balance
   const fetchData = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
       
-      // Utiliser les APIs existantes temporairement
-      // Pour les dépenses, récupérer toutes les données (pas de pagination)
-      const [paymentsResponse, expensesResponse, programsResponse] = await Promise.all([
-        fetch(api.url('/api/payments')),
-        fetch(api.url('/api/expenses?limit=1000')), // Récupérer toutes les dépenses
-        fetch(api.url(api.endpoints.programs))
-      ])
+      // 🚀 UNE SEULE requête vers l'API Balance optimisée
+      const params = new URLSearchParams()
+      if (dateDebut) params.append('dateDebut', dateDebut)
+      if (dateFin) params.append('dateFin', dateFin)
+      if (programmeFilter && programmeFilter !== 'tous') params.append('programme', programmeFilter)
+      if (periodeFilter) params.append('periode', periodeFilter)
 
-      if (!paymentsResponse.ok || !expensesResponse.ok || !programsResponse.ok) {
-        throw new Error('Erreur lors du chargement des données')
+      const balanceResponse = await fetch(api.url(`/api/balance?${params.toString()}`))
+      
+      if (!balanceResponse.ok) {
+        throw new Error('Erreur lors du chargement des données de balance')
       }
 
-      const [paymentsData, expensesData, programsData] = await Promise.all([
-        paymentsResponse.json(),
-        expensesResponse.json(),
-        programsResponse.json()
-      ])
+      const balanceData = await balanceResponse.json()
+      
+      // Récupérer aussi les programmes pour les filtres
+      const programsResponse = await fetch(api.url(api.endpoints.programs))
+      if (!programsResponse.ok) {
+        throw new Error('Erreur lors du chargement des programmes')
+      }
+      const programsData = await programsResponse.json()
 
-      // Debug: Vérifier la structure des données
-      console.log('Payments data:', paymentsData)
-      console.log('Expenses data structure:', expensesData)
-      console.log('Expenses array:', expensesData.expenses)
-      console.log('Expenses count:', expensesData.expenses?.length || 0)
-
-      // Construire les données de balance côté client
-      // Assurer que nous avons bien un tableau d'expenses
-      const expensesArray = Array.isArray(expensesData.expenses) ? expensesData.expenses : []
-      const balanceData = buildBalanceDataFromExistingAPIs(paymentsData, expensesArray, dateDebut, dateFin, programmeFilter, periodeFilter)
+      console.log('✅ Balance API - Données reçues:', balanceData)
       
       setBalanceData(balanceData)
       setProgrammes(programsData)
     } catch (err) {
+      console.error('❌ Erreur fetchData:', err)
       setError(err instanceof Error ? err.message : 'Une erreur est survenue')
     } finally {
       setLoading(false)
@@ -299,18 +337,27 @@ export default function SoldeCaissePage() {
 
   // Données par défaut si pas encore chargées
   const data = balanceData || {
-    statistics: { totalPaiements: 0, totalDepenses: 0, soldeFinal: 0 },
-    moisData: [],
-    detailsData: [],
-    moisMaxBenefice: { mois: "", solde: 0 },
-    summary: { totalPaiements: 0, totalDepenses: 0, soldeTotal: 0 }
+    statistics: { totalPaiements: 0, totalDepenses: 0, soldeFinal: 0, countPaiements: 0, countDepenses: 0 },
+    parMois: [],
+    details: [],
+    summary: { 
+      moisMaxBenefice: { mois: "", solde: 0 },
+      totalPaiements: 0, 
+      totalDepenses: 0, 
+      soldeTotal: 0 
+    },
+    parMethodePaiement: [],
+    parTypeDepense: [],
+    parAgent: [],
+    metadata: { periode: 'mois', dateDebut: null, dateFin: null, programme: 'tous', generatedAt: new Date().toISOString() }
   }
 
-  const { statistics, moisData, detailsData, moisMaxBenefice, summary } = data
+  const { statistics, parMois, details, summary, parMethodePaiement, parTypeDepense, parAgent } = data
   const { totalPaiements, totalDepenses, soldeFinal } = statistics
+  const { moisMaxBenefice } = summary
 
   // Filtrage des données par programme (fait côté serveur maintenant)
-  const filteredDetails = detailsData
+  const filteredDetails = details
 
   if (loading) {
     return (
@@ -484,7 +531,7 @@ export default function SoldeCaissePage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {moisData.map((item, index) => (
+                  {parMois.map((item, index) => (
                     <div key={index} className="bg-gray-50 p-4 rounded-lg">
                       <div className="flex justify-between items-center mb-2">
                         <h3 className="font-medium">{item.mois}</h3>

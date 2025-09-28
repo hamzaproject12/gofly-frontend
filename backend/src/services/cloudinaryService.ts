@@ -49,7 +49,6 @@ class CloudinaryService {
         folder: options.folder || 'omra-travel',
         resource_type: options.resource_type || 'auto',
         quality: options.quality || 'auto',
-        format: options.format || 'auto',
         ...options
       };
 
@@ -110,14 +109,12 @@ class CloudinaryService {
       // Pour les images (reçus photos)
       transformation.push(
         { quality: 'auto:good' },
-        { format: 'auto' },
         { flags: 'attachment' }, // Force download
         { secure: true }
       );
     } else if (file.mimetype === 'application/pdf') {
       // Pour les PDFs
       transformation.push(
-        { format: 'pdf' },
         { flags: 'attachment' },
         { secure: true }
       );

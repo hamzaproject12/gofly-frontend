@@ -11,6 +11,7 @@ import expenseRoutes from './routes/expenses';
 import uploadRouter from './routes/upload';
 import hotelsRouter from './routes/hotels';
 import paymentsRouter from './routes/payments';
+import balanceRouter from './routes/balance';
 import authRoutes from './routes/auth';
 import adminRoutes from './routes/admin';
 
@@ -71,6 +72,7 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/upload', uploadRouter);
 app.use('/api/hotels', hotelsRouter);
 app.use('/api/payments', paymentsRouter);
+app.use('/api/balance', balanceRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -143,6 +145,7 @@ app.listen(PORT, async () => {
   console.log('- /api/upload');
   console.log('- /api/hotels');
   console.log('- /api/payments');
+  console.log('- /api/balance');
   console.log('- /api/test');
   console.log('- /api/hotels-test');
   console.log('- /health');

@@ -36,6 +36,8 @@ type Payment = {
     fileName: string
     filePath: string
     fileType: string
+    cloudinaryId?: string
+    cloudinaryUrl?: string
   }
   reservation: {
     id: number
@@ -385,7 +387,12 @@ export default function PaiementsPage() {
                             variant="outline"
                             size="sm"
                             className="border-green-200 text-green-700 hover:bg-green-50"
-                            onClick={() => window.open(`http://localhost:5000/uploads/${paiement.fichier.filePath}`, '_blank')}
+                            onClick={() => {
+                              // Utiliser l'URL Cloudinary si disponible, sinon l'ancienne URL locale
+                              const fileUrl = paiement.fichier?.cloudinaryUrl || 
+                                             `http://localhost:5000/uploads/${paiement.fichier?.filePath}`;
+                              window.open(fileUrl, '_blank');
+                            }}
                           >
                             <Download className="h-4 w-4 mr-1" />
                             Reçu
@@ -396,7 +403,12 @@ export default function PaiementsPage() {
                             variant="outline"
                             size="sm"
                             className="border-blue-200 text-blue-700 hover:bg-blue-50"
-                            onClick={() => window.open(`http://localhost:5000/uploads/${paiement.fichier.filePath}`, '_blank')}
+                            onClick={() => {
+                              // Utiliser l'URL Cloudinary si disponible, sinon l'ancienne URL locale
+                              const fileUrl = paiement.fichier?.cloudinaryUrl || 
+                                             `http://localhost:5000/uploads/${paiement.fichier?.filePath}`;
+                              window.open(fileUrl, '_blank');
+                            }}
                           >
                             <Eye className="h-4 w-4 mr-1" />
                             Voir

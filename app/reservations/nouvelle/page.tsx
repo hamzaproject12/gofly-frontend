@@ -1109,37 +1109,52 @@ export default function NouvelleReservation() {
         );
       }
 
-      // Reçus de paiement (paiements avec fichier)
+      // Reçus de paiement (paiements avec fichier) - Utilisation de Cloudinary
       let paymentErrors: string[] = [];
       if (documents.payment && documents.payment.length > 0) {
         let paymentUploaded = false;
         await Promise.all(documents.payment.map(async (file, index) => {
-          console.log('Traitement fichier paiement:', { file, index });
+          console.log('🚀 Traitement fichier paiement avec Cloudinary:', { file, index });
           if (!file) return;
+          
           const formDataPaiement = new FormData();
-          formDataPaiement.append("payment", file);
+          formDataPaiement.append("file", file);
           formDataPaiement.append("reservationId", reservationId.toString());
+          formDataPaiement.append("fileType", "payment");
 
-                        const response = await fetch(api.url(api.endpoints.upload), {
+          // Utiliser le nouvel endpoint Cloudinary
+          const response = await fetch(api.url(api.endpoints.uploadCloudinary), {
             method: "POST",
             body: formDataPaiement,
           });
+          
           if (response.ok) {
             paymentUploaded = true;
-            // Récupérer l'id du fichier uploadé
+            // Récupérer les données du fichier uploadé vers Cloudinary
             const data = await response.json();
-            const fichierId = data.files && data.files[0] && data.files[0].id;
-            console.log('Résultat upload fichier paiement:', data, 'fichierId:', fichierId, 'paiement:', paiements[index]);
+            const uploadedFile = data.results && data.results[0];
+            const fichierId = uploadedFile && uploadedFile.id;
+            
+            console.log('✅ Résultat upload Cloudinary:', {
+              data,
+              uploadedFile,
+              fichierId,
+              paiement: paiements[index],
+              cloudinaryInfo: uploadedFile?.cloudinaryInfo
+            });
+            
             // Insérer le paiement avec le fichierId
             const paiement = paiements[index];
             if (paiement && fichierId) {
-              console.log('Paiement à insérer (avec fichier):', {
+              console.log('💰 Paiement à insérer (avec fichier Cloudinary):', {
                 paiement,
                 fichierId,
+                cloudinaryUrl: uploadedFile?.cloudinaryUrl,
                 index,
                 paiements,
                 documentsPayment: documents.payment
               });
+              
               const paymentResponse = await fetch(api.url(api.endpoints.payments), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1151,15 +1166,24 @@ export default function NouvelleReservation() {
                   programId: formData.programId
                 })
               });
+              
               const paymentData = await paymentResponse.clone().json();
-              console.log('Réponse API /api/payments (avec fichier):', paymentData);
+              console.log('✅ Réponse API /api/payments (avec fichier Cloudinary):', paymentData);
+              
               if (!paymentResponse.ok || !paymentData.id) {
                 paymentErrors.push(`Erreur lors de l'insertion du paiement ${index + 1}: ${paymentData.error || 'Aucune confirmation de la base'}`);
+              } else {
+                console.log('🎉 Paiement créé avec succès avec fichier Cloudinary:', {
+                  paymentId: paymentData.id,
+                  cloudinaryUrl: uploadedFile?.cloudinaryUrl,
+                  fichierId
+                });
               }
             }
           } else {
             const error = await response.json();
-            fileUploadErrors.push(`Erreur lors de l'upload du reçu de paiement ${index + 1}: ${error.error}`);
+            console.error('❌ Erreur upload Cloudinary:', error);
+            fileUploadErrors.push(`Erreur lors de l'upload du reçu de paiement ${index + 1} vers Cloudinary: ${error.error || error.details || 'Erreur inconnue'}`);
           }
         }));
         if (paymentUploaded) newUploadedStatus.payment = true;

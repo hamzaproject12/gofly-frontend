@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   CreditCard,
   DollarSign,
@@ -20,7 +21,8 @@ import {
   Plane,
   Receipt,
   Download,
-  Eye
+  Eye,
+  X
 } from "lucide-react"
 import Link from "next/link"
 
@@ -64,6 +66,7 @@ export default function PaiementsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [programFilter, setProgramFilter] = useState("tous")
   const [methodFilter, setMethodFilter] = useState("tous")
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string; type: string } | null>(null)
 
   const fetchData = useCallback(async () => {
     try {
@@ -407,7 +410,22 @@ export default function PaiementsPage() {
                               // Utiliser l'URL Cloudinary si disponible, sinon l'ancienne URL locale
                               const fileUrl = paiement.fichier?.cloudinaryUrl || 
                                              `http://localhost:5000/uploads/${paiement.fichier?.filePath}`;
-                              window.open(fileUrl, '_blank');
+                              const fileType = paiement.fichier?.fileType || 'image';
+                              const fileName = paiement.fichier?.fileName || 'Reçu de paiement';
+                              
+                              // Déterminer le type MIME basé sur l'extension
+                              const extension = fileName.split('.').pop()?.toLowerCase();
+                              let mimeType = 'image/jpeg'; // par défaut
+                              if (extension === 'pdf') mimeType = 'application/pdf';
+                              else if (extension === 'png') mimeType = 'image/png';
+                              else if (extension === 'gif') mimeType = 'image/gif';
+                              else if (extension === 'webp') mimeType = 'image/webp';
+                              
+                              setPreviewImage({
+                                url: fileUrl,
+                                title: fileName,
+                                type: mimeType
+                              });
                             }}
                           >
                             <Eye className="h-4 w-4 mr-1" />
@@ -423,6 +441,47 @@ export default function PaiementsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modal de prévisualisation d'image */}
+      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-6 pb-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-lg font-semibold">
+                {previewImage?.title}
+              </DialogTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPreviewImage(null)}
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+          
+          <div className="p-6 pt-4">
+            {previewImage && (
+              <div className="flex justify-center items-center min-h-[400px] bg-gray-50 rounded-lg">
+                {previewImage.type === 'application/pdf' ? (
+                  <iframe
+                    src={`${previewImage.url}#toolbar=0&navpanes=0&scrollbar=0`}
+                    className="w-full h-[600px] border-0 rounded-lg"
+                    title={previewImage.title}
+                  />
+                ) : (
+                  <img
+                    src={previewImage.url}
+                    alt={previewImage.title}
+                    className="max-w-full max-h-[600px] object-contain rounded-lg shadow-lg"
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

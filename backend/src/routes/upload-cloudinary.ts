@@ -24,6 +24,15 @@ const upload = multer({
 
 const ALLOWED_FILE_TYPES = ['passport', 'visa', 'flightBooked', 'hotelBooked', 'payment'];
 
+// Test route to verify the route loads
+router.get('/test', (req, res) => {
+  res.json({ 
+    message: 'Cloudinary route is working!',
+    timestamp: new Date().toISOString(),
+    cloudinaryConfigured: !!process.env.CLOUDINARY_CLOUD_NAME
+  });
+});
+
 /**
  * Upload de fichiers vers Cloudinary
  * POST /api/upload-cloudinary

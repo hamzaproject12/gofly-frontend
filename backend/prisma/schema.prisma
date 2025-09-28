@@ -138,7 +138,9 @@ model Fichier {
   fileType      String
   fileName      String
   storedName    String
-  filePath      String
+  filePath      String      // Chemin local (pour compatibilité)
+  cloudinaryId  String?     // ID Cloudinary (nouveau)
+  cloudinaryUrl String?     // URL Cloudinary (nouveau)
   uploaded_at   DateTime    @default(now()) @map("uploaded_at")
   fileCategory  String
   expenses      Expense[]

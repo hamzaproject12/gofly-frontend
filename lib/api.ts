@@ -9,6 +9,7 @@ export const api = {
     reservations: '/api/reservations',
     expenses: '/api/expenses',
     upload: '/api/upload',
+    uploadCloudinary: '/api/upload-cloudinary',
     hotels: '/api/hotels',
     payments: '/api/payments',
     health: '/health',

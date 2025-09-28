@@ -6,6 +6,19 @@ import cloudinaryService from '../services/cloudinaryService';
 const router = express.Router();
 const prisma = new PrismaClient();
 
+// CORS headers pour l'upload Cloudinary
+router.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 // Configuration multer pour les fichiers en mémoire (pour Cloudinary)
 const upload = multer({
   storage: multer.memoryStorage(),

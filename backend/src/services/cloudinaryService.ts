@@ -53,38 +53,33 @@ class CloudinaryService {
         ...options
       };
 
-      let uploadStream: any;
-
-      if (Buffer.isBuffer(file)) {
-        // Si c'est un Buffer, créer un stream
-        uploadStream = cloudinary.uploader.upload_stream(uploadOptions);
-        const readable = new Readable();
-        readable.push(file);
-        readable.push(null);
-        readable.pipe(uploadStream);
-      } else {
-        // Si c'est un fichier multer, utiliser upload_stream
-        uploadStream = cloudinary.uploader.upload_stream(uploadOptions);
-        const readable = new Readable();
-        readable.push(file.buffer);
-        readable.push(null);
-        readable.pipe(uploadStream);
-      }
-
       return new Promise((resolve, reject) => {
-        uploadStream.on('end', (result: UploadResult) => {
-          console.log('✅ Cloudinary upload successful:', {
-            public_id: result.public_id,
-            format: result.format,
-            bytes: result.bytes
-          });
-          resolve(result);
-        });
+        const uploadStream = cloudinary.uploader.upload_stream(
+          uploadOptions,
+          (error: any, result: any) => {
+            if (error) {
+              console.error('❌ Cloudinary upload error:', error);
+              return reject(error);
+            }
+            if (!result) {
+              console.error('❌ Cloudinary upload result is undefined');
+              return reject(new Error('Upload result is undefined'));
+            }
+            console.log('✅ Cloudinary upload successful:', {
+              public_id: result.public_id,
+              format: result.format,
+              bytes: result.bytes
+            });
+            resolve(result);
+          }
+        );
 
-        uploadStream.on('error', (error: any) => {
-          console.error('❌ Cloudinary upload error:', error);
-          reject(error);
-        });
+        // Pipe the file buffer to the upload stream
+        if (Buffer.isBuffer(file)) {
+          uploadStream.end(file);
+        } else {
+          uploadStream.end(file.buffer);
+        }
       });
 
     } catch (error) {

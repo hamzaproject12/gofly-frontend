@@ -29,7 +29,13 @@ router.get('/test', (req, res) => {
   res.json({ 
     message: 'Cloudinary route is working!',
     timestamp: new Date().toISOString(),
-    cloudinaryConfigured: !!process.env.CLOUDINARY_CLOUD_NAME
+    cloudinaryConfigured: !!process.env.CLOUDINARY_CLOUD_NAME,
+    envVars: {
+      cloudName: process.env.CLOUDINARY_CLOUD_NAME ? 'SET' : 'NOT_SET',
+      apiKey: process.env.CLOUDINARY_API_KEY ? 'SET' : 'NOT_SET',
+      apiSecret: process.env.CLOUDINARY_API_SECRET ? 'SET' : 'NOT_SET'
+    },
+    allEnvVars: Object.keys(process.env).filter(key => key.includes('CLOUDINARY'))
   });
 });
 
@@ -77,6 +83,11 @@ router.post('/', upload.any(), async (req, res) => {
         }
 
         console.log(`📤 Uploading ${file.originalname} to Cloudinary...`);
+
+        // Check if Cloudinary is configured
+        if (!process.env.CLOUDINARY_CLOUD_NAME) {
+          throw new Error('Cloudinary not configured. Please check environment variables.');
+        }
 
         // Upload vers Cloudinary
         const cloudinaryResult = await cloudinaryService.uploadPaymentReceipt(

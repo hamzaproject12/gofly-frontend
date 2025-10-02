@@ -819,7 +819,12 @@ export default function SoldeCaissePage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {(analyticsData.agentRanking?.details || []).slice(0, 5).map((agent, index) => (
+                    {(() => {
+                      console.log('🔍 Debug - Rendering agent ranking, details:', analyticsData.agentRanking?.details)
+                      return (analyticsData.agentRanking?.details || []).slice(0, 5)
+                    })().map((agent, index) => {
+                      console.log('🔍 Debug - Rendering agent item:', agent, 'index:', index)
+                      return (
                       <div key={agent.agentId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
@@ -839,7 +844,8 @@ export default function SoldeCaissePage() {
                           <p className="text-sm text-gray-500">Moy: {agent.avgAmount.toLocaleString()} DH</p>
                         </div>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -848,6 +854,10 @@ export default function SoldeCaissePage() {
             {/* 📈 Tendances et Cashflow */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               {/* 📊 Évolution Cashflow */}
+              {(() => {
+                console.log('🔍 Debug - Rendering cashflow section, data:', analyticsData.cashflow)
+                return null
+              })()}
               <Card className="border-0 shadow-lg">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -875,7 +885,11 @@ export default function SoldeCaissePage() {
                     {/* Graphique simple des 6 derniers mois */}
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-gray-700">6 derniers mois</p>
-                      {(analyticsData.cashflow?.data || []).slice(0, 6).map((month, index) => {
+                      {(() => {
+                        console.log('🔍 Debug - Rendering cashflow data:', analyticsData.cashflow?.data)
+                        return (analyticsData.cashflow?.data || []).slice(0, 6)
+                      })().map((month, index) => {
+                        console.log('🔍 Debug - Rendering cashflow month:', month, 'index:', index)
                         const cashflowData = analyticsData.cashflow?.data || []
                         const maxAmount = cashflowData.length > 0 ? Math.max(...cashflowData.slice(0, 6).map(m => Math.abs(m.netCashflow || 0))) : 0
                         const percentage = maxAmount > 0 ? (Math.abs(month.netCashflow || 0) / maxAmount) * 100 : 0

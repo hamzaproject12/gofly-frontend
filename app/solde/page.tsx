@@ -446,6 +446,7 @@ export default function SoldeCaissePage() {
 
       console.log('✅ Balance API - Données reçues:', balanceData)
       console.log('✅ Analytics API - Données reçues:', analyticsResult)
+      console.log('✅ Programs API - Données reçues:', programsData)
       
       setBalanceData(balanceData)
       setAnalyticsData(analyticsResult.data)
@@ -479,6 +480,11 @@ export default function SoldeCaissePage() {
     parAgent: [],
     metadata: { periode: 'mois', dateDebut: null, dateFin: null, programme: 'tous', generatedAt: new Date().toISOString() }
   }
+
+  console.log('🔍 Debug - balanceData:', balanceData)
+  console.log('🔍 Debug - analyticsData:', analyticsData)
+  console.log('🔍 Debug - programmes:', programmes)
+  console.log('🔍 Debug - data object:', data)
 
   const { statistics, parMois, details, summary, parMethodePaiement, parTypeDepense, parAgent } = data
   const { totalPaiements, totalDepenses, soldeFinal } = statistics || { totalPaiements: 0, totalDepenses: 0, soldeFinal: 0 }
@@ -749,7 +755,10 @@ export default function SoldeCaissePage() {
         </div>
 
         {/* 🎯 NOUVELLES SECTIONS ANALYTICS DÉCISIONNELLES */}
-        {analyticsData && analyticsData.programRanking && analyticsData.agentRanking && (
+        {(() => {
+          console.log('🔍 Debug - Rendering analytics sections, analyticsData:', analyticsData)
+          return analyticsData && analyticsData.programRanking && analyticsData.agentRanking
+        })() && (
           <>
             {/* 📊 Classements et Performance */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -766,7 +775,12 @@ export default function SoldeCaissePage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {(analyticsData.programRanking?.details || []).slice(0, 5).map((program, index) => (
+                    {(() => {
+                      console.log('🔍 Debug - Rendering program ranking, details:', analyticsData.programRanking?.details)
+                      return (analyticsData.programRanking?.details || []).slice(0, 5)
+                    })().map((program, index) => {
+                      console.log('🔍 Debug - Rendering program item:', program, 'index:', index)
+                      return (
                       <div key={program.programId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
@@ -786,7 +800,8 @@ export default function SoldeCaissePage() {
                           <p className="text-sm text-gray-500">Moy: {program.avgAmount.toLocaleString()} DH</p>
                         </div>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </CardContent>
               </Card>

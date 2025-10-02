@@ -168,15 +168,30 @@ router.get('/dashboard', async (req, res) => {
       programDiversity: await calculateProgramDiversity(dateFilter, programFilter)
     }
 
+    // 🔧 Conversion des BigInt en Number pour la sérialisation JSON
+    const convertBigIntToNumber = (obj: any): any => {
+      if (obj === null || obj === undefined) return obj;
+      if (typeof obj === 'bigint') return Number(obj);
+      if (Array.isArray(obj)) return obj.map(convertBigIntToNumber);
+      if (typeof obj === 'object') {
+        const converted: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+          converted[key] = convertBigIntToNumber(value);
+        }
+        return converted;
+      }
+      return obj;
+    };
+
     res.json({
       success: true,
-      data: {
+      data: convertBigIntToNumber({
         // 🏆 Classements
         programRanking: {
           summary: {
             totalPrograms: programRankingDetailed.length,
-            totalRevenue: programRanking._sum.amount || 0,
-            totalPayments: programRanking._count.id
+            totalRevenue: programRanking._sum?.amount || 0,
+            totalPayments: programRanking._count?.id || 0
           },
           details: programRankingDetailed
         },
@@ -215,7 +230,7 @@ router.get('/dashboard', async (req, res) => {
           programme,
           filters: { dateFilter, programFilter }
         }
-      }
+      })
     })
 
   } catch (error) {

@@ -108,8 +108,8 @@ router.get('/dashboard', async (req, res) => {
           SUM(amount) as "totalPayments",
           COUNT(*) as "countPayments"
         FROM "Payment" 
-        WHERE "paymentDate" >= COALESCE(${dateDebut || '2024-01-01'}, '2024-01-01')
-          AND "paymentDate" <= COALESCE(${dateFin || '2025-12-31'}, '2025-12-31')
+        WHERE "paymentDate" >= COALESCE(${dateDebut || '2024-01-01'}::timestamp, '2024-01-01'::timestamp)
+          AND "paymentDate" <= COALESCE(${dateFin || '2025-12-31'}::timestamp, '2025-12-31'::timestamp)
         GROUP BY period
         ORDER BY period DESC
         LIMIT 12
@@ -122,8 +122,8 @@ router.get('/dashboard', async (req, res) => {
           SUM(amount) as "totalExpenses",
           COUNT(*) as "countExpenses"
         FROM "Expense" 
-        WHERE date >= COALESCE(${dateDebut || '2024-01-01'}, '2024-01-01')
-          AND date <= COALESCE(${dateFin || '2025-12-31'}, '2025-12-31')
+        WHERE date >= COALESCE(${dateDebut || '2024-01-01'}::timestamp, '2024-01-01'::timestamp)
+          AND date <= COALESCE(${dateFin || '2025-12-31'}::timestamp, '2025-12-31'::timestamp)
         GROUP BY period
         ORDER BY period DESC
         LIMIT 12
@@ -146,8 +146,8 @@ router.get('/dashboard', async (req, res) => {
         UNION ALL
         SELECT date as transaction_date, amount, 'expense' as transaction_type FROM "Expense"
       ) as transactions
-      WHERE transaction_date >= COALESCE(${dateDebut || '2024-01-01'}, '2024-01-01')
-        AND transaction_date <= COALESCE(${dateFin || '2025-12-31'}, '2025-12-31')
+      WHERE transaction_date >= COALESCE(${dateDebut || '2024-01-01'}::timestamp, '2024-01-01'::timestamp)
+        AND transaction_date <= COALESCE(${dateFin || '2025-12-31'}::timestamp, '2025-12-31'::timestamp)
       GROUP BY month
       ORDER BY month DESC
       LIMIT 12
@@ -275,8 +275,8 @@ async function findBestPeriod(dateFilter: any, programFilter: any) {
       DATE("paymentDate") as date,
       SUM(amount) as total
     FROM "Payment"
-    WHERE "paymentDate" >= COALESCE(${dateFilter.paymentDate?.gte || '2024-01-01'}, '2024-01-01')
-      AND "paymentDate" <= COALESCE(${dateFilter.paymentDate?.lte || '2025-12-31'}, '2025-12-31')
+    WHERE "paymentDate" >= COALESCE(${dateFilter.paymentDate?.gte || '2024-01-01'}::timestamp, '2024-01-01'::timestamp)
+      AND "paymentDate" <= COALESCE(${dateFilter.paymentDate?.lte || '2025-12-31'}::timestamp, '2025-12-31'::timestamp)
     GROUP BY DATE("paymentDate")
     ORDER BY total DESC
     LIMIT 1

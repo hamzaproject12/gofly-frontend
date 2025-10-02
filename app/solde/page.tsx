@@ -915,6 +915,14 @@ export default function SoldeCaissePage() {
               </Card>
 
               {/* 📊 Métriques de Performance */}
+              {(() => {
+                console.log('🔍 Debug - Rendering performance section, data:', analyticsData.performance)
+                console.log('🔍 Debug - Performance trend:', analyticsData.performance?.trend)
+                console.log('🔍 Debug - Performance expenseRatio:', analyticsData.performance?.expenseRatio)
+                console.log('🔍 Debug - Performance programDiversity:', analyticsData.performance?.programDiversity)
+                console.log('🔍 Debug - Performance bestPeriod:', analyticsData.performance?.bestPeriod)
+                return null
+              })()}
               <Card className="border-0 shadow-lg">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -968,7 +976,10 @@ export default function SoldeCaissePage() {
                     </div>
 
                     {/* Meilleur jour */}
-                    {analyticsData.performance?.bestPeriod && (
+                    {(() => {
+                      console.log('🔍 Debug - Checking bestPeriod condition:', analyticsData.performance?.bestPeriod)
+                      return analyticsData.performance?.bestPeriod
+                    })() && (
                       <div className="bg-yellow-50 p-4 rounded-lg">
                         <h3 className="text-sm font-medium text-yellow-700 mb-2">Meilleur Jour</h3>
                         <div className="flex justify-between items-center">

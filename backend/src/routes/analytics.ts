@@ -104,12 +104,12 @@ router.get('/dashboard', async (req, res) => {
       // Paiements par période
       const paymentsTrend = await prisma.$queryRaw`
         SELECT 
-          DATE_FORMAT(paymentDate, ${groupByFormat}) as period,
-          SUM(amount) as totalPayments,
-          COUNT(*) as countPayments
-        FROM Payment 
-        WHERE paymentDate >= COALESCE(${dateDebut || '2024-01-01'}, '2024-01-01')
-          AND paymentDate <= COALESCE(${dateFin || '2025-12-31'}, '2025-12-31')
+          TO_CHAR("paymentDate", ${groupByFormat}) as period,
+          SUM(amount) as "totalPayments",
+          COUNT(*) as "countPayments"
+        FROM "Payment" 
+        WHERE "paymentDate" >= COALESCE(${dateDebut || '2024-01-01'}, '2024-01-01')
+          AND "paymentDate" <= COALESCE(${dateFin || '2025-12-31'}, '2025-12-31')
         GROUP BY period
         ORDER BY period DESC
         LIMIT 12
@@ -118,10 +118,10 @@ router.get('/dashboard', async (req, res) => {
       // Dépenses par période
       const expensesTrend = await prisma.$queryRaw`
         SELECT 
-          DATE_FORMAT(date, ${groupByFormat}) as period,
-          SUM(amount) as totalExpenses,
-          COUNT(*) as countExpenses
-        FROM Expense 
+          TO_CHAR(date, ${groupByFormat}) as period,
+          SUM(amount) as "totalExpenses",
+          COUNT(*) as "countExpenses"
+        FROM "Expense" 
         WHERE date >= COALESCE(${dateDebut || '2024-01-01'}, '2024-01-01')
           AND date <= COALESCE(${dateFin || '2025-12-31'}, '2025-12-31')
         GROUP BY period
@@ -137,14 +137,14 @@ router.get('/dashboard', async (req, res) => {
     // 💰 4. ÉVOLUTION CAISSE (cashflow)
     const cashflowData = await prisma.$queryRaw`
       SELECT 
-        DATE_FORMAT(transaction_date, '%Y-%m') as month,
+        TO_CHAR(transaction_date, 'YYYY-MM') as month,
         SUM(CASE WHEN transaction_type = 'payment' THEN amount ELSE 0 END) as payments,
         SUM(CASE WHEN transaction_type = 'expense' THEN amount ELSE 0 END) as expenses,
-        SUM(CASE WHEN transaction_type = 'payment' THEN amount ELSE -amount END) as netCashflow
+        SUM(CASE WHEN transaction_type = 'payment' THEN amount ELSE -amount END) as "netCashflow"
       FROM (
-        SELECT paymentDate as transaction_date, amount, 'payment' as transaction_type FROM Payment
+        SELECT "paymentDate" as transaction_date, amount, 'payment' as transaction_type FROM "Payment"
         UNION ALL
-        SELECT date as transaction_date, amount, 'expense' as transaction_type FROM Expense
+        SELECT date as transaction_date, amount, 'expense' as transaction_type FROM "Expense"
       ) as transactions
       WHERE transaction_date >= COALESCE(${dateDebut || '2024-01-01'}, '2024-01-01')
         AND transaction_date <= COALESCE(${dateFin || '2025-12-31'}, '2025-12-31')
@@ -272,12 +272,12 @@ async function calculateTrend(dateFilter: any, programFilter: any) {
 async function findBestPeriod(dateFilter: any, programFilter: any) {
   const bestDay = await prisma.$queryRaw`
     SELECT 
-      DATE(paymentDate) as date,
+      DATE("paymentDate") as date,
       SUM(amount) as total
-    FROM Payment
-    WHERE paymentDate >= COALESCE(${dateFilter.paymentDate?.gte || '2024-01-01'}, '2024-01-01')
-      AND paymentDate <= COALESCE(${dateFilter.paymentDate?.lte || '2025-12-31'}, '2025-12-31')
-    GROUP BY DATE(paymentDate)
+    FROM "Payment"
+    WHERE "paymentDate" >= COALESCE(${dateFilter.paymentDate?.gte || '2024-01-01'}, '2024-01-01')
+      AND "paymentDate" <= COALESCE(${dateFilter.paymentDate?.lte || '2025-12-31'}, '2025-12-31')
+    GROUP BY DATE("paymentDate")
     ORDER BY total DESC
     LIMIT 1
   ` as Array<{ date: string; total: number }>

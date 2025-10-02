@@ -481,8 +481,8 @@ export default function SoldeCaissePage() {
   }
 
   const { statistics, parMois, details, summary, parMethodePaiement, parTypeDepense, parAgent } = data
-  const { totalPaiements, totalDepenses, soldeFinal } = statistics
-  const { moisMaxBenefice } = summary
+  const { totalPaiements, totalDepenses, soldeFinal } = statistics || { totalPaiements: 0, totalDepenses: 0, soldeFinal: 0 }
+  const { moisMaxBenefice } = summary || { moisMaxBenefice: { mois: "", solde: 0 } }
 
   // Filtrage des données par programme (fait côté serveur maintenant)
   const filteredDetails = details
@@ -622,7 +622,7 @@ export default function SoldeCaissePage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="tous">Tous les programmes</SelectItem>
-                    {programmes.map((programme) => (
+                    {(programmes || []).map((programme) => (
                       <SelectItem key={programme.id} value={programme.name}>
                         {programme.name}
                       </SelectItem>
@@ -659,7 +659,7 @@ export default function SoldeCaissePage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {parMois.map((item, index) => (
+                  {(parMois || []).map((item, index) => (
                     <div key={index} className="bg-gray-50 p-4 rounded-lg">
                       <div className="flex justify-between items-center mb-2">
                         <h3 className="font-medium">{item.mois}</h3>
@@ -982,7 +982,7 @@ export default function SoldeCaissePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {filteredDetails.map((item, index) => (
+                  {(filteredDetails || []).map((item, index) => (
                     <tr key={index} className="hover:bg-gray-50">
                       <td className="py-3 px-4 text-sm">
                         {new Date(item.date).toLocaleDateString("fr-FR", {

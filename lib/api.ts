@@ -12,6 +12,8 @@ export const api = {
     uploadCloudinary: '/api/upload-cloudinary',
     hotels: '/api/hotels',
     payments: '/api/payments',
+    balance: '/api/balance',
+    analytics: '/api/analytics',
     health: '/health',
     test: '/api/test',
     // Program overview endpoints

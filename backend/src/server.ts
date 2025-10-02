@@ -13,6 +13,7 @@ import hotelsRouter from './routes/hotels';
 import paymentsRouter from './routes/payments';
 import balanceRouter from './routes/balance';
 import uploadCloudinaryRouter from './routes/upload-cloudinary';
+import analyticsRouter from './routes/analytics';
 import authRoutes from './routes/auth';
 import adminRoutes from './routes/admin';
 
@@ -75,6 +76,7 @@ app.use('/api/hotels', hotelsRouter);
 app.use('/api/payments', paymentsRouter);
 app.use('/api/balance', balanceRouter);
 app.use('/api/upload-cloudinary', uploadCloudinaryRouter);
+app.use('/api/analytics', analyticsRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -149,6 +151,7 @@ app.listen(PORT, async () => {
   console.log('- /api/payments');
   console.log('- /api/balance');
   console.log('- /api/upload-cloudinary');
+  console.log('- /api/analytics (dashboard analytics)');
   console.log('- /api/test');
   console.log('- /api/hotels-test');
   console.log('- /health');

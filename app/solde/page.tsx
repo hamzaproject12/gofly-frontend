@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Calendar,
@@ -21,6 +22,16 @@ import {
   Download,
   Filter,
   CreditCard,
+  TrendingUp,
+  TrendingDown,
+  Trophy,
+  Target,
+  Activity,
+  DollarSign,
+  PieChart,
+  LineChart,
+  Award,
+  Star,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -94,6 +105,112 @@ type BalanceData = {
     dateFin: string | null
     programme: string
     generatedAt: string
+  }
+}
+
+// 🎯 Types pour les analyses décisionnelles
+type AnalyticsData = {
+  programRanking: {
+    summary: {
+      totalPrograms: number
+      totalRevenue: number
+      totalPayments: number
+    }
+    details: Array<{
+      programId: number | null
+      programName: string
+      totalAmount: number
+      countPayments: number
+      avgAmount: number
+    }>
+  }
+  
+  agentRanking: {
+    summary: {
+      totalAgents: number
+      totalCollected: number
+      totalTransactions: number
+    }
+    details: Array<{
+      agentId: number | null
+      agentName: string
+      agentEmail: string
+      totalAmount: number
+      countPayments: number
+      avgAmount: number
+    }>
+  }
+  
+  trends: {
+    period: string
+    data: {
+      paymentsTrend: Array<{
+        period: string
+        totalPayments: number
+        countPayments: number
+      }>
+      expensesTrend: Array<{
+        period: string
+        totalExpenses: number
+        countExpenses: number
+      }>
+    }
+    insights: {
+      message: string
+      recommendation: string
+      risk: string
+    }
+  }
+  
+  cashflow: {
+    data: Array<{
+      month: string
+      payments: number
+      expenses: number
+      netCashflow: number
+    }>
+    summary: {
+      totalPayments: number
+      totalExpenses: number
+      totalCashflow: number
+      avgMonthly: number
+      trend: string
+      volatility: number
+    }
+  }
+  
+  performance: {
+    trend: {
+      direction: string
+      percentage: number
+      lastMonth: number
+      thisMonth: number
+      change: number
+    }
+    bestPeriod: {
+      date: string
+      total: number
+    } | null
+    expenseRatio: {
+      ratio: number
+      payments: number
+      expenses: number
+      net: number
+    }
+    programDiversity: {
+      activePrograms: number
+      totalPrograms: number
+      diversity: number
+    }
+  }
+  
+  metadata: {
+    generatedAt: string
+    period: string
+    dateDebut: string | null
+    dateFin: string | null
+    programme: string | null
+    filters: any
   }
 }
 
@@ -286,6 +403,7 @@ export default function SoldeCaissePage() {
 
   // États pour les données
   const [balanceData, setBalanceData] = useState<BalanceData | null>(null)
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
   const [programmes, setProgrammes] = useState<Program[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -303,24 +421,34 @@ export default function SoldeCaissePage() {
       if (programmeFilter && programmeFilter !== 'tous') params.append('programme', programmeFilter)
       if (periodeFilter) params.append('periode', periodeFilter)
 
-      const balanceResponse = await fetch(api.url(`/api/balance?${params.toString()}`))
+      // 🚀 Récupérer les données de balance ET les analytics en parallèle
+      const [balanceResponse, analyticsResponse, programsResponse] = await Promise.all([
+        fetch(api.url(`/api/balance?${params.toString()}`)),
+        fetch(api.url(`/api/analytics/dashboard?${params.toString()}`)),
+        fetch(api.url(api.endpoints.programs))
+      ])
       
       if (!balanceResponse.ok) {
         throw new Error('Erreur lors du chargement des données de balance')
       }
-
-      const balanceData = await balanceResponse.json()
-      
-      // Récupérer aussi les programmes pour les filtres
-      const programsResponse = await fetch(api.url(api.endpoints.programs))
+      if (!analyticsResponse.ok) {
+        throw new Error('Erreur lors du chargement des analytics')
+      }
       if (!programsResponse.ok) {
         throw new Error('Erreur lors du chargement des programmes')
       }
-      const programsData = await programsResponse.json()
+
+      const [balanceData, analyticsResult, programsData] = await Promise.all([
+        balanceResponse.json(),
+        analyticsResponse.json(),
+        programsResponse.json()
+      ])
 
       console.log('✅ Balance API - Données reçues:', balanceData)
+      console.log('✅ Analytics API - Données reçues:', analyticsResult)
       
       setBalanceData(balanceData)
+      setAnalyticsData(analyticsResult.data)
       setProgrammes(programsData)
     } catch (err) {
       console.error('❌ Erreur fetchData:', err)
@@ -619,6 +747,212 @@ export default function SoldeCaissePage() {
             </Card>
           </div>
         </div>
+
+        {/* 🎯 NOUVELLES SECTIONS ANALYTICS DÉCISIONNELLES */}
+        {analyticsData && (
+          <>
+            {/* 📊 Classements et Performance */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              {/* 🏆 Classement par Programme */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Trophy className="h-5 w-5 text-yellow-500" />
+                    Classement Programmes
+                    <Badge variant="secondary" className="ml-auto">
+                      {analyticsData.programRanking.summary.totalPrograms} programmes
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {analyticsData.programRanking.details.slice(0, 5).map((program, index) => (
+                      <div key={program.programId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
+                            index === 0 ? 'bg-yellow-500' : 
+                            index === 1 ? 'bg-gray-400' : 
+                            index === 2 ? 'bg-orange-500' : 'bg-blue-500'
+                          }`}>
+                            {index + 1}
+                          </div>
+                          <div>
+                            <p className="font-medium">{program.programName}</p>
+                            <p className="text-sm text-gray-500">{program.countPayments} paiements</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-green-600">{program.totalAmount.toLocaleString()} DH</p>
+                          <p className="text-sm text-gray-500">Moy: {program.avgAmount.toLocaleString()} DH</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 👥 Classement par Agent */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Award className="h-5 w-5 text-blue-500" />
+                    Top Agents
+                    <Badge variant="secondary" className="ml-auto">
+                      {analyticsData.agentRanking.summary.totalAgents} agents
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {analyticsData.agentRanking.details.slice(0, 5).map((agent, index) => (
+                      <div key={agent.agentId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
+                            index === 0 ? 'bg-yellow-500' : 
+                            index === 1 ? 'bg-gray-400' : 
+                            index === 2 ? 'bg-orange-500' : 'bg-blue-500'
+                          }`}>
+                            {index + 1}
+                          </div>
+                          <div>
+                            <p className="font-medium">{agent.agentName}</p>
+                            <p className="text-sm text-gray-500">{agent.countPayments} transactions</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-green-600">{agent.totalAmount.toLocaleString()} DH</p>
+                          <p className="text-sm text-gray-500">Moy: {agent.avgAmount.toLocaleString()} DH</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* 📈 Tendances et Cashflow */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              {/* 📊 Évolution Cashflow */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <LineChart className="h-5 w-5 text-purple-500" />
+                    Évolution Caisse
+                    <Badge variant={analyticsData.cashflow.summary.trend === 'positive' ? 'default' : 'destructive'} className="ml-auto">
+                      {analyticsData.cashflow.summary.trend === 'positive' ? '↗' : '↘'} {Math.abs(analyticsData.cashflow.summary.avgMonthly).toLocaleString()} DH/mois
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Métriques clés */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-green-50 p-3 rounded-lg">
+                        <p className="text-sm font-medium text-green-700">Total Cashflow</p>
+                        <p className="text-xl font-bold text-green-700">{analyticsData.cashflow.summary.totalCashflow.toLocaleString()} DH</p>
+                      </div>
+                      <div className="bg-blue-50 p-3 rounded-lg">
+                        <p className="text-sm font-medium text-blue-700">Volatilité</p>
+                        <p className="text-xl font-bold text-blue-700">{analyticsData.cashflow.summary.volatility.toLocaleString()} DH</p>
+                      </div>
+                    </div>
+
+                    {/* Graphique simple des 6 derniers mois */}
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-700">6 derniers mois</p>
+                      {analyticsData.cashflow.data.slice(0, 6).map((month, index) => {
+                        const maxAmount = Math.max(...analyticsData.cashflow.data.slice(0, 6).map(m => Math.abs(m.netCashflow)))
+                        const percentage = maxAmount > 0 ? (Math.abs(month.netCashflow) / maxAmount) * 100 : 0
+                        
+                        return (
+                          <div key={month.month} className="flex items-center gap-3">
+                            <div className="w-16 text-xs text-gray-500">{month.month}</div>
+                            <div className="flex-1 bg-gray-200 rounded-full h-4 relative">
+                              <div 
+                                className={`h-4 rounded-full ${month.netCashflow >= 0 ? 'bg-green-500' : 'bg-red-500'}`}
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                            <div className="w-20 text-right text-sm font-medium">
+                              {month.netCashflow.toLocaleString()} DH
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 📊 Métriques de Performance */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Target className="h-5 w-5 text-green-500" />
+                    Performance
+                    <Badge variant={analyticsData.performance.trend.direction === 'up' ? 'default' : 'destructive'} className="ml-auto">
+                      {analyticsData.performance.trend.direction === 'up' ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                      {analyticsData.performance.trend.percentage.toFixed(1)}%
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Tendance mois */}
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h3 className="text-sm font-medium text-blue-700 mb-2">Tendance Mensuelle</h3>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-sm text-gray-600">Mois précédent: {analyticsData.performance.trend.lastMonth.toLocaleString()} DH</p>
+                          <p className="text-sm text-gray-600">Ce mois: {analyticsData.performance.trend.thisMonth.toLocaleString()} DH</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-blue-700">
+                            {analyticsData.performance.trend.change >= 0 ? '+' : ''}{analyticsData.performance.trend.change.toLocaleString()} DH
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Ratio dépenses */}
+                    <div className="bg-orange-50 p-4 rounded-lg">
+                      <h3 className="text-sm font-medium text-orange-700 mb-2">Ratio Dépenses/Paiements</h3>
+                      <div className="flex justify-between items-center">
+                        <span className="text-2xl font-bold text-orange-700">{analyticsData.performance.expenseRatio.ratio.toFixed(1)}%</span>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-600">Paiements: {analyticsData.performance.expenseRatio.payments.toLocaleString()} DH</p>
+                          <p className="text-sm text-gray-600">Dépenses: {analyticsData.performance.expenseRatio.expenses.toLocaleString()} DH</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Diversité programmes */}
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                      <h3 className="text-sm font-medium text-purple-700 mb-2">Diversité Programmes</h3>
+                      <div className="flex justify-between items-center">
+                        <span className="text-2xl font-bold text-purple-700">{analyticsData.performance.programDiversity.diversity.toFixed(1)}%</span>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-600">{analyticsData.performance.programDiversity.activePrograms}/{analyticsData.performance.programDiversity.totalPrograms} actifs</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Meilleur jour */}
+                    {analyticsData.performance.bestPeriod && (
+                      <div className="bg-yellow-50 p-4 rounded-lg">
+                        <h3 className="text-sm font-medium text-yellow-700 mb-2">Meilleur Jour</h3>
+                        <div className="flex justify-between items-center">
+                          <span className="text-lg font-bold text-yellow-700">{analyticsData.performance.bestPeriod.date}</span>
+                          <span className="text-lg font-bold text-yellow-700">{analyticsData.performance.bestPeriod.total.toLocaleString()} DH</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
 
         {/* Détails des transactions */}
         <Card className="border-0 shadow-lg">

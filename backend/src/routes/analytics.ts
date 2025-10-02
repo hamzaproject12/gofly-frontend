@@ -297,7 +297,15 @@ async function findBestPeriod(dateFilter: any, programFilter: any) {
     LIMIT 1
   ` as Array<{ date: string; total: number }>
 
-  return bestDay[0] || null
+  const result = bestDay[0]
+  if (result) {
+    // Convertir la date en chaîne pour éviter les problèmes de sérialisation
+    return {
+      date: result.date.toString(),
+      total: Number(result.total)
+    }
+  }
+  return null
 }
 
 async function calculateExpenseRatio(dateFilter: any, programFilter: any) {

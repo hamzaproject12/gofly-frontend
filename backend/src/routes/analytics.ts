@@ -65,11 +65,11 @@ router.get('/dashboard', async (req, res) => {
 
     // 👥 2. CLASSEMENT PAR AGENT (qui encaisse le plus)
     const agentRanking = await prisma.payment.groupBy({
-      by: ['createdBy'],
+      by: ['agentId'],
       where: {
         ...dateFilter,
         reservation: programFilter,
-        createdBy: { not: null }
+        agentId: { not: null }
       },
       _sum: { amount: true },
       _count: { id: true },
@@ -78,16 +78,16 @@ router.get('/dashboard', async (req, res) => {
 
     const agentRankingDetailed = await Promise.all(
       agentRanking.map(async (item) => {
-        const agent = await prisma.user.findUnique({
-          where: { id: item.createdBy! }
+        const agent = await prisma.agent.findUnique({
+          where: { id: item.agentId! }
         })
         return {
-          agentId: item.createdBy,
+          agentId: item.agentId,
           agentName: agent?.nom || 'Agent inconnu',
           agentEmail: agent?.email || '',
-          totalAmount: item._sum.amount || 0,
-          countPayments: item._count.id,
-          avgAmount: item._count.id > 0 ? (item._sum.amount || 0) / item._count.id : 0
+          totalAmount: item._sum?.amount || 0,
+          countPayments: item._count?.id || 0,
+          avgAmount: (item._count?.id || 0) > 0 ? (item._sum?.amount || 0) / (item._count?.id || 1) : 0
         }
       })
     )
@@ -104,12 +104,12 @@ router.get('/dashboard', async (req, res) => {
       // Paiements par période
       const paymentsTrend = await prisma.$queryRaw`
         SELECT 
-          DATE_FORMAT(createdAt, ${groupByFormat}) as period,
+          DATE_FORMAT(paymentDate, ${groupByFormat}) as period,
           SUM(amount) as totalPayments,
           COUNT(*) as countPayments
         FROM Payment 
-        WHERE createdAt >= COALESCE(${dateDebut || '2024-01-01'}, '2024-01-01')
-          AND createdAt <= COALESCE(${dateFin || '2025-12-31'}, '2025-12-31')
+        WHERE paymentDate >= COALESCE(${dateDebut || '2024-01-01'}, '2024-01-01')
+          AND paymentDate <= COALESCE(${dateFin || '2025-12-31'}, '2025-12-31')
         GROUP BY period
         ORDER BY period DESC
         LIMIT 12
@@ -118,12 +118,12 @@ router.get('/dashboard', async (req, res) => {
       // Dépenses par période
       const expensesTrend = await prisma.$queryRaw`
         SELECT 
-          DATE_FORMAT(createdAt, ${groupByFormat}) as period,
+          DATE_FORMAT(date, ${groupByFormat}) as period,
           SUM(amount) as totalExpenses,
           COUNT(*) as countExpenses
         FROM Expense 
-        WHERE createdAt >= COALESCE(${dateDebut || '2024-01-01'}, '2024-01-01')
-          AND createdAt <= COALESCE(${dateFin || '2025-12-31'}, '2025-12-31')
+        WHERE date >= COALESCE(${dateDebut || '2024-01-01'}, '2024-01-01')
+          AND date <= COALESCE(${dateFin || '2025-12-31'}, '2025-12-31')
         GROUP BY period
         ORDER BY period DESC
         LIMIT 12
@@ -137,17 +137,17 @@ router.get('/dashboard', async (req, res) => {
     // 💰 4. ÉVOLUTION CAISSE (cashflow)
     const cashflowData = await prisma.$queryRaw`
       SELECT 
-        DATE_FORMAT(createdAt, '%Y-%m') as month,
-        SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END) as payments,
-        SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expenses,
-        SUM(CASE WHEN type = 'payment' THEN amount ELSE -amount END) as netCashflow
+        DATE_FORMAT(transaction_date, '%Y-%m') as month,
+        SUM(CASE WHEN transaction_type = 'payment' THEN amount ELSE 0 END) as payments,
+        SUM(CASE WHEN transaction_type = 'expense' THEN amount ELSE 0 END) as expenses,
+        SUM(CASE WHEN transaction_type = 'payment' THEN amount ELSE -amount END) as netCashflow
       FROM (
-        SELECT createdAt, amount, 'payment' as type FROM Payment
+        SELECT paymentDate as transaction_date, amount, 'payment' as transaction_type FROM Payment
         UNION ALL
-        SELECT createdAt, amount, 'expense' as type FROM Expense
+        SELECT date as transaction_date, amount, 'expense' as transaction_type FROM Expense
       ) as transactions
-      WHERE createdAt >= COALESCE(${dateDebut || '2024-01-01'}, '2024-01-01')
-        AND createdAt <= COALESCE(${dateFin || '2025-12-31'}, '2025-12-31')
+      WHERE transaction_date >= COALESCE(${dateDebut || '2024-01-01'}, '2024-01-01')
+        AND transaction_date <= COALESCE(${dateFin || '2025-12-31'}, '2025-12-31')
       GROUP BY month
       ORDER BY month DESC
       LIMIT 12
@@ -184,8 +184,8 @@ router.get('/dashboard', async (req, res) => {
         agentRanking: {
           summary: {
             totalAgents: agentRankingDetailed.length,
-            totalCollected: agentRanking.reduce((sum, agent) => sum + (agent._sum.amount || 0), 0),
-            totalTransactions: agentRanking.reduce((sum, agent) => sum + agent._count.id, 0)
+            totalCollected: agentRanking.reduce((sum, agent) => sum + (agent._sum?.amount || 0), 0),
+            totalTransactions: agentRanking.reduce((sum, agent) => sum + (agent._count?.id || 0), 0)
           },
           details: agentRankingDetailed
         },
@@ -200,7 +200,7 @@ router.get('/dashboard', async (req, res) => {
         // 💰 Cashflow
         cashflow: {
           data: cashflowData,
-          summary: calculateCashflowSummary(cashflowData)
+          summary: calculateCashflowSummary(cashflowData as any[])
         },
         
         // 📊 Performance
@@ -236,7 +236,7 @@ async function calculateTrend(dateFilter: any, programFilter: any) {
 
   const lastMonthData = await prisma.payment.aggregate({
     where: {
-      createdAt: {
+      paymentDate: {
         gte: lastMonth,
         lt: thisMonth
       },
@@ -247,7 +247,7 @@ async function calculateTrend(dateFilter: any, programFilter: any) {
 
   const thisMonthData = await prisma.payment.aggregate({
     where: {
-      createdAt: {
+      paymentDate: {
         gte: thisMonth
       },
       reservation: programFilter
@@ -255,8 +255,8 @@ async function calculateTrend(dateFilter: any, programFilter: any) {
     _sum: { amount: true }
   })
 
-  const lastMonthTotal = lastMonthData._sum.amount || 0
-  const thisMonthTotal = thisMonthData._sum.amount || 0
+  const lastMonthTotal = lastMonthData._sum?.amount || 0
+  const thisMonthTotal = thisMonthData._sum?.amount || 0
   
   const change = lastMonthTotal > 0 ? ((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100 : 0
 
@@ -272,15 +272,15 @@ async function calculateTrend(dateFilter: any, programFilter: any) {
 async function findBestPeriod(dateFilter: any, programFilter: any) {
   const bestDay = await prisma.$queryRaw`
     SELECT 
-      DATE(createdAt) as date,
+      DATE(paymentDate) as date,
       SUM(amount) as total
     FROM Payment
-    WHERE createdAt >= COALESCE(${dateFilter.createdAt?.gte || '2024-01-01'}, '2024-01-01')
-      AND createdAt <= COALESCE(${dateFilter.createdAt?.lte || '2025-12-31'}, '2025-12-31')
-    GROUP BY DATE(createdAt)
+    WHERE paymentDate >= COALESCE(${dateFilter.paymentDate?.gte || '2024-01-01'}, '2024-01-01')
+      AND paymentDate <= COALESCE(${dateFilter.paymentDate?.lte || '2025-12-31'}, '2025-12-31')
+    GROUP BY DATE(paymentDate)
     ORDER BY total DESC
     LIMIT 1
-  `
+  ` as Array<{ date: string; total: number }>
 
   return bestDay[0] || null
 }
@@ -296,8 +296,8 @@ async function calculateExpenseRatio(dateFilter: any, programFilter: any) {
     _sum: { amount: true }
   })
 
-  const paymentsTotal = totalPayments._sum.amount || 0
-  const expensesTotal = Math.abs(totalExpenses._sum.amount || 0)
+  const paymentsTotal = totalPayments._sum?.amount || 0
+  const expensesTotal = Math.abs(totalExpenses._sum?.amount || 0)
 
   return {
     ratio: paymentsTotal > 0 ? (expensesTotal / paymentsTotal) * 100 : 0,
@@ -332,12 +332,14 @@ function generateTrendInsights(trendData: any) {
   }
 }
 
-function calculateCashflowSummary(cashflowData: any) {
+function calculateCashflowSummary(cashflowData: any[]) {
   if (!cashflowData || cashflowData.length === 0) {
     return {
+      totalPayments: 0,
+      totalExpenses: 0,
       totalCashflow: 0,
       avgMonthly: 0,
-      trend: 'stable',
+      trend: 'stable' as const,
       volatility: 0
     }
   }

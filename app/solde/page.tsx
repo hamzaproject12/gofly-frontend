@@ -749,7 +749,7 @@ export default function SoldeCaissePage() {
         </div>
 
         {/* 🎯 NOUVELLES SECTIONS ANALYTICS DÉCISIONNELLES */}
-        {analyticsData && (
+        {analyticsData && analyticsData.programRanking && analyticsData.agentRanking && (
           <>
             {/* 📊 Classements et Performance */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -760,13 +760,13 @@ export default function SoldeCaissePage() {
                     <Trophy className="h-5 w-5 text-yellow-500" />
                     Classement Programmes
                     <Badge variant="secondary" className="ml-auto">
-                      {analyticsData.programRanking.summary.totalPrograms} programmes
+                      {analyticsData.programRanking?.summary?.totalPrograms || 0} programmes
                     </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {analyticsData.programRanking.details.slice(0, 5).map((program, index) => (
+                    {(analyticsData.programRanking?.details || []).slice(0, 5).map((program, index) => (
                       <div key={program.programId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
@@ -798,13 +798,13 @@ export default function SoldeCaissePage() {
                     <Award className="h-5 w-5 text-blue-500" />
                     Top Agents
                     <Badge variant="secondary" className="ml-auto">
-                      {analyticsData.agentRanking.summary.totalAgents} agents
+                      {analyticsData.agentRanking?.summary?.totalAgents || 0} agents
                     </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {analyticsData.agentRanking.details.slice(0, 5).map((agent, index) => (
+                    {(analyticsData.agentRanking?.details || []).slice(0, 5).map((agent, index) => (
                       <div key={agent.agentId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
@@ -838,8 +838,8 @@ export default function SoldeCaissePage() {
                   <CardTitle className="text-lg flex items-center gap-2">
                     <LineChart className="h-5 w-5 text-purple-500" />
                     Évolution Caisse
-                    <Badge variant={analyticsData.cashflow.summary.trend === 'positive' ? 'default' : 'destructive'} className="ml-auto">
-                      {analyticsData.cashflow.summary.trend === 'positive' ? '↗' : '↘'} {Math.abs(analyticsData.cashflow.summary.avgMonthly).toLocaleString()} DH/mois
+                    <Badge variant={analyticsData.cashflow?.summary?.trend === 'positive' ? 'default' : 'destructive'} className="ml-auto">
+                      {analyticsData.cashflow?.summary?.trend === 'positive' ? '↗' : '↘'} {Math.abs(analyticsData.cashflow?.summary?.avgMonthly || 0).toLocaleString()} DH/mois
                     </Badge>
                   </CardTitle>
                 </CardHeader>
@@ -849,20 +849,21 @@ export default function SoldeCaissePage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-green-50 p-3 rounded-lg">
                         <p className="text-sm font-medium text-green-700">Total Cashflow</p>
-                        <p className="text-xl font-bold text-green-700">{analyticsData.cashflow.summary.totalCashflow.toLocaleString()} DH</p>
+                        <p className="text-xl font-bold text-green-700">{(analyticsData.cashflow?.summary?.totalCashflow || 0).toLocaleString()} DH</p>
                       </div>
                       <div className="bg-blue-50 p-3 rounded-lg">
                         <p className="text-sm font-medium text-blue-700">Volatilité</p>
-                        <p className="text-xl font-bold text-blue-700">{analyticsData.cashflow.summary.volatility.toLocaleString()} DH</p>
+                        <p className="text-xl font-bold text-blue-700">{(analyticsData.cashflow?.summary?.volatility || 0).toLocaleString()} DH</p>
                       </div>
                     </div>
 
                     {/* Graphique simple des 6 derniers mois */}
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-gray-700">6 derniers mois</p>
-                      {analyticsData.cashflow.data.slice(0, 6).map((month, index) => {
-                        const maxAmount = Math.max(...analyticsData.cashflow.data.slice(0, 6).map(m => Math.abs(m.netCashflow)))
-                        const percentage = maxAmount > 0 ? (Math.abs(month.netCashflow) / maxAmount) * 100 : 0
+                      {(analyticsData.cashflow?.data || []).slice(0, 6).map((month, index) => {
+                        const cashflowData = analyticsData.cashflow?.data || []
+                        const maxAmount = cashflowData.length > 0 ? Math.max(...cashflowData.slice(0, 6).map(m => Math.abs(m.netCashflow || 0))) : 0
+                        const percentage = maxAmount > 0 ? (Math.abs(month.netCashflow || 0) / maxAmount) * 100 : 0
                         
                         return (
                           <div key={month.month} className="flex items-center gap-3">
@@ -890,9 +891,9 @@ export default function SoldeCaissePage() {
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Target className="h-5 w-5 text-green-500" />
                     Performance
-                    <Badge variant={analyticsData.performance.trend.direction === 'up' ? 'default' : 'destructive'} className="ml-auto">
-                      {analyticsData.performance.trend.direction === 'up' ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                      {analyticsData.performance.trend.percentage.toFixed(1)}%
+                    <Badge variant={analyticsData.performance?.trend?.direction === 'up' ? 'default' : 'destructive'} className="ml-auto">
+                      {analyticsData.performance?.trend?.direction === 'up' ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                      {(analyticsData.performance?.trend?.percentage || 0).toFixed(1)}%
                     </Badge>
                   </CardTitle>
                 </CardHeader>
@@ -903,12 +904,12 @@ export default function SoldeCaissePage() {
                       <h3 className="text-sm font-medium text-blue-700 mb-2">Tendance Mensuelle</h3>
                       <div className="flex justify-between items-center">
                         <div>
-                          <p className="text-sm text-gray-600">Mois précédent: {analyticsData.performance.trend.lastMonth.toLocaleString()} DH</p>
-                          <p className="text-sm text-gray-600">Ce mois: {analyticsData.performance.trend.thisMonth.toLocaleString()} DH</p>
+                          <p className="text-sm text-gray-600">Mois précédent: {(analyticsData.performance?.trend?.lastMonth || 0).toLocaleString()} DH</p>
+                          <p className="text-sm text-gray-600">Ce mois: {(analyticsData.performance?.trend?.thisMonth || 0).toLocaleString()} DH</p>
                         </div>
                         <div className="text-right">
                           <p className="text-lg font-bold text-blue-700">
-                            {analyticsData.performance.trend.change >= 0 ? '+' : ''}{analyticsData.performance.trend.change.toLocaleString()} DH
+                            {(analyticsData.performance?.trend?.change || 0) >= 0 ? '+' : ''}{(analyticsData.performance?.trend?.change || 0).toLocaleString()} DH
                           </p>
                         </div>
                       </div>
@@ -918,10 +919,10 @@ export default function SoldeCaissePage() {
                     <div className="bg-orange-50 p-4 rounded-lg">
                       <h3 className="text-sm font-medium text-orange-700 mb-2">Ratio Dépenses/Paiements</h3>
                       <div className="flex justify-between items-center">
-                        <span className="text-2xl font-bold text-orange-700">{analyticsData.performance.expenseRatio.ratio.toFixed(1)}%</span>
+                        <span className="text-2xl font-bold text-orange-700">{(analyticsData.performance?.expenseRatio?.ratio || 0).toFixed(1)}%</span>
                         <div className="text-right">
-                          <p className="text-sm text-gray-600">Paiements: {analyticsData.performance.expenseRatio.payments.toLocaleString()} DH</p>
-                          <p className="text-sm text-gray-600">Dépenses: {analyticsData.performance.expenseRatio.expenses.toLocaleString()} DH</p>
+                          <p className="text-sm text-gray-600">Paiements: {(analyticsData.performance?.expenseRatio?.payments || 0).toLocaleString()} DH</p>
+                          <p className="text-sm text-gray-600">Dépenses: {(analyticsData.performance?.expenseRatio?.expenses || 0).toLocaleString()} DH</p>
                         </div>
                       </div>
                     </div>
@@ -930,20 +931,20 @@ export default function SoldeCaissePage() {
                     <div className="bg-purple-50 p-4 rounded-lg">
                       <h3 className="text-sm font-medium text-purple-700 mb-2">Diversité Programmes</h3>
                       <div className="flex justify-between items-center">
-                        <span className="text-2xl font-bold text-purple-700">{analyticsData.performance.programDiversity.diversity.toFixed(1)}%</span>
+                        <span className="text-2xl font-bold text-purple-700">{(analyticsData.performance?.programDiversity?.diversity || 0).toFixed(1)}%</span>
                         <div className="text-right">
-                          <p className="text-sm text-gray-600">{analyticsData.performance.programDiversity.activePrograms}/{analyticsData.performance.programDiversity.totalPrograms} actifs</p>
+                          <p className="text-sm text-gray-600">{analyticsData.performance?.programDiversity?.activePrograms || 0}/{analyticsData.performance?.programDiversity?.totalPrograms || 0} actifs</p>
                         </div>
                       </div>
                     </div>
 
                     {/* Meilleur jour */}
-                    {analyticsData.performance.bestPeriod && (
+                    {analyticsData.performance?.bestPeriod && (
                       <div className="bg-yellow-50 p-4 rounded-lg">
                         <h3 className="text-sm font-medium text-yellow-700 mb-2">Meilleur Jour</h3>
                         <div className="flex justify-between items-center">
                           <span className="text-lg font-bold text-yellow-700">{analyticsData.performance.bestPeriod.date}</span>
-                          <span className="text-lg font-bold text-yellow-700">{analyticsData.performance.bestPeriod.total.toLocaleString()} DH</span>
+                          <span className="text-lg font-bold text-yellow-700">{(analyticsData.performance.bestPeriod.total || 0).toLocaleString()} DH</span>
                         </div>
                       </div>
                     )}

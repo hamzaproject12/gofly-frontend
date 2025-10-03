@@ -662,6 +662,39 @@ export default function SoldeCaissePage() {
           </CardContent>
         </Card>
 
+        {/* 🧪 Test Graphique STATIQUE - Toujours visible */}
+        <div className="mb-6">
+          <Card className="border-4 border-red-500 bg-red-50">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2 text-red-700">
+                <BarChart3 className="h-5 w-5 text-red-500" />
+                TEST STATIQUE - Ceci doit TOUJOURS être visible
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-32 bg-white border-2 border-red-300 rounded p-4">
+                <div className="flex items-end justify-center gap-4 h-full">
+                  <div className="flex flex-col items-center">
+                    <div className="w-8 bg-green-500 h-20"></div>
+                    <span className="text-xs mt-1">Test 1</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <div className="w-8 bg-blue-500 h-16"></div>
+                    <span className="text-xs mt-1">Test 2</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <div className="w-8 bg-purple-500 h-12"></div>
+                    <span className="text-xs mt-1">Test 3</span>
+                  </div>
+                </div>
+              </div>
+              <p className="text-sm text-red-700 mt-2 font-bold">
+                ⚠️ Si vous ne voyez PAS ce graphique rouge, il y a un problème de rendu CSS/HTML
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Analyse par mois */}
         {/* 🧪 Test Graphique Simple - HTML/CSS */}
         <div className="mb-6">
@@ -669,10 +702,21 @@ export default function SoldeCaissePage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-blue-500" />
-                Test Graphique HTML/CSS (Fallback)
+                Test Graphique HTML/CSS (Fallback) - DEBUG
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {/* Debug Info */}
+              <div className="mb-4 p-3 bg-gray-100 rounded text-xs">
+                <p><strong>Debug Info:</strong></p>
+                <p>parMois length: {(parMois || []).length}</p>
+                <p>parTypeDepense length: {(parTypeDepense || []).length}</p>
+                <p>analyticsData exists: {analyticsData ? 'YES' : 'NO'}</p>
+                <p>cashflow data length: {(analyticsData?.cashflow?.data || []).length}</p>
+                <p>Loading: {loading ? 'YES' : 'NO'}</p>
+                <p>Error: {error || 'None'}</p>
+              </div>
+              
               <div className="h-64 flex items-end justify-center gap-4 p-4">
                 {/* Barre Paiements */}
                 <div className="flex flex-col items-center">

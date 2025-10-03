@@ -14,6 +14,7 @@ import paymentsRouter from './routes/payments';
 import balanceRouter from './routes/balance';
 import uploadCloudinaryRouter from './routes/upload-cloudinary';
 import analyticsRouter from './routes/analytics';
+import roomAvailabilityRouter from './routes/room-availability';
 import authRoutes from './routes/auth';
 import adminRoutes from './routes/admin';
 
@@ -77,6 +78,7 @@ app.use('/api/payments', paymentsRouter);
 app.use('/api/balance', balanceRouter);
 app.use('/api/upload-cloudinary', uploadCloudinaryRouter);
 app.use('/api/analytics', analyticsRouter);
+app.use('/api/room-availability', roomAvailabilityRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

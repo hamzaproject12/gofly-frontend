@@ -14,6 +14,7 @@ export const api = {
     payments: '/api/payments',
     balance: '/api/balance',
     analytics: '/api/analytics',
+    roomAvailability: '/api/room-availability',
     health: '/health',
     test: '/api/test',
     // Program overview endpoints

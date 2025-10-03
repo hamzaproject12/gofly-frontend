@@ -663,35 +663,38 @@ export default function SoldeCaissePage() {
         </Card>
 
         {/* Analyse par mois */}
-        {/* 🧪 Test Graphique Simple */}
+        {/* 🧪 Test Graphique Simple - HTML/CSS */}
         <div className="mb-6">
           <Card className="border-2 border-blue-500">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-blue-500" />
-                Test Graphique Simple (Données Statiques)
+                Test Graphique HTML/CSS (Fallback)
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={[
-                    { mois: "Jan", paiements: 100, depenses: 80 },
-                    { mois: "Fév", paiements: 150, depenses: 120 },
-                    { mois: "Mar", paiements: 200, depenses: 150 }
-                  ]}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="mois" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="paiements" fill="#10b981" name="Paiements" />
-                    <Bar dataKey="depenses" fill="#ef4444" name="Dépenses" />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="h-64 flex items-end justify-center gap-4 p-4">
+                {/* Barre Paiements */}
+                <div className="flex flex-col items-center">
+                  <div className="w-12 bg-green-500 rounded-t" style={{ height: '120px' }}></div>
+                  <span className="text-xs mt-2">Paiements</span>
+                  <span className="text-xs text-green-600 font-bold">100k DH</span>
+                </div>
+                {/* Barre Dépenses */}
+                <div className="flex flex-col items-center">
+                  <div className="w-12 bg-red-500 rounded-t" style={{ height: '80px' }}></div>
+                  <span className="text-xs mt-2">Dépenses</span>
+                  <span className="text-xs text-red-600 font-bold">80k DH</span>
+                </div>
+                {/* Barre Solde */}
+                <div className="flex flex-col items-center">
+                  <div className="w-12 bg-blue-500 rounded-t" style={{ height: '40px' }}></div>
+                  <span className="text-xs mt-2">Solde</span>
+                  <span className="text-xs text-blue-600 font-bold">20k DH</span>
+                </div>
               </div>
               <p className="text-sm text-gray-600 mt-2">
-                Si vous voyez ce graphique, Recharts fonctionne correctement.
+                Graphique HTML/CSS de test - Si vous voyez ceci, le problème est avec Recharts.
               </p>
             </CardContent>
           </Card>
@@ -708,36 +711,46 @@ export default function SoldeCaissePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={parMois || []}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="mois" 
-                        tick={{ fontSize: 12 }}
-                        tickFormatter={(value) => value?.substring(0, 3) || value}
-                      />
-                      <YAxis 
-                        tick={{ fontSize: 12 }}
-                        tickFormatter={(value) => `${(value / 1000).toFixed(0)}k DH`}
-                      />
-                      <Tooltip 
-                        formatter={(value: any, name: string) => [
-                          `${value.toLocaleString()} DH`, 
-                          name === 'paiements' ? 'Paiements' : 'Dépenses'
-                        ]}
-                        labelFormatter={(label) => `Mois: ${label}`}
-                      />
-                      <Legend />
-                      <Bar dataKey="paiements" fill="#10b981" name="Paiements" />
-                      <Bar dataKey="depenses" fill="#ef4444" name="Dépenses" />
-                    </BarChart>
-                    {(parMois || []).length === 0 && (
-                      <div className="flex items-center justify-center h-full text-gray-500">
-                        <p>Aucune donnée disponible pour cette période</p>
-                      </div>
-                    )}
-                  </ResponsiveContainer>
+                <div className="h-80 p-4">
+                  {(parMois || []).length > 0 ? (
+                    <div className="flex items-end justify-center gap-2 h-full">
+                      {(parMois || []).map((item, index) => {
+                        const maxValue = Math.max(...(parMois || []).map(m => Math.max(m.paiements, m.depenses)))
+                        const paiementsHeight = maxValue > 0 ? (item.paiements / maxValue) * 200 : 0
+                        const depensesHeight = maxValue > 0 ? (item.depenses / maxValue) * 200 : 0
+                        
+                        return (
+                          <div key={index} className="flex flex-col items-center gap-2 flex-1">
+                            <div className="flex flex-col items-center gap-1 w-full">
+                              {/* Barre Paiements */}
+                              <div 
+                                className="w-full bg-green-500 rounded-t-sm" 
+                                style={{ height: `${paiementsHeight}px`, minHeight: '4px' }}
+                                title={`Paiements: ${item.paiements.toLocaleString()} DH`}
+                              ></div>
+                              {/* Barre Dépenses */}
+                              <div 
+                                className="w-full bg-red-500 rounded-b-sm" 
+                                style={{ height: `${depensesHeight}px`, minHeight: '4px' }}
+                                title={`Dépenses: ${item.depenses.toLocaleString()} DH`}
+                              ></div>
+                            </div>
+                            <span className="text-xs text-gray-600 font-medium">
+                              {item.mois.substring(0, 3)}
+                            </span>
+                            <div className="text-xs text-center">
+                              <div className="text-green-600">{item.paiements.toLocaleString()} DH</div>
+                              <div className="text-red-600">{item.depenses.toLocaleString()} DH</div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      <p>Aucune donnée disponible pour cette période</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -755,37 +768,37 @@ export default function SoldeCaissePage() {
               <CardContent>
                 <div className="space-y-4">
                   {/* Pie Chart */}
-                  <div className="h-64 relative">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={parTypeDepense || []}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                          outerRadius={70}
-                          fill="#8884d8"
-                          dataKey="total"
-                        >
-                          {(parTypeDepense || []).map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={[
-                              '#ef4444', // Rouge - Vol
-                              '#f97316', // Orange - Hotel Madina  
-                              '#eab308', // Jaune - Hotel Makkah
-                              '#22c55e', // Vert - Visa
-                              '#6366f1'  // Indigo - Autre
-                            ][index % 5]} />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          formatter={(value: any) => [`${value.toLocaleString()} DH`, 'Montant']}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    {(parTypeDepense || []).length === 0 && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90">
-                        <p className="text-gray-500 text-sm">Aucune donnée disponible</p>
+                  <div className="h-64 p-4">
+                    {(parTypeDepense || []).length > 0 ? (
+                      <div className="space-y-3">
+                        {(parTypeDepense || []).map((item, index) => {
+                          const totalDepenses = (parTypeDepense || []).reduce((sum, d) => sum + d.total, 0)
+                          const percentage = totalDepenses > 0 ? (item.total / totalDepenses) * 100 : 0
+                          const colors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500', 'bg-blue-500']
+                          
+                          return (
+                            <div key={index} className="space-y-1">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium">{item.type}</span>
+                                <span className="text-sm font-bold">{item.total.toLocaleString()} DH</span>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-3">
+                                <div 
+                                  className={`h-3 rounded-full ${colors[index % colors.length]}`}
+                                  style={{ width: `${percentage}%` }}
+                                  title={`${percentage.toFixed(1)}%`}
+                                ></div>
+                              </div>
+                              <div className="text-xs text-gray-600 text-center">
+                                {percentage.toFixed(1)}% ({item.total.toLocaleString()} DH)
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-500">
+                        <p className="text-sm">Aucune donnée disponible</p>
                       </div>
                     )}
                   </div>
@@ -962,45 +975,37 @@ export default function SoldeCaissePage() {
                       </div>
                     </div>
 
-                    {/* Graphique Line Chart */}
-                    <div className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={analyticsData.cashflow?.data || []}>
-                          <defs>
-                            <linearGradient id="colorCashflow" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                              <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis 
-                            dataKey="month" 
-                            tick={{ fontSize: 12 }}
-                            tickFormatter={(value) => value?.substring(5) || value}
-                          />
-                          <YAxis 
-                            tick={{ fontSize: 12 }}
-                            tickFormatter={(value) => `${value.toLocaleString()} DH`}
-                          />
-                          <Tooltip 
-                            formatter={(value: any) => [`${value.toLocaleString()} DH`, 'Solde Net']}
-                            labelFormatter={(label) => `Mois: ${label}`}
-                          />
-                          <Area
-                            type="monotone"
-                            dataKey="netCashflow"
-                            stroke="#10b981"
-                            strokeWidth={2}
-                            fill="url(#colorCashflow)"
-                            name="Solde Net"
-                          />
-                        </AreaChart>
-                        {(analyticsData.cashflow?.data || []).length === 0 && (
-                          <div className="flex items-center justify-center h-full text-gray-500">
-                            <p>Aucune donnée de cashflow disponible</p>
-                          </div>
-                        )}
-                      </ResponsiveContainer>
+                    {/* Graphique Line Chart - HTML/CSS */}
+                    <div className="h-80 p-4">
+                      {(analyticsData.cashflow?.data || []).length > 0 ? (
+                        <div className="flex items-end justify-center gap-4 h-full">
+                          {(analyticsData.cashflow?.data || []).map((item, index) => {
+                            const maxValue = Math.max(...(analyticsData.cashflow?.data || []).map(d => Math.abs(d.netCashflow || 0)))
+                            const height = maxValue > 0 ? Math.abs((item.netCashflow || 0) / maxValue) * 200 : 0
+                            const isPositive = (item.netCashflow || 0) >= 0
+                            
+                            return (
+                              <div key={index} className="flex flex-col items-center gap-2">
+                                <div 
+                                  className={`w-8 rounded-t-sm ${isPositive ? 'bg-green-500' : 'bg-red-500'}`}
+                                  style={{ height: `${height}px`, minHeight: '4px' }}
+                                  title={`${item.netCashflow.toLocaleString()} DH`}
+                                ></div>
+                                <span className="text-xs text-gray-600 font-medium">
+                                  {item.month?.substring(5) || 'N/A'}
+                                </span>
+                                <span className={`text-xs font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                                  {item.netCashflow.toLocaleString()} DH
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-gray-500">
+                          <p>Aucune donnée de cashflow disponible</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardContent>

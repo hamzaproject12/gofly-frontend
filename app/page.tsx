@@ -171,6 +171,17 @@ export default function HomePage() {
     }
   };
 
+  const getRoomTypeOrder = (roomType: string) => {
+    switch (roomType) {
+      case 'SINGLE': return 1;
+      case 'DOUBLE': return 2;
+      case 'TRIPLE': return 3;
+      case 'QUAD': return 4;
+      case 'QUINT': return 5;
+      default: return 99;
+    }
+  };
+
   const getGenderIcon = (gender: string) => {
     return gender === 'Homme' ? '👨' : gender === 'Femme' ? '👩' : '👥';
   };
@@ -401,7 +412,9 @@ export default function HomePage() {
                           <h3 className="font-semibold text-gray-900">{hotel.hotelName}</h3>
                         </div>
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                          {hotel.rooms.map((room) => {
+                          {hotel.rooms
+                            .sort((a, b) => getRoomTypeOrder(a.roomType) - getRoomTypeOrder(b.roomType))
+                            .map((room) => {
                             const roomStyle = getRoomTypeStyle(room.roomType);
                             return (
                               <div 
@@ -483,13 +496,12 @@ export default function HomePage() {
                 <CardContent className="p-6">
                   <div className="space-y-6">
                     {program.hotels.map((hotel, hotelIndex) => {
-                      // Grouper les chambres par type et genre
+                      // Grouper les chambres par type seulement (fusionner tous les genres)
                       const roomsByType = hotel.rooms.reduce((acc, room) => {
-                        const typeKey = `${room.roomType}-${room.gender}`;
+                        const typeKey = room.roomType;
                         if (!acc[typeKey]) {
                           acc[typeKey] = {
                             roomType: room.roomType,
-                            gender: room.gender,
                             rooms: [],
                             totalPlaces: 0,
                             placesOccupees: 0,
@@ -512,9 +524,11 @@ export default function HomePage() {
                             <h3 className="font-semibold text-gray-900 text-lg">{hotel.hotelName}</h3>
                           </div>
                           
-                          {/* Types de chambres en horizontal */}
+                          {/* Types de chambres en horizontal - Triés et sans séparation de genre */}
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                            {Object.values(roomsByType).map((roomType: any, typeIndex: number) => {
+                            {Object.values(roomsByType)
+                              .sort((a: any, b: any) => getRoomTypeOrder(a.roomType) - getRoomTypeOrder(b.roomType))
+                              .map((roomType: any, typeIndex: number) => {
                               const roomStyle = getRoomTypeStyle(roomType.roomType);
                               return (
                                 <div key={typeIndex} className={`${roomStyle.bgColor} rounded-lg p-4 border-2 ${roomStyle.borderColor} shadow-sm hover:shadow-md transition-shadow`}>
@@ -524,9 +538,6 @@ export default function HomePage() {
                                     <h4 className={`font-semibold ${roomStyle.textColor} mt-1`}>
                                       {roomType.roomType}
                                     </h4>
-                                    <p className={`text-sm ${roomStyle.textColor}`}>
-                                      {getGenderIcon(roomType.gender)}
-                                    </p>
                                   </div>
                                   
                                   {/* Statistiques */}

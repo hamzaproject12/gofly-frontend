@@ -312,12 +312,12 @@ export default function HomePage() {
             </div>
             <div className="mt-4 flex items-center justify-center gap-6 text-sm">
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-green-500 border-2 border-green-600"></div>
-                <span className="text-gray-600">Occupé</span>
+                <div className="w-4 h-4 rounded-full bg-red-500 border-2 border-red-600"></div>
+                <span className="text-gray-600">Réservé</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-red-500 border-2 border-red-600"></div>
-                <span className="text-gray-600">Libre</span>
+                <div className="w-4 h-4 rounded-full bg-green-500 border-2 border-green-600"></div>
+                <span className="text-gray-600">Disponible</span>
               </div>
             </div>
           </CardContent>
@@ -438,12 +438,12 @@ export default function HomePage() {
                                   {room.visualPlaces.map((place, index) => (
                                     <div
                                       key={index}
-                                      className={`w-6 h-6 rounded-full border-2 ${
-                                        place.color === 'green' 
-                                          ? 'bg-green-500 border-green-600' 
-                                          : 'bg-red-500 border-red-600'
-                                      }`}
-                                      title={place.isOccupied ? 'Occupé' : 'Libre'}
+                                  className={`w-6 h-6 rounded-full border-2 ${
+                                    place.isOccupied 
+                                      ? 'bg-red-500 border-red-600' 
+                                      : 'bg-green-500 border-green-600'
+                                  }`}
+                                  title={place.isOccupied ? 'Réservé' : 'Disponible'}
                                     />
                                   ))}
                                 </div>
@@ -572,10 +572,10 @@ export default function HomePage() {
                                             key={index}
                                             className={`w-4 h-4 rounded-full border ${
                                               isOccupied 
-                                                ? 'bg-green-500 border-green-600' 
-                                                : 'bg-red-500 border-red-600'
+                                                ? 'bg-red-500 border-red-600' 
+                                                : 'bg-green-500 border-green-600'
                                             }`}
-                                            title={isOccupied ? 'Occupé' : 'Libre'}
+                                            title={isOccupied ? 'Réservé' : 'Disponible'}
                                           />
                                         );
                                       })}

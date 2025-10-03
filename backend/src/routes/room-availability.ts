@@ -66,7 +66,7 @@ router.get('/', async (req, res) => {
           // Générer les couleurs pour l'affichage visuel
           visualPlaces: Array.from({ length: room.nbrPlaceTotal }, (_, index) => ({
             isOccupied: index < (room.nbrPlaceTotal - room.nbrPlaceRestantes),
-            color: index < (room.nbrPlaceTotal - room.nbrPlaceRestantes) ? 'green' : 'red'
+            color: index < (room.nbrPlaceTotal - room.nbrPlaceRestantes) ? 'red' : 'green'
           }))
         }))
       }))

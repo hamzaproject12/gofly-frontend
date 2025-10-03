@@ -491,6 +491,14 @@ export default function SoldeCaissePage() {
   const { totalPaiements, totalDepenses, soldeFinal } = statistics || { totalPaiements: 0, totalDepenses: 0, soldeFinal: 0 }
   const { moisMaxBenefice } = summary || { moisMaxBenefice: { mois: "", solde: 0 } }
 
+  // 🔍 Debug des données pour les graphiques
+  console.log('🔍 Debug - Données pour graphiques:', {
+    parMois: parMois || [],
+    parTypeDepense: parTypeDepense || [],
+    analyticsData: analyticsData || {},
+    cashflowData: analyticsData?.cashflow?.data || []
+  })
+
   // Filtrage des données par programme (fait côté serveur maintenant)
   const filteredDetails = details
 
@@ -690,6 +698,11 @@ export default function SoldeCaissePage() {
                       <Bar dataKey="paiements" fill="#10b981" name="Paiements" />
                       <Bar dataKey="depenses" fill="#ef4444" name="Dépenses" />
                     </BarChart>
+                    {(parMois || []).length === 0 && (
+                      <div className="flex items-center justify-center h-full text-gray-500">
+                        <p>Aucune donnée disponible pour cette période</p>
+                      </div>
+                    )}
                   </ResponsiveContainer>
                 </div>
               </CardContent>
@@ -708,7 +721,7 @@ export default function SoldeCaissePage() {
               <CardContent>
                 <div className="space-y-4">
                   {/* Pie Chart */}
-                  <div className="h-64">
+                  <div className="h-64 relative">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -736,6 +749,11 @@ export default function SoldeCaissePage() {
                         />
                       </PieChart>
                     </ResponsiveContainer>
+                    {(parTypeDepense || []).length === 0 && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90">
+                        <p className="text-gray-500 text-sm">Aucune donnée disponible</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Résumé rapide */}
@@ -943,6 +961,11 @@ export default function SoldeCaissePage() {
                             name="Solde Net"
                           />
                         </AreaChart>
+                        {(analyticsData.cashflow?.data || []).length === 0 && (
+                          <div className="flex items-center justify-center h-full text-gray-500">
+                            <p>Aucune donnée de cashflow disponible</p>
+                          </div>
+                        )}
                       </ResponsiveContainer>
                     </div>
                   </div>

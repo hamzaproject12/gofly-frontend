@@ -663,6 +663,40 @@ export default function SoldeCaissePage() {
         </Card>
 
         {/* Analyse par mois */}
+        {/* 🧪 Test Graphique Simple */}
+        <div className="mb-6">
+          <Card className="border-2 border-blue-500">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-blue-500" />
+                Test Graphique Simple (Données Statiques)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={[
+                    { mois: "Jan", paiements: 100, depenses: 80 },
+                    { mois: "Fév", paiements: 150, depenses: 120 },
+                    { mois: "Mar", paiements: 200, depenses: 150 }
+                  ]}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="mois" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="paiements" fill="#10b981" name="Paiements" />
+                    <Bar dataKey="depenses" fill="#ef4444" name="Dépenses" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="text-sm text-gray-600 mt-2">
+                Si vous voyez ce graphique, Recharts fonctionne correctement.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           {/* Bar Chart - Entrées vs Sorties */}
           <div className="lg:col-span-2">

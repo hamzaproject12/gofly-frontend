@@ -367,7 +367,7 @@ export default function EditReservation() {
   const section1Complete = form.nom && form.prenom && form.telephone && form.typeChambre && form.prix && form.gender
   const section2Complete = form.programId && form.hotelMadina && form.hotelMakkah
   const section3Complete = paiements.length > 0 && paiements.every(p => p.montant && p.type && p.date)
-  const section4Complete = documents.length > 0
+  const section4Complete = true // Les toggles sont toujours complétés
 
   const totalProgress = [section1Complete, section2Complete, section3Complete, section4Complete]
     .filter(Boolean).length * 25
@@ -660,135 +660,246 @@ export default function EditReservation() {
               </CardContent>
             </Card>
 
-            {/* Section 4: Documents */}
+            {/* Section 4: Documents Fournisseur */}
             <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
               <CardHeader className="bg-gradient-to-r from-purple-600 to-purple-700 text-white">
                 <CardTitle className="text-xl flex items-center gap-3">
                   <FileText className="h-6 w-6" />
-                  Documents
+                  Documents Fournisseur
                   {section4Complete && <CheckCircle className="h-5 w-5 text-green-300" />}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Passeport */}
-                  <div className="space-y-2">
-                    <Label className="text-purple-700 font-medium">Passeport</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="file"
-                        onChange={(e) => handleDocumentChange(e, 'passport')}
-                        accept="image/*,.pdf"
-                        className="h-10 border-2 border-purple-200 focus:border-purple-500 rounded-lg"
-                      />
-                      {documents.find(d => d.type === 'passport') && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveDocument('passport')}
-                          className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    {previews.passport && (
-                      <div className="mt-2">
-                        <Badge variant="secondary" className="text-xs">
-                          Document uploadé
-                        </Badge>
+                <div className="space-y-4">
+                  {/* Statuts des documents avec toggle switches */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Statut Visa */}
+                    <div className="bg-white p-4 rounded-lg border border-purple-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 bg-blue-100 rounded-lg">
+                            <FileText className="h-4 w-4 text-blue-600" />
+                          </div>
+                          <Label className="text-purple-700 font-medium">Statut Visa</Label>
+                        </div>
+                        <Switch
+                          checked={form.statutVisa || false}
+                          onCheckedChange={(checked) => setForm({ ...form, statutVisa: checked })}
+                          className="data-[state=checked]:bg-blue-600"
+                        />
                       </div>
-                    )}
+                      <div className="text-sm text-gray-600">
+                        {form.statutVisa ? (
+                          <div className="flex items-center gap-2 text-green-600">
+                            <CheckCircle className="h-4 w-4" />
+                            Visa obtenu
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-orange-600">
+                            <Bell className="h-4 w-4" />
+                            En attente
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Statut Vol */}
+                    <div className="bg-white p-4 rounded-lg border border-purple-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 bg-green-100 rounded-lg">
+                            <Calendar className="h-4 w-4 text-green-600" />
+                          </div>
+                          <Label className="text-purple-700 font-medium">Statut Vol</Label>
+                        </div>
+                        <Switch
+                          checked={form.statutVol || false}
+                          onCheckedChange={(checked) => setForm({ ...form, statutVol: checked })}
+                          className="data-[state=checked]:bg-green-600"
+                        />
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {form.statutVol ? (
+                          <div className="flex items-center gap-2 text-green-600">
+                            <CheckCircle className="h-4 w-4" />
+                            Billet réservé
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-orange-600">
+                            <Bell className="h-4 w-4" />
+                            En attente
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Statut Hôtel */}
+                    <div className="bg-white p-4 rounded-lg border border-purple-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 bg-purple-100 rounded-lg">
+                            <Hotel className="h-4 w-4 text-purple-600" />
+                          </div>
+                          <Label className="text-purple-700 font-medium">Statut Hôtel</Label>
+                        </div>
+                        <Switch
+                          checked={form.statutHotel || false}
+                          onCheckedChange={(checked) => setForm({ ...form, statutHotel: checked })}
+                          className="data-[state=checked]:bg-purple-600"
+                        />
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {form.statutHotel ? (
+                          <div className="flex items-center gap-2 text-green-600">
+                            <CheckCircle className="h-4 w-4" />
+                            Hôtel réservé
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-orange-600">
+                            <Bell className="h-4 w-4" />
+                            En attente
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Visa */}
-                  <div className="space-y-2">
-                    <Label className="text-purple-700 font-medium">Visa</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="file"
-                        onChange={(e) => handleDocumentChange(e, 'visa')}
-                        accept=".pdf,image/*"
-                        className="h-10 border-2 border-purple-200 focus:border-purple-500 rounded-lg"
-                      />
-                      {documents.find(d => d.type === 'visa') && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveDocument('visa')}
-                          className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    {previews.visa && (
-                      <div className="mt-2">
-                        <Badge variant="secondary" className="text-xs">
-                          Document uploadé
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
+                  {/* Affichage des documents existants */}
+                  {(documents.length > 0 || Object.keys(previews).length > 0) && (
+                    <div className="mt-6">
+                      <h4 className="text-lg font-semibold text-purple-800 mb-4">Documents attachés</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Passeport */}
+                        {documents.find(d => d.type === 'passport') && (
+                          <div className="bg-white p-4 rounded-lg border border-purple-200">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="p-2 bg-blue-100 rounded-lg">
+                                  <FileText className="h-4 w-4 text-blue-600" />
+                                </div>
+                                <div>
+                                  <p className="font-medium text-gray-900">Passeport</p>
+                                  <p className="text-sm text-gray-600">Document uploadé</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setPreview({ url: previews.passport || documents.find(d => d.type === 'passport')?.url || '', title: 'Passeport' })}
+                                  className="text-blue-600 hover:text-blue-800"
+                                >
+                                  <ZoomIn className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveDocument('passport')}
+                                  className="text-red-600 hover:text-red-800"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
-                  {/* Billet d'avion */}
-                  <div className="space-y-2">
-                    <Label className="text-purple-700 font-medium">Billet d'avion</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="file"
-                        onChange={(e) => handleDocumentChange(e, 'flightBooked')}
-                        accept=".pdf"
-                        className="h-10 border-2 border-purple-200 focus:border-purple-500 rounded-lg"
-                      />
-                      {documents.find(d => d.type === 'flightBooked') && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveDocument('flightBooked')}
-                          className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    {previews.flightBooked && (
-                      <div className="mt-2">
-                        <Badge variant="secondary" className="text-xs">
-                          Document uploadé
-                        </Badge>
+                        {/* Reçus de paiement */}
+                        {paiements.map((paiement, index) => (
+                          paiement.recu && (
+                            <div key={index} className="bg-white p-4 rounded-lg border border-orange-200">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-2 bg-orange-100 rounded-lg">
+                                    <CreditCard className="h-4 w-4 text-orange-600" />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-gray-900">Reçu paiement #{index + 1}</p>
+                                    <p className="text-sm text-gray-600">{paiement.type} - {paiement.montant} DH</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setPreview({ url: paiement.recu || '', title: `Reçu paiement ${paiement.type}` })}
+                                    className="text-orange-600 hover:text-orange-800"
+                                  >
+                                    <ZoomIn className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handlePaiementChange(index, 'recu', '')}
+                                    className="text-red-600 hover:text-red-800"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        ))}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
-                  {/* Réservation hôtel */}
-                  <div className="space-y-2">
-                    <Label className="text-purple-700 font-medium">Réservation hôtel</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="file"
-                        onChange={(e) => handleDocumentChange(e, 'hotelBooked')}
-                        accept=".pdf"
-                        className="h-10 border-2 border-purple-200 focus:border-purple-500 rounded-lg"
-                      />
-                      {documents.find(d => d.type === 'hotelBooked') && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveDocument('hotelBooked')}
-                          className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    {previews.hotelBooked && (
-                      <div className="mt-2">
-                        <Badge variant="secondary" className="text-xs">
-                          Document uploadé
-                        </Badge>
+                  {/* Upload de nouveaux documents */}
+                  <div className="mt-6">
+                    <h4 className="text-lg font-semibold text-purple-800 mb-4">Ajouter des documents</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Passeport */}
+                      <div className="space-y-2">
+                        <Label className="text-purple-700 font-medium">Passeport</Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="file"
+                            onChange={(e) => handleDocumentChange(e, 'passport')}
+                            accept="image/*,.pdf"
+                            className="h-10 border-2 border-purple-200 focus:border-purple-500 rounded-lg"
+                          />
+                          {previews.passport && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveDocument('passport')}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        {previews.passport && (
+                          <div className="mt-2">
+                            <Badge variant="secondary" className="text-xs">
+                              Nouveau document sélectionné
+                            </Badge>
+                          </div>
+                        )}
                       </div>
-                    )}
+
+                      {/* Reçu de paiement */}
+                      <div className="space-y-2">
+                        <Label className="text-purple-700 font-medium">Reçu de paiement</Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="file"
+                            onChange={(e) => {
+                              // Pour simplifier, on ajoute au premier paiement sans reçu
+                              const firstPaymentWithoutReceipt = paiements.findIndex(p => !p.recu);
+                              if (firstPaymentWithoutReceipt !== -1) {
+                                handlePaiementChange(firstPaymentWithoutReceipt, 'recu', 'uploaded');
+                              }
+                            }}
+                            accept="image/*,.pdf"
+                            className="h-10 border-2 border-purple-200 focus:border-purple-500 rounded-lg"
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          Sera associé au premier paiement sans reçu
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -838,7 +949,7 @@ export default function EditReservation() {
                   </div>
                   <div className={`flex items-center gap-3 ${section4Complete ? "text-green-600" : "text-gray-400"}`}>
                     {section4Complete ? <CheckCircle className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
-                    <span className="text-sm font-medium">Documents</span>
+                    <span className="text-sm font-medium">Documents Fournisseur</span>
                   </div>
                 </div>
                 

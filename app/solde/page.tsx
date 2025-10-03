@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Calendar,
@@ -655,97 +656,93 @@ export default function SoldeCaissePage() {
 
         {/* Analyse par mois */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          {/* Bar Chart - Entrées vs Sorties */}
           <div className="lg:col-span-2">
             <Card className="border-0 shadow-lg h-full">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-gray-500" />
-                  Analyse par mois
+                  Entrées vs Sorties par Période
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {(parMois || []).map((item, index) => (
-                    <div key={index} className="bg-gray-50 p-4 rounded-lg">
-                      <div className="flex justify-between items-center mb-2">
-                        <h3 className="font-medium">{item.mois}</h3>
-                        <span className="font-bold text-blue-700">{item.solde.toLocaleString()} DH</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-xs text-gray-500">Paiements</p>
-                          <div className="flex items-center gap-2">
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div
-                                className="bg-green-600 h-2 rounded-full"
-                                style={{ width: `${(item.paiements / 200000) * 100}%` }}
-                              ></div>
-                            </div>
-                            <span className="text-xs font-medium text-green-700">
-                              {item.paiements.toLocaleString()} DH
-                            </span>
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500">Dépenses</p>
-                          <div className="flex items-center gap-2">
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div
-                                className="bg-red-600 h-2 rounded-full"
-                                style={{ width: `${(item.depenses / 200000) * 100}%` }}
-                              ></div>
-                            </div>
-                            <span className="text-xs font-medium text-red-700">
-                              {item.depenses.toLocaleString()} DH
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={parMois || []}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="mois" 
+                        tick={{ fontSize: 12 }}
+                        tickFormatter={(value) => value?.substring(0, 3) || value}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12 }}
+                        tickFormatter={(value) => `${(value / 1000).toFixed(0)}k DH`}
+                      />
+                      <Tooltip 
+                        formatter={(value: any, name: string) => [
+                          `${value.toLocaleString()} DH`, 
+                          name === 'paiements' ? 'Paiements' : 'Dépenses'
+                        ]}
+                        labelFormatter={(label) => `Mois: ${label}`}
+                      />
+                      <Legend />
+                      <Bar dataKey="paiements" fill="#10b981" name="Paiements" />
+                      <Bar dataKey="depenses" fill="#ef4444" name="Dépenses" />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
           </div>
 
+          {/* Pie Chart - Répartition des Dépenses */}
           <div>
             <Card className="border-0 shadow-lg h-full">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <Wallet className="h-5 w-5 text-gray-500" />
-                  Résumé
+                  <PieChart className="h-5 w-5 text-blue-500" />
+                  Répartition des Dépenses
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <h3 className="text-sm font-medium text-blue-700 mb-2">Mois le plus rentable</h3>
-                    <div className="flex justify-between items-center">
-                      <span className="text-lg font-bold">{moisMaxBenefice.mois}</span>
-                      <span className="text-lg font-bold text-green-600">
-                        {moisMaxBenefice.solde.toLocaleString()} DH
-                      </span>
-                    </div>
+                <div className="space-y-4">
+                  {/* Pie Chart */}
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={parTypeDepense || []}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          outerRadius={70}
+                          fill="#8884d8"
+                          dataKey="total"
+                        >
+                          {(parTypeDepense || []).map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={[
+                              '#ef4444', // Rouge - Vol
+                              '#f97316', // Orange - Hotel Madina  
+                              '#eab308', // Jaune - Hotel Makkah
+                              '#22c55e', // Vert - Visa
+                              '#6366f1'  // Indigo - Autre
+                            ][index % 5]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value: any) => [`${value.toLocaleString()} DH`, 'Montant']}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
 
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <h3 className="text-sm font-medium text-green-700 mb-2">Total des paiements</h3>
-                    <p className="text-2xl font-bold text-green-700">
-                      {summary.totalPaiements.toLocaleString()} DH
-                    </p>
-                  </div>
-
-                  <div className="bg-red-50 p-4 rounded-lg">
-                    <h3 className="text-sm font-medium text-red-700 mb-2">Total des dépenses</h3>
-                    <p className="text-2xl font-bold text-red-700">
+                  {/* Résumé rapide */}
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">Total Dépenses</h3>
+                    <p className="text-lg font-bold text-red-700">
                       {summary.totalDepenses.toLocaleString()} DH
-                    </p>
-                  </div>
-
-                  <div className="bg-yellow-50 p-4 rounded-lg">
-                    <h3 className="text-sm font-medium text-yellow-700 mb-2">Solde total</h3>
-                    <p className="text-2xl font-bold text-yellow-700">
-                      {summary.soldeTotal.toLocaleString()} DH
                     </p>
                   </div>
                 </div>
@@ -754,11 +751,52 @@ export default function SoldeCaissePage() {
           </div>
         </div>
 
+        {/* 📊 Résumé des Métriques Clés */}
+        <Card className="border-0 shadow-lg mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-gray-500" />
+              Résumé des Métriques Clés
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="text-sm font-medium text-blue-700 mb-2">Mois le plus rentable</h3>
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-bold">{moisMaxBenefice.mois}</span>
+                  <span className="text-lg font-bold text-green-600">
+                    {moisMaxBenefice.solde.toLocaleString()} DH
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-green-50 p-4 rounded-lg">
+                <h3 className="text-sm font-medium text-green-700 mb-2">Total des paiements</h3>
+                <p className="text-2xl font-bold text-green-700">
+                  {summary.totalPaiements.toLocaleString()} DH
+                </p>
+              </div>
+
+              <div className="bg-red-50 p-4 rounded-lg">
+                <h3 className="text-sm font-medium text-red-700 mb-2">Total des dépenses</h3>
+                <p className="text-2xl font-bold text-red-700">
+                  {summary.totalDepenses.toLocaleString()} DH
+                </p>
+              </div>
+
+              <div className="bg-yellow-50 p-4 rounded-lg">
+                <h3 className="text-sm font-medium text-yellow-700 mb-2">Solde total</h3>
+                <p className="text-2xl font-bold text-yellow-700">
+                  {summary.soldeTotal.toLocaleString()} DH
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* 🎯 NOUVELLES SECTIONS ANALYTICS DÉCISIONNELLES */}
-        {(() => {
-          console.log('🔍 Debug - Rendering analytics sections, analyticsData:', analyticsData)
-          return analyticsData && analyticsData.programRanking && analyticsData.agentRanking
-        })() && (
+        {analyticsData && analyticsData.programRanking && analyticsData.agentRanking && (
           <>
             {/* 📊 Classements et Performance */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -775,12 +813,7 @@ export default function SoldeCaissePage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {(() => {
-                      console.log('🔍 Debug - Rendering program ranking, details:', analyticsData.programRanking?.details)
-                      return (analyticsData.programRanking?.details || []).slice(0, 5)
-                    })().map((program, index) => {
-                      console.log('🔍 Debug - Rendering program item:', program, 'index:', index)
-                      return (
+                    {(analyticsData.programRanking?.details || []).slice(0, 5).map((program, index) => (
                       <div key={program.programId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
@@ -800,8 +833,7 @@ export default function SoldeCaissePage() {
                           <p className="text-sm text-gray-500">Moy: {program.avgAmount.toLocaleString()} DH</p>
                         </div>
                       </div>
-                      )
-                    })}
+                    ))}
                   </div>
                 </CardContent>
               </Card>
@@ -853,16 +885,12 @@ export default function SoldeCaissePage() {
 
             {/* 📈 Tendances et Cashflow */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              {/* 📊 Évolution Cashflow */}
-              {(() => {
-                console.log('🔍 Debug - Rendering cashflow section, data:', analyticsData.cashflow)
-                return null
-              })()}
+              {/* 📊 Évolution Cashflow - Line Chart */}
               <Card className="border-0 shadow-lg">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <LineChart className="h-5 w-5 text-purple-500" />
-                    Évolution Caisse
+                    Évolution du Solde dans le Temps
                     <Badge variant={analyticsData.cashflow?.summary?.trend === 'positive' ? 'default' : 'destructive'} className="ml-auto">
                       {analyticsData.cashflow?.summary?.trend === 'positive' ? '↗' : '↘'} {Math.abs(analyticsData.cashflow?.summary?.avgMonthly || 0).toLocaleString()} DH/mois
                     </Badge>
@@ -882,47 +910,46 @@ export default function SoldeCaissePage() {
                       </div>
                     </div>
 
-                    {/* Graphique simple des 6 derniers mois */}
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-gray-700">6 derniers mois</p>
-                      {(() => {
-                        console.log('🔍 Debug - Rendering cashflow data:', analyticsData.cashflow?.data)
-                        return (analyticsData.cashflow?.data || []).slice(0, 6)
-                      })().map((month, index) => {
-                        console.log('🔍 Debug - Rendering cashflow month:', month, 'index:', index)
-                        const cashflowData = analyticsData.cashflow?.data || []
-                        const maxAmount = cashflowData.length > 0 ? Math.max(...cashflowData.slice(0, 6).map(m => Math.abs(m.netCashflow || 0))) : 0
-                        const percentage = maxAmount > 0 ? (Math.abs(month.netCashflow || 0) / maxAmount) * 100 : 0
-                        
-                        return (
-                          <div key={month.month} className="flex items-center gap-3">
-                            <div className="w-16 text-xs text-gray-500">{month.month}</div>
-                            <div className="flex-1 bg-gray-200 rounded-full h-4 relative">
-                              <div 
-                                className={`h-4 rounded-full ${month.netCashflow >= 0 ? 'bg-green-500' : 'bg-red-500'}`}
-                                style={{ width: `${percentage}%` }}
-                              />
-                            </div>
-                            <div className="w-20 text-right text-sm font-medium">
-                              {month.netCashflow.toLocaleString()} DH
-                            </div>
-                          </div>
-                        )
-                      })}
+                    {/* Graphique Line Chart */}
+                    <div className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={analyticsData.cashflow?.data || []}>
+                          <defs>
+                            <linearGradient id="colorCashflow" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                              <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis 
+                            dataKey="month" 
+                            tick={{ fontSize: 12 }}
+                            tickFormatter={(value) => value?.substring(5) || value}
+                          />
+                          <YAxis 
+                            tick={{ fontSize: 12 }}
+                            tickFormatter={(value) => `${value.toLocaleString()} DH`}
+                          />
+                          <Tooltip 
+                            formatter={(value: any) => [`${value.toLocaleString()} DH`, 'Solde Net']}
+                            labelFormatter={(label) => `Mois: ${label}`}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="netCashflow"
+                            stroke="#10b981"
+                            strokeWidth={2}
+                            fill="url(#colorCashflow)"
+                            name="Solde Net"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               {/* 📊 Métriques de Performance */}
-              {(() => {
-                console.log('🔍 Debug - Rendering performance section, data:', analyticsData.performance)
-                console.log('🔍 Debug - Performance trend:', analyticsData.performance?.trend)
-                console.log('🔍 Debug - Performance expenseRatio:', analyticsData.performance?.expenseRatio)
-                console.log('🔍 Debug - Performance programDiversity:', analyticsData.performance?.programDiversity)
-                console.log('🔍 Debug - Performance bestPeriod:', analyticsData.performance?.bestPeriod)
-                return null
-              })()}
               <Card className="border-0 shadow-lg">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -976,10 +1003,7 @@ export default function SoldeCaissePage() {
                     </div>
 
                     {/* Meilleur jour */}
-                    {(() => {
-                      console.log('🔍 Debug - Checking bestPeriod condition:', analyticsData.performance?.bestPeriod)
-                      return analyticsData.performance?.bestPeriod
-                    })() && (
+                    {analyticsData.performance?.bestPeriod && (
                       <div className="bg-yellow-50 p-4 rounded-lg">
                         <h3 className="text-sm font-medium text-yellow-700 mb-2">Meilleur Jour</h3>
                         <div className="flex justify-between items-center">

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+// import { LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts' // Temporarily disabled
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Calendar,
@@ -29,8 +29,6 @@ import {
   Target,
   Activity,
   DollarSign,
-  PieChart,
-  LineChart,
   Award,
   Star,
 } from "lucide-react"
@@ -805,7 +803,7 @@ export default function SoldeCaissePage() {
             <Card className="border-0 shadow-lg h-full">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <PieChart className="h-5 w-5 text-blue-500" />
+                  <Target className="h-5 w-5 text-blue-500" />
                   Répartition des Dépenses
                 </CardTitle>
               </CardHeader>
@@ -998,7 +996,7 @@ export default function SoldeCaissePage() {
               <Card className="border-0 shadow-lg">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <LineChart className="h-5 w-5 text-purple-500" />
+                    <TrendingUp className="h-5 w-5 text-purple-500" />
                     Évolution du Solde dans le Temps
                     <Badge variant={analyticsData.cashflow?.summary?.trend === 'positive' ? 'default' : 'destructive'} className="ml-auto">
                       {analyticsData.cashflow?.summary?.trend === 'positive' ? '↗' : '↘'} {Math.abs(analyticsData.cashflow?.summary?.avgMonthly || 0).toLocaleString()} DH/mois

@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-// import { LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts' // Temporarily disabled
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Calendar,
@@ -218,180 +217,8 @@ type Program = {
   name: string
 }
 
-// 🎯 Plus besoin de fonctions côté client - tout est géré par l'API Balance optimisée !
-/*function buildBalanceDataFromExistingAPIs(paymentsData: any[], expensesData: any[], dateDebut: string, dateFin: string, programmeFilter: string, periodeFilter: string): BalanceData {
-  console.log('Building balance data with:', {
-    paymentsCount: paymentsData.length,
-    expensesCount: expensesData.length,
-    paymentsSample: paymentsData.slice(0, 2),
-    expensesSample: expensesData.slice(0, 2),
-    dateDebut,
-    dateFin,
-    programmeFilter,
-    periodeFilter
-  })
-  
-  // Appliquer les filtres de date
-  let filteredPayments = paymentsData
-  let filteredExpenses = expensesData
+// 🎯 API Balance optimisée - toutes les données viennent du backend
 
-  if (dateDebut || dateFin) {
-    const startDate = dateDebut ? new Date(dateDebut) : null
-    const endDate = dateFin ? new Date(dateFin) : null
-
-    filteredPayments = paymentsData.filter(p => {
-      const paymentDate = new Date(p.paymentDate)
-      return (!startDate || paymentDate >= startDate) && (!endDate || paymentDate <= endDate)
-    })
-
-    filteredExpenses = expensesData.filter(e => {
-      const expenseDate = new Date(e.date)
-      return (!startDate || expenseDate >= startDate) && (!endDate || expenseDate <= endDate)
-    })
-  }
-
-  // Appliquer le filtre de programme
-  if (programmeFilter !== 'tous') {
-    filteredPayments = filteredPayments.filter(p => p.reservation?.program?.name === programmeFilter)
-    filteredExpenses = filteredExpenses.filter(e => e.program?.name === programmeFilter)
-  }
-
-  // Calculer les statistiques globales avec vérifications
-  const totalPaiements = filteredPayments.reduce((sum, p) => {
-    const amount = parseFloat(p.amount) || 0
-    return sum + amount
-  }, 0)
-  
-  const totalDepenses = filteredExpenses.reduce((sum, e) => {
-    const amount = parseFloat(e.amount) || 0
-    return sum + amount
-  }, 0)
-  
-  const soldeFinal = totalPaiements - totalDepenses
-
-  console.log('Calculs:', {
-    totalPaiements,
-    totalDepenses,
-    soldeFinal,
-    filteredPaymentsCount: filteredPayments.length,
-    filteredExpensesCount: filteredExpenses.length
-  })
-
-  // Calculer les données par mois
-  const moisData = calculateMonthlyData(filteredPayments, filteredExpenses, periodeFilter)
-
-  // Créer les détails des transactions
-  const detailsData = createTransactionDetails(filteredPayments, filteredExpenses)
-
-  // Trouver le mois avec le plus grand bénéfice
-  const moisMaxBenefice = moisData.reduce((max, item) => (item.solde > max.solde ? item : max), { mois: "", solde: 0 })
-
-  // Calculer les totaux pour le résumé
-  const totalPaiementsMois = moisData.reduce((sum, item) => sum + item.paiements, 0)
-  const totalDepensesMois = moisData.reduce((sum, item) => sum + item.depenses, 0)
-  const soldeTotalMois = moisData.reduce((sum, item) => sum + item.solde, 0)
-
-  return {
-    statistics: {
-      totalPaiements,
-      totalDepenses,
-      soldeFinal
-    },
-    moisData,
-    detailsData,
-    moisMaxBenefice,
-    summary: {
-      totalPaiements: totalPaiementsMois,
-      totalDepenses: totalDepensesMois,
-      soldeTotal: soldeTotalMois
-    }
-  }
-}*/
-
-/*// Fonction pour calculer les données par mois
-function calculateMonthlyData(payments: any[], expenses: any[], periode: string) {
-  const moisData: any[] = []
-  
-  // Déterminer le nombre de mois à analyser
-  const monthsToAnalyze = periode === 'trimestre' ? 3 : periode === 'annee' ? 12 : 6
-  
-  // Générer les mois à analyser (les X derniers mois)
-  const currentDate = new Date()
-  for (let i = monthsToAnalyze - 1; i >= 0; i--) {
-    const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1)
-    const mois = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
-    const moisCapitalized = mois.charAt(0).toUpperCase() + mois.slice(1)
-    
-    // Filtrer les paiements pour ce mois
-    const monthStart = new Date(date.getFullYear(), date.getMonth(), 1)
-    const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59)
-    
-    const paiementsMois = payments.filter(p => {
-      const paymentDate = new Date(p.paymentDate)
-      return paymentDate >= monthStart && paymentDate <= monthEnd
-    })
-    
-    const depensesMois = expenses.filter(e => {
-      const expenseDate = new Date(e.date)
-      return expenseDate >= monthStart && expenseDate <= monthEnd
-    })
-    
-    const totalPaiementsMois = paiementsMois.reduce((sum, p) => {
-      const amount = parseFloat(p.amount) || 0
-      return sum + amount
-    }, 0)
-    
-    const totalDepensesMois = depensesMois.reduce((sum, e) => {
-      const amount = parseFloat(e.amount) || 0
-      return sum + amount
-    }, 0)
-    
-    const soldeMois = totalPaiementsMois - totalDepensesMois
-    
-    moisData.push({
-      mois: moisCapitalized,
-      paiements: totalPaiementsMois,
-      depenses: totalDepensesMois,
-      solde: soldeMois
-    })
-  }
-  
-  return moisData
-}*/
-
-/*// Fonction pour créer les détails des transactions
-function createTransactionDetails(payments: any[], expenses: any[]) {
-  const details: any[] = []
-  
-  // Ajouter les paiements
-  payments.forEach(payment => {
-    details.push({
-      id: `payment_${payment.id}`,
-      date: payment.paymentDate,
-      type: 'paiement',
-      description: `Paiement - ${payment.reservation?.firstName || 'N/A'} ${payment.reservation?.lastName || 'N/A'}`,
-      montant: parseFloat(payment.amount) || 0,
-      programme: payment.reservation?.program?.name || 'Programme non spécifié',
-      reservationId: payment.reservationId
-    })
-  })
-  
-  // Ajouter les dépenses
-  expenses.forEach(expense => {
-    details.push({
-      id: `expense_${expense.id}`,
-      date: expense.date,
-      type: 'depense',
-      description: expense.description,
-      montant: -(parseFloat(expense.amount) || 0), // Négatif pour les dépenses
-      programme: expense.program?.name || 'Programme non spécifié',
-      programId: expense.programId
-    })
-  })
-  
-  // Trier par date (plus récent en premier)
-  return details.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-}*/
 
 export default function SoldeCaissePage() {
   // États pour les filtres
@@ -443,9 +270,6 @@ export default function SoldeCaissePage() {
         programsResponse.json()
       ])
 
-      console.log('✅ Balance API - Données reçues:', balanceData)
-      console.log('✅ Analytics API - Données reçues:', analyticsResult)
-      console.log('✅ Programs API - Données reçues:', programsData)
       
       setBalanceData(balanceData)
       setAnalyticsData(analyticsResult.data)
@@ -480,22 +304,11 @@ export default function SoldeCaissePage() {
     metadata: { periode: 'mois', dateDebut: null, dateFin: null, programme: 'tous', generatedAt: new Date().toISOString() }
   }
 
-  console.log('🔍 Debug - balanceData:', balanceData)
-  console.log('🔍 Debug - analyticsData:', analyticsData)
-  console.log('🔍 Debug - programmes:', programmes)
-  console.log('🔍 Debug - data object:', data)
 
   const { statistics, parMois, details, summary, parMethodePaiement, parTypeDepense, parAgent } = data
   const { totalPaiements, totalDepenses, soldeFinal } = statistics || { totalPaiements: 0, totalDepenses: 0, soldeFinal: 0 }
   const { moisMaxBenefice } = summary || { moisMaxBenefice: { mois: "", solde: 0 } }
 
-  // 🔍 Debug des données pour les graphiques
-  console.log('🔍 Debug - Données pour graphiques:', {
-    parMois: parMois || [],
-    parTypeDepense: parTypeDepense || [],
-    analyticsData: analyticsData || {},
-    cashflowData: analyticsData?.cashflow?.data || []
-  })
 
   // Filtrage des données par programme (fait côté serveur maintenant)
   const filteredDetails = details
@@ -660,87 +473,8 @@ export default function SoldeCaissePage() {
           </CardContent>
         </Card>
 
-        {/* 🧪 Test Graphique STATIQUE - Toujours visible */}
-        <div className="mb-6">
-          <Card className="border-4 border-red-500 bg-red-50">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2 text-red-700">
-                <BarChart3 className="h-5 w-5 text-red-500" />
-                TEST STATIQUE - Ceci doit TOUJOURS être visible
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-32 bg-white border-2 border-red-300 rounded p-4">
-                <div className="flex items-end justify-center gap-4 h-full">
-                  <div className="flex flex-col items-center">
-                    <div className="w-8 bg-green-500 h-20"></div>
-                    <span className="text-xs mt-1">Test 1</span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <div className="w-8 bg-blue-500 h-16"></div>
-                    <span className="text-xs mt-1">Test 2</span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <div className="w-8 bg-purple-500 h-12"></div>
-                    <span className="text-xs mt-1">Test 3</span>
-                  </div>
-                </div>
-              </div>
-              <p className="text-sm text-red-700 mt-2 font-bold">
-                ⚠️ Si vous ne voyez PAS ce graphique rouge, il y a un problème de rendu CSS/HTML
-              </p>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Analyse par mois */}
-        {/* 🧪 Test Graphique Simple - HTML/CSS */}
-        <div className="mb-6">
-          <Card className="border-2 border-blue-500">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-blue-500" />
-                Test Graphique HTML/CSS (Fallback) - DEBUG
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {/* Debug Info */}
-              <div className="mb-4 p-3 bg-gray-100 rounded text-xs">
-                <p><strong>Debug Info:</strong></p>
-                <p>parMois length: {(parMois || []).length}</p>
-                <p>parTypeDepense length: {(parTypeDepense || []).length}</p>
-                <p>analyticsData exists: {analyticsData ? 'YES' : 'NO'}</p>
-                <p>cashflow data length: {(analyticsData?.cashflow?.data || []).length}</p>
-                <p>Loading: {loading ? 'YES' : 'NO'}</p>
-                <p>Error: {error || 'None'}</p>
-              </div>
-              
-              <div className="h-64 flex items-end justify-center gap-4 p-4">
-                {/* Barre Paiements */}
-                <div className="flex flex-col items-center">
-                  <div className="w-12 bg-green-500 rounded-t" style={{ height: '120px' }}></div>
-                  <span className="text-xs mt-2">Paiements</span>
-                  <span className="text-xs text-green-600 font-bold">100k DH</span>
-                </div>
-                {/* Barre Dépenses */}
-                <div className="flex flex-col items-center">
-                  <div className="w-12 bg-red-500 rounded-t" style={{ height: '80px' }}></div>
-                  <span className="text-xs mt-2">Dépenses</span>
-                  <span className="text-xs text-red-600 font-bold">80k DH</span>
-                </div>
-                {/* Barre Solde */}
-                <div className="flex flex-col items-center">
-                  <div className="w-12 bg-blue-500 rounded-t" style={{ height: '40px' }}></div>
-                  <span className="text-xs mt-2">Solde</span>
-                  <span className="text-xs text-blue-600 font-bold">20k DH</span>
-                </div>
-              </div>
-              <p className="text-sm text-gray-600 mt-2">
-                Graphique HTML/CSS de test - Si vous voyez ceci, le problème est avec Recharts.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           {/* Bar Chart - Entrées vs Sorties */}

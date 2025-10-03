@@ -119,6 +119,46 @@ export default function HomePage() {
     }
   };
 
+  const getRoomTypeStyle = (roomType: string) => {
+    switch (roomType) {
+      case 'SINGLE':
+        return {
+          borderColor: 'border-blue-500',
+          bgColor: 'bg-blue-50',
+          textColor: 'text-blue-700',
+          badgeColor: 'bg-blue-100 text-blue-800'
+        };
+      case 'DOUBLE':
+        return {
+          borderColor: 'border-green-500',
+          bgColor: 'bg-green-50',
+          textColor: 'text-green-700',
+          badgeColor: 'bg-green-100 text-green-800'
+        };
+      case 'TRIPLE':
+        return {
+          borderColor: 'border-purple-500',
+          bgColor: 'bg-purple-50',
+          textColor: 'text-purple-700',
+          badgeColor: 'bg-purple-100 text-purple-800'
+        };
+      case 'QUAD':
+        return {
+          borderColor: 'border-orange-500',
+          bgColor: 'bg-orange-50',
+          textColor: 'text-orange-700',
+          badgeColor: 'bg-orange-100 text-orange-800'
+        };
+      default:
+        return {
+          borderColor: 'border-gray-500',
+          bgColor: 'bg-gray-50',
+          textColor: 'text-gray-700',
+          badgeColor: 'bg-gray-100 text-gray-800'
+        };
+    }
+  };
+
   const getGenderIcon = (gender: string) => {
     return gender === 'Homme' ? '👨' : gender === 'Femme' ? '👩' : '👥';
   };
@@ -177,6 +217,58 @@ export default function HomePage() {
             )}
           </div>
         </div>
+
+        {/* Légende des types de chambres */}
+        <Card className="border-0 shadow-lg mb-6">
+          <CardHeader className="bg-gradient-to-r from-gray-50 to-blue-50">
+            <CardTitle className="flex items-center gap-2">
+              <span className="text-xl">🎨</span>
+              <span>Légende des Types de Chambres</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="flex items-center gap-3 p-3 bg-blue-50 border-2 border-blue-500 rounded-lg">
+                <span className="text-lg">🏠</span>
+                <div>
+                  <p className="font-medium text-blue-700">SINGLE</p>
+                  <p className="text-xs text-blue-600">1 personne</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-green-50 border-2 border-green-500 rounded-lg">
+                <span className="text-lg">🏘️</span>
+                <div>
+                  <p className="font-medium text-green-700">DOUBLE</p>
+                  <p className="text-xs text-green-600">2 personnes</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-purple-50 border-2 border-purple-500 rounded-lg">
+                <span className="text-lg">🏢</span>
+                <div>
+                  <p className="font-medium text-purple-700">TRIPLE</p>
+                  <p className="text-xs text-purple-600">3 personnes</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-orange-50 border-2 border-orange-500 rounded-lg">
+                <span className="text-lg">🏬</span>
+                <div>
+                  <p className="font-medium text-orange-700">QUAD</p>
+                  <p className="text-xs text-orange-600">4 personnes</p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center justify-center gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-green-500 border-2 border-green-600"></div>
+                <span className="text-gray-600">Occupé</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-red-500 border-2 border-red-600"></div>
+                <span className="text-gray-600">Libre</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Statistiques globales */}
         {roomData?.summary && (
@@ -265,43 +357,51 @@ export default function HomePage() {
                         <h3 className="font-semibold text-gray-900">{hotel.hotelName}</h3>
                       </div>
                       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {hotel.rooms.map((room) => (
-                          <div key={room.id} className="bg-white rounded-lg p-4 border">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-2">
-                                <span className="text-lg">{getRoomTypeIcon(room.roomType)}</span>
-                                <span className="font-medium text-gray-900">
-                                  {room.roomType} {getGenderIcon(room.gender)}
+                        {hotel.rooms.map((room) => {
+                          const roomStyle = getRoomTypeStyle(room.roomType);
+                          return (
+                            <div 
+                              key={room.id} 
+                              className={`${roomStyle.bgColor} rounded-lg p-4 border-2 ${roomStyle.borderColor} shadow-sm hover:shadow-md transition-shadow`}
+                            >
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg">{getRoomTypeIcon(room.roomType)}</span>
+                                  <span className={`font-medium ${roomStyle.textColor}`}>
+                                    {room.roomType} {getGenderIcon(room.gender)}
+                                  </span>
+                                </div>
+                                <Badge className={`text-xs ${roomStyle.badgeColor}`}>
+                                  {room.placesOccupees}/{room.totalPlaces}
+                                </Badge>
+                              </div>
+                              
+                              {/* Affichage visuel des places */}
+                              <div className="flex items-center gap-1 mb-3">
+                                {room.visualPlaces.map((place, index) => (
+                                  <div
+                                    key={index}
+                                    className={`w-6 h-6 rounded-full border-2 ${
+                                      place.color === 'green' 
+                                        ? 'bg-green-500 border-green-600' 
+                                        : 'bg-red-500 border-red-600'
+                                    }`}
+                                    title={place.isOccupied ? 'Occupé' : 'Libre'}
+                                  />
+                                ))}
+                              </div>
+                              
+                              <div className="flex items-center justify-between text-sm">
+                                <span className={roomStyle.textColor}>
+                                  {room.placesOccupees} occupé{room.placesOccupees > 1 ? 's' : ''}
+                                </span>
+                                <span className={`font-medium ${roomStyle.textColor}`}>
+                                  {room.prixRoom.toLocaleString()} DH
                                 </span>
                               </div>
-                              <Badge variant="secondary" className="text-xs">
-                                {room.placesOccupees}/{room.totalPlaces}
-                              </Badge>
                             </div>
-                            
-                            {/* Affichage visuel des places */}
-                            <div className="flex items-center gap-1 mb-3">
-                              {room.visualPlaces.map((place, index) => (
-                                <div
-                                  key={index}
-                                  className={`w-6 h-6 rounded-full border-2 ${
-                                    place.color === 'green' 
-                                      ? 'bg-green-500 border-green-600' 
-                                      : 'bg-red-500 border-red-600'
-                                  }`}
-                                  title={place.isOccupied ? 'Occupé' : 'Libre'}
-                                />
-                              ))}
-                            </div>
-                            
-                            <div className="flex items-center justify-between text-sm text-gray-600">
-                              <span>{room.placesOccupees} occupé{room.placesOccupees > 1 ? 's' : ''}</span>
-                              <span className="font-medium text-indigo-600">
-                                {room.prixRoom.toLocaleString()} DH
-                              </span>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   ))}

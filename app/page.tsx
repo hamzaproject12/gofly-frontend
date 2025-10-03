@@ -237,7 +237,7 @@ export default function HomePage() {
                   className="flex items-center gap-2"
                 >
                   <List className="h-4 w-4" />
-                  Vue Détail Hôtels
+                  Vue Types Chambres
                 </Button>
               </div>
               {agent && (
@@ -455,143 +455,178 @@ export default function HomePage() {
             ))}
           </div>
         ) : (
-          /* Vue Détail Hôtels - Groupée par hôtel */
+          /* Vue Détail Hôtels - Programmes → Hôtels → Types de chambres horizontaux */
           <div className="space-y-6">
-            {/* Grouper tous les hôtels de tous les programmes */}
-            {(() => {
-              const allHotels = roomData?.data.flatMap(program => 
-                program.hotels.map(hotel => ({
-                  ...hotel,
-                  programName: program.name,
-                  programId: program.id
-                }))
-              ) || [];
-
-              // Grouper par nom d'hôtel
-              const hotelsGrouped = allHotels.reduce((acc, hotel) => {
-                const key = hotel.hotelName;
-                if (!acc[key]) {
-                  acc[key] = {
-                    hotelName: hotel.hotelName,
-                    programs: []
-                  };
-                }
-                
-                // Grouper les chambres par type et genre
-                const roomsByType = hotel.rooms.reduce((roomAcc, room) => {
-                  const typeKey = `${room.roomType}-${room.gender}`;
-                  if (!roomAcc[typeKey]) {
-                    roomAcc[typeKey] = {
-                      roomType: room.roomType,
-                      gender: room.gender,
-                      rooms: [],
-                      totalPlaces: 0,
-                      placesOccupees: 0,
-                      placesRestantes: 0
-                    };
-                  }
-                  roomAcc[typeKey].rooms.push(room);
-                  roomAcc[typeKey].totalPlaces += room.totalPlaces;
-                  roomAcc[typeKey].placesOccupees += room.placesOccupees;
-                  roomAcc[typeKey].placesRestantes += room.placesRestantes;
-                  return roomAcc;
-                }, {} as any);
-
-                acc[key].programs.push({
-                  programName: hotel.programName,
-                  programId: hotel.programId,
-                  roomsByType: Object.values(roomsByType)
-                });
-                
-                return acc;
-              }, {} as any);
-
-              return Object.values(hotelsGrouped).map((hotel: any, index) => (
-                <Card key={index} className="border-0 shadow-lg">
-                  <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
-                    <CardTitle className="flex items-center gap-3">
-                      <MapPin className="h-6 w-6 text-blue-500" />
+            {roomData?.data.map((program) => (
+              <Card key={program.id} className="border-0 shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-indigo-50 to-blue-50">
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">🎯</span>
                       <div>
-                        <h2 className="text-xl font-bold text-gray-900">{hotel.hotelName}</h2>
+                        <h2 className="text-xl font-bold text-gray-900">{program.name}</h2>
                         <p className="text-sm text-gray-600">
-                          {hotel.programs.length} programme{hotel.programs.length > 1 ? 's' : ''}
+                          Créé le {new Date(program.created_at).toLocaleDateString('fr-FR')}
                         </p>
                       </div>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="space-y-6">
-                      {hotel.programs.map((program: any, progIndex: number) => (
-                        <div key={progIndex} className="border rounded-lg p-4 bg-gray-50">
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="outline" className="text-lg px-3 py-1">
+                        {program.statistics.placesRestantes} / {program.statistics.totalPlaces}
+                      </Badge>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Taux d'occupation: {program.statistics.occupancyRate}%
+                      </p>
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="space-y-6">
+                    {program.hotels.map((hotel, hotelIndex) => {
+                      // Grouper les chambres par type et genre
+                      const roomsByType = hotel.rooms.reduce((acc, room) => {
+                        const typeKey = `${room.roomType}-${room.gender}`;
+                        if (!acc[typeKey]) {
+                          acc[typeKey] = {
+                            roomType: room.roomType,
+                            gender: room.gender,
+                            rooms: [],
+                            totalPlaces: 0,
+                            placesOccupees: 0,
+                            placesRestantes: 0,
+                            totalReservations: 0
+                          };
+                        }
+                        acc[typeKey].rooms.push(room);
+                        acc[typeKey].totalPlaces += room.totalPlaces;
+                        acc[typeKey].placesOccupees += room.placesOccupees;
+                        acc[typeKey].placesRestantes += room.placesRestantes;
+                        acc[typeKey].totalReservations += room.placesOccupees; // Chaque place occupée = 1 réservation
+                        return acc;
+                      }, {} as any);
+
+                      return (
+                        <div key={hotelIndex} className="border rounded-lg p-4 bg-gray-50">
                           <div className="flex items-center gap-2 mb-4">
-                            <span className="text-lg">🎯</span>
-                            <h3 className="font-semibold text-gray-900">{program.programName}</h3>
+                            <MapPin className="h-5 w-5 text-blue-500" />
+                            <h3 className="font-semibold text-gray-900 text-lg">{hotel.hotelName}</h3>
                           </div>
                           
-                          <div className="space-y-4">
-                            {program.roomsByType.map((roomType: any, typeIndex: number) => {
+                          {/* Types de chambres en horizontal */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                            {Object.values(roomsByType).map((roomType: any, typeIndex: number) => {
                               const roomStyle = getRoomTypeStyle(roomType.roomType);
                               return (
-                                <div key={typeIndex} className="bg-white rounded-lg p-4 border">
-                                  <div className="flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-3">
-                                      <span className="text-xl">{getRoomTypeIcon(roomType.roomType)}</span>
-                                      <div>
-                                        <h4 className={`font-semibold ${roomStyle.textColor}`}>
-                                          {roomType.roomType} {getGenderIcon(roomType.gender)}
-                                        </h4>
-                                        <p className="text-sm text-gray-600">
-                                          {roomType.rooms.length} chambre{roomType.rooms.length > 1 ? 's' : ''}
-                                        </p>
-                                      </div>
+                                <div key={typeIndex} className={`${roomStyle.bgColor} rounded-lg p-4 border-2 ${roomStyle.borderColor} shadow-sm hover:shadow-md transition-shadow`}>
+                                  {/* Header du type de chambre */}
+                                  <div className="text-center mb-3">
+                                    <span className="text-2xl">{getRoomTypeIcon(roomType.roomType)}</span>
+                                    <h4 className={`font-semibold ${roomStyle.textColor} mt-1`}>
+                                      {roomType.roomType}
+                                    </h4>
+                                    <p className={`text-sm ${roomStyle.textColor}`}>
+                                      {getGenderIcon(roomType.gender)}
+                                    </p>
+                                  </div>
+                                  
+                                  {/* Statistiques */}
+                                  <div className="space-y-2 mb-3">
+                                    <div className="flex justify-between text-sm">
+                                      <span className={roomStyle.textColor}>Chambres:</span>
+                                      <span className={`font-medium ${roomStyle.textColor}`}>
+                                        {roomType.rooms.length}
+                                      </span>
                                     </div>
-                                    <div className="text-right">
-                                      <Badge className={`text-sm px-3 py-1 ${roomStyle.badgeColor}`}>
-                                        {roomType.placesOccupees} / {roomType.totalPlaces}
-                                      </Badge>
-                                      <p className="text-xs text-gray-600 mt-1">
-                                        {roomType.placesRestantes} disponible{roomType.placesRestantes > 1 ? 's' : ''}
-                                      </p>
+                                    <div className="flex justify-between text-sm">
+                                      <span className={roomStyle.textColor}>Réservations:</span>
+                                      <span className={`font-medium ${roomStyle.textColor}`}>
+                                        {roomType.totalReservations}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                      <span className={roomStyle.textColor}>Places libres:</span>
+                                      <span className={`font-medium ${roomStyle.textColor}`}>
+                                        {roomType.placesRestantes}
+                                      </span>
                                     </div>
                                   </div>
                                   
-                                  {/* Affichage visuel des places */}
-                                  <div className="flex items-center gap-1 mb-3">
-                                    {Array.from({ length: roomType.totalPlaces }, (_, index) => {
-                                      const isOccupied = index < roomType.placesOccupees;
-                                      return (
-                                        <div
-                                          key={index}
-                                          className={`w-6 h-6 rounded-full border-2 ${
-                                            isOccupied 
-                                              ? 'bg-green-500 border-green-600' 
-                                              : 'bg-red-500 border-red-600'
-                                          }`}
-                                          title={isOccupied ? 'Occupé' : 'Libre'}
-                                        />
-                                      );
-                                    })}
+                                  {/* Indicateur visuel global */}
+                                  <div className="mb-3">
+                                    <div className="flex justify-center gap-1 flex-wrap">
+                                      {Array.from({ length: Math.min(roomType.totalPlaces, 10) }, (_, index) => {
+                                        const isOccupied = index < roomType.placesOccupees;
+                                        return (
+                                          <div
+                                            key={index}
+                                            className={`w-4 h-4 rounded-full border ${
+                                              isOccupied 
+                                                ? 'bg-green-500 border-green-600' 
+                                                : 'bg-red-500 border-red-600'
+                                            }`}
+                                            title={isOccupied ? 'Occupé' : 'Libre'}
+                                          />
+                                        );
+                                      })}
+                                      {roomType.totalPlaces > 10 && (
+                                        <span className={`text-xs ${roomStyle.textColor} ml-1`}>
+                                          +{roomType.totalPlaces - 10}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className={`text-xs text-center mt-1 ${roomStyle.textColor}`}>
+                                      {roomType.placesOccupees}/{roomType.totalPlaces} places
+                                    </p>
                                   </div>
                                   
-                                  <div className="flex items-center justify-between text-sm">
-                                    <span className={roomStyle.textColor}>
-                                      {roomType.placesOccupees} occupé{roomType.placesOccupees > 1 ? 's' : ''} sur {roomType.totalPlaces}
+                                  {/* Prix moyen */}
+                                  <div className="text-center">
+                                    <span className={`text-sm font-medium ${roomStyle.textColor}`}>
+                                      {Math.round(roomType.rooms.reduce((sum: number, room: any) => sum + room.prixRoom, 0) / roomType.rooms.length).toLocaleString()} DH
                                     </span>
-                                    <span className={`font-medium ${roomStyle.textColor}`}>
-                                      Prix moyen: {Math.round(roomType.rooms.reduce((sum: number, room: any) => sum + room.prixRoom, 0) / roomType.rooms.length).toLocaleString()} DH
-                                    </span>
+                                    <p className="text-xs text-gray-500">prix moyen</p>
                                   </div>
                                 </div>
                               );
                             })}
                           </div>
+                          
+                          {/* Résumé de l'hôtel */}
+                          <div className="mt-4 p-3 bg-white rounded-lg border">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                              <div className="text-center">
+                                <p className="font-semibold text-gray-900">
+                                  {hotel.rooms.length}
+                                </p>
+                                <p className="text-gray-600">Chambres totales</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="font-semibold text-green-600">
+                                  {hotel.rooms.reduce((sum, room) => sum + room.placesOccupees, 0)}
+                                </p>
+                                <p className="text-gray-600">Réservations</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="font-semibold text-red-600">
+                                  {hotel.rooms.reduce((sum, room) => sum + room.placesRestantes, 0)}
+                                </p>
+                                <p className="text-gray-600">Places libres</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="font-semibold text-blue-600">
+                                  {Math.round((hotel.rooms.reduce((sum, room) => sum + room.placesOccupees, 0) / hotel.rooms.reduce((sum, room) => sum + room.totalPlaces, 0)) * 100)}%
+                                </p>
+                                <p className="text-gray-600">Taux occupation</p>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ));
-            })()}
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
 

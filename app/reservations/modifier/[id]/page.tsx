@@ -61,6 +61,7 @@ interface Hotel {
 interface Paiement {
   type: string;
   montant: string;
+  date: string;
   recu: string | null;
 }
 
@@ -130,6 +131,7 @@ export default function EditReservation() {
 
   const [paiements, setPaiements] = useState<Paiement[]>([])
   const [previews, setPreviews] = useState<{ [key: string]: { url: string, type: string } }>({})
+  const [reservationData, setReservationData] = useState<any>(null)
   const [documents, setDocuments] = useState<{
     passport: File | null;
     visa: File | null;
@@ -163,6 +165,7 @@ export default function EditReservation() {
         if (reservationId) {
           const reservationResponse = await fetch(api.url(`/api/reservations/${reservationId}`))
           const reservationData = await reservationResponse.json()
+          setReservationData(reservationData)
           
           setFormData({
             programme: reservationData.program?.name || "",
@@ -193,6 +196,13 @@ export default function EditReservation() {
           // Charger les documents existants
           const docObj: any = {}
           ;(reservationData.documents || reservationData.fichiers || []).forEach((d: any) => {
+            console.log('🔍 Debug - Document found:', {
+              fileType: d.fileType,
+              cloudinaryUrl: d.cloudinaryUrl,
+              filePath: d.filePath,
+              fileName: d.fileName
+            });
+            
             docObj[d.fileType] = { 
               url: d.cloudinaryUrl || d.filePath, 
               type: d.fileType,
@@ -203,9 +213,19 @@ export default function EditReservation() {
           // Set previews pour les documents existants
           Object.entries(docObj).forEach(([type, doc]: any) => {
             if (doc.url) {
+              console.log('🔍 Debug - Setting preview for:', {
+                type,
+                url: doc.url,
+                fileName: doc.fileName,
+                isPdf: doc.fileName?.includes('.pdf')
+              });
+              
               setPreviews(prev => ({ 
                 ...prev, 
-                [type]: { url: doc.url, type: doc.fileName?.includes('.pdf') ? 'application/pdf' : 'image/*' }
+                [type]: { 
+                  url: doc.url, 
+                  type: doc.fileName?.includes('.pdf') ? 'application/pdf' : 'image/*' 
+                }
               }))
             }
           })
@@ -333,6 +353,38 @@ export default function EditReservation() {
 
   const supprimerPaiement = (index: number) => {
     setPaiements(paiements => paiements.filter((_, i) => i !== index))
+  }
+
+  // Helper function pour obtenir l'URL d'un document
+  const getDocumentUrl = (type: string) => {
+    // D'abord vérifier dans previews (pour les nouveaux fichiers)
+    if (previews[type]) {
+      return previews[type].url;
+    }
+    
+    // Ensuite vérifier dans les documents existants de la réservation
+    const existingDoc = (reservationData.documents || reservationData.fichiers || []).find((d: any) => d.fileType === type);
+    if (existingDoc) {
+      return existingDoc.cloudinaryUrl || existingDoc.filePath;
+    }
+    
+    return null;
+  }
+
+  // Helper function pour obtenir le type d'un document
+  const getDocumentType = (type: string) => {
+    // D'abord vérifier dans previews
+    if (previews[type]) {
+      return previews[type].type;
+    }
+    
+    // Ensuite vérifier dans les documents existants
+    const existingDoc = (reservationData.documents || reservationData.fichiers || []).find((d: any) => d.fileType === type);
+    if (existingDoc) {
+      return existingDoc.fileName?.includes('.pdf') ? 'application/pdf' : 'image/*';
+    }
+    
+    return 'image/*';
   }
 
   // Calculs de progression
@@ -618,7 +670,7 @@ export default function EditReservation() {
                         </Button>
                       )}
                     </div>
-                    {previews.passport && (
+                    {getDocumentUrl('passport') && (
                       <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-sm font-medium text-blue-700">Aperçu du passeport</span>
@@ -629,7 +681,7 @@ export default function EditReservation() {
                               onClick={e => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                setPreviewImage({ url: previews.passport.url, title: 'Passeport', type: previews.passport.type });
+                                setPreviewImage({ url: getDocumentUrl('passport') || '', title: 'Passeport', type: getDocumentType('passport') });
                               }}
                             >
                               <ZoomIn className="h-3 w-3 mr-1" />
@@ -647,15 +699,15 @@ export default function EditReservation() {
                           </div>
                         </div>
                         <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
-                          {previews.passport.type === 'application/pdf' ? (
+                          {getDocumentType('passport') === 'application/pdf' ? (
                             <embed
-                              src={`${previews.passport.url}#toolbar=0&navpanes=0&scrollbar=0`}
+                              src={`${getDocumentUrl('passport')}#toolbar=0&navpanes=0&scrollbar=0`}
                               type="application/pdf"
                               className="w-full h-full"
                             />
                           ) : (
                             <img
-                              src={previews.passport.url}
+                              src={getDocumentUrl('passport')}
                               alt="Passeport"
                               className="w-full h-full object-contain"
                             />

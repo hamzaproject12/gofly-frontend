@@ -1042,6 +1042,29 @@ export default function NouvelleReservation() {
       };
 
       // 1. Créer d'abord la réservation
+      console.log('🔍 DEBUG Creating reservation with URL:', api.url(api.endpoints.reservations));
+      console.log('🔍 DEBUG Reservation data:', {
+        firstName: formData.prenom,
+        lastName: formData.nom,
+        phone: formData.telephone,
+        programId: parseInt(formData.programId),
+        roomType: formData.typeChambre,
+        gender: formData.gender,
+        hotelMadina: hotelsMadina.find(h => h.id.toString() === formData.hotelMadina)?.name || formData.hotelMadina,
+        hotelMakkah: hotelsMakkah.find(h => h.id.toString() === formData.hotelMakkah)?.name || formData.hotelMakkah,
+        price: parseFloat(formData.prix),
+        reservationDate: new Date().toISOString(),
+        status: reservationStatus,
+        statutPasseport: attachmentStatus.passport,
+        statutVisa: attachmentStatus.visa,
+        statutHotel: attachmentStatus.hotelBooked,
+        statutVol: attachmentStatus.flightBooked,
+        paidAmount: paidAmount,
+        reduction: 0,
+        roomMadinaId: hotelsMadina.find(h => h.id.toString() === formData.hotelMadina)?.id || null,
+        roomMakkahId: hotelsMakkah.find(h => h.id.toString() === formData.hotelMakkah)?.id || null
+      });
+      
       const reservationResponse = await fetch(api.url(api.endpoints.reservations), {
         method: "POST",
         headers: {
@@ -2182,7 +2205,7 @@ export default function NouvelleReservation() {
                           className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
                           disabled={isSubmitting}
                         />
-                        {documents.passport && (
+                        {(passportCloudinaryUrl || documents.passport) && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -2194,7 +2217,7 @@ export default function NouvelleReservation() {
                           </Button>
                         )}
                       </div>
-                      {previews.passport && (
+                      {(passportCloudinaryUrl || previews.passport) && (
                         <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-blue-700">Aperçu du passeport</span>
@@ -2205,7 +2228,7 @@ export default function NouvelleReservation() {
                                 onClick={e => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  setPreviewImage({ url: previews.passport.url, title: 'Passeport', type: previews.passport.type });
+                                  setPreviewImage({ url: passportCloudinaryUrl || previews.passport.url, title: 'Passeport', type: previews.passport.type });
                                 }}
                               >
                                 <ZoomIn className="h-3 w-3 mr-1" />
@@ -2225,13 +2248,13 @@ export default function NouvelleReservation() {
                           <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
                             {previews.passport.type === 'application/pdf' ? (
                               <embed
-                                src={`${previews.passport.url}#toolbar=0&navpanes=0&scrollbar=0`}
+                                src={`${passportCloudinaryUrl || previews.passport.url}#toolbar=0&navpanes=0&scrollbar=0`}
                                 type="application/pdf"
                                 className="w-full h-full"
                               />
                             ) : (
                               <img
-                                src={previews.passport.url}
+                                src={passportCloudinaryUrl || previews.passport.url}
                                 alt="Passeport"
                                 className="w-full h-full object-contain"
                               />
@@ -2291,7 +2314,7 @@ export default function NouvelleReservation() {
                                   className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
                                   disabled={isSubmitting}
                                 />
-                                {previews[`payment_${index}`] && (
+                                {(paiement.recu || documents.payment?.[index]) && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
@@ -2314,7 +2337,7 @@ export default function NouvelleReservation() {
                                   </Button>
                                 )}
                               </div>
-                              {previews[`payment_${index}`] && (
+                              {(paiement.recu || previews[`payment_${index}`]) && (
                                 <div className="mt-2 p-2 border border-orange-200 rounded-lg bg-white">
                                   <div className="flex items-center justify-between mb-2">
                                     <span className="text-sm font-medium text-orange-700">Aperçu du reçu</span>
@@ -2325,7 +2348,7 @@ export default function NouvelleReservation() {
                                         onClick={e => {
                                           e.preventDefault();
                                           e.stopPropagation();
-                                          setPreviewImage({ url: previews[`payment_${index}`].url, title: 'Reçu paiement', type: previews[`payment_${index}`].type });
+                                          setPreviewImage({ url: paiement.recu || previews[`payment_${index}`]?.url, title: 'Reçu paiement', type: previews[`payment_${index}`]?.type || 'image/*' });
                                         }}
                                       >
                                         <ZoomIn className="h-3 w-3 mr-1" />
@@ -2334,15 +2357,15 @@ export default function NouvelleReservation() {
                                     </div>
                                   </div>
                                   <div className="w-full h-[200px] overflow-hidden rounded-lg border border-orange-200 flex items-center justify-center bg-orange-50">
-                                    {previews[`payment_${index}`].type === 'application/pdf' ? (
+                                    {(paiement.recu && paiement.recu.includes('.pdf')) || previews[`payment_${index}`]?.type === 'application/pdf' ? (
                                       <embed
-                                        src={`${previews[`payment_${index}`].url}#toolbar=0&navpanes=0&scrollbar=0`}
+                                        src={`${paiement.recu || previews[`payment_${index}`]?.url}#toolbar=0&navpanes=0&scrollbar=0`}
                                         type="application/pdf"
                                         className="w-full h-full"
                                       />
                                     ) : (
                                       <img
-                                        src={previews[`payment_${index}`].url}
+                                        src={paiement.recu || previews[`payment_${index}`]?.url}
                                         alt="Reçu paiement"
                                         className="max-h-full max-w-full object-contain"
                                       />

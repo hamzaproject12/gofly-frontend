@@ -1020,7 +1020,7 @@ export default function NouvelleReservation() {
     });
 
     // Déclare l'objet local fichierIds ici
-    const fichierIds: { visa: number | null, flightBooked: number | null, hotelBooked: number | null } = { visa: null, flightBooked: null, hotelBooked: null };
+    const fichierIds: { passport: number | null, visa: number | null, flightBooked: number | null, hotelBooked: number | null } = { passport: null, visa: null, flightBooked: null, hotelBooked: null };
 
     try {
       // Construire l'objet documents pour indiquer les statuts d'attachement
@@ -1075,25 +1075,51 @@ export default function NouvelleReservation() {
       const fileUploadErrors: string[] = [];
       const newUploadedStatus = { ...uploadedStatus };
 
-      // Passeport
+      // Passeport - Utiliser l'URL Cloudinary si disponible
       if (documents.passport) {
-        const formDataPassport = new FormData();
-        formDataPassport.append("passport", documents.passport);
-        formDataPassport.append("reservationId", reservationId.toString());
-        fileUploadPromises.push(
-          fetch(api.url(api.endpoints.upload), {
-            method: "POST",
-            body: formDataPassport,
-          }).then(async (response) => {
-            if (response.ok) {
-              newUploadedStatus.passport = true;
-            } else {
-              const error = await response.json();
-              fileUploadErrors.push(`Erreur lors de l'upload du passeport: ${error.error}`);
-            }
-            return response;
-          })
-        );
+        if (previews.passport && previews.passport.url.startsWith('http')) {
+          // URL Cloudinary déjà disponible, créer directement l'enregistrement fichier
+          const formDataPassport = new FormData();
+          formDataPassport.append("fileType", "passport");
+          formDataPassport.append("fileName", documents.passport.name);
+          formDataPassport.append("filePath", previews.passport.url);
+          formDataPassport.append("reservationId", reservationId.toString());
+          fileUploadPromises.push(
+            fetch(api.url(api.endpoints.upload), {
+              method: "POST",
+              body: formDataPassport,
+            }).then(async (response) => {
+              if (response.ok) {
+                newUploadedStatus.passport = true;
+                const data = await response.json();
+                fichierIds.passport = data.files && data.files[0] && data.files[0].id;
+              } else {
+                const error = await response.json();
+                fileUploadErrors.push(`Erreur lors de l'enregistrement du passeport: ${error.error}`);
+              }
+              return response;
+            })
+          );
+        } else {
+          // Fallback vers l'upload traditionnel si pas d'URL Cloudinary
+          const formDataPassport = new FormData();
+          formDataPassport.append("passport", documents.passport);
+          formDataPassport.append("reservationId", reservationId.toString());
+          fileUploadPromises.push(
+            fetch(api.url(api.endpoints.upload), {
+              method: "POST",
+              body: formDataPassport,
+            }).then(async (response) => {
+              if (response.ok) {
+                newUploadedStatus.passport = true;
+              } else {
+                const error = await response.json();
+                fileUploadErrors.push(`Erreur lors de l'upload du passeport: ${error.error}`);
+              }
+              return response;
+            })
+          );
+        }
       }
 
       // Visa
@@ -1245,31 +1271,63 @@ export default function NouvelleReservation() {
         if (paymentUploaded) newUploadedStatus.payment = true;
       }
 
-      // Paiements SANS fichier (toujours après la création de la réservation)
+      // Paiements AVEC et SANS fichier (toujours après la création de la réservation)
       await Promise.all(paiements.map(async (paiement, index) => {
-        // Si ce paiement n'a pas de fichier associé dans documents.payment
-        if (!documents.payment || !documents.payment[index]) {
-          if (paiement.montant && paiement.type) {
-            console.log('Paiement à insérer (sans fichier):', {
-              paiement,
-              index,
-              paiements
-            });
-            const paymentResponse = await fetch('http://localhost:5000/api/payments', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                amount: parseFloat(paiement.montant),
-                type: paiement.type,
-                reservationId: reservationId,
-                programId: formData.programId
-              })
-            });
-            const paymentData = await paymentResponse.clone().json();
-            console.log('Réponse API /api/payments (sans fichier):', paymentData);
-            if (!paymentResponse.ok || !paymentData.id) {
-              paymentErrors.push(`Erreur lors de l'insertion du paiement ${index + 1}: ${paymentData.error || 'Aucune confirmation de la base'}`);
+        if (paiement.montant && paiement.type) {
+          // Vérifier si ce paiement a un reçu Cloudinary
+          const hasReceipt = paiement.recu && paiement.recu.startsWith('http');
+          
+          console.log('Paiement à insérer:', {
+            paiement,
+            index,
+            hasReceipt,
+            receiptUrl: paiement.recu
+          });
+
+          const paymentData: any = {
+            amount: parseFloat(paiement.montant),
+            type: paiement.type,
+            reservationId: reservationId,
+            programId: formData.programId
+          };
+
+          // Si le paiement a un reçu Cloudinary, créer d'abord le fichier
+          if (hasReceipt && paiement.recu) {
+            const formDataReceipt = new FormData();
+            formDataReceipt.append("fileType", "payment");
+            formDataReceipt.append("fileName", `payment_${index}_receipt.${paiement.recu.includes('.pdf') ? 'pdf' : 'jpg'}`);
+            formDataReceipt.append("filePath", paiement.recu);
+            formDataReceipt.append("reservationId", reservationId.toString());
+
+            try {
+              const fileResponse = await fetch(api.url(api.endpoints.upload), {
+                method: "POST",
+                body: formDataReceipt,
+              });
+
+              if (fileResponse.ok) {
+                const fileData = await fileResponse.json();
+                const fichierId = fileData.files && fileData.files[0] && fileData.files[0].id;
+                if (fichierId) {
+                  paymentData.fichierId = fichierId;
+                }
+              }
+            } catch (error) {
+              console.error('Erreur création fichier reçu:', error);
             }
+          }
+
+          const paymentResponse = await fetch('http://localhost:5000/api/payments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(paymentData)
+          });
+          
+          const paymentResult = await paymentResponse.clone().json();
+          console.log('Réponse API /api/payments:', paymentResult);
+          
+          if (!paymentResponse.ok || !paymentResult.id) {
+            paymentErrors.push(`Erreur lors de l'insertion du paiement ${index + 1}: ${paymentResult.error || 'Aucune confirmation de la base'}`);
           }
         }
       }));

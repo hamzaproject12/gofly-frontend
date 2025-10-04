@@ -176,8 +176,8 @@ export default function EditReservation() {
             prenom: reservationData.firstName || "",
             telephone: reservationData.phone || "",
             prix: reservationData.price?.toString() || "",
-            hotelMadina: reservationData.hotelMadina || "",
-            hotelMakkah: reservationData.hotelMakkah || "",
+            hotelMadina: reservationData.hotelMadinaId?.toString() || reservationData.hotelMadina || "",
+            hotelMakkah: reservationData.hotelMakkahId?.toString() || reservationData.hotelMakkah || "",
             dateReservation: reservationData.reservationDate?.split('T')[0] || new Date().toISOString().split('T')[0],
             programId: reservationData.programId?.toString() || "",
             gender: reservationData.gender || "",
@@ -241,8 +241,8 @@ export default function EditReservation() {
         phone: formData.telephone,
         programId: Number(formData.programId),
         roomType: formData.typeChambre,
-        hotelMadina: formData.hotelMadina,
-        hotelMakkah: formData.hotelMakkah,
+        hotelMadinaId: formData.hotelMadina ? Number(formData.hotelMadina) : null,
+        hotelMakkahId: formData.hotelMakkah ? Number(formData.hotelMakkah) : null,
         price: parseFloat(formData.prix),
         reservationDate: formData.dateReservation,
         gender: formData.gender,
@@ -278,18 +278,33 @@ export default function EditReservation() {
     }
   }
 
-  // Fonctions de gestion des fichiers (simplifiées pour l'édition)
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: DocumentType) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    // Pour l'édition, on stocke juste le fichier localement
-    if (type === 'passport') {
-      setDocuments(prev => ({ ...prev, passport: file }))
-      setPreviews(prev => ({ 
-        ...prev, 
-        passport: { url: URL.createObjectURL(file), type: file.type }
-      }))
+  // Fonctions de gestion des fichiers (alignées avec Nouvelle Réservation)
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: DocumentType) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    
+    if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
+      setDocuments(prev => ({
+        ...prev,
+        [type]: file
+      }));
+      
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPreviews(prev => ({
+            ...prev,
+            [type]: { url: reader.result as string, type: file.type }
+          }));
+        };
+        reader.readAsDataURL(file);
+      } else if (file.type === 'application/pdf') {
+        setPreviews(prev => ({
+          ...prev,
+          [type]: { url: URL.createObjectURL(file), type: file.type }
+        }));
+      }
     }
   }
 
@@ -680,7 +695,7 @@ export default function EditReservation() {
                       </div>
                       {paiement.recu && (
                         <div className="mt-3 p-2 border border-orange-200 rounded-lg bg-white">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-orange-700">Reçu de paiement</span>
                             <div className="flex items-center gap-2">
                               <button
@@ -699,6 +714,21 @@ export default function EditReservation() {
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
+                          </div>
+                          <div className="w-full h-[150px] overflow-hidden rounded-lg border border-orange-200">
+                            {paiement.recu.includes('.pdf') ? (
+                              <embed
+                                src={`${paiement.recu}#toolbar=0&navpanes=0&scrollbar=0`}
+                                type="application/pdf"
+                                className="w-full h-full"
+                              />
+                            ) : (
+                              <img
+                                src={paiement.recu}
+                                alt="Reçu de paiement"
+                                className="w-full h-full object-contain"
+                              />
+                            )}
                           </div>
                         </div>
                       )}

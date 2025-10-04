@@ -220,9 +220,13 @@ export default function EditReservation() {
                 isPdf: doc.fileName?.includes('.pdf')
               });
               
+              // Normaliser les types pour la cohérence
+              const normalizedType = type === 'passeport' ? 'passport' : 
+                                   type === 'paiement' ? 'payment' : type;
+              
               setPreviews(prev => ({ 
                 ...prev, 
-                [type]: { 
+                [normalizedType]: { 
                   url: doc.url, 
                   type: doc.fileName?.includes('.pdf') ? 'application/pdf' : 'image/*' 
                 }
@@ -363,8 +367,20 @@ export default function EditReservation() {
     }
     
     // Ensuite vérifier dans les documents existants de la réservation
-    const existingDoc = (reservationData.documents || reservationData.fichiers || []).find((d: any) => d.fileType === type);
+    // Gérer les variations de types (passport/passeport, payment/paiement)
+    const typeVariations = type === 'passport' ? ['passport', 'passeport'] : 
+                          type === 'payment' ? ['payment', 'paiement'] : [type];
+    
+    const existingDoc = (reservationData.documents || reservationData.fichiers || []).find((d: any) => 
+      typeVariations.includes(d.fileType)
+    );
+    
     if (existingDoc) {
+      console.log('🔍 Debug - Found document for type:', {
+        requestedType: type,
+        foundType: existingDoc.fileType,
+        url: existingDoc.cloudinaryUrl || existingDoc.filePath
+      });
       return existingDoc.cloudinaryUrl || existingDoc.filePath;
     }
     
@@ -379,7 +395,14 @@ export default function EditReservation() {
     }
     
     // Ensuite vérifier dans les documents existants
-    const existingDoc = (reservationData.documents || reservationData.fichiers || []).find((d: any) => d.fileType === type);
+    // Gérer les variations de types (passport/passeport, payment/paiement)
+    const typeVariations = type === 'passport' ? ['passport', 'passeport'] : 
+                          type === 'payment' ? ['payment', 'paiement'] : [type];
+    
+    const existingDoc = (reservationData.documents || reservationData.fichiers || []).find((d: any) => 
+      typeVariations.includes(d.fileType)
+    );
+    
     if (existingDoc) {
       return existingDoc.fileName?.includes('.pdf') ? 'application/pdf' : 'image/*';
     }

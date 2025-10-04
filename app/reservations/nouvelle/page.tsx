@@ -809,33 +809,86 @@ export default function NouvelleReservation() {
     return url.match(/\.(jpeg|jpg|gif|png)$/) != null;
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: DocumentType) => {
+  // Fonction pour uploader vers Cloudinary
+  const uploadToCloudinary = async (file: File, type: DocumentType): Promise<string | null> => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('fileType', type);
+      formData.append('fileCategory', 'reservation');
+
+      const response = await fetch(api.url(api.endpoints.uploadCloudinary), {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('Erreur lors de l\'upload');
+
+      const result = await response.json();
+      return result.data.cloudinaryUrl;
+    } catch (error) {
+      console.error('Erreur upload Cloudinary:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible d'uploader le fichier vers Cloudinary",
+        variant: "destructive"
+      });
+      return null;
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: DocumentType) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
+    
     if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
-      setDocuments(prev => ({
-        ...prev,
-        [type]: file
-      }));
-      setAttachmentStatus(prev => ({
-        ...prev,
-        [type]: true
-      }));
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
+      // Upload vers Cloudinary pour le passeport
+      if (type === 'passport') {
+        const cloudinaryUrl = await uploadToCloudinary(file, type);
+        if (cloudinaryUrl) {
+          setDocuments(prev => ({
+            ...prev,
+            [type]: file
+          }));
+          setAttachmentStatus(prev => ({
+            ...prev,
+            [type]: true
+          }));
           setPreviews(prev => ({
             ...prev,
-            [type]: { url: reader.result as string, type: file.type }
+            [type]: { url: cloudinaryUrl, type: file.type }
           }));
-        };
-        reader.readAsDataURL(file);
-      } else if (file.type === 'application/pdf') {
-        setPreviews(prev => ({
+          toast({
+            title: "Succès",
+            description: "Passeport uploadé avec succès vers Cloudinary",
+          });
+        }
+      } else {
+        // Pour les autres types de documents, garder l'ancienne logique
+        setDocuments(prev => ({
           ...prev,
-          [type]: { url: URL.createObjectURL(file), type: file.type }
+          [type]: file
         }));
+        setAttachmentStatus(prev => ({
+          ...prev,
+          [type]: true
+        }));
+        if (file.type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setPreviews(prev => ({
+              ...prev,
+              [type]: { url: reader.result as string, type: file.type }
+            }));
+          };
+          reader.readAsDataURL(file);
+        } else if (file.type === 'application/pdf') {
+          setPreviews(prev => ({
+            ...prev,
+            [type]: { url: URL.createObjectURL(file), type: file.type }
+          }));
+        }
       }
     } else {
       toast({
@@ -904,7 +957,7 @@ export default function NouvelleReservation() {
   };
 
   // Correction du handler pour gérer un fichier par paiement
-  const handlePaymentFileChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+  const handlePaymentFileChange = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!(file.type === 'application/pdf' || file.type.startsWith('image/'))) {
@@ -915,27 +968,30 @@ export default function NouvelleReservation() {
       });
       return;
     }
-    // Mettre à jour le fichier de paiement à l'index
-    setDocuments(prev => {
-      const newPayments = [...(prev.payment || [])];
-      newPayments[index] = file;
-      return { ...prev, payment: newPayments };
-    });
-    // Créer l'aperçu
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviews(prev => ({
-          ...prev,
-          [`payment_${index}`]: { url: reader.result as string, type: file.type }
-        }));
-      };
-      reader.readAsDataURL(file);
-    } else if (file.type === 'application/pdf') {
+
+    // Upload vers Cloudinary pour les reçus de paiement
+    const cloudinaryUrl = await uploadToCloudinary(file, 'payment');
+    if (cloudinaryUrl) {
+      // Mettre à jour le fichier de paiement à l'index
+      setDocuments(prev => {
+        const newPayments = [...(prev.payment || [])];
+        newPayments[index] = file;
+        return { ...prev, payment: newPayments };
+      });
+      
+      // Créer l'aperçu avec l'URL Cloudinary
       setPreviews(prev => ({
         ...prev,
-        [`payment_${index}`]: { url: URL.createObjectURL(file), type: file.type }
+        [`payment_${index}`]: { url: cloudinaryUrl, type: file.type }
       }));
+
+      // Mettre à jour le paiement avec l'URL Cloudinary
+      mettreAJourPaiement(index, 'recu', cloudinaryUrl);
+      
+      toast({
+        title: "Succès",
+        description: "Reçu de paiement uploadé avec succès vers Cloudinary",
+      });
     }
   };
 
@@ -2050,6 +2106,7 @@ export default function NouvelleReservation() {
                           onChange={(e) => handleFileChange(e, 'passport')}
                           accept="image/*,.pdf"
                           className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                          disabled={isSubmitting}
                         />
                         {documents.passport && (
                           <Button
@@ -2057,6 +2114,7 @@ export default function NouvelleReservation() {
                             size="icon"
                             onClick={() => handleRemoveDocument('passport')}
                             className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                            disabled={isSubmitting}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -2157,6 +2215,7 @@ export default function NouvelleReservation() {
                                   onChange={e => handlePaymentFileChange(e, index)}
                                   accept="image/*,.pdf"
                                   className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
+                                  disabled={isSubmitting}
                                 />
                                 {previews[`payment_${index}`] && (
                                   <Button

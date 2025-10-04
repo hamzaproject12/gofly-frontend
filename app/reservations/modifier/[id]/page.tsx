@@ -98,20 +98,6 @@ type FormData = {
   }>;
 };
 
-const ROOM_TYPES = [
-  { value: 'SINGLE', label: 'Simple (1 personne)', icon: '🏠' },
-  { value: 'DOUBLE', label: 'Double (2 personnes)', icon: '🏘️' },
-  { value: 'TRIPLE', label: 'Triple (3 personnes)', icon: '🏢' },
-  { value: 'QUAD', label: 'Quadruple (4 personnes)', icon: '🏬' },
-  { value: 'QUINT', label: 'Quintuple (5 personnes)', icon: '🏭' },
-];
-
-const GENDER_OPTIONS = [
-  { value: 'Homme', label: 'Homme', icon: '👨' },
-  { value: 'Femme', label: 'Femme', icon: '👩' },
-  { value: 'Mixte', label: 'Mixte', icon: '👥' },
-];
-
 export default function EditReservation() {
   const { toast } = useToast()
   const router = useRouter()
@@ -121,30 +107,44 @@ export default function EditReservation() {
   const [loading, setLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [programs, setPrograms] = useState<Program[]>([])
-  const [preview, setPreview] = useState<{ url: string; title: string } | null>(null)
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string; type: string } | null>(null)
+  const [showRoomGuide, setShowRoomGuide] = useState(false)
   
-  const [form, setForm] = useState<FormData>({
-    programme: '',
-    typeChambre: '',
-    nom: '',
-    prenom: '',
-    telephone: '',
-    prix: '',
-    hotelMadina: '',
-    hotelMakkah: '',
-    dateReservation: '',
-    programId: '',
-    gender: '',
+  const [formData, setFormData] = useState<FormData>({
+    programme: "",
+    typeChambre: "",
+    nom: "",
+    prenom: "",
+    telephone: "",
+    prix: "",
+    hotelMadina: "",
+    hotelMakkah: "",
+    dateReservation: new Date().toISOString().split('T')[0],
+    programId: "",
+    gender: "",
     statutVisa: false,
     statutVol: false,
     statutHotel: false,
     paiements: []
   })
 
-  const [paiements, setPaiements] = useState<any[]>([])
-  const [documents, setDocuments] = useState<any[]>([])
-  const [previews, setPreviews] = useState<{ [key: string]: string }>({})
-  const [fileInputs, setFileInputs] = useState<FileInputs>({
+  const [paiements, setPaiements] = useState<Paiement[]>([])
+  const [previews, setPreviews] = useState<{ [key: string]: { url: string, type: string } }>({})
+  const [documents, setDocuments] = useState<{
+    passport: File | null;
+    visa: File | null;
+    hotelBooked: File | null;
+    flightBooked: File | null;
+    payment: (File | null)[];
+  }>({
+    passport: null,
+    visa: null,
+    hotelBooked: null,
+    flightBooked: null,
+    payment: []
+  })
+
+  const fileInputs = useRef<FileInputs>({
     passeport: null,
     visa: null,
     billetAller: null,
@@ -169,18 +169,18 @@ export default function EditReservation() {
           const reservationResponse = await fetch(api.url(`/api/reservations/${reservationId}`))
           const reservationData = await reservationResponse.json()
           
-          setForm({
-            programme: reservationData.program?.name || '',
-            typeChambre: reservationData.roomType || '',
-            nom: reservationData.lastName || '',
-            prenom: reservationData.firstName || '',
-            telephone: reservationData.phone || '',
-            prix: reservationData.price?.toString() || '',
-            hotelMadina: reservationData.hotelMadina || '',
-            hotelMakkah: reservationData.hotelMakkah || '',
-            dateReservation: reservationData.reservationDate?.split('T')[0] || '',
-            programId: reservationData.programId?.toString() || '',
-            gender: reservationData.gender || '',
+          setFormData({
+            programme: reservationData.program?.name || "",
+            typeChambre: reservationData.roomType || "",
+            nom: reservationData.lastName || "",
+            prenom: reservationData.firstName || "",
+            telephone: reservationData.phone || "",
+            prix: reservationData.price?.toString() || "",
+            hotelMadina: reservationData.hotelMadina || "",
+            hotelMakkah: reservationData.hotelMakkah || "",
+            dateReservation: reservationData.reservationDate?.split('T')[0] || new Date().toISOString().split('T')[0],
+            programId: reservationData.programId?.toString() || "",
+            gender: reservationData.gender || "",
             statutVisa: reservationData.statutVisa || false,
             statutVol: reservationData.statutVol || false,
             statutHotel: reservationData.statutHotel || false,
@@ -205,16 +205,14 @@ export default function EditReservation() {
             }
           })
           
-          setDocuments([
-            docObj['passport'] ? { type: 'passport', url: docObj['passport'].url, fileName: docObj['passport'].fileName } : null,
-            docObj['visa'] ? { type: 'visa', url: docObj['visa'].url, fileName: docObj['visa'].fileName } : null,
-            docObj['hotelBooked'] ? { type: 'hotelBooked', url: docObj['hotelBooked'].url, fileName: docObj['hotelBooked'].fileName } : null,
-            docObj['flightBooked'] ? { type: 'flightBooked', url: docObj['flightBooked'].url, fileName: docObj['flightBooked'].fileName } : null,
-          ].filter(Boolean))
-
-          // Previews pour les documents existants
+          // Set previews pour les documents existants
           Object.entries(docObj).forEach(([type, doc]: any) => {
-            if (doc.url) setPreviews(prev => ({ ...prev, [type]: doc.url }))
+            if (doc.url) {
+              setPreviews(prev => ({ 
+                ...prev, 
+                [type]: { url: doc.url, type: doc.fileName?.includes('.pdf') ? 'application/pdf' : 'image/*' }
+              }))
+            }
           })
         }
       } catch (error) {
@@ -232,105 +230,26 @@ export default function EditReservation() {
     fetchData()
   }, [reservationId, toast])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
-  }
-
-  const handleProgramChange = (value: string) => {
-    const selectedProgram = programs.find(p => p.id.toString() === value)
-    setForm(prev => ({
-      ...prev,
-      programId: value,
-      programme: selectedProgram?.name || '',
-      hotelMadina: '',
-      hotelMakkah: '',
-    }))
-  }
-
-  const handlePaiementChange = (index: number, field: string, value: string) => {
-    setPaiements(paiements => paiements.map((p, i) => 
-      i === index ? { ...p, [field]: value } : p
-    ))
-  }
-
-  const handleAddPaiement = () => {
-    setPaiements([...paiements, { montant: '', type: '', date: '', recu: '' }])
-  }
-
-  const handleRemovePaiement = (index: number) => {
-    setPaiements(paiements => paiements.filter((_, i) => i !== index))
-  }
-
-  const handleDocumentUpload = async (file: File, type: DocumentType) => {
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('fileType', type)
-      formData.append('fileCategory', 'reservation')
-
-      const response = await fetch(api.url(api.endpoints.uploadCloudinary), {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!response.ok) throw new Error('Erreur lors de l\'upload')
-
-      const result = await response.json()
-      return result.data.cloudinaryUrl
-    } catch (error) {
-      console.error('Erreur upload:', error)
-      toast({
-        title: "Erreur",
-        description: "Impossible d'uploader le fichier",
-        variant: "destructive"
-      })
-      return null
-    }
-  }
-
-  const handleDocumentChange = async (e: React.ChangeEvent<HTMLInputElement>, type: DocumentType) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const cloudinaryUrl = await handleDocumentUpload(file, type)
-    if (cloudinaryUrl) {
-      setDocuments(prev => [
-        ...prev.filter(d => d.type !== type),
-        { type, url: cloudinaryUrl, fileName: file.name }
-      ])
-      setPreviews(prev => ({ ...prev, [type]: cloudinaryUrl }))
-    }
-  }
-
-  const handleRemoveDocument = (type: string) => {
-    setDocuments(prev => prev.filter(d => d.type !== type))
-    setPreviews(prev => {
-      const newPreviews = { ...prev }
-      delete newPreviews[type]
-      return newPreviews
-    })
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
 
     try {
       const body = {
-        firstName: form.prenom,
-        lastName: form.nom,
-        phone: form.telephone,
-        programId: Number(form.programId),
-        roomType: form.typeChambre,
-        hotelMadina: form.hotelMadina,
-        hotelMakkah: form.hotelMakkah,
-        price: parseFloat(form.prix),
-        reservationDate: form.dateReservation,
-        gender: form.gender,
-        statutPasseport: documents.some(d => d.type === 'passport'),
-        statutVisa: form.statutVisa,
-        statutHotel: form.statutHotel,
-        statutVol: form.statutVol,
+        firstName: formData.prenom,
+        lastName: formData.nom,
+        phone: formData.telephone,
+        programId: Number(formData.programId),
+        roomType: formData.typeChambre,
+        hotelMadina: formData.hotelMadina,
+        hotelMakkah: formData.hotelMakkah,
+        price: parseFloat(formData.prix),
+        reservationDate: formData.dateReservation,
+        gender: formData.gender,
+        statutPasseport: documents.passport !== null,
+        statutVisa: formData.statutVisa,
+        statutHotel: formData.statutHotel,
+        statutVol: formData.statutVol,
       }
 
       const response = await fetch(api.url(`/api/reservations/${reservationId}`), {
@@ -359,13 +278,49 @@ export default function EditReservation() {
     }
   }
 
-  // Calculs de progression
-  const selectedProgram = programs.find(p => p.id.toString() === form.programId)
-  const hotelsMadina = selectedProgram?.hotelsMadina?.map(h => h.hotel) || []
-  const hotelsMakkah = selectedProgram?.hotelsMakkah?.map(h => h.hotel) || []
+  // Fonctions de gestion des fichiers (simplifiées pour l'édition)
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: DocumentType) => {
+    const file = e.target.files?.[0]
+    if (!file) return
 
-  const section1Complete = form.nom && form.prenom && form.telephone && form.typeChambre && form.prix && form.gender
-  const section2Complete = form.programId && form.hotelMadina && form.hotelMakkah
+    // Pour l'édition, on stocke juste le fichier localement
+    if (type === 'passport') {
+      setDocuments(prev => ({ ...prev, passport: file }))
+      setPreviews(prev => ({ 
+        ...prev, 
+        passport: { url: URL.createObjectURL(file), type: file.type }
+      }))
+    }
+  }
+
+  const handleRemoveDocument = (type: string) => {
+    if (type === 'passport') {
+      setDocuments(prev => ({ ...prev, passport: null }))
+      setPreviews(prev => {
+        const newPreviews = { ...prev }
+        delete newPreviews[type]
+        return newPreviews
+      })
+    }
+  }
+
+  const mettreAJourPaiement = (index: number, field: string, value: string) => {
+    setPaiements(paiements => paiements.map((p, i) => 
+      i === index ? { ...p, [field]: value } : p
+    ))
+  }
+
+  const ajouterPaiement = () => {
+    setPaiements([...paiements, { montant: '', type: '', date: '', recu: '' }])
+  }
+
+  const supprimerPaiement = (index: number) => {
+    setPaiements(paiements => paiements.filter((_, i) => i !== index))
+  }
+
+  // Calculs de progression
+  const section1Complete = formData.nom && formData.prenom && formData.telephone && formData.typeChambre && formData.prix && formData.gender
+  const section2Complete = formData.programId && formData.hotelMadina && formData.hotelMakkah
   const section3Complete = paiements.length > 0 && paiements.every(p => p.montant && p.type && p.date)
   const section4Complete = true // Les toggles sont toujours complétés
 
@@ -402,32 +357,54 @@ export default function EditReservation() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Colonne principale - Formulaire */}
-          <div className="lg:col-span-3 space-y-6">
-            {/* Section 1: Informations Client */}
-            <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
-              <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-                <CardTitle className="text-xl flex items-center gap-3">
-                  <User className="h-6 w-6" />
-                  Informations Client
-                  {section1Complete && <CheckCircle className="h-5 w-5 text-green-300" />}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Structure identique à Nouvelle Réservation */}
+        <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
+          <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+            <CardTitle className="text-xl flex items-center gap-3">
+              <Sparkles className="h-6 w-6" />
+              Modifier la Réservation
+              {formData.prix && (
+                <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/30 ml-auto">
+                  <Wallet className="h-4 w-4 text-white" />
+                  <span className="text-sm text-white/80 font-medium">Prix:</span>
+                  <span className="text-lg font-bold text-white">
+                    {parseFloat(formData.prix).toLocaleString('fr-FR')} DH
+                  </span>
+                </div>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6 space-y-6">
+            <form onSubmit={handleSubmit}>
+              {/* Section 1: Configuration du Voyage */}
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
+                <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" />
+                  Configuration du Voyage
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                   <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium">Programme *</Label>
+                    <Label className="text-blue-700 font-medium text-sm">Programme *</Label>
                     <Select
-                      value={form.programId}
-                      onValueChange={handleProgramChange}
+                      value={formData.programme}
+                      onValueChange={(value) => {
+                        const selectedProgram = programs.find(p => p.name === value);
+                        setFormData(prev => ({
+                          ...prev,
+                          programme: value,
+                          programId: selectedProgram?.id.toString() || "",
+                          hotelMadina: "",
+                          hotelMakkah: ""
+                        }));
+                      }}
                     >
-                      <SelectTrigger className="h-12 border-2 border-blue-200 rounded-lg">
-                        <SelectValue placeholder="Sélectionnez un programme" />
+                      <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
+                        <SelectValue placeholder="Sélectionner un programme" />
                       </SelectTrigger>
                       <SelectContent>
                         {programs.map((program) => (
-                          <SelectItem key={program.id} value={program.id.toString()}>
+                          <SelectItem key={program.id} value={program.name}>
                             {program.name}
                           </SelectItem>
                         ))}
@@ -436,193 +413,248 @@ export default function EditReservation() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium">Type de chambre *</Label>
+                    <Label className="text-blue-700 font-medium text-sm">Type de chambre *</Label>
                     <Select
-                      value={form.typeChambre}
-                      onValueChange={(value) => setForm({ ...form, typeChambre: value })}
+                      value={formData.typeChambre}
+                      onValueChange={(value) => setFormData({ ...formData, typeChambre: value })}
                     >
-                      <SelectTrigger className="h-12 border-2 border-blue-200 rounded-lg">
+                      <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
                         <SelectValue placeholder="Sélectionner le type" />
                       </SelectTrigger>
                       <SelectContent>
-                        {ROOM_TYPES.map((type) => (
-                          <SelectItem key={type.value} value={type.value}>
-                            <div className="flex items-center gap-2">
-                              <span>{type.icon}</span>
-                              <span>{type.label}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="SINGLE">1 personne</SelectItem>
+                        <SelectItem value="DOUBLE">2 personnes</SelectItem>
+                        <SelectItem value="TRIPLE">3 personnes</SelectItem>
+                        <SelectItem value="QUAD">4 personnes</SelectItem>
+                        <SelectItem value="QUINT">5 personnes</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium">Nom *</Label>
-                    <Input
-                      name="nom"
-                      value={form.nom}
-                      onChange={handleChange}
-                      className="h-12 border-2 border-blue-200 rounded-lg"
-                      placeholder="Nom de famille"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium">Prénom *</Label>
-                    <Input
-                      name="prenom"
-                      value={form.prenom}
-                      onChange={handleChange}
-                      className="h-12 border-2 border-blue-200 rounded-lg"
-                      placeholder="Prénom"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium">Téléphone *</Label>
-                    <Input
-                      name="telephone"
-                      value={form.telephone}
-                      onChange={handleChange}
-                      className="h-12 border-2 border-blue-200 rounded-lg"
-                      placeholder="Numéro de téléphone"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium">Genre *</Label>
+                    <Label className="text-blue-700 font-medium text-sm">Genre *</Label>
                     <Select
-                      value={form.gender}
-                      onValueChange={(value) => setForm({ ...form, gender: value })}
+                      value={formData.gender}
+                      onValueChange={(value) => setFormData({ ...formData, gender: value })}
                     >
-                      <SelectTrigger className="h-12 border-2 border-blue-200 rounded-lg">
+                      <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
                         <SelectValue placeholder="Sélectionner le genre" />
                       </SelectTrigger>
                       <SelectContent>
-                        {GENDER_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            <div className="flex items-center gap-2">
-                              <span>{option.icon}</span>
-                              <span>{option.label}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium">Prix du voyage (DH) *</Label>
-                    <Input
-                      name="prix"
-                      value={form.prix}
-                      onChange={handleChange}
-                      className="h-12 border-2 border-blue-200 rounded-lg"
-                      placeholder="Prix total"
-                      type="number"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium">Date de réservation</Label>
-                    <Input
-                      name="dateReservation"
-                      value={form.dateReservation}
-                      onChange={handleChange}
-                      className="h-12 border-2 border-blue-200 rounded-lg"
-                      type="date"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Section 2: Sélection des Hôtels */}
-            <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
-              <CardHeader className="bg-gradient-to-r from-green-600 to-green-700 text-white">
-                <CardTitle className="text-xl flex items-center gap-3">
-                  <Hotel className="h-6 w-6" />
-                  Sélection des Hôtels
-                  {section2Complete && <CheckCircle className="h-5 w-5 text-green-300" />}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-green-700 font-medium">Hôtel à Madina *</Label>
-                    <Select
-                      value={form.hotelMadina}
-                      onValueChange={(value) => setForm({ ...form, hotelMadina: value })}
-                      disabled={!form.programId}
-                    >
-                      <SelectTrigger className="h-12 border-2 border-green-200 rounded-lg">
-                        <SelectValue placeholder={form.programId ? "Sélectionner un hôtel à Madina" : "Sélectionnez d'abord un programme"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {hotelsMadina.map((hotel) => (
-                          <SelectItem key={hotel.id} value={hotel.name}>
-                            {hotel.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-green-700 font-medium">Hôtel à Makkah *</Label>
-                    <Select
-                      value={form.hotelMakkah}
-                      onValueChange={(value) => setForm({ ...form, hotelMakkah: value })}
-                      disabled={!form.programId}
-                    >
-                      <SelectTrigger className="h-12 border-2 border-green-200 rounded-lg">
-                        <SelectValue placeholder={form.programId ? "Sélectionner un hôtel à Makkah" : "Sélectionnez d'abord un programme"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {hotelsMakkah.map((hotel) => (
-                          <SelectItem key={hotel.id} value={hotel.name}>
-                            {hotel.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="Homme">Homme</SelectItem>
+                        <SelectItem value="Femme">Femme</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Section 3: Paiements */}
-            <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
-              <CardHeader className="bg-gradient-to-r from-orange-600 to-orange-700 text-white">
-                <CardTitle className="text-xl flex items-center gap-3">
-                  <CreditCard className="h-6 w-6" />
+                {/* Choix des hôtels */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Hôtel à Madina */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">🕌</span>
+                      <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina *</Label>
+                    </div>
+                    <Select
+                      value={formData.hotelMadina}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, hotelMadina: value }))}
+                      disabled={!formData.programId}
+                    >
+                      <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
+                        <SelectValue placeholder={formData.programId ? "Sélectionner un hôtel à Madina" : "Sélectionnez d'abord un programme"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sans hôtel</SelectItem>
+                        {programs
+                          .find(p => p.id === parseInt(formData.programId))
+                          ?.hotelsMadina
+                          ?.map((ph: { hotel: Hotel }) => (
+                            <SelectItem key={ph.hotel.id} value={ph.hotel.id.toString()}>
+                              {ph.hotel.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Hôtel à Makkah */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">🕋</span>
+                      <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah *</Label>
+                    </div>
+                    <Select
+                      value={formData.hotelMakkah}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, hotelMakkah: value }))}
+                      disabled={!formData.programId}
+                    >
+                      <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
+                        <SelectValue placeholder={formData.programId ? "Sélectionner un hôtel à Makkah" : "Sélectionnez d'abord un programme"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sans hôtel</SelectItem>
+                        {programs
+                          .find(p => p.id === parseInt(formData.programId))
+                          ?.hotelsMakkah
+                          ?.map((ph: { hotel: Hotel }) => (
+                            <SelectItem key={ph.hotel.id} value={ph.hotel.id.toString()}>
+                              {ph.hotel.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Informations Client */}
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
+                <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Informations Client
+                  {section1Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-blue-700 font-medium text-sm">Nom *</Label>
+                    <Input
+                      value={formData.nom}
+                      onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
+                      placeholder="Nom du client"
+                      className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-blue-700 font-medium text-sm">Prénom *</Label>
+                    <Input
+                      value={formData.prenom}
+                      onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
+                      placeholder="Prénom du client"
+                      className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-blue-700 font-medium text-sm">Téléphone *</Label>
+                    <Input
+                      value={formData.telephone}
+                      onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
+                      placeholder="Numéro de téléphone"
+                      className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                    />
+                  </div>
+
+                  {/* Passeport - Ajouté dans Informations Client */}
+                  <div className="space-y-2 md:col-span-3">
+                    <Label className="text-blue-700 font-medium text-sm">Passeport *</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="file"
+                        ref={(el) => {
+                          if (el) fileInputs.current.passeport = el;
+                        }}
+                        onChange={(e) => handleFileChange(e, 'passport')}
+                        accept="image/*,.pdf"
+                        className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                      />
+                      {documents.passport && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveDocument('passport')}
+                          className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {previews.passport && (
+                      <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-blue-700">Aperçu du passeport</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded"
+                              onClick={e => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setPreviewImage({ url: previews.passport.url, title: 'Passeport', type: previews.passport.type });
+                              }}
+                            >
+                              <ZoomIn className="h-3 w-3 mr-1" />
+                              Zoom
+                            </button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveDocument('passport')}
+                              className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Supprimer
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
+                          {previews.passport.type === 'application/pdf' ? (
+                            <embed
+                              src={`${previews.passport.url}#toolbar=0&navpanes=0&scrollbar=0`}
+                              type="application/pdf"
+                              className="w-full h-full"
+                            />
+                          ) : (
+                            <img
+                              src={previews.passport.url}
+                              alt="Passeport"
+                              className="w-full h-full object-contain"
+                            />
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Paiements */}
+              <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200 mb-6">
+                <h3 className="text-lg font-semibold text-orange-800 mb-4 flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
                   Paiements
-                  {section3Complete && <CheckCircle className="h-5 w-5 text-green-300" />}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
+                  {section2Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
+                </h3>
                 <div className="space-y-4">
                   {paiements.map((paiement, index) => (
                     <div key={index} className="p-4 border border-orange-200 rounded-lg bg-white/60">
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                         <div className="md:col-span-3 space-y-2">
-                          <Label className="text-orange-700 font-medium text-sm">Type de paiement</Label>
-                          <Input
+                          <Label className="text-orange-700 font-medium text-sm">Mode de paiement</Label>
+                          <Select
                             value={paiement.type}
-                            onChange={(e) => handlePaiementChange(index, 'type', e.target.value)}
-                            className="h-10 border-2 border-orange-200 rounded-lg"
-                            placeholder="Espèces, Virement, etc."
-                          />
+                            onValueChange={(value) => mettreAJourPaiement(index, "type", value)}
+                          >
+                            <SelectTrigger className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg">
+                              <SelectValue placeholder="Sélectionner paiement" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="especes">Espèces</SelectItem>
+                              <SelectItem value="virement">Virement</SelectItem>
+                              <SelectItem value="carte">Carte</SelectItem>
+                              <SelectItem value="cheque">Chèque</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div className="md:col-span-3 space-y-2">
                           <Label className="text-orange-700 font-medium text-sm">Montant (DH)</Label>
                           <Input
-                            value={paiement.montant}
-                            onChange={(e) => handlePaiementChange(index, 'montant', e.target.value)}
-                            className="h-10 border-2 border-orange-200 rounded-lg"
-                            placeholder="Montant"
                             type="number"
+                            value={paiement.montant}
+                            onChange={(e) => mettreAJourPaiement(index, "montant", e.target.value)}
+                            placeholder="Montant en dirhams"
+                            className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
                           />
                         </div>
                         <div className="md:col-span-3 space-y-2">
@@ -630,15 +662,15 @@ export default function EditReservation() {
                           <Input
                             type="date"
                             value={paiement.date}
-                            onChange={(e) => handlePaiementChange(index, 'date', e.target.value)}
-                            className="h-10 border-2 border-orange-200 rounded-lg"
+                            onChange={(e) => mettreAJourPaiement(index, "date", e.target.value)}
+                            className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
                           />
                         </div>
-                        <div className="md:col-span-2 flex items-center justify-center">
+                        <div className="md:col-span-3 flex items-center justify-center">
                           <Button
                             type="button"
                             variant="destructive"
-                            onClick={() => handleRemovePaiement(index)}
+                            onClick={() => supprimerPaiement(index)}
                             className="flex items-center gap-2"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -646,30 +678,50 @@ export default function EditReservation() {
                           </Button>
                         </div>
                       </div>
+                      {paiement.recu && (
+                        <div className="mt-3 p-2 border border-orange-200 rounded-lg bg-white">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-orange-700">Reçu de paiement</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                className="text-orange-600 hover:text-orange-800 hover:bg-orange-50 p-1 rounded"
+                                onClick={() => setPreviewImage({ url: paiement.recu || '', title: 'Reçu paiement', type: 'image/*' })}
+                              >
+                                <ZoomIn className="h-4 w-4" />
+                              </button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => mettreAJourPaiement(index, 'recu', '')}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                   <Button
                     type="button"
-                    onClick={handleAddPaiement}
+                    onClick={ajouterPaiement}
                     className="mt-2 bg-orange-600 hover:bg-orange-700"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Ajouter un paiement
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* Section 4: Documents Fournisseur */}
-            <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
-              <CardHeader className="bg-gradient-to-r from-purple-600 to-purple-700 text-white">
-                <CardTitle className="text-xl flex items-center gap-3">
-                  <FileText className="h-6 w-6" />
+              {/* Section 4: Documents Fournisseur - Statuts simplifiés */}
+              <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200 mb-6">
+                <h3 className="text-lg font-semibold text-purple-800 mb-4 flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
                   Documents Fournisseur
-                  {section4Complete && <CheckCircle className="h-5 w-5 text-green-300" />}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
+                  {section3Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
+                </h3>
                 <div className="space-y-4">
                   {/* Statuts des documents avec toggle switches */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -683,13 +735,13 @@ export default function EditReservation() {
                           <Label className="text-purple-700 font-medium">Statut Visa</Label>
                         </div>
                         <Switch
-                          checked={form.statutVisa || false}
-                          onCheckedChange={(checked) => setForm({ ...form, statutVisa: checked })}
+                          checked={formData.statutVisa || false}
+                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, statutVisa: checked }))}
                           className="data-[state=checked]:bg-blue-600"
                         />
                       </div>
                       <div className="text-sm text-gray-600">
-                        {form.statutVisa ? (
+                        {formData.statutVisa ? (
                           <div className="flex items-center gap-2 text-green-600">
                             <CheckCircle className="h-4 w-4" />
                             Visa obtenu
@@ -713,13 +765,13 @@ export default function EditReservation() {
                           <Label className="text-purple-700 font-medium">Statut Vol</Label>
                         </div>
                         <Switch
-                          checked={form.statutVol || false}
-                          onCheckedChange={(checked) => setForm({ ...form, statutVol: checked })}
+                          checked={formData.statutVol || false}
+                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, statutVol: checked }))}
                           className="data-[state=checked]:bg-green-600"
                         />
                       </div>
                       <div className="text-sm text-gray-600">
-                        {form.statutVol ? (
+                        {formData.statutVol ? (
                           <div className="flex items-center gap-2 text-green-600">
                             <CheckCircle className="h-4 w-4" />
                             Billet réservé
@@ -743,13 +795,13 @@ export default function EditReservation() {
                           <Label className="text-purple-700 font-medium">Statut Hôtel</Label>
                         </div>
                         <Switch
-                          checked={form.statutHotel || false}
-                          onCheckedChange={(checked) => setForm({ ...form, statutHotel: checked })}
+                          checked={formData.statutHotel || false}
+                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, statutHotel: checked }))}
                           className="data-[state=checked]:bg-purple-600"
                         />
                       </div>
                       <div className="text-sm text-gray-600">
-                        {form.statutHotel ? (
+                        {formData.statutHotel ? (
                           <div className="flex items-center gap-2 text-green-600">
                             <CheckCircle className="h-4 w-4" />
                             Hôtel réservé
@@ -763,232 +815,49 @@ export default function EditReservation() {
                       </div>
                     </div>
                   </div>
-
-                  {/* Affichage des documents existants */}
-                  {(documents.length > 0 || Object.keys(previews).length > 0) && (
-                    <div className="mt-6">
-                      <h4 className="text-lg font-semibold text-purple-800 mb-4">Documents attachés</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Passeport */}
-                        {documents.find(d => d.type === 'passport') && (
-                          <div className="bg-white p-4 rounded-lg border border-purple-200">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <div className="p-2 bg-blue-100 rounded-lg">
-                                  <FileText className="h-4 w-4 text-blue-600" />
-                                </div>
-                                <div>
-                                  <p className="font-medium text-gray-900">Passeport</p>
-                                  <p className="text-sm text-gray-600">Document uploadé</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setPreview({ url: previews.passport || documents.find(d => d.type === 'passport')?.url || '', title: 'Passeport' })}
-                                  className="text-blue-600 hover:text-blue-800"
-                                >
-                                  <ZoomIn className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRemoveDocument('passport')}
-                                  className="text-red-600 hover:text-red-800"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Reçus de paiement */}
-                        {paiements.map((paiement, index) => (
-                          paiement.recu && (
-                            <div key={index} className="bg-white p-4 rounded-lg border border-orange-200">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <div className="p-2 bg-orange-100 rounded-lg">
-                                    <CreditCard className="h-4 w-4 text-orange-600" />
-                                  </div>
-                                  <div>
-                                    <p className="font-medium text-gray-900">Reçu paiement #{index + 1}</p>
-                                    <p className="text-sm text-gray-600">{paiement.type} - {paiement.montant} DH</p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setPreview({ url: paiement.recu || '', title: `Reçu paiement ${paiement.type}` })}
-                                    className="text-orange-600 hover:text-orange-800"
-                                  >
-                                    <ZoomIn className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handlePaiementChange(index, 'recu', '')}
-                                    className="text-red-600 hover:text-red-800"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Upload de nouveaux documents */}
-                  <div className="mt-6">
-                    <h4 className="text-lg font-semibold text-purple-800 mb-4">Ajouter des documents</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Passeport */}
-                      <div className="space-y-2">
-                        <Label className="text-purple-700 font-medium">Passeport</Label>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="file"
-                            onChange={(e) => handleDocumentChange(e, 'passport')}
-                            accept="image/*,.pdf"
-                            className="h-10 border-2 border-purple-200 focus:border-purple-500 rounded-lg"
-                          />
-                          {previews.passport && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveDocument('passport')}
-                              className="text-red-600 hover:text-red-800"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                        {previews.passport && (
-                          <div className="mt-2">
-                            <Badge variant="secondary" className="text-xs">
-                              Nouveau document sélectionné
-                            </Badge>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Reçu de paiement */}
-                      <div className="space-y-2">
-                        <Label className="text-purple-700 font-medium">Reçu de paiement</Label>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="file"
-                            onChange={(e) => {
-                              // Pour simplifier, on ajoute au premier paiement sans reçu
-                              const firstPaymentWithoutReceipt = paiements.findIndex(p => !p.recu);
-                              if (firstPaymentWithoutReceipt !== -1) {
-                                handlePaiementChange(firstPaymentWithoutReceipt, 'recu', 'uploaded');
-                              }
-                            }}
-                            accept="image/*,.pdf"
-                            className="h-10 border-2 border-purple-200 focus:border-purple-500 rounded-lg"
-                          />
-                        </div>
-                        <p className="text-xs text-gray-500">
-                          Sera associé au premier paiement sans reçu
-                        </p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* Boutons d'action */}
-            <div className="flex justify-end gap-4">
-              <Link href="/reservations">
-                <Button variant="outline" size="lg">
-                  Annuler
+              {/* Boutons d'action */}
+              <div className="flex justify-end gap-4">
+                <Link href="/reservations">
+                  <Button variant="outline" size="lg">
+                    Annuler
+                  </Button>
+                </Link>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  size="lg"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  {isSubmitting ? "Modification..." : "Modifier la réservation"}
                 </Button>
-              </Link>
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                size="lg"
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                {isSubmitting ? "Modification..." : "Modifier la réservation"}
-              </Button>
-            </div>
-          </div>
-
-          {/* Colonne droite - Progression */}
-          <div className="space-y-6">
-            <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm sticky top-6">
-              <CardHeader className="bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-t-xl">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Sparkles className="h-5 w-5" />
-                  Progression
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                <div className="space-y-3">
-                  <div className={`flex items-center gap-3 ${section1Complete ? "text-green-600" : "text-gray-400"}`}>
-                    {section1Complete ? <CheckCircle className="h-5 w-5" /> : <User className="h-5 w-5" />}
-                    <span className="text-sm font-medium">Informations Client</span>
-                  </div>
-                  <div className={`flex items-center gap-3 ${section2Complete ? "text-green-600" : "text-gray-400"}`}>
-                    {section2Complete ? <CheckCircle className="h-5 w-5" /> : <Hotel className="h-5 w-5" />}
-                    <span className="text-sm font-medium">Hôtels</span>
-                  </div>
-                  <div className={`flex items-center gap-3 ${section3Complete ? "text-green-600" : "text-gray-400"}`}>
-                    {section3Complete ? <CheckCircle className="h-5 w-5" /> : <CreditCard className="h-5 w-5" />}
-                    <span className="text-sm font-medium">Paiements</span>
-                  </div>
-                  <div className={`flex items-center gap-3 ${section4Complete ? "text-green-600" : "text-gray-400"}`}>
-                    {section4Complete ? <CheckCircle className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
-                    <span className="text-sm font-medium">Documents Fournisseur</span>
-                  </div>
-                </div>
-                
-                <div className="mt-6">
-                  <div className="flex justify-between text-sm text-gray-600 mb-2">
-                    <span>Complétion</span>
-                    <span>{totalProgress}%</span>
-                  </div>
-                  <div className="bg-gray-200 rounded-full h-3">
-                    <div
-                      className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-500"
-                      style={{ width: `${totalProgress}%` }}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </form>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Dialog de prévisualisation */}
-      <Dialog open={!!preview} onOpenChange={() => setPreview(null)}>
+      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-auto">
           <DialogHeader>
-            <DialogTitle>{preview?.title}</DialogTitle>
+            <DialogTitle>{previewImage?.title}</DialogTitle>
           </DialogHeader>
-          {preview && (
+          {previewImage && (
             <div className="mt-4">
-              {preview.url.includes('.pdf') ? (
+              {previewImage.url.includes('.pdf') ? (
                 <iframe
-                  src={preview.url}
+                  src={previewImage.url}
                   className="w-full h-96 border rounded"
-                  title={preview.title}
+                  title={previewImage.title}
                 />
               ) : (
                 <img
-                  src={preview.url}
-                  alt={preview.title}
+                  src={previewImage.url}
+                  alt={previewImage.title}
                   className="w-full h-auto rounded"
                 />
               )}

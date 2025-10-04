@@ -127,6 +127,7 @@ export default function NouvelleReservation() {
   })
   const [paiements, setPaiements] = useState<Paiement[]>([])
   const [previews, setPreviews] = useState<{ [key: string]: { url: string, type: string } }>({})
+  const [passportCloudinaryUrl, setPassportCloudinaryUrl] = useState<string>('')
   const [formData, setFormData] = useState<{
     programme: string;
     typeChambre: string;
@@ -845,7 +846,9 @@ export default function NouvelleReservation() {
     if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
       // Upload vers Cloudinary pour le passeport
       if (type === 'passport') {
+        console.log('🔍 DEBUG Uploading passport to Cloudinary:', file.name);
         const cloudinaryUrl = await uploadToCloudinary(file, type);
+        console.log('🔍 DEBUG Cloudinary URL received:', cloudinaryUrl);
         if (cloudinaryUrl) {
           setDocuments(prev => ({
             ...prev,
@@ -859,6 +862,7 @@ export default function NouvelleReservation() {
             ...prev,
             [type]: { url: cloudinaryUrl, type: file.type }
           }));
+          setPassportCloudinaryUrl(cloudinaryUrl); // Stocker l'URL Cloudinary
           toast({
             title: "Succès",
             description: "Passeport uploadé avec succès vers Cloudinary",
@@ -913,6 +917,11 @@ export default function NouvelleReservation() {
       ...prev,
       [type]: false
     }));
+    
+    // Réinitialiser l'URL Cloudinary du passeport si c'est un passeport
+    if (type === 'passport') {
+      setPassportCloudinaryUrl('');
+    }
   }
 
   // Composant pour afficher la prévisualisation d'un document
@@ -1077,12 +1086,19 @@ export default function NouvelleReservation() {
 
       // Passeport - Utiliser l'URL Cloudinary si disponible
       if (documents.passport) {
-        if (previews.passport && previews.passport.url.startsWith('http')) {
+        console.log('🔍 DEBUG Passport:', {
+          hasDocumentsPassport: !!documents.passport,
+          hasPassportCloudinaryUrl: !!passportCloudinaryUrl,
+          passportCloudinaryUrl: passportCloudinaryUrl,
+          startsWithHttp: passportCloudinaryUrl.startsWith('http')
+        });
+        
+        if (passportCloudinaryUrl && passportCloudinaryUrl.startsWith('http')) {
           // URL Cloudinary déjà disponible, créer directement l'enregistrement fichier
           const formDataPassport = new FormData();
           formDataPassport.append("fileType", "passport");
           formDataPassport.append("fileName", documents.passport.name);
-          formDataPassport.append("filePath", previews.passport.url);
+          formDataPassport.append("filePath", passportCloudinaryUrl);
           formDataPassport.append("reservationId", reservationId.toString());
           fileUploadPromises.push(
             fetch(api.url(api.endpoints.upload), {

@@ -159,12 +159,7 @@ export default function EditReservation() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Charger les programmes
-        const programsResponse = await fetch(api.url(api.endpoints.programs))
-        const programsData = await programsResponse.json()
-        setPrograms(programsData)
-
-        // Charger la réservation existante
+        // Charger la réservation existante d'abord
         if (reservationId) {
           const reservationResponse = await fetch(api.url(`/api/reservations/${reservationId}`))
           const reservationData = await reservationResponse.json()
@@ -214,6 +209,13 @@ export default function EditReservation() {
               }))
             }
           })
+
+          // Charger seulement le programme de cette réservation
+          if (reservationData.programId) {
+            const programResponse = await fetch(api.url(`/api/programs/${reservationData.programId}`))
+            const programData = await programResponse.json()
+            setPrograms([programData]) // Un seul programme dans le tableau
+          }
         }
       } catch (error) {
         console.error('Erreur lors du chargement:', error)
@@ -355,7 +357,7 @@ export default function EditReservation() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
@@ -374,10 +376,10 @@ export default function EditReservation() {
 
         {/* Structure identique à Nouvelle Réservation */}
         <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
-          <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-            <CardTitle className="text-xl flex items-center gap-3">
-              <Sparkles className="h-6 w-6" />
-              Modifier la Réservation
+                <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+                  <CardTitle className="text-xl flex items-center gap-3">
+                    <Sparkles className="h-6 w-6" />
+                    Modifier la Réservation
               {formData.prix && (
                 <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/30 ml-auto">
                   <Wallet className="h-4 w-4 text-white" />
@@ -387,66 +389,97 @@ export default function EditReservation() {
                   </span>
                 </div>
               )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6 space-y-6">
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-6">
             <form onSubmit={handleSubmit}>
               {/* Section 1: Configuration du Voyage */}
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
-                <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
                   <Sparkles className="h-5 w-5" />
                   Configuration du Voyage
-                </h3>
+                    </h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <div className="space-y-2">
+                      <div className="space-y-2">
                     <Label className="text-blue-700 font-medium text-sm">Programme *</Label>
-                    <Select
+                        <Select
                       value={formData.programme}
-                      onValueChange={(value) => {
-                        const selectedProgram = programs.find(p => p.name === value);
-                        setFormData(prev => ({
-                          ...prev,
-                          programme: value,
-                          programId: selectedProgram?.id.toString() || "",
-                          hotelMadina: "",
-                          hotelMakkah: ""
-                        }));
+                      onValueChange={async (value) => {
+                        // Si on change de programme, charger le nouveau programme
+                        if (value && value !== formData.programme) {
+                          try {
+                            // Chercher d'abord dans les programmes déjà chargés
+                            let selectedProgram = programs.find(p => p.name === value);
+                            
+                            // Si pas trouvé, charger depuis l'API
+                            if (!selectedProgram) {
+                              const programResponse = await fetch(api.url(`/api/programs`))
+                              const allPrograms = await programResponse.json()
+                              selectedProgram = allPrograms.find((p: any) => p.name === value)
+                              
+                              if (selectedProgram) {
+                                setPrograms([selectedProgram]) // Remplacer par le nouveau programme
+                              }
+                            }
+                            
+                            setFormData(prev => ({
+                              ...prev,
+                              programme: value,
+                              programId: selectedProgram?.id.toString() || "",
+                              hotelMadina: "",
+                              hotelMakkah: ""
+                            }));
+                          } catch (error) {
+                            console.error('Erreur lors du chargement du programme:', error)
+                            toast({
+                              title: "Erreur",
+                              description: "Impossible de charger les données du programme",
+                              variant: "destructive"
+                            })
+                          }
+                        }
                       }}
                     >
                       <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
                         <SelectValue placeholder="Sélectionner un programme" />
-                      </SelectTrigger>
+                          </SelectTrigger>
                       <SelectContent>
                         {programs.map((program) => (
                           <SelectItem key={program.id} value={program.name}>
                             {program.name}
                           </SelectItem>
                         ))}
+                        {/* Option pour charger d'autres programmes si nécessaire */}
+                        {programs.length === 1 && (
+                          <SelectItem value="__load_other__" disabled>
+                            Autres programmes disponibles...
+                          </SelectItem>
+                        )}
                       </SelectContent>
-                    </Select>
-                  </div>
+                        </Select>
+                      </div>
 
-                  <div className="space-y-2">
+                      <div className="space-y-2">
                     <Label className="text-blue-700 font-medium text-sm">Type de chambre *</Label>
-                    <Select
+                        <Select
                       value={formData.typeChambre}
                       onValueChange={(value) => setFormData({ ...formData, typeChambre: value })}
-                    >
+                        >
                       <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
-                        <SelectValue placeholder="Sélectionner le type" />
-                      </SelectTrigger>
-                      <SelectContent>
+                            <SelectValue placeholder="Sélectionner le type" />
+                          </SelectTrigger>
+                          <SelectContent>
                         <SelectItem value="SINGLE">1 personne</SelectItem>
                         <SelectItem value="DOUBLE">2 personnes</SelectItem>
                         <SelectItem value="TRIPLE">3 personnes</SelectItem>
                         <SelectItem value="QUAD">4 personnes</SelectItem>
                         <SelectItem value="QUINT">5 personnes</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                  <div className="space-y-2">
+                      <div className="space-y-2">
                     <Label className="text-blue-700 font-medium text-sm">Genre *</Label>
                     <Select
                       value={formData.gender}
@@ -460,26 +493,26 @@ export default function EditReservation() {
                         <SelectItem value="Femme">Femme</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                </div>
+                      </div>
+                      </div>
 
                 {/* Choix des hôtels */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Hôtel à Madina */}
-                  <div className="space-y-2">
+                      <div className="space-y-2">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-lg">🕌</span>
                       <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina *</Label>
                     </div>
-                    <Select
+                        <Select
                       value={formData.hotelMadina}
                       onValueChange={(value) => setFormData(prev => ({ ...prev, hotelMadina: value }))}
                       disabled={!formData.programId}
                     >
                       <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
                         <SelectValue placeholder={formData.programId ? "Sélectionner un hôtel à Madina" : "Sélectionnez d'abord un programme"} />
-                      </SelectTrigger>
-                      <SelectContent>
+                          </SelectTrigger>
+                          <SelectContent>
                         <SelectItem value="none">Sans hôtel</SelectItem>
                         {programs
                           .find(p => p.id === parseInt(formData.programId))
@@ -488,26 +521,26 @@ export default function EditReservation() {
                             <SelectItem key={ph.hotel.id} value={ph.hotel.id.toString()}>
                               {ph.hotel.name}
                             </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
                   {/* Hôtel à Makkah */}
-                  <div className="space-y-2">
+                      <div className="space-y-2">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-lg">🕋</span>
                       <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah *</Label>
                     </div>
-                    <Select
+                        <Select
                       value={formData.hotelMakkah}
                       onValueChange={(value) => setFormData(prev => ({ ...prev, hotelMakkah: value }))}
                       disabled={!formData.programId}
                     >
                       <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
                         <SelectValue placeholder={formData.programId ? "Sélectionner un hôtel à Makkah" : "Sélectionnez d'abord un programme"} />
-                      </SelectTrigger>
-                      <SelectContent>
+                          </SelectTrigger>
+                          <SelectContent>
                         <SelectItem value="none">Sans hôtel</SelectItem>
                         {programs
                           .find(p => p.id === parseInt(formData.programId))
@@ -516,12 +549,12 @@ export default function EditReservation() {
                             <SelectItem key={ph.hotel.id} value={ph.hotel.id.toString()}>
                               {ph.hotel.name}
                             </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
 
               {/* Section 2: Informations Client */}
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
@@ -636,16 +669,16 @@ export default function EditReservation() {
 
               {/* Section 3: Paiements */}
               <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200 mb-6">
-                <h3 className="text-lg font-semibold text-orange-800 mb-4 flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  Paiements
-                  {section2Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
-                </h3>
-                <div className="space-y-4">
-                  {paiements.map((paiement, index) => (
-                    <div key={index} className="p-4 border border-orange-200 rounded-lg bg-white/60">
+                    <h3 className="text-lg font-semibold text-orange-800 mb-4 flex items-center gap-2">
+                      <CreditCard className="h-5 w-5" />
+                      Paiements
+                      {section2Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
+                    </h3>
+                    <div className="space-y-4">
+                      {paiements.map((paiement, index) => (
+                        <div key={index} className="p-4 border border-orange-200 rounded-lg bg-white/60">
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                        <div className="md:col-span-3 space-y-2">
+                            <div className="md:col-span-3 space-y-2">
                           <Label className="text-orange-700 font-medium text-sm">Mode de paiement</Label>
                           <Select
                             value={paiement.type}
@@ -661,8 +694,8 @@ export default function EditReservation() {
                               <SelectItem value="cheque">Chèque</SelectItem>
                             </SelectContent>
                           </Select>
-                        </div>
-                        <div className="md:col-span-3 space-y-2">
+                            </div>
+                            <div className="md:col-span-3 space-y-2">
                           <Label className="text-orange-700 font-medium text-sm">Montant (DH)</Label>
                           <Input
                             type="number"
@@ -671,8 +704,8 @@ export default function EditReservation() {
                             placeholder="Montant en dirhams"
                             className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
                           />
-                        </div>
-                        <div className="md:col-span-3 space-y-2">
+                            </div>
+                            <div className="md:col-span-3 space-y-2">
                           <Label className="text-orange-700 font-medium text-sm">Date</Label>
                           <Input
                             type="date"
@@ -692,7 +725,7 @@ export default function EditReservation() {
                             Supprimer
                           </Button>
                         </div>
-                      </div>
+                            </div>
                       {paiement.recu && (
                         <div className="mt-3 p-2 border border-orange-200 rounded-lg bg-white">
                           <div className="flex items-center justify-between mb-2">
@@ -742,16 +775,16 @@ export default function EditReservation() {
                     <Plus className="h-4 w-4 mr-2" />
                     Ajouter un paiement
                   </Button>
-                </div>
-              </div>
+                    </div>
+                  </div>
 
               {/* Section 4: Documents Fournisseur - Statuts simplifiés */}
               <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200 mb-6">
-                <h3 className="text-lg font-semibold text-purple-800 mb-4 flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Documents Fournisseur
-                  {section3Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
-                </h3>
+                    <h3 className="text-lg font-semibold text-purple-800 mb-4 flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Documents Fournisseur
+                      {section3Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
+                    </h3>
                 <div className="space-y-4">
                   {/* Statuts des documents avec toggle switches */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -811,9 +844,9 @@ export default function EditReservation() {
                             <Bell className="h-4 w-4" />
                             En attente
                           </div>
-                        )}
+                          )}
+                        </div>
                       </div>
-                    </div>
 
                     {/* Statut Hôtel */}
                     <div className="bg-white p-4 rounded-lg border border-purple-200">
@@ -849,7 +882,7 @@ export default function EditReservation() {
               </div>
 
               {/* Boutons d'action */}
-              <div className="flex justify-end gap-4">
+                  <div className="flex justify-end gap-4">
                 <Link href="/reservations">
                   <Button variant="outline" size="lg">
                     Annuler
@@ -862,13 +895,13 @@ export default function EditReservation() {
                   className="bg-blue-600 hover:bg-blue-700"
                 >
                   <Edit className="h-4 w-4 mr-2" />
-                  {isSubmitting ? "Modification..." : "Modifier la réservation"}
-                </Button>
-              </div>
+                      {isSubmitting ? "Modification..." : "Modifier la réservation"}
+                    </Button>
+                  </div>
             </form>
-          </CardContent>
-        </Card>
-      </div>
+                </CardContent>
+              </Card>
+            </div>
 
       {/* Dialog de prévisualisation */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
@@ -895,6 +928,6 @@ export default function EditReservation() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+        </div>
   )
-}
+} 

@@ -127,7 +127,6 @@ export default function NouvelleReservation() {
   })
   const [paiements, setPaiements] = useState<Paiement[]>([])
   const [previews, setPreviews] = useState<{ [key: string]: { url: string, type: string } }>({})
-  const [passportCloudinaryUrl, setPassportCloudinaryUrl] = useState<string>('')
   const [formData, setFormData] = useState<{
     programme: string;
     typeChambre: string;
@@ -811,89 +810,46 @@ export default function NouvelleReservation() {
   };
 
   // Fonction pour uploader vers Cloudinary
-  const uploadToCloudinary = async (file: File, type: DocumentType): Promise<string | null> => {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('fileType', type);
-      formData.append('fileCategory', 'reservation');
 
-      const response = await fetch(api.url(api.endpoints.uploadCloudinary), {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error('Erreur lors de l\'upload');
-
-      const result = await response.json();
-      return result.data.cloudinaryUrl;
-    } catch (error) {
-      console.error('Erreur upload Cloudinary:', error);
-      toast({
-        title: "Erreur",
-        description: "Impossible d'uploader le fichier vers Cloudinary",
-        variant: "destructive"
-      });
-      return null;
-    }
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: DocumentType) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: DocumentType) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
     
     if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
-      // Upload vers Cloudinary pour le passeport
-      if (type === 'passport') {
-        console.log('🔍 DEBUG Uploading passport to Cloudinary:', file.name);
-        const cloudinaryUrl = await uploadToCloudinary(file, type);
-        console.log('🔍 DEBUG Cloudinary URL received:', cloudinaryUrl);
-        if (cloudinaryUrl) {
-          setDocuments(prev => ({
-            ...prev,
-            [type]: file
-          }));
-          setAttachmentStatus(prev => ({
-            ...prev,
-            [type]: true
-          }));
+      // Stocker le fichier localement pour l'aperçu (pas d'upload vers Cloudinary maintenant)
+      setDocuments(prev => ({
+        ...prev,
+        [type]: file
+      }));
+      setAttachmentStatus(prev => ({
+        ...prev,
+        [type]: true
+      }));
+      
+      // Créer l'aperçu local
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
           setPreviews(prev => ({
             ...prev,
-            [type]: { url: cloudinaryUrl, type: file.type }
+            [type]: { url: reader.result as string, type: file.type }
           }));
-          setPassportCloudinaryUrl(cloudinaryUrl); // Stocker l'URL Cloudinary
-          toast({
-            title: "Succès",
-            description: "Passeport uploadé avec succès vers Cloudinary",
-          });
-        }
-      } else {
-        // Pour les autres types de documents, garder l'ancienne logique
-        setDocuments(prev => ({
+        };
+        reader.readAsDataURL(file);
+      } else if (file.type === 'application/pdf') {
+        setPreviews(prev => ({
           ...prev,
-          [type]: file
+          [type]: { url: URL.createObjectURL(file), type: file.type }
         }));
-        setAttachmentStatus(prev => ({
-          ...prev,
-          [type]: true
-        }));
-        if (file.type.startsWith('image/')) {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            setPreviews(prev => ({
-              ...prev,
-              [type]: { url: reader.result as string, type: file.type }
-            }));
-          };
-          reader.readAsDataURL(file);
-        } else if (file.type === 'application/pdf') {
-          setPreviews(prev => ({
-            ...prev,
-            [type]: { url: URL.createObjectURL(file), type: file.type }
-          }));
-        }
       }
+      
+      console.log('🔍 Debug - File selected locally:', {
+        type,
+        fileName: file.name,
+        fileType: file.type,
+        localPreview: true
+      });
     } else {
       toast({
         title: "Erreur",
@@ -918,10 +874,6 @@ export default function NouvelleReservation() {
       [type]: false
     }));
     
-    // Réinitialiser l'URL Cloudinary du passeport si c'est un passeport
-    if (type === 'passport') {
-      setPassportCloudinaryUrl('');
-    }
   }
 
   // Composant pour afficher la prévisualisation d'un document
@@ -966,7 +918,7 @@ export default function NouvelleReservation() {
   };
 
   // Correction du handler pour gérer un fichier par paiement
-  const handlePaymentFileChange = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+  const handlePaymentFileChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!(file.type === 'application/pdf' || file.type.startsWith('image/'))) {
@@ -977,37 +929,54 @@ export default function NouvelleReservation() {
       });
       return;
     }
-
-    // Upload vers Cloudinary pour les reçus de paiement
-    const cloudinaryUrl = await uploadToCloudinary(file, 'payment');
-    if (cloudinaryUrl) {
-      // Mettre à jour le fichier de paiement à l'index
-      setDocuments(prev => {
-        const newPayments = [...(prev.payment || [])];
-        newPayments[index] = file;
-        return { ...prev, payment: newPayments };
-      });
-      
-      // Créer l'aperçu avec l'URL Cloudinary
+    
+    // Stocker le fichier localement pour l'aperçu (pas d'upload vers Cloudinary maintenant)
+    setDocuments(prev => {
+      const newPayments = [...(prev.payment || [])];
+      newPayments[index] = file;
+      return { ...prev, payment: newPayments };
+    });
+    
+    // Créer l'aperçu local
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviews(prev => ({
+          ...prev,
+          [`payment_${index}`]: { url: reader.result as string, type: file.type }
+        }));
+      };
+      reader.readAsDataURL(file);
+    } else if (file.type === 'application/pdf') {
       setPreviews(prev => ({
         ...prev,
-        [`payment_${index}`]: { url: cloudinaryUrl, type: file.type }
+        [`payment_${index}`]: { url: URL.createObjectURL(file), type: file.type }
       }));
-
-      // Mettre à jour le paiement avec l'URL Cloudinary
-      mettreAJourPaiement(index, 'recu', cloudinaryUrl);
-      
-      toast({
-        title: "Succès",
-        description: "Reçu de paiement uploadé avec succès vers Cloudinary",
-      });
     }
+    
+    console.log('🔍 Debug - Payment file selected locally:', {
+      index,
+      fileName: file.name,
+      fileType: file.type,
+      localPreview: true
+    });
   };
 
+  const handleRemovePayment = (index: number) => {
+    setPaiements(prev => prev.filter((_, i) => i !== index))
+    setDocuments(prev => {
+      const newPayment = [...(prev.payment || [])]
+      newPayment.splice(index, 1)
+      return { ...prev, payment: newPayment }
+    })
+    setPreviews(prev => {
+      const newPreviews = { ...prev }
+      delete newPreviews[`payment_${index}`]
+      return newPreviews
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
-    console.log('handleSubmit appelé');
-    console.log('paiements:', paiements);
-    console.log('documents.payment:', documents.payment);
     e.preventDefault();
     setIsSubmitting(true);
 
@@ -1029,7 +998,7 @@ export default function NouvelleReservation() {
     });
 
     // Déclare l'objet local fichierIds ici
-    const fichierIds: { passport: number | null, visa: number | null, flightBooked: number | null, hotelBooked: number | null } = { passport: null, visa: null, flightBooked: null, hotelBooked: null };
+    const fichierIds: { visa: number | null, flightBooked: number | null, hotelBooked: number | null } = { visa: null, flightBooked: null, hotelBooked: null };
 
     try {
       // Construire l'objet documents pour indiquer les statuts d'attachement
@@ -1042,28 +1011,6 @@ export default function NouvelleReservation() {
       };
 
       // 1. Créer d'abord la réservation
-      console.log('🔍 DEBUG Creating reservation with URL:', api.url(api.endpoints.reservations));
-      console.log('🔍 DEBUG Reservation data:', {
-        firstName: formData.prenom,
-        lastName: formData.nom,
-        phone: formData.telephone,
-        programId: parseInt(formData.programId),
-        roomType: formData.typeChambre,
-        gender: formData.gender,
-        hotelMadina: hotelsMadina.find(h => h.id.toString() === formData.hotelMadina)?.name || formData.hotelMadina,
-        hotelMakkah: hotelsMakkah.find(h => h.id.toString() === formData.hotelMakkah)?.name || formData.hotelMakkah,
-        price: parseFloat(formData.prix),
-        reservationDate: new Date().toISOString(),
-        status: reservationStatus,
-        statutPasseport: attachmentStatus.passport,
-        statutVisa: attachmentStatus.visa,
-        statutHotel: attachmentStatus.hotelBooked,
-        statutVol: attachmentStatus.flightBooked,
-        paidAmount: paidAmount,
-        reduction: 0,
-        roomMadinaId: hotelsMadina.find(h => h.id.toString() === formData.hotelMadina)?.id || null,
-        roomMakkahId: hotelsMakkah.find(h => h.id.toString() === formData.hotelMakkah)?.id || null
-      });
       
       const reservationResponse = await fetch(api.url(api.endpoints.reservations), {
         method: "POST",
@@ -1107,57 +1054,37 @@ export default function NouvelleReservation() {
       const fileUploadErrors: string[] = [];
       const newUploadedStatus = { ...uploadedStatus };
 
-      // Passeport - Utiliser l'URL Cloudinary si disponible
+      // Passeport - Upload vers Cloudinary et création du fichier
       if (documents.passport) {
-        console.log('🔍 DEBUG Passport:', {
-          hasDocumentsPassport: !!documents.passport,
-          hasPassportCloudinaryUrl: !!passportCloudinaryUrl,
-          passportCloudinaryUrl: passportCloudinaryUrl,
-          startsWithHttp: passportCloudinaryUrl.startsWith('http')
-        });
-        
-        if (passportCloudinaryUrl && passportCloudinaryUrl.startsWith('http')) {
-          // URL Cloudinary déjà disponible, créer directement l'enregistrement fichier
+        try {
           const formDataPassport = new FormData();
+          formDataPassport.append("file", documents.passport);
+          formDataPassport.append("reservationId", reservationId.toString());
           formDataPassport.append("fileType", "passport");
-          formDataPassport.append("fileName", documents.passport.name);
-          formDataPassport.append("filePath", passportCloudinaryUrl);
-          formDataPassport.append("reservationId", reservationId.toString());
-          fileUploadPromises.push(
-            fetch(api.url(api.endpoints.upload), {
-              method: "POST",
-              body: formDataPassport,
-            }).then(async (response) => {
-              if (response.ok) {
-                newUploadedStatus.passport = true;
-                const data = await response.json();
-                fichierIds.passport = data.files && data.files[0] && data.files[0].id;
-              } else {
-                const error = await response.json();
-                fileUploadErrors.push(`Erreur lors de l'enregistrement du passeport: ${error.error}`);
-              }
-              return response;
-            })
-          );
-        } else {
-          // Fallback vers l'upload traditionnel si pas d'URL Cloudinary
-          const formDataPassport = new FormData();
-          formDataPassport.append("passport", documents.passport);
-          formDataPassport.append("reservationId", reservationId.toString());
-          fileUploadPromises.push(
-            fetch(api.url(api.endpoints.upload), {
-              method: "POST",
-              body: formDataPassport,
-            }).then(async (response) => {
-              if (response.ok) {
-                newUploadedStatus.passport = true;
-              } else {
-                const error = await response.json();
-                fileUploadErrors.push(`Erreur lors de l'upload du passeport: ${error.error}`);
-              }
-              return response;
-            })
-          );
+
+          const response = await fetch(api.url(api.endpoints.uploadCloudinary), {
+            method: "POST",
+            body: formDataPassport,
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            const uploadedFile = data.results && data.results[0];
+            const fichierId = uploadedFile && uploadedFile.id;
+            
+            if (fichierId) {
+              console.log('✅ Passport uploaded to Cloudinary with fichierId:', fichierId);
+              newUploadedStatus.passport = true;
+            } else {
+              fileUploadErrors.push('Erreur: Aucun fichierId retourné pour le passeport');
+            }
+          } else {
+            const error = await response.json();
+            fileUploadErrors.push(`Erreur lors de l'upload du passeport vers Cloudinary: ${error.error || 'Erreur inconnue'}`);
+          }
+        } catch (error) {
+          console.error('❌ Erreur upload passeport:', error);
+          fileUploadErrors.push('Erreur lors de l\'upload du passeport');
         }
       }
 
@@ -1235,7 +1162,6 @@ export default function NouvelleReservation() {
       if (documents.payment && documents.payment.length > 0) {
         let paymentUploaded = false;
         await Promise.all(documents.payment.map(async (file, index) => {
-          console.log('🚀 Traitement fichier paiement avec Cloudinary:', { file, index });
           if (!file) return;
           
           const formDataPaiement = new FormData();
@@ -1256,25 +1182,10 @@ export default function NouvelleReservation() {
             const uploadedFile = data.results && data.results[0];
             const fichierId = uploadedFile && uploadedFile.id;
             
-            console.log('✅ Résultat upload Cloudinary:', {
-              data,
-              uploadedFile,
-              fichierId,
-              paiement: paiements[index],
-              cloudinaryInfo: uploadedFile?.cloudinaryInfo
-            });
             
             // Insérer le paiement avec le fichierId
             const paiement = paiements[index];
             if (paiement && fichierId) {
-              console.log('💰 Paiement à insérer (avec fichier Cloudinary):', {
-                paiement,
-                fichierId,
-                cloudinaryUrl: uploadedFile?.cloudinaryUrl,
-                index,
-                paiements,
-                documentsPayment: documents.payment
-              });
               
               const paymentResponse = await fetch(api.url(api.endpoints.payments), {
                 method: 'POST',
@@ -1289,84 +1200,39 @@ export default function NouvelleReservation() {
               });
               
               const paymentData = await paymentResponse.clone().json();
-              console.log('✅ Réponse API /api/payments (avec fichier Cloudinary):', paymentData);
               
               if (!paymentResponse.ok || !paymentData.id) {
                 paymentErrors.push(`Erreur lors de l'insertion du paiement ${index + 1}: ${paymentData.error || 'Aucune confirmation de la base'}`);
               } else {
-                console.log('🎉 Paiement créé avec succès avec fichier Cloudinary:', {
-                  paymentId: paymentData.id,
-                  cloudinaryUrl: uploadedFile?.cloudinaryUrl,
-                  fichierId
-                });
               }
             }
           } else {
             const error = await response.json();
-            console.error('❌ Erreur upload Cloudinary:', error);
             fileUploadErrors.push(`Erreur lors de l'upload du reçu de paiement ${index + 1} vers Cloudinary: ${error.error || error.details || 'Erreur inconnue'}`);
           }
         }));
         if (paymentUploaded) newUploadedStatus.payment = true;
       }
 
-      // Paiements AVEC et SANS fichier (toujours après la création de la réservation)
+      // Paiements SANS fichier (toujours après la création de la réservation)
       await Promise.all(paiements.map(async (paiement, index) => {
-        if (paiement.montant && paiement.type) {
-          // Vérifier si ce paiement a un reçu Cloudinary
-          const hasReceipt = paiement.recu && paiement.recu.startsWith('http');
-          
-          console.log('Paiement à insérer:', {
-            paiement,
-            index,
-            hasReceipt,
-            receiptUrl: paiement.recu
-          });
-
-          const paymentData: any = {
-            amount: parseFloat(paiement.montant),
-            type: paiement.type,
-            reservationId: reservationId,
-            programId: formData.programId
-          };
-
-          // Si le paiement a un reçu Cloudinary, créer d'abord le fichier
-          if (hasReceipt && paiement.recu) {
-            const formDataReceipt = new FormData();
-            formDataReceipt.append("fileType", "payment");
-            formDataReceipt.append("fileName", `payment_${index}_receipt.${paiement.recu.includes('.pdf') ? 'pdf' : 'jpg'}`);
-            formDataReceipt.append("filePath", paiement.recu);
-            formDataReceipt.append("reservationId", reservationId.toString());
-
-            try {
-              const fileResponse = await fetch(api.url(api.endpoints.upload), {
-                method: "POST",
-                body: formDataReceipt,
-              });
-
-              if (fileResponse.ok) {
-                const fileData = await fileResponse.json();
-                const fichierId = fileData.files && fileData.files[0] && fileData.files[0].id;
-                if (fichierId) {
-                  paymentData.fichierId = fichierId;
-                }
-              }
-            } catch (error) {
-              console.error('Erreur création fichier reçu:', error);
+        // Si ce paiement n'a pas de fichier associé dans documents.payment
+        if (!documents.payment || !documents.payment[index]) {
+          if (paiement.montant && paiement.type) {
+            const paymentResponse = await fetch(api.url(api.endpoints.payments), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                amount: parseFloat(paiement.montant),
+                type: paiement.type,
+                reservationId: reservationId,
+                programId: formData.programId
+              })
+            });
+            const paymentData = await paymentResponse.clone().json();
+            if (!paymentResponse.ok || !paymentData.id) {
+              paymentErrors.push(`Erreur lors de l'insertion du paiement ${index + 1}: ${paymentData.error || 'Aucune confirmation de la base'}`);
             }
-          }
-
-          const paymentResponse = await fetch('http://localhost:5000/api/payments', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(paymentData)
-          });
-          
-          const paymentResult = await paymentResponse.clone().json();
-          console.log('Réponse API /api/payments:', paymentResult);
-          
-          if (!paymentResponse.ok || !paymentResult.id) {
-            paymentErrors.push(`Erreur lors de l'insertion du paiement ${index + 1}: ${paymentResult.error || 'Aucune confirmation de la base'}`);
           }
         }
       }));
@@ -1391,7 +1257,6 @@ export default function NouvelleReservation() {
           reservationId: reservationId
         };
         expensesToCreate.push(volExpense);
-        console.log('Expense Vol à créer:', volExpense);
       }
 
       // 2. Expense pour le service de visa (si activé)
@@ -1406,7 +1271,6 @@ export default function NouvelleReservation() {
           reservationId: reservationId
         };
         expensesToCreate.push(visaExpense);
-        console.log('Expense Visa à créer:', visaExpense);
       }
 
       // 3. Expense pour l'hôtel Madina (si sélectionné)
@@ -1434,7 +1298,6 @@ export default function NouvelleReservation() {
             reservationId: reservationId
           };
           expensesToCreate.push(hotelMadinaExpense);
-          console.log('Expense Hotel Madina à créer:', hotelMadinaExpense);
         }
       }
 
@@ -1463,16 +1326,12 @@ export default function NouvelleReservation() {
             reservationId: reservationId
           };
           expensesToCreate.push(hotelMakkahExpense);
-          console.log('Expense Hotel Makkah à créer:', hotelMakkahExpense);
         }
       }
 
       // Créer toutes les expenses
-      console.log('=== CRÉATION DES EXPENSES ===');
-      console.log('Expenses à créer:', expensesToCreate);
       
       await Promise.all(expensesToCreate.map(async (expense, index) => {
-        console.log(`Création de l'expense ${index + 1}:`, expense);
         
         const expenseResponse = await fetch(api.url(api.endpoints.expenses), {
           method: 'POST',
@@ -1487,13 +1346,11 @@ export default function NouvelleReservation() {
           console.error('Erreur parsing JSON Expense:', e);
         }
         
-        console.log('Réponse API /api/expenses:', expenseData, 'status:', expenseResponse.status);
         
         if (!expenseResponse.ok || !expenseData || !expenseData.id) {
           console.error('Erreur lors de l\'insertion de la dépense:', expenseData);
           expenseErrors.push(`Erreur lors de l'insertion de la dépense ${expense.type}: ${expenseData?.error || 'Aucune confirmation de la base'}`);
         } else {
-          console.log(`✅ Expense ${expense.type} créée avec succès, ID:`, expenseData.id);
         }
       }));
 
@@ -2205,7 +2062,7 @@ export default function NouvelleReservation() {
                           className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
                           disabled={isSubmitting}
                         />
-                        {(passportCloudinaryUrl || documents.passport) && (
+                        {documents.passport && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -2217,7 +2074,7 @@ export default function NouvelleReservation() {
                           </Button>
                         )}
                       </div>
-                      {(passportCloudinaryUrl || previews.passport) && (
+                      {previews.passport && (
                         <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-blue-700">Aperçu du passeport</span>
@@ -2228,7 +2085,7 @@ export default function NouvelleReservation() {
                                 onClick={e => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  setPreviewImage({ url: passportCloudinaryUrl || previews.passport.url, title: 'Passeport', type: previews.passport.type });
+                                  setPreviewImage({ url: previews.passport.url, title: 'Passeport', type: previews.passport.type });
                                 }}
                               >
                                 <ZoomIn className="h-3 w-3 mr-1" />
@@ -2246,15 +2103,15 @@ export default function NouvelleReservation() {
                             </div>
                           </div>
                           <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
-                            {previews.passport.type === 'application/pdf' ? (
+                            {previews.passport?.type === 'application/pdf' ? (
                               <embed
-                                src={`${passportCloudinaryUrl || previews.passport.url}#toolbar=0&navpanes=0&scrollbar=0`}
+                                src={`${previews.passport.url}#toolbar=0&navpanes=0&scrollbar=0`}
                                 type="application/pdf"
                                 className="w-full h-full"
                               />
                             ) : (
                               <img
-                                src={passportCloudinaryUrl || previews.passport.url}
+                                src={previews.passport.url}
                                 alt="Passeport"
                                 className="w-full h-full object-contain"
                               />
@@ -2314,7 +2171,7 @@ export default function NouvelleReservation() {
                                   className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
                                   disabled={isSubmitting}
                                 />
-                                {(paiement.recu || documents.payment?.[index]) && (
+                                {documents.payment?.[index] && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
@@ -2337,7 +2194,7 @@ export default function NouvelleReservation() {
                                   </Button>
                                 )}
                               </div>
-                              {(paiement.recu || previews[`payment_${index}`]) && (
+                              {previews[`payment_${index}`] && (
                                 <div className="mt-2 p-2 border border-orange-200 rounded-lg bg-white">
                                   <div className="flex items-center justify-between mb-2">
                                     <span className="text-sm font-medium text-orange-700">Aperçu du reçu</span>
@@ -2348,7 +2205,7 @@ export default function NouvelleReservation() {
                                         onClick={e => {
                                           e.preventDefault();
                                           e.stopPropagation();
-                                          setPreviewImage({ url: paiement.recu || previews[`payment_${index}`]?.url, title: 'Reçu paiement', type: previews[`payment_${index}`]?.type || 'image/*' });
+                                          setPreviewImage({ url: previews[`payment_${index}`]?.url, title: 'Reçu paiement', type: previews[`payment_${index}`]?.type || 'image/*' });
                                         }}
                                       >
                                         <ZoomIn className="h-3 w-3 mr-1" />
@@ -2357,15 +2214,15 @@ export default function NouvelleReservation() {
                                     </div>
                                   </div>
                                   <div className="w-full h-[200px] overflow-hidden rounded-lg border border-orange-200 flex items-center justify-center bg-orange-50">
-                                    {(paiement.recu && paiement.recu.includes('.pdf')) || previews[`payment_${index}`]?.type === 'application/pdf' ? (
+                                    {previews[`payment_${index}`]?.type === 'application/pdf' ? (
                                       <embed
-                                        src={`${paiement.recu || previews[`payment_${index}`]?.url}#toolbar=0&navpanes=0&scrollbar=0`}
+                                        src={`${previews[`payment_${index}`]?.url}#toolbar=0&navpanes=0&scrollbar=0`}
                                         type="application/pdf"
                                         className="w-full h-full"
                                       />
                                     ) : (
                                       <img
-                                        src={paiement.recu || previews[`payment_${index}`]?.url}
+                                        src={previews[`payment_${index}`]?.url}
                                         alt="Reçu paiement"
                                         className="max-h-full max-w-full object-contain"
                                       />

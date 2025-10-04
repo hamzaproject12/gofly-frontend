@@ -65,17 +65,16 @@ router.post('/', upload.any(), async (req, res) => {
 
     const { reservationId, fileType } = req.body;
 
-    if (!reservationId) {
-      return res.status(400).json({ error: 'reservationId est requis' });
-    }
+    // reservationId est optionnel - si fourni, vérifier que la réservation existe
+    let reservation = null;
+    if (reservationId) {
+      reservation = await prisma.reservation.findUnique({
+        where: { id: parseInt(reservationId) }
+      });
 
-    // Vérifier que la réservation existe
-    const reservation = await prisma.reservation.findUnique({
-      where: { id: parseInt(reservationId) }
-    });
-
-    if (!reservation) {
-      return res.status(404).json({ error: 'Réservation non trouvée' });
+      if (!reservation) {
+        return res.status(404).json({ error: 'Réservation non trouvée' });
+      }
     }
 
     const files = Array.isArray(req.files) ? req.files : [];
@@ -105,7 +104,7 @@ router.post('/', upload.any(), async (req, res) => {
         // Upload vers Cloudinary
         const cloudinaryResult = await cloudinaryService.uploadPaymentReceipt(
           file,
-          parseInt(reservationId),
+          reservationId ? parseInt(reservationId) : 0, // Utiliser 0 si pas de reservationId
           currentFileType
         );
 
@@ -132,28 +131,31 @@ router.post('/', upload.any(), async (req, res) => {
         // Obtenir l'extension du fichier
         const extension = (file.originalname.split('.').pop() || '').toLowerCase();
 
-        // Sauvegarder en base de données avec les infos Cloudinary
-        const dbFile = await prisma.fichier.create({
-          data: {
-            reservationId: parseInt(reservationId),
-            fileName: file.originalname,
-            storedName: cloudinaryResult.public_id,
-            fileType: fileTypeForDb,
-            filePath: `cloudinary://${cloudinaryResult.public_id}`, // Pour compatibilité
-            cloudinaryId: cloudinaryResult.public_id,
-            cloudinaryUrl: cloudinaryResult.secure_url,
-            fileCategory: extension
-          }
-        });
+        // Sauvegarder en base de données seulement si reservationId est fourni
+        let dbFile = null;
+        if (reservationId) {
+          dbFile = await prisma.fichier.create({
+            data: {
+              reservationId: parseInt(reservationId),
+              fileName: file.originalname,
+              storedName: cloudinaryResult.public_id,
+              fileType: fileTypeForDb,
+              filePath: `cloudinary://${cloudinaryResult.public_id}`, // Pour compatibilité
+              cloudinaryId: cloudinaryResult.public_id,
+              cloudinaryUrl: cloudinaryResult.secure_url,
+              fileCategory: extension
+            }
+          });
+        }
 
         results.push({
-          id: dbFile.id,
-          fileName: dbFile.fileName,
-          storedName: dbFile.storedName,
-          fileType: dbFile.fileType,
-          filePath: dbFile.filePath,
-          cloudinaryId: dbFile.cloudinaryId,
-          cloudinaryUrl: dbFile.cloudinaryUrl,
+          id: dbFile?.id || null,
+          fileName: file.originalname,
+          storedName: cloudinaryResult.public_id,
+          fileType: fileTypeForDb,
+          filePath: `cloudinary://${cloudinaryResult.public_id}`,
+          cloudinaryId: cloudinaryResult.public_id,
+          cloudinaryUrl: cloudinaryResult.secure_url,
           cloudinaryInfo: {
             public_id: cloudinaryResult.public_id,
             secure_url: cloudinaryResult.secure_url,

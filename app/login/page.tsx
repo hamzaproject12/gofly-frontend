@@ -139,90 +139,91 @@ export default function LoginPage() {
 
             {/* Card de connexion */}
             <div className="bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-10 transform hover:shadow-[hsl(44.38deg_86.67%_61.76%)]/20 hover:shadow-2xl transition-all duration-500 animate-slide-up">
-            <div className="text-center mb-8">
-              <h2 className="text-4xl font-bold text-white mb-3">
-                Connexion
-              </h2>
-              <p className="text-gray-400 text-sm">
-                Accédez à votre espace de gestion
-              </p>
+              <div className="text-center mb-8">
+                <h2 className="text-4xl font-bold text-white mb-3">
+                  Connexion
+                </h2>
+                <p className="text-gray-400 text-sm">
+                  Accédez à votre espace de gestion
+                </p>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Champ Email */}
+                <div className="group">
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+                    Adresse email
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-[hsl(44.38deg_86.67%_61.76%)] transition-colors" />
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={formData.email}
+                      onChange={handleChange}
+                      className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[hsl(44.38deg_86.67%_61.76%)] focus:border-transparent transition-all"
+                      placeholder="exemple@email.com"
+                    />
+                  </div>
+                </div>
+
+                {/* Champ Mot de passe */}
+                <div className="group">
+                  <label htmlFor="motDePasse" className="block text-sm font-medium text-gray-300 mb-2">
+                    Mot de passe
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-[hsl(44.38deg_86.67%_61.76%)] transition-colors" />
+                    <input
+                      id="motDePasse"
+                      name="motDePasse"
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                      value={formData.motDePasse}
+                      onChange={handleChange}
+                      className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[hsl(44.38deg_86.67%_61.76%)] focus:border-transparent transition-all"
+                      placeholder="••••••••"
+                    />
+                  </div>
+                </div>
+
+                {/* Message d'erreur */}
+                {error && (
+                  <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 animate-shake">
+                    <p className="text-sm text-red-400 text-center">{error}</p>
+                  </div>
+                )}
+
+                {/* Bouton de connexion */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-gradient-to-r from-[hsl(44.38deg_86.67%_61.76%)] to-[hsl(44.38deg_86.67%_51.76%)] text-black font-semibold py-3 px-6 rounded-xl hover:from-[hsl(44.38deg_86.67%_71.76%)] hover:to-[hsl(44.38deg_86.67%_61.76%)] focus:outline-none focus:ring-2 focus:ring-[hsl(44.38deg_86.67%_61.76%)] focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 group"
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin"></div>
+                      <span>Connexion...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Se connecter</span>
+                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </>
+                  )}
+                </button>
+              </form>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Champ Email */}
-              <div className="group">
-                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-                  Adresse email
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-[hsl(44.38deg_86.67%_61.76%)] transition-colors" />
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[hsl(44.38deg_86.67%_61.76%)] focus:border-transparent transition-all"
-                    placeholder="exemple@email.com"
-                  />
-                </div>
-              </div>
-
-              {/* Champ Mot de passe */}
-              <div className="group">
-                <label htmlFor="motDePasse" className="block text-sm font-medium text-gray-300 mb-2">
-                  Mot de passe
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-[hsl(44.38deg_86.67%_61.76%)] transition-colors" />
-                  <input
-                    id="motDePasse"
-                    name="motDePasse"
-                    type="password"
-                    autoComplete="current-password"
-                    required
-                    value={formData.motDePasse}
-                    onChange={handleChange}
-                    className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[hsl(44.38deg_86.67%_61.76%)] focus:border-transparent transition-all"
-                    placeholder="••••••••"
-                  />
-                </div>
-              </div>
-
-              {/* Message d'erreur */}
-              {error && (
-                <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 animate-shake">
-                  <p className="text-sm text-red-400 text-center">{error}</p>
-                </div>
-              )}
-
-              {/* Bouton de connexion */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-[hsl(44.38deg_86.67%_61.76%)] to-[hsl(44.38deg_86.67%_51.76%)] text-black font-semibold py-3 px-6 rounded-xl hover:from-[hsl(44.38deg_86.67%_71.76%)] hover:to-[hsl(44.38deg_86.67%_61.76%)] focus:outline-none focus:ring-2 focus:ring-[hsl(44.38deg_86.67%_61.76%)] focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 group"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin"></div>
-                    <span>Connexion...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Se connecter</span>
-                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                  </>
-                )}
-              </button>
-            </form>
+            {/* Footer */}
+            <p className="text-center text-gray-500 text-xs mt-8">
+              © 2025 GoFly. Tous droits réservés.
+            </p>
           </div>
-
-          {/* Footer */}
-          <p className="text-center text-gray-500 text-xs mt-8">
-            © 2025 GoFly. Tous droits réservés.
-          </p>
         </div>
       </div>
     </div>

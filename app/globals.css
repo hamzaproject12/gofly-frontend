@@ -10,6 +10,24 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+  
+  /* Animation delays for travel theme */
+  .animation-delay-500 {
+    animation-delay: 500ms;
+  }
+  
+  .animation-delay-1000 {
+    animation-delay: 1000ms;
+  }
+  
+  .animation-delay-1500 {
+    animation-delay: 1500ms;
+  }
+  
+  /* Gradient animation background size */
+  .animate-gradient {
+    background-size: 200% 200%;
+  }
 }
 
 @layer base {

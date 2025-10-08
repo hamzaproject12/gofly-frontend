@@ -54,15 +54,15 @@ export default function LoginPage() {
     <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
       {/* Image de fond - Kaaba/La Mecque */}
       <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-black/70 to-black/90 z-10"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-black/75 via-black/65 to-black/80 z-10"></div>
         <img
-          src="https://res.cloudinary.com/dbwjlcaze/image/upload/v1759949499/omra-travel/payments/payment_18_1759949498453.png"
-          alt="Kaaba Background"
+          src="https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?q=80&w=2070&auto=format&fit=crop"
+          alt="Masjid al-Nabawi Background"
           className="w-full h-full object-cover"
           loading="eager"
         />
         {/* Overlay de points dorés */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,204,102,0.1)_0%,transparent_50%)] z-10"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,204,102,0.15)_0%,transparent_60%)] z-10"></div>
       </div>
 
       {/* Particules flottantes */}
@@ -83,14 +83,16 @@ export default function LoginPage() {
 
       {/* Logo en haut à gauche */}
       <div className="absolute top-6 left-6 z-30 animate-slide-down">
-        <div className="relative">
-          <div className="absolute -inset-3 bg-[hsl(44.38deg_86.67%_61.76%)]/20 rounded-full blur-xl animate-pulse"></div>
-          <img
-            src="/logo-gofly.png"
-            alt="GoFly Logo"
-            className="relative w-20 h-20 md:w-24 md:h-24 object-contain drop-shadow-2xl animate-logo-glow"
-            loading="eager"
-          />
+        <div className="relative group">
+          <div className="absolute -inset-4 bg-[hsl(44.38deg_86.67%_61.76%)]/30 rounded-full blur-2xl animate-pulse group-hover:bg-[hsl(44.38deg_86.67%_61.76%)]/50 transition-all duration-500"></div>
+          <div className="relative bg-white/10 backdrop-blur-md rounded-2xl p-2 border border-white/20">
+            <img
+              src="/logo-gofly.png"
+              alt="GoFly Logo"
+              className="relative w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-[0_0_25px_rgba(255,204,102,0.6)] animate-logo-glow"
+              loading="eager"
+            />
+          </div>
         </div>
       </div>
 

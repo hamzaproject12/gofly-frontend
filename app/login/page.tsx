@@ -75,6 +75,7 @@ export default function LoginPage() {
               width={180} 
               height={180}
               className="drop-shadow-2xl"
+              priority
             />
           </div>
           
@@ -105,16 +106,17 @@ export default function LoginPage() {
               width={120} 
               height={120}
               className="drop-shadow-2xl"
+              priority
             />
           </div>
 
           {/* Card de connexion */}
           <div className="bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 transform hover:scale-[1.02] transition-all duration-300">
             <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-white mb-2">
+              <h2 className="text-4xl font-bold text-white mb-3">
                 Connexion
               </h2>
-              <p className="text-gray-400">
+              <p className="text-gray-400 text-sm">
                 Accédez à votre espace de gestion
               </p>
             </div>
@@ -188,19 +190,6 @@ export default function LoginPage() {
                 )}
               </button>
             </form>
-
-            {/* Lien d'inscription */}
-            <div className="mt-6 text-center">
-              <p className="text-gray-400 text-sm">
-                Pas encore de compte ?{' '}
-                <Link
-                  href="/register"
-                  className="text-[hsl(44.38deg_86.67%_61.76%)] hover:text-[hsl(44.38deg_86.67%_71.76%)] font-medium transition-colors hover:underline"
-                >
-                  Créer un compte
-                </Link>
-              </p>
-            </div>
           </div>
 
           {/* Footer */}

@@ -220,7 +220,7 @@ export default function EditReservation() {
                 isPdf: doc.fileName?.includes('.pdf')
               });
               
-              // Normaliser les types pour la cohérence
+              // Normaliser les types pour la cohérence 
               const normalizedType = type === 'passeport' ? 'passport' : 
                                    type === 'paiement' ? 'payment' : type;
               

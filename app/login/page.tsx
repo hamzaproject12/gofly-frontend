@@ -56,9 +56,10 @@ export default function LoginPage() {
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-black/70 to-black/90 z-10"></div>
         <img
-          src="https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?q=80&w=2070"
+          src="https://res.cloudinary.com/dbwjlcaze/image/upload/v1759949499/omra-travel/payments/payment_18_1759949498453.png"
           alt="Kaaba Background"
           className="w-full h-full object-cover"
+          loading="eager"
         />
         {/* Overlay de points dorés */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,204,102,0.1)_0%,transparent_50%)] z-10"></div>
@@ -80,20 +81,21 @@ export default function LoginPage() {
         </div>
       </div>
 
+      {/* Logo en haut à gauche */}
+      <div className="absolute top-6 left-6 z-30 animate-slide-down">
+        <div className="relative">
+          <div className="absolute -inset-3 bg-[hsl(44.38deg_86.67%_61.76%)]/20 rounded-full blur-xl animate-pulse"></div>
+          <img
+            src="/logo-gofly.png"
+            alt="GoFly Logo"
+            className="relative w-20 h-20 md:w-24 md:h-24 object-contain drop-shadow-2xl animate-logo-glow"
+            loading="eager"
+          />
+        </div>
+      </div>
+
       {/* Contenu principal */}
       <div className="relative z-30 w-full max-w-md px-6">
-        {/* Logo */}
-        <div className="flex justify-center mb-8 animate-slide-down">
-          <div className="relative">
-            <div className="absolute -inset-4 bg-[hsl(44.38deg_86.67%_61.76%)]/20 rounded-full blur-2xl animate-pulse"></div>
-            <img
-              src="/logo-gofly.png"
-              alt="GoFly Logo"
-              className="relative w-32 h-32 md:w-40 md:h-40 object-contain drop-shadow-2xl animate-logo-glow"
-            />
-          </div>
-        </div>
-
         {/* Titre principal */}
         <div className="text-center mb-8 animate-slide-up">
           <h1 className="text-4xl md:text-5xl font-bold mb-3 bg-gradient-to-r from-white via-[hsl(44.38deg_86.67%_61.76%)] to-white bg-clip-text text-transparent animate-gradient leading-tight">

@@ -63,6 +63,7 @@ interface Paiement {
   montant: string;
   date: string;
   recu: string | null;
+  id?: number; // ID optionnel pour identifier les paiements existants
 }
 
 interface FileInputs {
@@ -129,6 +130,9 @@ export default function EditReservation() {
     paiements: []
   })
 
+  // État pour stocker les valeurs initiales (pour détecter les changements)
+  const [initialData, setInitialData] = useState<any>(null)
+
   const [paiements, setPaiements] = useState<Paiement[]>([])
   const [previews, setPreviews] = useState<{ [key: string]: { url: string, type: string } }>({})
   const [reservationData, setReservationData] = useState<any>(null)
@@ -167,7 +171,7 @@ export default function EditReservation() {
           const reservationData = await reservationResponse.json()
           setReservationData(reservationData)
           
-          setFormData({
+          const initialFormData = {
             programme: reservationData.program?.name || "",
             typeChambre: reservationData.roomType || "",
             nom: reservationData.lastName || "",
@@ -183,15 +187,20 @@ export default function EditReservation() {
             statutVol: reservationData.statutVol || false,
             statutHotel: reservationData.statutHotel || false,
             paiements: []
-          })
+          }
+          
+          setFormData(initialFormData)
+          setInitialData(initialFormData) // Stocker les données initiales
 
           // Charger les paiements existants
-          setPaiements((reservationData.payments || []).map((p: any) => ({
+          const initialPaiements = (reservationData.payments || []).map((p: any) => ({
             montant: p.amount?.toString() || '',
             type: p.paymentMethod || '',
             date: p.paymentDate?.split('T')[0] || '',
-            recu: p.fichier?.cloudinaryUrl || p.fichier?.filePath || ''
-          })))
+            recu: p.fichier?.cloudinaryUrl || p.fichier?.filePath || '',
+            id: p.id // Garder l'ID pour identifier les paiements existants
+          }))
+          setPaiements(initialPaiements)
 
           // Charger les documents existants
           const docObj: any = {}
@@ -211,7 +220,7 @@ export default function EditReservation() {
           })
           
           // Set previews pour les documents existants
-          Object.entries(docObj).forEach(([type, doc]: any) => {
+        Object.entries(docObj).forEach(([type, doc]: any) => {
             if (doc.url) {
               console.log('🔍 Debug - Setting preview for:', {
                 type,
@@ -238,6 +247,12 @@ export default function EditReservation() {
           if (reservationData.programId) {
             const programResponse = await fetch(api.url(`/api/programs/${reservationData.programId}`))
             const programData = await programResponse.json()
+            console.log('🔍 Debug - Program loaded:', {
+              id: programData.id,
+              name: programData.name,
+              hotelsMadina: programData.hotelsMadina?.length,
+              hotelsMakkah: programData.hotelsMakkah?.length
+            })
             setPrograms([programData]) // Un seul programme dans le tableau
           }
         }
@@ -261,18 +276,54 @@ export default function EditReservation() {
     setIsSubmitting(true)
 
     try {
+      // 1. Uploader les nouveaux documents vers Cloudinary
+      const fileUploadErrors: string[] = []
+      
+      // Upload nouveau passeport si présent
+      if (documents.passport && reservationId) {
+        const formDataPassport = new FormData();
+        formDataPassport.append("file", documents.passport);
+        formDataPassport.append("reservationId", reservationId.toString());
+        formDataPassport.append("fileType", "passport");
+
+        const response = await fetch(api.url(api.endpoints.uploadCloudinary), {
+          method: "POST",
+          body: formDataPassport,
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          fileUploadErrors.push(`Erreur lors de l'upload du passeport: ${error.error || 'Erreur inconnue'}`);
+        }
+      }
+
+      // Upload nouveaux reçus de paiement si présents
+      if (reservationId) {
+        for (let i = 0; i < documents.payment.length; i++) {
+          const paymentFile = documents.payment[i];
+          if (paymentFile) {
+            const formDataPayment = new FormData();
+            formDataPayment.append("file", paymentFile);
+            formDataPayment.append("reservationId", reservationId.toString());
+            formDataPayment.append("fileType", "payment");
+
+            const response = await fetch(api.url(api.endpoints.uploadCloudinary), {
+              method: "POST",
+              body: formDataPayment,
+            });
+            
+            if (!response.ok) {
+              const error = await response.json();
+              fileUploadErrors.push(`Erreur lors de l'upload du reçu de paiement ${i + 1}: ${error.error || 'Erreur inconnue'}`);
+            }
+          }
+        }
+      }
+
+      // 2. Mettre à jour les informations de la réservation (seulement les champs modifiables)
       const body = {
-        firstName: formData.prenom,
-        lastName: formData.nom,
-        phone: formData.telephone,
-        programId: Number(formData.programId),
-        roomType: formData.typeChambre,
-        hotelMadinaId: formData.hotelMadina ? Number(formData.hotelMadina) : null,
-        hotelMakkahId: formData.hotelMakkah ? Number(formData.hotelMakkah) : null,
         price: parseFloat(formData.prix),
         reservationDate: formData.dateReservation,
-        gender: formData.gender,
-        statutPasseport: documents.passport !== null,
         statutVisa: formData.statutVisa,
         statutHotel: formData.statutHotel,
         statutVol: formData.statutVol,
@@ -286,10 +337,41 @@ export default function EditReservation() {
 
       if (!response.ok) throw new Error('Erreur lors de la modification')
 
-      toast({
-        title: "Succès",
-        description: "Réservation modifiée avec succès",
-      })
+      // 3. Gérer les nouveaux paiements (si ajoutés)
+      for (const paiement of paiements) {
+        // Si le paiement n'a pas d'ID, c'est un nouveau paiement
+        if (!paiement.id && paiement.montant && paiement.type && paiement.date) {
+          const paymentBody = {
+            reservationId: Number(reservationId),
+            amount: parseFloat(paiement.montant),
+            paymentMethod: paiement.type,
+            paymentDate: paiement.date,
+          }
+
+          const paymentResponse = await fetch(api.url('/api/payments'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(paymentBody)
+          })
+
+          if (!paymentResponse.ok) {
+            fileUploadErrors.push(`Erreur lors de l'ajout du paiement`)
+          }
+        }
+      }
+
+      if (fileUploadErrors.length > 0) {
+        toast({
+          title: "Avertissement",
+          description: `Réservation modifiée mais avec des erreurs: ${fileUploadErrors.join(', ')}`,
+          variant: "destructive"
+        })
+      } else {
+        toast({
+          title: "Succès",
+          description: "Réservation modifiée avec succès",
+        })
+      }
       
       router.push('/reservations')
     } catch (error) {
@@ -331,6 +413,43 @@ export default function EditReservation() {
           [type]: { url: URL.createObjectURL(file), type: file.type }
         }));
       }
+    }
+  }
+
+  const handlePaymentFileChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!(file.type === 'application/pdf' || file.type.startsWith('image/'))) {
+      toast({
+        title: "Erreur",
+        description: "Format de fichier non supporté. Seuls les fichiers PDF et images sont acceptés.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Stocker le fichier localement pour l'aperçu
+    setDocuments(prev => {
+      const newPayments = [...(prev.payment || [])];
+      newPayments[index] = file;
+      return { ...prev, payment: newPayments };
+    });
+    
+    // Créer l'aperçu local
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviews(prev => ({
+          ...prev,
+          [`payment_${index}`]: { url: reader.result as string, type: file.type }
+        }));
+      };
+      reader.readAsDataURL(file);
+    } else if (file.type === 'application/pdf') {
+      setPreviews(prev => ({
+        ...prev,
+        [`payment_${index}`]: { url: URL.createObjectURL(file), type: file.type }
+      }));
     }
   }
 
@@ -477,71 +596,31 @@ export default function EditReservation() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                       <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Programme *</Label>
+                    <Label className="text-blue-700 font-medium text-sm">Programme * (Non modifiable)</Label>
                         <Select
                       value={formData.programme}
-                      onValueChange={async (value) => {
-                        // Si on change de programme, charger le nouveau programme
-                        if (value && value !== formData.programme) {
-                          try {
-                            // Chercher d'abord dans les programmes déjà chargés
-                            let selectedProgram = programs.find(p => p.name === value);
-                            
-                            // Si pas trouvé, charger depuis l'API
-                            if (!selectedProgram) {
-                              const programResponse = await fetch(api.url(`/api/programs`))
-                              const allPrograms = await programResponse.json()
-                              selectedProgram = allPrograms.find((p: any) => p.name === value)
-                              
-                              if (selectedProgram) {
-                                setPrograms([selectedProgram]) // Remplacer par le nouveau programme
-                              }
-                            }
-                            
-                            setFormData(prev => ({
-                              ...prev,
-                              programme: value,
-                              programId: selectedProgram?.id.toString() || "",
-                              hotelMadina: "",
-                              hotelMakkah: ""
-                            }));
-                          } catch (error) {
-                            console.error('Erreur lors du chargement du programme:', error)
-                            toast({
-                              title: "Erreur",
-                              description: "Impossible de charger les données du programme",
-                              variant: "destructive"
-                            })
-                          }
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
+                      disabled={true}
+                        >
+                      <SelectTrigger className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed">
                         <SelectValue placeholder="Sélectionner un programme" />
                           </SelectTrigger>
-                      <SelectContent>
-                        {programs.map((program) => (
+                          <SelectContent>
+                            {programs.map((program) => (
                           <SelectItem key={program.id} value={program.name}>
-                            {program.name}
-                          </SelectItem>
-                        ))}
-                        {/* Option pour charger d'autres programmes si nécessaire */}
-                        {programs.length === 1 && (
-                          <SelectItem value="__load_other__" disabled>
-                            Autres programmes disponibles...
-                          </SelectItem>
-                        )}
-                      </SelectContent>
+                                {program.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
                         </Select>
                       </div>
 
                       <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Type de chambre *</Label>
+                    <Label className="text-blue-700 font-medium text-sm">Type de chambre * (Non modifiable)</Label>
                         <Select
                       value={formData.typeChambre}
-                      onValueChange={(value) => setFormData({ ...formData, typeChambre: value })}
+                      disabled={true}
                         >
-                      <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
+                      <SelectTrigger className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed">
                             <SelectValue placeholder="Sélectionner le type" />
                           </SelectTrigger>
                           <SelectContent>
@@ -555,12 +634,12 @@ export default function EditReservation() {
                       </div>
 
                       <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Genre *</Label>
+                    <Label className="text-blue-700 font-medium text-sm">Genre * (Non modifiable)</Label>
                     <Select
                       value={formData.gender}
-                      onValueChange={(value) => setFormData({ ...formData, gender: value })}
+                      disabled={true}
                     >
-                      <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
+                      <SelectTrigger className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed">
                         <SelectValue placeholder="Sélectionner le genre" />
                       </SelectTrigger>
                       <SelectContent>
@@ -577,15 +656,14 @@ export default function EditReservation() {
                       <div className="space-y-2">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-lg">🕌</span>
-                      <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina *</Label>
+                      <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina * (Non modifiable)</Label>
                     </div>
                         <Select
                       value={formData.hotelMadina}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, hotelMadina: value }))}
-                      disabled={!formData.programId}
-                    >
-                      <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
-                        <SelectValue placeholder={formData.programId ? "Sélectionner un hôtel à Madina" : "Sélectionnez d'abord un programme"} />
+                      disabled={true}
+                        >
+                      <SelectTrigger className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed">
+                        <SelectValue placeholder="Sélectionner un hôtel à Madina" />
                           </SelectTrigger>
                           <SelectContent>
                         <SelectItem value="none">Sans hôtel</SelectItem>
@@ -605,15 +683,14 @@ export default function EditReservation() {
                       <div className="space-y-2">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-lg">🕋</span>
-                      <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah *</Label>
+                      <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah * (Non modifiable)</Label>
                     </div>
                         <Select
                       value={formData.hotelMakkah}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, hotelMakkah: value }))}
-                      disabled={!formData.programId}
-                    >
-                      <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
-                        <SelectValue placeholder={formData.programId ? "Sélectionner un hôtel à Makkah" : "Sélectionnez d'abord un programme"} />
+                      disabled={true}
+                        >
+                      <SelectTrigger className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed">
+                        <SelectValue placeholder="Sélectionner un hôtel à Makkah" />
                           </SelectTrigger>
                           <SelectContent>
                         <SelectItem value="none">Sans hôtel</SelectItem>
@@ -640,32 +717,32 @@ export default function EditReservation() {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Nom *</Label>
+                    <Label className="text-blue-700 font-medium text-sm">Nom * (Non modifiable)</Label>
                     <Input
                       value={formData.nom}
-                      onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
+                      disabled={true}
                       placeholder="Nom du client"
-                      className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                      className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Prénom *</Label>
+                    <Label className="text-blue-700 font-medium text-sm">Prénom * (Non modifiable)</Label>
                     <Input
                       value={formData.prenom}
-                      onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
+                      disabled={true}
                       placeholder="Prénom du client"
-                      className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                      className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Téléphone *</Label>
+                    <Label className="text-blue-700 font-medium text-sm">Téléphone * (Non modifiable)</Label>
                     <Input
                       value={formData.telephone}
-                      onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
+                      disabled={true}
                       placeholder="Numéro de téléphone"
-                      className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                      className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed"
                     />
                   </div>
 
@@ -795,12 +872,89 @@ export default function EditReservation() {
                             variant="destructive"
                             onClick={() => supprimerPaiement(index)}
                             className="flex items-center gap-2"
+                            disabled={!!paiement.id}
+                            title={paiement.id ? "Impossible de supprimer un paiement existant" : "Supprimer ce paiement"}
                           >
                             <Trash2 className="h-4 w-4" />
                             Supprimer
                           </Button>
                         </div>
                             </div>
+
+                      {/* Upload de reçu de paiement */}
+                      {!paiement.recu && (
+                        <div className="mt-3 space-y-2">
+                          <Label className="text-orange-700 font-medium text-sm">Reçu de paiement</Label>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="file"
+                              onChange={(e) => handlePaymentFileChange(e, index)}
+                              accept="image/*,.pdf"
+                              className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
+                            />
+                            {documents.payment?.[index] && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setPreviews(prev => {
+                                    const newPreviews = { ...prev };
+                                    delete newPreviews[`payment_${index}`];
+                                    return newPreviews;
+                                  });
+                                  setDocuments(prev => {
+                                    const newPayments = [...(prev.payment || [])];
+                                    newPayments[index] = null;
+                                    return { ...prev, payment: newPayments };
+                                  });
+                                }}
+                                className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Aperçu du nouveau reçu uploadé */}
+                      {previews[`payment_${index}`] && (
+                        <div className="mt-3 p-2 border border-orange-200 rounded-lg bg-white">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-orange-700">Aperçu du nouveau reçu</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                className="text-orange-600 hover:text-orange-800 hover:bg-orange-50 p-1 rounded"
+                                onClick={() => setPreviewImage({ 
+                                  url: previews[`payment_${index}`].url, 
+                                  title: 'Nouveau reçu paiement', 
+                                  type: previews[`payment_${index}`].type 
+                                })}
+                              >
+                                <ZoomIn className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="w-full h-[150px] overflow-hidden rounded-lg border border-orange-200">
+                            {previews[`payment_${index}`].type === 'application/pdf' ? (
+                              <embed
+                                src={`${previews[`payment_${index}`].url}#toolbar=0&navpanes=0&scrollbar=0`}
+                                type="application/pdf"
+                                className="w-full h-full"
+                              />
+                            ) : (
+                              <img
+                                src={previews[`payment_${index}`].url}
+                                alt="Nouveau reçu de paiement"
+                                className="w-full h-full object-contain"
+                              />
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Reçu existant */}
                       {paiement.recu && (
                         <div className="mt-3 p-2 border border-orange-200 rounded-lg bg-white">
                           <div className="flex items-center justify-between mb-2">
@@ -840,8 +994,8 @@ export default function EditReservation() {
                           </div>
                         </div>
                       )}
-                    </div>
-                  ))}
+                        </div>
+                      ))}
                   <Button
                     type="button"
                     onClick={ajouterPaiement}

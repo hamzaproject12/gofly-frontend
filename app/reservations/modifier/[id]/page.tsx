@@ -276,51 +276,9 @@ export default function EditReservation() {
     setIsSubmitting(true)
 
     try {
-      // 1. Uploader les nouveaux documents vers Cloudinary
       const fileUploadErrors: string[] = []
       
-      // Upload nouveau passeport si présent
-      if (documents.passport && reservationId) {
-        const formDataPassport = new FormData();
-        formDataPassport.append("file", documents.passport);
-        formDataPassport.append("reservationId", reservationId.toString());
-        formDataPassport.append("fileType", "passport");
-
-        const response = await fetch(api.url(api.endpoints.uploadCloudinary), {
-          method: "POST",
-          body: formDataPassport,
-        });
-        
-        if (!response.ok) {
-          const error = await response.json();
-          fileUploadErrors.push(`Erreur lors de l'upload du passeport: ${error.error || 'Erreur inconnue'}`);
-        }
-      }
-
-      // Upload nouveaux reçus de paiement si présents
-      if (reservationId) {
-        for (let i = 0; i < documents.payment.length; i++) {
-          const paymentFile = documents.payment[i];
-          if (paymentFile) {
-            const formDataPayment = new FormData();
-            formDataPayment.append("file", paymentFile);
-            formDataPayment.append("reservationId", reservationId.toString());
-            formDataPayment.append("fileType", "payment");
-
-            const response = await fetch(api.url(api.endpoints.uploadCloudinary), {
-              method: "POST",
-              body: formDataPayment,
-            });
-            
-            if (!response.ok) {
-              const error = await response.json();
-              fileUploadErrors.push(`Erreur lors de l'upload du reçu de paiement ${i + 1}: ${error.error || 'Erreur inconnue'}`);
-            }
-          }
-        }
-      }
-
-      // 2. Mettre à jour les informations de la réservation (seulement les champs modifiables)
+      // 1. Mettre à jour les informations de la réservation (seulement les champs modifiables)
       const body = {
         price: parseFloat(formData.prix),
         reservationDate: formData.dateReservation,
@@ -329,33 +287,95 @@ export default function EditReservation() {
         statutVol: formData.statutVol,
       }
 
+      console.log('📝 Mise à jour réservation:', body)
+
       const response = await fetch(api.url(`/api/reservations/${reservationId}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       })
 
-      if (!response.ok) throw new Error('Erreur lors de la modification')
+      if (!response.ok) throw new Error('Erreur lors de la modification de la réservation')
 
-      // 3. Gérer les nouveaux paiements (si ajoutés)
-      for (const paiement of paiements) {
-        // Si le paiement n'a pas d'ID, c'est un nouveau paiement
-        if (!paiement.id && paiement.montant && paiement.type && paiement.date) {
-          const paymentBody = {
-            reservationId: Number(reservationId),
-            amount: parseFloat(paiement.montant),
-            paymentMethod: paiement.type,
-            paymentDate: paiement.date,
-          }
+      // 2. Upload nouveau passeport si présent
+      if (documents.passport && reservationId) {
+        console.log('📤 Upload passeport vers Cloudinary...')
+        const formDataPassport = new FormData();
+        formDataPassport.append("file", documents.passport);
+        formDataPassport.append("reservationId", reservationId.toString());
+        formDataPassport.append("fileType", "passport");
 
-          const paymentResponse = await fetch(api.url('/api/payments'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(paymentBody)
-          })
+        const passportResponse = await fetch(api.url(api.endpoints.uploadCloudinary), {
+          method: "POST",
+          body: formDataPassport,
+        });
+        
+        if (!passportResponse.ok) {
+          const error = await passportResponse.json();
+          fileUploadErrors.push(`Erreur lors de l'upload du passeport: ${error.error || 'Erreur inconnue'}`);
+        } else {
+          console.log('✅ Passeport uploadé avec succès')
+        }
+      }
 
-          if (!paymentResponse.ok) {
-            fileUploadErrors.push(`Erreur lors de l'ajout du paiement`)
+      // 3. Créer les nouveaux paiements et uploader leurs reçus
+      if (reservationId) {
+        for (let i = 0; i < paiements.length; i++) {
+          const paiement = paiements[i];
+          // Si le paiement n'a pas d'ID, c'est un nouveau paiement
+          if (!paiement.id && paiement.montant && paiement.type && paiement.date) {
+            console.log(`💰 Création nouveau paiement ${i + 1}:`, {
+              montant: paiement.montant,
+              type: paiement.type,
+              date: paiement.date
+            })
+
+            const paymentBody = {
+              reservationId: Number(reservationId),
+              amount: parseFloat(paiement.montant),
+              paymentMethod: paiement.type,
+              paymentDate: paiement.date,
+            }
+
+            const paymentResponse = await fetch(api.url('/api/payments'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(paymentBody)
+            })
+
+            if (!paymentResponse.ok) {
+              const error = await paymentResponse.json()
+              console.error('❌ Erreur création paiement:', error)
+              fileUploadErrors.push(`Erreur lors de l'ajout du paiement ${i + 1}`)
+            } else {
+              const paymentData = await paymentResponse.json()
+              const newPaymentId = paymentData.id
+              
+              console.log('✅ Paiement créé avec ID:', newPaymentId)
+              
+              // Upload le reçu si présent et le lier au paiement
+              if (documents.payment[i]) {
+                console.log(`📤 Upload reçu pour paiement ID ${newPaymentId}...`)
+                const formDataPayment = new FormData();
+                formDataPayment.append("file", documents.payment[i] as File);
+                formDataPayment.append("reservationId", reservationId.toString());
+                formDataPayment.append("paymentId", newPaymentId.toString());
+                formDataPayment.append("fileType", "payment");
+
+                const receiptResponse = await fetch(api.url(api.endpoints.uploadCloudinary), {
+                  method: "POST",
+                  body: formDataPayment,
+                });
+                
+                if (!receiptResponse.ok) {
+                  const error = await receiptResponse.json();
+                  console.error('❌ Erreur upload reçu:', error)
+                  fileUploadErrors.push(`Erreur lors de l'upload du reçu de paiement ${i + 1}: ${error.error || 'Erreur inconnue'}`);
+                } else {
+                  console.log('✅ Reçu uploadé et lié au paiement')
+                }
+              }
+            }
           }
         }
       }
@@ -471,7 +491,9 @@ export default function EditReservation() {
   }
 
   const ajouterPaiement = () => {
-    setPaiements([...paiements, { montant: '', type: '', date: '', recu: '' }])
+    // Ajouter un nouveau paiement avec la date actuelle
+    const today = new Date().toISOString().split('T')[0]
+    setPaiements([...paiements, { montant: '', type: '', date: today, recu: '' }])
   }
 
   const supprimerPaiement = (index: number) => {
@@ -527,6 +549,19 @@ export default function EditReservation() {
     }
     
     return 'image/*';
+  }
+
+  // Helper function pour obtenir le nom d'un hôtel par son ID
+  const getHotelName = (hotelId: string, city: 'madina' | 'makkah') => {
+    if (!hotelId || !formData.programId || programs.length === 0) return '';
+    
+    const program = programs.find(p => p.id === parseInt(formData.programId));
+    if (!program) return '';
+    
+    const hotelsList = city === 'madina' ? program.hotelsMadina : program.hotelsMakkah;
+    const hotelRelation = hotelsList?.find((ph: { hotel: Hotel }) => ph.hotel.id.toString() === hotelId);
+    
+    return hotelRelation?.hotel.name || '';
   }
 
   // Calculs de progression
@@ -663,7 +698,9 @@ export default function EditReservation() {
                       disabled={true}
                         >
                       <SelectTrigger className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed">
-                        <SelectValue placeholder="Sélectionner un hôtel à Madina" />
+                        <SelectValue>
+                          {getHotelName(formData.hotelMadina, 'madina') || 'Sélectionner un hôtel à Madina'}
+                        </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                         <SelectItem value="none">Sans hôtel</SelectItem>
@@ -690,7 +727,9 @@ export default function EditReservation() {
                       disabled={true}
                         >
                       <SelectTrigger className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed">
-                        <SelectValue placeholder="Sélectionner un hôtel à Makkah" />
+                        <SelectValue>
+                          {getHotelName(formData.hotelMakkah, 'makkah') || 'Sélectionner un hôtel à Makkah'}
+                        </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                         <SelectItem value="none">Sans hôtel</SelectItem>
@@ -831,12 +870,15 @@ export default function EditReservation() {
                         <div key={index} className="p-4 border border-orange-200 rounded-lg bg-white/60">
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                             <div className="md:col-span-3 space-y-2">
-                          <Label className="text-orange-700 font-medium text-sm">Mode de paiement</Label>
+                          <Label className="text-orange-700 font-medium text-sm">
+                            Mode de paiement {paiement.id && "(Non modifiable)"}
+                          </Label>
                           <Select
                             value={paiement.type}
                             onValueChange={(value) => mettreAJourPaiement(index, "type", value)}
+                            disabled={!!paiement.id}
                           >
-                            <SelectTrigger className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg">
+                            <SelectTrigger className={`h-10 border-2 rounded-lg ${paiement.id ? 'border-gray-300 bg-gray-100 cursor-not-allowed' : 'border-orange-200 focus:border-orange-500'}`}>
                               <SelectValue placeholder="Sélectionner paiement" />
                             </SelectTrigger>
                             <SelectContent>
@@ -848,22 +890,28 @@ export default function EditReservation() {
                           </Select>
                             </div>
                             <div className="md:col-span-3 space-y-2">
-                          <Label className="text-orange-700 font-medium text-sm">Montant (DH)</Label>
+                          <Label className="text-orange-700 font-medium text-sm">
+                            Montant (DH) {paiement.id && "(Non modifiable)"}
+                          </Label>
                           <Input
                             type="number"
                             value={paiement.montant}
                             onChange={(e) => mettreAJourPaiement(index, "montant", e.target.value)}
                             placeholder="Montant en dirhams"
-                            className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
+                            disabled={!!paiement.id}
+                            className={`h-10 border-2 rounded-lg ${paiement.id ? 'border-gray-300 bg-gray-100 cursor-not-allowed' : 'border-orange-200 focus:border-orange-500'}`}
                           />
                             </div>
                             <div className="md:col-span-3 space-y-2">
-                          <Label className="text-orange-700 font-medium text-sm">Date</Label>
+                          <Label className="text-orange-700 font-medium text-sm">
+                            Date {paiement.id && "(Non modifiable)"}
+                          </Label>
                           <Input
                             type="date"
                             value={paiement.date}
                             onChange={(e) => mettreAJourPaiement(index, "date", e.target.value)}
-                            className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
+                            disabled={!!paiement.id}
+                            className={`h-10 border-2 rounded-lg ${paiement.id ? 'border-gray-300 bg-gray-100 cursor-not-allowed' : 'border-orange-200 focus:border-orange-500'}`}
                           />
                         </div>
                         <div className="md:col-span-3 flex items-center justify-center">

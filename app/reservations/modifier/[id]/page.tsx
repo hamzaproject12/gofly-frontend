@@ -189,6 +189,13 @@ export default function EditReservation() {
             paiements: []
           }
           
+          console.log('📋 Données initiales chargées:', {
+            statutVisa: reservationData.statutVisa,
+            statutVol: reservationData.statutVol,
+            statutHotel: reservationData.statutHotel,
+            initialFormData
+          })
+          
           setFormData(initialFormData)
           setInitialData(initialFormData) // Stocker les données initiales
 
@@ -287,7 +294,12 @@ export default function EditReservation() {
         statutVol: formData.statutVol,
       }
 
-      console.log('📝 Mise à jour réservation:', body)
+      console.log('📝 Mise à jour réservation:', {
+        reservationId,
+        url: api.url(`/api/reservations/${reservationId}`),
+        body,
+        bodyJSON: JSON.stringify(body)
+      })
 
       const response = await fetch(api.url(`/api/reservations/${reservationId}`), {
         method: 'PUT',
@@ -295,7 +307,20 @@ export default function EditReservation() {
         body: JSON.stringify(body)
       })
 
-      if (!response.ok) throw new Error('Erreur lors de la modification de la réservation')
+      console.log('📥 Réponse PUT:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Erreur inconnue' }))
+        console.error('❌ Erreur PUT:', errorData)
+        throw new Error(`Erreur lors de la modification de la réservation: ${errorData.error || response.statusText}`)
+      }
+
+      const responseData = await response.json()
+      console.log('✅ Réponse PUT succès:', responseData)
 
       // 2. Upload nouveau passeport si présent
       if (documents.passport && reservationId) {

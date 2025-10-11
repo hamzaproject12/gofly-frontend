@@ -286,18 +286,25 @@ export default function EditReservation() {
       const fileUploadErrors: string[] = []
       
       // 1. Mettre à jour les informations de la réservation (seulement les champs modifiables)
+      // Vérifier si un nouveau passeport est uploadé OU si un passeport existe déjà
+      const hasNewPassport = documents.passport !== null;
+      const hasExistingPassport = getDocumentUrl('passport') !== null;
+      const shouldUpdateStatutPasseport = hasNewPassport || hasExistingPassport;
+      
       const body = {
         price: parseFloat(formData.prix),
         reservationDate: formData.dateReservation,
         statutVisa: formData.statutVisa,
         statutHotel: formData.statutHotel,
         statutVol: formData.statutVol,
+        statutPasseport: shouldUpdateStatutPasseport
       }
 
       console.log('📝 Mise à jour réservation:', {
         reservationId,
         url: api.url(`/api/reservations/${reservationId}`),
         body,
+        hasNewPassport,
         bodyJSON: JSON.stringify(body)
       })
 

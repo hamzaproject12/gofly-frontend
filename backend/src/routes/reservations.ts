@@ -404,23 +404,70 @@ router.put('/:id', async (req, res) => {
       price,
       reservationDate,
       documents,
-      paiements
+      paiements,
+      statutPasseport,
+      statutVisa,
+      statutHotel,
+      statutVol
     } = req.body;
+
+    console.log('📝 PUT /api/reservations/:id - Données reçues:', {
+      id: req.params.id,
+      price,
+      reservationDate,
+      statutPasseport,
+      statutVisa,
+      statutHotel,
+      statutVol
+    });
+
+    // Calculer le paidAmount à partir de tous les paiements de cette réservation
+    const existingPayments = await prisma.payment.findMany({
+      where: { reservationId: parseInt(req.params.id) }
+    });
+    
+    const totalPaid = existingPayments.reduce((sum, payment) => sum + payment.amount, 0);
+    console.log('💰 Calcul paidAmount:', {
+      nombrePaiements: existingPayments.length,
+      totalPaid
+    });
+
+    // Construire l'objet de mise à jour avec seulement les champs fournis
+    const updateData: any = {};
+    
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
+    if (phone !== undefined) updateData.phone = phone;
+    if (programId !== undefined) updateData.programId = programId;
+    if (roomType !== undefined) updateData.roomType = roomType;
+    if (hotelMadina !== undefined) updateData.hotelMadina = hotelMadina;
+    if (hotelMakkah !== undefined) updateData.hotelMakkah = hotelMakkah;
+    if (price !== undefined) updateData.price = price;
+    if (reservationDate !== undefined) updateData.reservationDate = new Date(reservationDate);
+    
+    // Ajouter les statuts (accepter false comme valeur valide)
+    if (statutPasseport !== undefined) updateData.statutPasseport = statutPasseport;
+    if (statutVisa !== undefined) updateData.statutVisa = statutVisa;
+    if (statutHotel !== undefined) updateData.statutHotel = statutHotel;
+    if (statutVol !== undefined) updateData.statutVol = statutVol;
+    
+    // Mettre à jour paidAmount avec le total calculé
+    updateData.paidAmount = totalPaid;
+
+    console.log('🔄 Données à mettre à jour:', updateData);
 
     // Mettre à jour la réservation
     const reservation = await prisma.reservation.update({
       where: { id: parseInt(req.params.id) },
-      data: {
-        firstName,
-        lastName,
-        phone,
-        programId,
-        roomType,
-        hotelMadina,
-        hotelMakkah,
-        price,
-        reservationDate: new Date(reservationDate)
-      }
+      data: updateData
+    });
+
+    console.log('✅ Réservation mise à jour:', {
+      id: reservation.id,
+      statutVisa: reservation.statutVisa,
+      statutHotel: reservation.statutHotel,
+      statutVol: reservation.statutVol,
+      paidAmount: reservation.paidAmount
     });
 
     // Mettre à jour les fichiers

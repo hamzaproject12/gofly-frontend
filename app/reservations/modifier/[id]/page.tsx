@@ -631,57 +631,31 @@ export default function EditReservation() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                       <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Programme * (Non modifiable)</Label>
-                        <Select
-                      value={formData.programme}
-                      disabled={true}
-                        >
-                      <SelectTrigger className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed">
-                        <SelectValue placeholder="Sélectionner un programme" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {programs.map((program) => (
-                          <SelectItem key={program.id} value={program.name}>
-                                {program.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                    <Label className="text-blue-700 font-medium text-sm">Programme *</Label>
+                        <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                          <span className="text-gray-900 font-medium">{formData.programme || 'N/A'}</span>
+                        </div>
                       </div>
 
                       <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Type de chambre * (Non modifiable)</Label>
-                        <Select
-                      value={formData.typeChambre}
-                      disabled={true}
-                        >
-                      <SelectTrigger className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed">
-                            <SelectValue placeholder="Sélectionner le type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                        <SelectItem value="SINGLE">1 personne</SelectItem>
-                        <SelectItem value="DOUBLE">2 personnes</SelectItem>
-                        <SelectItem value="TRIPLE">3 personnes</SelectItem>
-                        <SelectItem value="QUAD">4 personnes</SelectItem>
-                        <SelectItem value="QUINT">5 personnes</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    <Label className="text-blue-700 font-medium text-sm">Type de chambre *</Label>
+                        <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                          <span className="text-gray-900 font-medium">
+                            {formData.typeChambre === 'SINGLE' && '1 personne'}
+                            {formData.typeChambre === 'DOUBLE' && '2 personnes'}
+                            {formData.typeChambre === 'TRIPLE' && '3 personnes'}
+                            {formData.typeChambre === 'QUAD' && '4 personnes'}
+                            {formData.typeChambre === 'QUINT' && '5 personnes'}
+                            {!formData.typeChambre && 'N/A'}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Genre * (Non modifiable)</Label>
-                    <Select
-                      value={formData.gender}
-                      disabled={true}
-                    >
-                      <SelectTrigger className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed">
-                        <SelectValue placeholder="Sélectionner le genre" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Homme">Homme</SelectItem>
-                        <SelectItem value="Femme">Femme</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label className="text-blue-700 font-medium text-sm">Genre *</Label>
+                        <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                          <span className="text-gray-900 font-medium">{formData.gender || 'N/A'}</span>
+                        </div>
                       </div>
                       </div>
 
@@ -691,58 +665,26 @@ export default function EditReservation() {
                       <div className="space-y-2">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-lg">🕌</span>
-                      <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina * (Non modifiable)</Label>
+                      <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina *</Label>
                     </div>
-                        <Select
-                      value={formData.hotelMadina}
-                      disabled={true}
-                        >
-                      <SelectTrigger className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed">
-                        <SelectValue>
-                          {getHotelName(formData.hotelMadina, 'madina') || 'Sélectionner un hôtel à Madina'}
-                        </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                        <SelectItem value="none">Sans hôtel</SelectItem>
-                        {programs
-                          .find(p => p.id === parseInt(formData.programId))
-                          ?.hotelsMadina
-                          ?.map((ph: { hotel: Hotel }) => (
-                            <SelectItem key={ph.hotel.id} value={ph.hotel.id.toString()}>
-                              {ph.hotel.name}
-                            </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                          <span className="text-gray-900 font-medium">
+                            {getHotelName(formData.hotelMadina, 'madina') || 'Sans hôtel'}
+                          </span>
+                        </div>
                       </div>
 
                   {/* Hôtel à Makkah */}
                       <div className="space-y-2">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-lg">🕋</span>
-                      <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah * (Non modifiable)</Label>
+                      <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah *</Label>
                     </div>
-                        <Select
-                      value={formData.hotelMakkah}
-                      disabled={true}
-                        >
-                      <SelectTrigger className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed">
-                        <SelectValue>
-                          {getHotelName(formData.hotelMakkah, 'makkah') || 'Sélectionner un hôtel à Makkah'}
-                        </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                        <SelectItem value="none">Sans hôtel</SelectItem>
-                        {programs
-                          .find(p => p.id === parseInt(formData.programId))
-                          ?.hotelsMakkah
-                          ?.map((ph: { hotel: Hotel }) => (
-                            <SelectItem key={ph.hotel.id} value={ph.hotel.id.toString()}>
-                              {ph.hotel.name}
-                            </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                          <span className="text-gray-900 font-medium">
+                            {getHotelName(formData.hotelMakkah, 'makkah') || 'Sans hôtel'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -753,63 +695,55 @@ export default function EditReservation() {
                   <User className="h-5 w-5" />
                   Informations Client
                   {section1Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
-                </h3>
+                    </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Nom * (Non modifiable)</Label>
-                    <Input
-                      value={formData.nom}
-                      disabled={true}
-                      placeholder="Nom du client"
-                      className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed"
-                    />
+                    <Label className="text-blue-700 font-medium text-sm">Nom *</Label>
+                    <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                      <span className="text-gray-900 font-medium">{formData.nom || 'N/A'}</span>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Prénom * (Non modifiable)</Label>
-                    <Input
-                      value={formData.prenom}
-                      disabled={true}
-                      placeholder="Prénom du client"
-                      className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed"
-                    />
+                    <Label className="text-blue-700 font-medium text-sm">Prénom *</Label>
+                    <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                      <span className="text-gray-900 font-medium">{formData.prenom || 'N/A'}</span>
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Téléphone * (Non modifiable)</Label>
-                    <Input
-                      value={formData.telephone}
-                      disabled={true}
-                      placeholder="Numéro de téléphone"
-                      className="h-10 border-2 border-gray-300 bg-gray-100 rounded-lg cursor-not-allowed"
-                    />
+                      <div className="space-y-2">
+                    <Label className="text-blue-700 font-medium text-sm">Téléphone *</Label>
+                    <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                      <span className="text-gray-900 font-medium">{formData.telephone || 'N/A'}</span>
+                    </div>
                   </div>
 
                   {/* Passeport - Ajouté dans Informations Client */}
                   <div className="space-y-2 md:col-span-3">
                     <Label className="text-blue-700 font-medium text-sm">Passeport *</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="file"
-                        ref={(el) => {
-                          if (el) fileInputs.current.passeport = el;
-                        }}
-                        onChange={(e) => handleFileChange(e, 'passport')}
-                        accept="image/*,.pdf"
-                        className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                      />
-                      {documents.passport && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveDocument('passport')}
-                          className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    {getDocumentUrl('passport') && (
+                    {!getDocumentUrl('passport') ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="file"
+                          ref={(el) => {
+                            if (el) fileInputs.current.passeport = el;
+                          }}
+                          onChange={(e) => handleFileChange(e, 'passport')}
+                          accept="image/*,.pdf"
+                          className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                        />
+                        {documents.passport && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveDocument('passport')}
+                            className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
                       <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-sm font-medium text-blue-700">Aperçu du passeport</span>
@@ -826,15 +760,6 @@ export default function EditReservation() {
                               <ZoomIn className="h-3 w-3 mr-1" />
                               Zoom
                             </button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveDocument('passport')}
-                              className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-3 w-3 mr-1" />
-                              Supprimer
-                            </Button>
                           </div>
                         </div>
                         <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
@@ -870,49 +795,64 @@ export default function EditReservation() {
                         <div key={index} className="p-4 border border-orange-200 rounded-lg bg-white/60">
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                             <div className="md:col-span-3 space-y-2">
-                          <Label className="text-orange-700 font-medium text-sm">
-                            Mode de paiement {paiement.id && "(Non modifiable)"}
-                          </Label>
-                          <Select
-                            value={paiement.type}
-                            onValueChange={(value) => mettreAJourPaiement(index, "type", value)}
-                            disabled={!!paiement.id}
-                          >
-                            <SelectTrigger className={`h-10 border-2 rounded-lg ${paiement.id ? 'border-gray-300 bg-gray-100 cursor-not-allowed' : 'border-orange-200 focus:border-orange-500'}`}>
-                              <SelectValue placeholder="Sélectionner paiement" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="especes">Espèces</SelectItem>
-                              <SelectItem value="virement">Virement</SelectItem>
-                              <SelectItem value="carte">Carte</SelectItem>
-                              <SelectItem value="cheque">Chèque</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <Label className="text-orange-700 font-medium text-sm">Mode de paiement</Label>
+                          {paiement.id ? (
+                            <div className="h-10 px-3 py-2 border-2 border-orange-200 rounded-lg bg-orange-50 flex items-center">
+                              <span className="text-gray-900 font-medium">
+                                {paiement.type === 'especes' && 'Espèces'}
+                                {paiement.type === 'virement' && 'Virement'}
+                                {paiement.type === 'carte' && 'Carte'}
+                                {paiement.type === 'cheque' && 'Chèque'}
+                                {!['especes', 'virement', 'carte', 'cheque'].includes(paiement.type) && paiement.type}
+                              </span>
+                            </div>
+                          ) : (
+                            <Select
+                              value={paiement.type}
+                              onValueChange={(value) => mettreAJourPaiement(index, "type", value)}
+                            >
+                              <SelectTrigger className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg">
+                                <SelectValue placeholder="Sélectionner paiement" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="especes">Espèces</SelectItem>
+                                <SelectItem value="virement">Virement</SelectItem>
+                                <SelectItem value="carte">Carte</SelectItem>
+                                <SelectItem value="cheque">Chèque</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
                             </div>
                             <div className="md:col-span-3 space-y-2">
-                          <Label className="text-orange-700 font-medium text-sm">
-                            Montant (DH) {paiement.id && "(Non modifiable)"}
-                          </Label>
-                          <Input
-                            type="number"
-                            value={paiement.montant}
-                            onChange={(e) => mettreAJourPaiement(index, "montant", e.target.value)}
-                            placeholder="Montant en dirhams"
-                            disabled={!!paiement.id}
-                            className={`h-10 border-2 rounded-lg ${paiement.id ? 'border-gray-300 bg-gray-100 cursor-not-allowed' : 'border-orange-200 focus:border-orange-500'}`}
-                          />
+                          <Label className="text-orange-700 font-medium text-sm">Montant (DH)</Label>
+                          {paiement.id ? (
+                            <div className="h-10 px-3 py-2 border-2 border-orange-200 rounded-lg bg-orange-50 flex items-center">
+                              <span className="text-gray-900 font-medium">{paiement.montant} DH</span>
+                            </div>
+                          ) : (
+                            <Input
+                              type="number"
+                              value={paiement.montant}
+                              onChange={(e) => mettreAJourPaiement(index, "montant", e.target.value)}
+                              placeholder="Montant en dirhams"
+                              className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
+                            />
+                          )}
                             </div>
                             <div className="md:col-span-3 space-y-2">
-                          <Label className="text-orange-700 font-medium text-sm">
-                            Date {paiement.id && "(Non modifiable)"}
-                          </Label>
-                          <Input
-                            type="date"
-                            value={paiement.date}
-                            onChange={(e) => mettreAJourPaiement(index, "date", e.target.value)}
-                            disabled={!!paiement.id}
-                            className={`h-10 border-2 rounded-lg ${paiement.id ? 'border-gray-300 bg-gray-100 cursor-not-allowed' : 'border-orange-200 focus:border-orange-500'}`}
-                          />
+                          <Label className="text-orange-700 font-medium text-sm">Date</Label>
+                          {paiement.id ? (
+                            <div className="h-10 px-3 py-2 border-2 border-orange-200 rounded-lg bg-orange-50 flex items-center">
+                              <span className="text-gray-900 font-medium">{paiement.date}</span>
+                            </div>
+                          ) : (
+                            <Input
+                              type="date"
+                              value={paiement.date}
+                              onChange={(e) => mettreAJourPaiement(index, "date", e.target.value)}
+                              className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
+                            />
+                          )}
                         </div>
                         <div className="md:col-span-3 flex items-center justify-center">
                           <Button
@@ -1015,14 +955,6 @@ export default function EditReservation() {
                               >
                                 <ZoomIn className="h-4 w-4" />
                               </button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => mettreAJourPaiement(index, 'recu', '')}
-                                className="text-red-600 hover:text-red-800"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
                             </div>
                           </div>
                           <div className="w-full h-[150px] overflow-hidden rounded-lg border border-orange-200">

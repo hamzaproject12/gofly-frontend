@@ -553,15 +553,34 @@ export default function EditReservation() {
 
   // Helper function pour obtenir le nom d'un hôtel par son ID
   const getHotelName = (hotelId: string, city: 'madina' | 'makkah') => {
-    if (!hotelId || !formData.programId || programs.length === 0) return '';
+    console.log('🔍 getHotelName called:', { hotelId, city, programId: formData.programId, programsCount: programs.length });
+    
+    if (!hotelId || hotelId === 'none') return 'Sans hôtel';
+    if (!formData.programId || programs.length === 0) {
+      console.log('⚠️ No program loaded yet');
+      return 'Chargement...';
+    }
     
     const program = programs.find(p => p.id === parseInt(formData.programId));
-    if (!program) return '';
+    console.log('🔍 Program found:', program?.id, program?.name);
+    
+    if (!program) {
+      console.log('⚠️ Program not found in programs array');
+      return 'Chargement...';
+    }
     
     const hotelsList = city === 'madina' ? program.hotelsMadina : program.hotelsMakkah;
-    const hotelRelation = hotelsList?.find((ph: { hotel: Hotel }) => ph.hotel.id.toString() === hotelId);
+    console.log('🔍 Hotels list:', { city, count: hotelsList?.length, hotelsList });
     
-    return hotelRelation?.hotel.name || '';
+    const hotelRelation = hotelsList?.find((ph: { hotel: Hotel }) => ph.hotel.id.toString() === hotelId);
+    console.log('🔍 Hotel relation found:', hotelRelation);
+    
+    if (!hotelRelation) {
+      console.log('⚠️ Hotel not found with ID:', hotelId);
+      return `Hôtel ID ${hotelId}`;
+    }
+    
+    return hotelRelation.hotel.name;
   }
 
   // Calculs de progression
@@ -669,7 +688,7 @@ export default function EditReservation() {
                     </div>
                         <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
                           <span className="text-gray-900 font-medium">
-                            {getHotelName(formData.hotelMadina, 'madina') || 'Sans hôtel'}
+                            {getHotelName(formData.hotelMadina, 'madina')}
                           </span>
                         </div>
                       </div>
@@ -682,7 +701,7 @@ export default function EditReservation() {
                     </div>
                         <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
                           <span className="text-gray-900 font-medium">
-                            {getHotelName(formData.hotelMakkah, 'makkah') || 'Sans hôtel'}
+                            {getHotelName(formData.hotelMakkah, 'makkah')}
                           </span>
                         </div>
                       </div>
@@ -784,20 +803,20 @@ export default function EditReservation() {
               </div>
 
               {/* Section 3: Paiements */}
-              <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200 mb-6">
-                    <h3 className="text-lg font-semibold text-orange-800 mb-4 flex items-center gap-2">
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
+                    <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
                       <CreditCard className="h-5 w-5" />
                       Paiements
                       {section2Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
                     </h3>
                     <div className="space-y-4">
                       {paiements.map((paiement, index) => (
-                        <div key={index} className="p-4 border border-orange-200 rounded-lg bg-white/60">
+                        <div key={index} className="p-4 border border-blue-200 rounded-lg bg-white/60">
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                             <div className="md:col-span-3 space-y-2">
-                          <Label className="text-orange-700 font-medium text-sm">Mode de paiement</Label>
+                          <Label className="text-blue-700 font-medium text-sm">Mode de paiement</Label>
                           {paiement.id ? (
-                            <div className="h-10 px-3 py-2 border-2 border-orange-200 rounded-lg bg-orange-50 flex items-center">
+                            <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
                               <span className="text-gray-900 font-medium">
                                 {paiement.type === 'especes' && 'Espèces'}
                                 {paiement.type === 'virement' && 'Virement'}
@@ -811,7 +830,7 @@ export default function EditReservation() {
                               value={paiement.type}
                               onValueChange={(value) => mettreAJourPaiement(index, "type", value)}
                             >
-                              <SelectTrigger className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg">
+                              <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
                                 <SelectValue placeholder="Sélectionner paiement" />
                               </SelectTrigger>
                               <SelectContent>
@@ -824,9 +843,9 @@ export default function EditReservation() {
                           )}
                             </div>
                             <div className="md:col-span-3 space-y-2">
-                          <Label className="text-orange-700 font-medium text-sm">Montant (DH)</Label>
+                          <Label className="text-blue-700 font-medium text-sm">Montant (DH)</Label>
                           {paiement.id ? (
-                            <div className="h-10 px-3 py-2 border-2 border-orange-200 rounded-lg bg-orange-50 flex items-center">
+                            <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
                               <span className="text-gray-900 font-medium">{paiement.montant} DH</span>
                             </div>
                           ) : (
@@ -835,14 +854,14 @@ export default function EditReservation() {
                               value={paiement.montant}
                               onChange={(e) => mettreAJourPaiement(index, "montant", e.target.value)}
                               placeholder="Montant en dirhams"
-                              className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
+                              className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
                             />
                           )}
                             </div>
                             <div className="md:col-span-3 space-y-2">
-                          <Label className="text-orange-700 font-medium text-sm">Date</Label>
+                          <Label className="text-blue-700 font-medium text-sm">Date</Label>
                           {paiement.id ? (
-                            <div className="h-10 px-3 py-2 border-2 border-orange-200 rounded-lg bg-orange-50 flex items-center">
+                            <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
                               <span className="text-gray-900 font-medium">{paiement.date}</span>
                             </div>
                           ) : (
@@ -850,7 +869,7 @@ export default function EditReservation() {
                               type="date"
                               value={paiement.date}
                               onChange={(e) => mettreAJourPaiement(index, "date", e.target.value)}
-                              className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
+                              className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
                             />
                           )}
                         </div>
@@ -872,13 +891,13 @@ export default function EditReservation() {
                       {/* Upload de reçu de paiement */}
                       {!paiement.recu && (
                         <div className="mt-3 space-y-2">
-                          <Label className="text-orange-700 font-medium text-sm">Reçu de paiement</Label>
+                          <Label className="text-blue-700 font-medium text-sm">Reçu de paiement</Label>
                           <div className="flex items-center gap-2">
                             <Input
                               type="file"
                               onChange={(e) => handlePaymentFileChange(e, index)}
                               accept="image/*,.pdf"
-                              className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
+                              className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
                             />
                             {documents.payment?.[index] && (
                               <Button
@@ -907,13 +926,13 @@ export default function EditReservation() {
 
                       {/* Aperçu du nouveau reçu uploadé */}
                       {previews[`payment_${index}`] && (
-                        <div className="mt-3 p-2 border border-orange-200 rounded-lg bg-white">
+                        <div className="mt-3 p-2 border border-blue-200 rounded-lg bg-white">
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-orange-700">Aperçu du nouveau reçu</span>
+                            <span className="text-sm font-medium text-blue-700">Aperçu du nouveau reçu</span>
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
-                                className="text-orange-600 hover:text-orange-800 hover:bg-orange-50 p-1 rounded"
+                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 rounded"
                                 onClick={() => setPreviewImage({ 
                                   url: previews[`payment_${index}`].url, 
                                   title: 'Nouveau reçu paiement', 
@@ -924,7 +943,7 @@ export default function EditReservation() {
                               </button>
                             </div>
                           </div>
-                          <div className="w-full h-[150px] overflow-hidden rounded-lg border border-orange-200">
+                          <div className="w-full h-[150px] overflow-hidden rounded-lg border border-blue-200">
                             {previews[`payment_${index}`].type === 'application/pdf' ? (
                               <embed
                                 src={`${previews[`payment_${index}`].url}#toolbar=0&navpanes=0&scrollbar=0`}
@@ -944,20 +963,20 @@ export default function EditReservation() {
 
                       {/* Reçu existant */}
                       {paiement.recu && (
-                        <div className="mt-3 p-2 border border-orange-200 rounded-lg bg-white">
+                        <div className="mt-3 p-2 border border-blue-200 rounded-lg bg-white">
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-orange-700">Reçu de paiement</span>
+                            <span className="text-sm font-medium text-blue-700">Reçu de paiement</span>
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
-                                className="text-orange-600 hover:text-orange-800 hover:bg-orange-50 p-1 rounded"
+                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 rounded"
                                 onClick={() => setPreviewImage({ url: paiement.recu || '', title: 'Reçu paiement', type: 'image/*' })}
                               >
                                 <ZoomIn className="h-4 w-4" />
                               </button>
                             </div>
                           </div>
-                          <div className="w-full h-[150px] overflow-hidden rounded-lg border border-orange-200">
+                          <div className="w-full h-[150px] overflow-hidden rounded-lg border border-blue-200">
                             {paiement.recu.includes('.pdf') ? (
                               <embed
                                 src={`${paiement.recu}#toolbar=0&navpanes=0&scrollbar=0`}
@@ -979,7 +998,7 @@ export default function EditReservation() {
                   <Button
                     type="button"
                     onClick={ajouterPaiement}
-                    className="mt-2 bg-orange-600 hover:bg-orange-700"
+                    className="mt-2 bg-blue-600 hover:bg-blue-700"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Ajouter un paiement
@@ -988,8 +1007,8 @@ export default function EditReservation() {
                   </div>
 
               {/* Section 4: Documents Fournisseur - Statuts simplifiés */}
-              <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200 mb-6">
-                    <h3 className="text-lg font-semibold text-purple-800 mb-4 flex items-center gap-2">
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
+                    <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
                       <FileText className="h-5 w-5" />
                       Documents Fournisseur
                       {section3Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
@@ -998,13 +1017,13 @@ export default function EditReservation() {
                   {/* Statuts des documents avec toggle switches */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Statut Visa */}
-                    <div className="bg-white p-4 rounded-lg border border-purple-200">
+                    <div className="bg-white p-4 rounded-lg border border-blue-200">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <div className="p-2 bg-blue-100 rounded-lg">
                             <FileText className="h-4 w-4 text-blue-600" />
                           </div>
-                          <Label className="text-purple-700 font-medium">Statut Visa</Label>
+                          <Label className="text-blue-700 font-medium">Statut Visa</Label>
                         </div>
                         <Switch
                           checked={formData.statutVisa || false}
@@ -1028,18 +1047,18 @@ export default function EditReservation() {
                     </div>
 
                     {/* Statut Vol */}
-                    <div className="bg-white p-4 rounded-lg border border-purple-200">
+                    <div className="bg-white p-4 rounded-lg border border-blue-200">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <div className="p-2 bg-green-100 rounded-lg">
-                            <Calendar className="h-4 w-4 text-green-600" />
+                          <div className="p-2 bg-blue-100 rounded-lg">
+                            <Calendar className="h-4 w-4 text-blue-600" />
                           </div>
-                          <Label className="text-purple-700 font-medium">Statut Vol</Label>
+                          <Label className="text-blue-700 font-medium">Statut Vol</Label>
                         </div>
                         <Switch
                           checked={formData.statutVol || false}
                           onCheckedChange={(checked) => setFormData(prev => ({ ...prev, statutVol: checked }))}
-                          className="data-[state=checked]:bg-green-600"
+                          className="data-[state=checked]:bg-blue-600"
                         />
                       </div>
                       <div className="text-sm text-gray-600">
@@ -1058,18 +1077,18 @@ export default function EditReservation() {
                       </div>
 
                     {/* Statut Hôtel */}
-                    <div className="bg-white p-4 rounded-lg border border-purple-200">
+                    <div className="bg-white p-4 rounded-lg border border-blue-200">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <div className="p-2 bg-purple-100 rounded-lg">
-                            <Hotel className="h-4 w-4 text-purple-600" />
+                          <div className="p-2 bg-blue-100 rounded-lg">
+                            <Hotel className="h-4 w-4 text-blue-600" />
                           </div>
-                          <Label className="text-purple-700 font-medium">Statut Hôtel</Label>
+                          <Label className="text-blue-700 font-medium">Statut Hôtel</Label>
                         </div>
                         <Switch
                           checked={formData.statutHotel || false}
                           onCheckedChange={(checked) => setFormData(prev => ({ ...prev, statutHotel: checked }))}
-                          className="data-[state=checked]:bg-purple-600"
+                          className="data-[state=checked]:bg-blue-600"
                         />
                       </div>
                       <div className="text-sm text-gray-600">

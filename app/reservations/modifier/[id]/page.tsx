@@ -518,10 +518,10 @@ export default function EditReservation() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreviews(prev => ({
-          ...prev,
+      ...prev,
           [`payment_${index}`]: { url: reader.result as string, type: file.type }
-        }));
-      };
+    }));
+  };
       reader.readAsDataURL(file);
     } else if (file.type === 'application/pdf') {
       setPreviews(prev => ({
@@ -768,32 +768,32 @@ export default function EditReservation() {
 
               {/* Section 2: Informations Client */}
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
-                <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Informations Client
-                  {section1Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
+                    <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
+                      <User className="h-5 w-5" />
+                      Informations Client
+                      {section1Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
                     </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
+                      <div className="space-y-2">
                     <Label className="text-blue-700 font-medium text-sm">Nom *</Label>
                     <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
                       <span className="text-gray-900 font-medium">{formData.nom || 'N/A'}</span>
                     </div>
-                  </div>
+                      </div>
 
-                  <div className="space-y-2">
+                      <div className="space-y-2">
                     <Label className="text-blue-700 font-medium text-sm">Prénom *</Label>
                     <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
                       <span className="text-gray-900 font-medium">{formData.prenom || 'N/A'}</span>
                     </div>
-                  </div>
+                      </div>
 
                       <div className="space-y-2">
                     <Label className="text-blue-700 font-medium text-sm">Téléphone *</Label>
                     <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
                       <span className="text-gray-900 font-medium">{formData.telephone || 'N/A'}</span>
-                    </div>
-                  </div>
+                      </div>
+                      </div>
 
                   {/* Passeport - Ajouté dans Informations Client */}
                   <div className="space-y-2 md:col-span-3">
@@ -837,8 +837,8 @@ export default function EditReservation() {
                               <ZoomIn className="h-3 w-3 mr-1" />
                               Zoom
                             </button>
-                          </div>
-                        </div>
+                      </div>
+                    </div>
                         <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
                           {getDocumentType('passport') === 'application/pdf' ? (
                             <embed
@@ -853,12 +853,12 @@ export default function EditReservation() {
                               className="w-full h-full object-contain"
                             />
                           )}
-                        </div>
+                  </div>
                       </div>
                     )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
 
               {/* Section 3: Paiements */}
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
@@ -1033,7 +1033,7 @@ export default function EditReservation() {
                                 <ZoomIn className="h-4 w-4" />
                               </button>
                             </div>
-                          </div>
+                            </div>
                           <div className="w-full h-[150px] overflow-hidden rounded-lg border border-blue-200">
                             {paiement.recu.includes('.pdf') ? (
                               <embed
@@ -1048,8 +1048,8 @@ export default function EditReservation() {
                                 className="w-full h-full object-contain"
                               />
                             )}
+                            </div>
                           </div>
-                        </div>
                       )}
                         </div>
                       ))}
@@ -1100,9 +1100,9 @@ export default function EditReservation() {
                             <Bell className="h-4 w-4" />
                             En attente
                           </div>
-                        )}
+                          )}
+                        </div>
                       </div>
-                    </div>
 
                     {/* Statut Vol */}
                     <div className="bg-white p-4 rounded-lg border border-blue-200">
@@ -1154,17 +1154,17 @@ export default function EditReservation() {
                           <div className="flex items-center gap-2 text-green-600">
                             <CheckCircle className="h-4 w-4" />
                             Hôtel réservé
-                          </div>
+                        </div>
                         ) : (
                           <div className="flex items-center gap-2 text-orange-600">
                             <Bell className="h-4 w-4" />
                             En attente
-                          </div>
-                        )}
+                      </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
               </div>
 
               {/* Boutons d'action */}
@@ -1210,7 +1210,7 @@ export default function EditReservation() {
                   className="w-full h-auto rounded"
                 />
               )}
-            </div>
+                  </div>
           )}
         </DialogContent>
       </Dialog>

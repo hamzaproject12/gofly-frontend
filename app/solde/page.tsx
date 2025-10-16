@@ -443,11 +443,11 @@ export default function SoldeCaissePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Total Paiements */}
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                <div className="flex items-center justify-between">
-                  <div>
+              <div className="flex items-center justify-between">
+                <div>
                     <p className="text-slate-300 text-sm">Total Paiements</p>
                     <p className="text-2xl font-bold text-green-400">{totalPaiements.toLocaleString()} DH</p>
-                  </div>
+                </div>
                   <CreditCard className="h-8 w-8 text-green-400" />
                 </div>
               </div>
@@ -603,8 +603,8 @@ export default function SoldeCaissePage() {
                             <div className="text-xs text-center">
                               <div className="text-green-600">{item.paiements.toLocaleString()} DH</div>
                               <div className="text-red-600">{item.depenses.toLocaleString()} DH</div>
-                            </div>
                           </div>
+                        </div>
                         )
                       })}
                         </div>
@@ -619,7 +619,7 @@ export default function SoldeCaissePage() {
           </div>
 
           {/* Pie Chart - Répartition des Dépenses */}
-          <div>
+                        <div>
             <Card className="border-0 shadow-lg h-full">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -649,19 +649,19 @@ export default function SoldeCaissePage() {
                                   className={`h-3 rounded-full ${colors[index % colors.length]}`}
                                   style={{ width: `${percentage}%` }}
                                   title={`${percentage.toFixed(1)}%`}
-                                ></div>
-                              </div>
+                              ></div>
+                            </div>
                               <div className="text-xs text-gray-600 text-center">
                                 {percentage.toFixed(1)}% ({item.total.toLocaleString()} DH)
-                              </div>
-                            </div>
+                          </div>
+                        </div>
                           )
                         })}
                       </div>
                     ) : (
                       <div className="flex items-center justify-center h-full text-gray-500">
                         <p className="text-sm">Aucune donnée disponible</p>
-                      </div>
+                    </div>
                     )}
                   </div>
 
@@ -676,17 +676,17 @@ export default function SoldeCaissePage() {
               </CardContent>
             </Card>
           </div>
-        </div>
+          </div>
 
         {/* 📊 Résumé des Métriques Clés */}
         <Card className="border-0 shadow-lg mb-6">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Wallet className="h-5 w-5 text-gray-500" />
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Wallet className="h-5 w-5 text-gray-500" />
               Résumé des Métriques Clés
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <h3 className="text-sm font-medium text-blue-700 mb-2">Mois le plus rentable</h3>
@@ -734,8 +734,8 @@ export default function SoldeCaissePage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* 📊 Graphique Types de Chambres */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
+        <Card className="border-0 shadow-lg">
+          <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Bed className="h-5 w-5 text-blue-500" />
                 Occupation des Chambres par Type
@@ -1102,7 +1102,7 @@ export default function SoldeCaissePage() {
                     {/* Tendance mois */}
                     <div className="bg-blue-50 p-4 rounded-lg">
                       <h3 className="text-sm font-medium text-blue-700 mb-2">Tendance Mensuelle</h3>
-                      <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center">
                         <div>
                           <p className="text-sm text-gray-600">Mois précédent: {(analyticsData.performance?.trend?.lastMonth || 0).toLocaleString()} DH</p>
                           <p className="text-sm text-gray-600">Ce mois: {(analyticsData.performance?.trend?.thisMonth || 0).toLocaleString()} DH</p>
@@ -1154,223 +1154,6 @@ export default function SoldeCaissePage() {
             </div>
           </>
         )}
-
-        {/* 4️⃣ ANALYSES AVANCÉES */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">📈 Analyses Avancées</h2>
-            <Badge variant="outline" className="text-green-600 border-green-200">
-              Filtrage par programme
-            </Badge>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* 📊 Graphique Types de Chambres */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Bed className="h-5 w-5 text-blue-500" />
-                Occupation des Chambres par Type
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80 p-4">
-                {chartsLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  </div>
-                ) : roomsData.length > 0 ? (
-                  <div className="flex items-end justify-center gap-2 h-full">
-                    {roomsData.map((item, index) => {
-                      const maxValue = Math.max(...roomsData.map(r => Math.max(r.nbRoomsReserver, r.nbRoomsRestant)))
-                      const reservedHeight = maxValue > 0 ? (item.nbRoomsReserver / maxValue) * 200 : 0
-                      const availableHeight = maxValue > 0 ? (item.nbRoomsRestant / maxValue) * 200 : 0
-                      
-                      return (
-                        <div key={index} className="flex flex-col items-center gap-2 flex-1">
-                          <div className="flex flex-col items-center gap-1 w-full">
-                            {/* Barre Chambres Réservées */}
-                            <div 
-                              className="w-full bg-red-500 rounded-t-sm" 
-                              style={{ height: `${reservedHeight}px`, minHeight: '4px' }}
-                              title={`Réservées: ${item.nbRoomsReserver}`}
-                            ></div>
-                            {/* Barre Chambres Disponibles */}
-                            <div 
-                              className="w-full bg-green-500 rounded-b-sm" 
-                              style={{ height: `${availableHeight}px`, minHeight: '4px' }}
-                              title={`Disponibles: ${item.nbRoomsRestant}`}
-                            ></div>
-                          </div>
-                          <span className="text-xs text-gray-600 font-medium">
-                            {item.roomType}
-                          </span>
-                          <div className="text-xs text-center">
-                            <div className="text-red-600">{item.nbRoomsReserver} réservées</div>
-                            <div className="text-green-600">{item.nbRoomsRestant} libres</div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    <p>Aucune donnée disponible</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 🏨 Graphique Hôtels */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <HotelIcon className="h-5 w-5 text-purple-500" />
-                Répartition par Hôtel
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80 p-4">
-                {chartsLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-                  </div>
-                ) : hotelsData.length > 0 ? (
-                  <div className="flex items-end justify-center gap-2 h-full">
-                    {hotelsData.slice(0, 8).map((item, index) => {
-                      const maxValue = Math.max(...hotelsData.map(h => h.nbPersonnes))
-                      const height = maxValue > 0 ? (item.nbPersonnes / maxValue) * 200 : 0
-                      const colors = ['bg-purple-500', 'bg-blue-500', 'bg-green-500', 'bg-orange-500', 'bg-red-500', 'bg-indigo-500', 'bg-pink-500', 'bg-yellow-500']
-                      
-                      return (
-                        <div key={index} className="flex flex-col items-center gap-2 flex-1">
-                          <div 
-                            className={`w-full ${colors[index % colors.length]} rounded-t-sm`}
-                            style={{ height: `${height}px`, minHeight: '4px' }}
-                            title={`${item.hotelName}: ${item.nbPersonnes} personnes`}
-                          ></div>
-                          <span className="text-xs text-gray-600 font-medium text-center">
-                            {item.hotelName.length > 12 ? item.hotelName.substring(0, 12) + '...' : item.hotelName}
-                          </span>
-                          <div className="text-xs text-center font-bold">
-                            {item.nbPersonnes} pers.
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    <p>Aucune donnée disponible</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* 📊 Deuxième ligne de graphiques */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* 👥 Graphique Genres */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Users className="h-5 w-5 text-green-500" />
-                Répartition par Genre
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80 p-4">
-                {chartsLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-                  </div>
-                ) : genderData.length > 0 ? (
-                  <div className="flex items-end justify-center gap-4 h-full">
-                    {genderData.map((item, index) => {
-                      const maxValue = Math.max(...genderData.map(g => g.nbReservations))
-                      const height = maxValue > 0 ? (item.nbReservations / maxValue) * 200 : 0
-                      const colors = ['bg-blue-500', 'bg-pink-500']
-                      const icons = ['👨', '👩']
-                      
-                      return (
-                        <div key={index} className="flex flex-col items-center gap-2 flex-1">
-                          <div className="text-2xl mb-2">{icons[index] || '👤'}</div>
-                          <div 
-                            className={`w-16 ${colors[index % colors.length]} rounded-t-lg`}
-                            style={{ height: `${height}px`, minHeight: '4px' }}
-                            title={`${item.gender}: ${item.nbReservations} réservations`}
-                          ></div>
-                          <span className="text-sm text-gray-600 font-medium">
-                            {item.gender}
-                          </span>
-                          <div className="text-sm text-center font-bold">
-                            {item.nbReservations}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    <p>Aucune donnée disponible</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 💰 Graphique Solde */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-yellow-500" />
-                Vue d'ensemble Financière
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80 p-4">
-                {chartsLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
-                  </div>
-                ) : soldeData.length > 0 ? (
-                  <div className="flex items-end justify-center gap-4 h-full">
-                    {soldeData.map((item, index) => {
-                      const maxValue = Math.max(...soldeData.map(s => s.montant))
-                      const height = maxValue > 0 ? (item.montant / maxValue) * 200 : 0
-                      const colors = ['bg-blue-500', 'bg-green-500', 'bg-red-500']
-                      const icons = ['💰', '💳', '💸']
-                      
-                      return (
-                        <div key={index} className="flex flex-col items-center gap-2 flex-1">
-                          <div className="text-2xl mb-2">{icons[index] || '💼'}</div>
-                          <div 
-                            className={`w-20 ${colors[index % colors.length]} rounded-t-lg`}
-                            style={{ height: `${height}px`, minHeight: '4px' }}
-                            title={`${item.type}: ${item.montant.toLocaleString()} DH`}
-                          ></div>
-                          <span className="text-sm text-gray-600 font-medium text-center">
-                            {item.type}
-                          </span>
-                          <div className="text-sm text-center font-bold">
-                            {item.montant.toLocaleString()} DH
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    <p>Aucune donnée disponible</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
       </div>
     </div>

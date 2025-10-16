@@ -135,11 +135,11 @@ export default function NouvelleDepensePage() {
                     <p className="text-indigo-100 text-sm">Système de suivi</p>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+                        </div>
+                  </div>
+                </div>
+                  </div>
+                </div>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Card className="border-none shadow-2xl bg-white/80 backdrop-blur-sm">
@@ -282,7 +282,7 @@ export default function NouvelleDepensePage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+          </div>
 
                 {/* Date */}
                 <div className="space-y-3">
@@ -300,8 +300,8 @@ export default function NouvelleDepensePage() {
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                     className="h-14 text-base font-medium border-2 border-gray-200 rounded-2xl focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 transition-all duration-300 shadow-lg hover:shadow-xl bg-white"
                   />
-                </div>
-              </div>
+                  </div>
+                  </div>
 
               {/* Boutons */}
               <div className="flex justify-between items-center pt-8 border-t-2 border-gray-100">
@@ -314,18 +314,18 @@ export default function NouvelleDepensePage() {
                     <p className="text-sm">Vérifiez toutes les informations avant de continuer</p>
                   </div>
                 </div>
-                
+
                 <div className="flex gap-4">
                   <Link href="/depenses">
-                    <Button
+                <Button
                       type="button"
                       variant="outline"
                       className="h-12 px-8 border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 rounded-2xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl"
                     >
                       <ArrowLeft className="h-4 w-4 mr-2" />
-                      Annuler
-                    </Button>
-                  </Link>
+                    Annuler
+                  </Button>
+                </Link>
                   <Button
                     type="submit"
                     disabled={loading}
@@ -346,8 +346,8 @@ export default function NouvelleDepensePage() {
                 </div>
               </div>
             </form>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
       </div>
     </div>
   )

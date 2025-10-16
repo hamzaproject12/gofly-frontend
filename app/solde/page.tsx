@@ -30,8 +30,33 @@ import {
   DollarSign,
   Award,
   Star,
+  Bed,
+  Hotel as HotelIcon,
 } from "lucide-react"
 import Link from "next/link"
+
+// Types pour les nouveaux graphiques
+type RoomsChartData = {
+  roomType: string
+  nbRoomsReserver: number
+  nbRoomsRestant: number
+  totalRooms: number
+}
+
+type HotelsChartData = {
+  hotelName: string
+  nbPersonnes: number
+}
+
+type GenderChartData = {
+  gender: string
+  nbReservations: number
+}
+
+type SoldeChartData = {
+  type: string
+  montant: number
+}
 
 type BalanceData = {
   // 📊 Statistiques principales
@@ -221,6 +246,13 @@ export default function SoldeCaissePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // États pour les nouveaux graphiques
+  const [roomsData, setRoomsData] = useState<RoomsChartData[]>([])
+  const [hotelsData, setHotelsData] = useState<HotelsChartData[]>([])
+  const [genderData, setGenderData] = useState<GenderChartData[]>([])
+  const [soldeData, setSoldeData] = useState<SoldeChartData[]>([])
+  const [chartsLoading, setChartsLoading] = useState(false)
+
   // 🎯 Fonction optimisée pour récupérer les données via l'API Balance
   const fetchData = useCallback(async () => {
     try {
@@ -269,10 +301,49 @@ export default function SoldeCaissePage() {
     }
   }, [dateDebut, dateFin, programmeFilter, periodeFilter])
 
+  // 🎯 Fonction pour récupérer les données des graphiques
+  const fetchChartsData = useCallback(async () => {
+    try {
+      setChartsLoading(true)
+      
+      // Récupérer toutes les données des graphiques en parallèle
+      const [roomsRes, hotelsRes, genderRes, soldeRes] = await Promise.all([
+        fetch(api.url(`/api/balance/charts/rooms?programme=${programmeFilter}`)),
+        fetch(api.url(`/api/balance/charts/hotels?programme=${programmeFilter}`)),
+        fetch(api.url(`/api/balance/charts/gender?programme=${programmeFilter}`)),
+        fetch(api.url(`/api/balance/charts/solde?programme=${programmeFilter}`))
+      ])
+
+      const [roomsData, hotelsData, genderData, soldeData] = await Promise.all([
+        roomsRes.json(),
+        hotelsRes.json(),
+        genderRes.json(),
+        soldeRes.json()
+      ])
+
+      setRoomsData(roomsData.data || [])
+      setHotelsData(hotelsData.data || [])
+      setGenderData(genderData.data || [])
+      setSoldeData(soldeData.data || [])
+
+      console.log('✅ Graphiques chargés:', {
+        rooms: roomsData.data?.length || 0,
+        hotels: hotelsData.data?.length || 0,
+        gender: genderData.data?.length || 0,
+        solde: soldeData.data?.length || 0
+      })
+    } catch (err) {
+      console.error('❌ Erreur fetchChartsData:', err)
+    } finally {
+      setChartsLoading(false)
+    }
+  }, [programmeFilter])
+
   // Charger les données au montage et quand les filtres changent
   useEffect(() => {
     fetchData()
-  }, [fetchData])
+    fetchChartsData()
+  }, [fetchData, fetchChartsData])
 
   // Données par défaut si pas encore chargées
   const data = balanceData || {
@@ -841,6 +912,214 @@ export default function SoldeCaissePage() {
             </div>
           </>
         )}
+
+        {/* 🆕 NOUVEAUX GRAPHIQUES AVEC FILTRE PROGRAMME */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* 📊 Graphique Types de Chambres */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Bed className="h-5 w-5 text-blue-500" />
+                Occupation des Chambres par Type
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80 p-4">
+                {chartsLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : roomsData.length > 0 ? (
+                  <div className="flex items-end justify-center gap-2 h-full">
+                    {roomsData.map((item, index) => {
+                      const maxValue = Math.max(...roomsData.map(r => Math.max(r.nbRoomsReserver, r.nbRoomsRestant)))
+                      const reservedHeight = maxValue > 0 ? (item.nbRoomsReserver / maxValue) * 200 : 0
+                      const availableHeight = maxValue > 0 ? (item.nbRoomsRestant / maxValue) * 200 : 0
+                      
+                      return (
+                        <div key={index} className="flex flex-col items-center gap-2 flex-1">
+                          <div className="flex flex-col items-center gap-1 w-full">
+                            {/* Barre Chambres Réservées */}
+                            <div 
+                              className="w-full bg-red-500 rounded-t-sm" 
+                              style={{ height: `${reservedHeight}px`, minHeight: '4px' }}
+                              title={`Réservées: ${item.nbRoomsReserver}`}
+                            ></div>
+                            {/* Barre Chambres Disponibles */}
+                            <div 
+                              className="w-full bg-green-500 rounded-b-sm" 
+                              style={{ height: `${availableHeight}px`, minHeight: '4px' }}
+                              title={`Disponibles: ${item.nbRoomsRestant}`}
+                            ></div>
+                          </div>
+                          <span className="text-xs text-gray-600 font-medium">
+                            {item.roomType}
+                          </span>
+                          <div className="text-xs text-center">
+                            <div className="text-red-600">{item.nbRoomsReserver} réservées</div>
+                            <div className="text-green-600">{item.nbRoomsRestant} libres</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    <p>Aucune donnée disponible</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 🏨 Graphique Hôtels */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <HotelIcon className="h-5 w-5 text-purple-500" />
+                Répartition par Hôtel
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80 p-4">
+                {chartsLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                  </div>
+                ) : hotelsData.length > 0 ? (
+                  <div className="flex items-end justify-center gap-2 h-full">
+                    {hotelsData.slice(0, 8).map((item, index) => {
+                      const maxValue = Math.max(...hotelsData.map(h => h.nbPersonnes))
+                      const height = maxValue > 0 ? (item.nbPersonnes / maxValue) * 200 : 0
+                      const colors = ['bg-purple-500', 'bg-blue-500', 'bg-green-500', 'bg-orange-500', 'bg-red-500', 'bg-indigo-500', 'bg-pink-500', 'bg-yellow-500']
+                      
+                      return (
+                        <div key={index} className="flex flex-col items-center gap-2 flex-1">
+                          <div 
+                            className={`w-full ${colors[index % colors.length]} rounded-t-sm`}
+                            style={{ height: `${height}px`, minHeight: '4px' }}
+                            title={`${item.hotelName}: ${item.nbPersonnes} personnes`}
+                          ></div>
+                          <span className="text-xs text-gray-600 font-medium text-center">
+                            {item.hotelName.length > 12 ? item.hotelName.substring(0, 12) + '...' : item.hotelName}
+                          </span>
+                          <div className="text-xs text-center font-bold">
+                            {item.nbPersonnes} pers.
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    <p>Aucune donnée disponible</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* 📊 Deuxième ligne de graphiques */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* 👥 Graphique Genres */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Users className="h-5 w-5 text-green-500" />
+                Répartition par Genre
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80 p-4">
+                {chartsLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                  </div>
+                ) : genderData.length > 0 ? (
+                  <div className="flex items-end justify-center gap-4 h-full">
+                    {genderData.map((item, index) => {
+                      const maxValue = Math.max(...genderData.map(g => g.nbReservations))
+                      const height = maxValue > 0 ? (item.nbReservations / maxValue) * 200 : 0
+                      const colors = ['bg-blue-500', 'bg-pink-500']
+                      const icons = ['👨', '👩']
+                      
+                      return (
+                        <div key={index} className="flex flex-col items-center gap-2 flex-1">
+                          <div className="text-2xl mb-2">{icons[index] || '👤'}</div>
+                          <div 
+                            className={`w-16 ${colors[index % colors.length]} rounded-t-lg`}
+                            style={{ height: `${height}px`, minHeight: '4px' }}
+                            title={`${item.gender}: ${item.nbReservations} réservations`}
+                          ></div>
+                          <span className="text-sm text-gray-600 font-medium">
+                            {item.gender}
+                          </span>
+                          <div className="text-sm text-center font-bold">
+                            {item.nbReservations}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    <p>Aucune donnée disponible</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 💰 Graphique Solde */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-yellow-500" />
+                Vue d'ensemble Financière
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80 p-4">
+                {chartsLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
+                  </div>
+                ) : soldeData.length > 0 ? (
+                  <div className="flex items-end justify-center gap-4 h-full">
+                    {soldeData.map((item, index) => {
+                      const maxValue = Math.max(...soldeData.map(s => s.montant))
+                      const height = maxValue > 0 ? (item.montant / maxValue) * 200 : 0
+                      const colors = ['bg-blue-500', 'bg-green-500', 'bg-red-500']
+                      const icons = ['💰', '💳', '💸']
+                      
+                      return (
+                        <div key={index} className="flex flex-col items-center gap-2 flex-1">
+                          <div className="text-2xl mb-2">{icons[index] || '💼'}</div>
+                          <div 
+                            className={`w-20 ${colors[index % colors.length]} rounded-t-lg`}
+                            style={{ height: `${height}px`, minHeight: '4px' }}
+                            title={`${item.type}: ${item.montant.toLocaleString()} DH`}
+                          ></div>
+                          <span className="text-sm text-gray-600 font-medium text-center">
+                            {item.type}
+                          </span>
+                          <div className="text-sm text-center font-bold">
+                            {item.montant.toLocaleString()} DH
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    <p>Aucune donnée disponible</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
       </div>
     </div>

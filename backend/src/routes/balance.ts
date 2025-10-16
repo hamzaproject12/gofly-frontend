@@ -274,4 +274,287 @@ async function calculateMonthlyDataOptimized(dateFilter: any, programFilter: any
 }
 
 
+// 📊 API pour graphique des types de chambres
+router.get('/charts/rooms', async (req, res) => {
+  try {
+    const { programme } = req.query;
+    
+    console.log('🏠 API Rooms Chart appelée avec:', { programme });
+
+    // Filtre par programme
+    const programFilter = programme && programme !== 'tous' ? { name: programme as string } : undefined;
+
+    // Récupérer les données des chambres par type
+    const roomStats = await prisma.room.groupBy({
+      by: ['roomType'],
+      where: {
+        ...(programFilter && { program: programFilter })
+      },
+      _count: {
+        id: true
+      }
+    });
+
+    // Récupérer les réservations pour calculer les chambres occupées
+    const reservations = await prisma.reservation.findMany({
+      where: {
+        ...(programFilter && { 
+          program: programFilter 
+        })
+      },
+      select: {
+        roomType: true
+      }
+    });
+
+    // Calculer les statistiques par type de chambre
+    const roomTypeStats = roomStats.map(room => {
+      const type = room.roomType;
+      const totalRooms = room._count.id;
+      
+      // Compter les réservations pour ce type
+      const reservationsCount = reservations.filter(r => r.roomType === type).length;
+      const roomsRestantes = Math.max(0, totalRooms - reservationsCount);
+      
+      return {
+        roomType: type,
+        nbRoomsReserver: reservationsCount,
+        nbRoomsRestant: roomsRestantes,
+        totalRooms: totalRooms
+      };
+    });
+
+    // Ajouter les types de chambres qui n'ont pas de rooms mais ont des réservations
+    const allRoomTypes: ('SINGLE' | 'DOUBLE' | 'TRIPLE' | 'QUAD' | 'QUINT')[] = ['SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD', 'QUINT'];
+    const existingTypes = roomTypeStats.map(r => r.roomType);
+    const missingTypes = allRoomTypes.filter(type => !existingTypes.includes(type));
+    
+    missingTypes.forEach(type => {
+      const reservationsCount = reservations.filter(r => r.roomType === type).length;
+      if (reservationsCount > 0) {
+        roomTypeStats.push({
+          roomType: type,
+          nbRoomsReserver: reservationsCount,
+          nbRoomsRestant: 0,
+          totalRooms: reservationsCount
+        });
+      }
+    });
+
+    console.log('✅ Rooms Chart - Données générées:', roomTypeStats);
+
+    res.json({
+      data: roomTypeStats.sort((a, b) => {
+        const order = ['SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD', 'QUINT'];
+        return order.indexOf(a.roomType) - order.indexOf(b.roomType);
+      }),
+      metadata: {
+        programme: programme || 'tous',
+        generatedAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur Rooms Chart API:', error);
+    res.status(500).json({ 
+      error: 'Erreur lors de la récupération des données des chambres',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// 🏨 API pour graphique des hôtels
+router.get('/charts/hotels', async (req, res) => {
+  try {
+    const { programme } = req.query;
+    
+    console.log('🏨 API Hotels Chart appelée avec:', { programme });
+
+    // Filtre par programme
+    const programFilter = programme && programme !== 'tous' ? { name: programme as string } : undefined;
+
+    // Récupérer les réservations avec les hôtels
+    const reservations = await prisma.reservation.findMany({
+      where: {
+        ...(programFilter && { 
+          program: programFilter 
+        })
+      },
+      select: {
+        hotelMadina: true,
+        hotelMakkah: true
+      }
+    });
+
+    // Compter les personnes par hôtel
+    const hotelStats: { [key: string]: number } = {};
+    
+    reservations.forEach(reservation => {
+      // Hôtel à Madina
+      if (reservation.hotelMadina && reservation.hotelMadina !== 'Sans hôtel') {
+        hotelStats[reservation.hotelMadina] = (hotelStats[reservation.hotelMadina] || 0) + 1;
+      }
+      
+      // Hôtel à Makkah
+      if (reservation.hotelMakkah && reservation.hotelMakkah !== 'Sans hôtel') {
+        hotelStats[reservation.hotelMakkah] = (hotelStats[reservation.hotelMakkah] || 0) + 1;
+      }
+    });
+
+    // Transformer en array pour le graphique
+    const hotelData = Object.entries(hotelStats).map(([hotelName, nbPersonnes]) => ({
+      hotelName,
+      nbPersonnes
+    })).sort((a, b) => b.nbPersonnes - a.nbPersonnes);
+
+    console.log('✅ Hotels Chart - Données générées:', hotelData);
+
+    res.json({
+      data: hotelData,
+      metadata: {
+        programme: programme || 'tous',
+        generatedAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur Hotels Chart API:', error);
+    res.status(500).json({ 
+      error: 'Erreur lors de la récupération des données des hôtels',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// 👥 API pour graphique des genres
+router.get('/charts/gender', async (req, res) => {
+  try {
+    const { programme } = req.query;
+    
+    console.log('👥 API Gender Chart appelée avec:', { programme });
+
+    // Filtre par programme
+    const programFilter = programme && programme !== 'tous' ? { name: programme as string } : undefined;
+
+    // Récupérer les réservations groupées par genre
+    const genderStats = await prisma.reservation.groupBy({
+      by: ['gender'],
+      where: {
+        ...(programFilter && { 
+          program: programFilter 
+        })
+      },
+      _count: {
+        id: true
+      }
+    });
+
+    // Transformer en array pour le graphique
+    const genderData = genderStats.map(stat => ({
+      gender: stat.gender,
+      nbReservations: stat._count.id
+    })).sort((a, b) => b.nbReservations - a.nbReservations);
+
+    console.log('✅ Gender Chart - Données générées:', genderData);
+
+    res.json({
+      data: genderData,
+      metadata: {
+        programme: programme || 'tous',
+        generatedAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur Gender Chart API:', error);
+    res.status(500).json({ 
+      error: 'Erreur lors de la récupération des données des genres',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// 💰 API pour graphique du solde
+router.get('/charts/solde', async (req, res) => {
+  try {
+    const { programme } = req.query;
+    
+    console.log('💰 API Solde Chart appelée avec:', { programme });
+
+    // Filtre par programme
+    const programFilter = programme && programme !== 'tous' ? { name: programme as string } : undefined;
+
+    // Récupérer les données en parallèle
+    const [gainPrevu, paiementsReels, depenses] = await Promise.all([
+      // Gain prévu (somme des prix des réservations)
+      prisma.reservation.aggregate({
+        where: {
+          ...(programFilter && { 
+            program: programFilter 
+          })
+        },
+        _sum: {
+          price: true
+        }
+      }),
+      
+      // Paiements réels (somme des paidAmount)
+      prisma.reservation.aggregate({
+        where: {
+          ...(programFilter && { 
+            program: programFilter 
+          })
+        },
+        _sum: {
+          paidAmount: true
+        }
+      }),
+      
+      // Dépenses du programme
+      prisma.expense.aggregate({
+        where: {
+          ...(programFilter && { 
+            program: programFilter 
+          })
+        },
+        _sum: {
+          amount: true
+        }
+      })
+    ]);
+
+    const soldeData = [
+      {
+        type: 'Gain prévu',
+        montant: gainPrevu._sum.price || 0
+      },
+      {
+        type: 'Paiements',
+        montant: paiementsReels._sum.paidAmount || 0
+      },
+      {
+        type: 'Dépenses',
+        montant: depenses._sum.amount || 0
+      }
+    ];
+
+    console.log('✅ Solde Chart - Données générées:', soldeData);
+
+    res.json({
+      data: soldeData,
+      metadata: {
+        programme: programme || 'tous',
+        generatedAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur Solde Chart API:', error);
+    res.status(500).json({ 
+      error: 'Erreur lors de la récupération des données du solde',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router;

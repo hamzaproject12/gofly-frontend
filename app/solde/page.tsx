@@ -428,7 +428,7 @@ export default function SoldeCaissePage() {
         <div className="mb-8">
           <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-8 text-white shadow-2xl">
             <div className="flex items-center justify-between mb-6">
-              <div>
+                <div>
                 <h1 className="text-3xl font-bold mb-2">💰 Calcul du Solde de Caisse</h1>
                 <p className="text-slate-300">État financier en temps réel</p>
               </div>
@@ -454,22 +454,22 @@ export default function SoldeCaissePage() {
 
               {/* Total Dépenses */}
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                <div className="flex items-center justify-between">
-                  <div>
+              <div className="flex items-center justify-between">
+                <div>
                     <p className="text-slate-300 text-sm">Total Dépenses</p>
                     <p className="text-2xl font-bold text-red-400">{Math.abs(totalDepenses).toLocaleString()} DH</p>
-                  </div>
+                </div>
                   <FileText className="h-8 w-8 text-red-400" />
                 </div>
               </div>
 
               {/* Solde Final Prévu */}
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                <div className="flex items-center justify-between">
-                  <div>
+              <div className="flex items-center justify-between">
+                <div>
                     <p className="text-slate-300 text-sm">Solde Final Prévu</p>
                     <p className="text-2xl font-bold text-blue-400">{soldeFinalPrevu.toLocaleString()} DH</p>
-                  </div>
+                </div>
                   <TrendingUp className="h-8 w-8 text-blue-400" />
                 </div>
               </div>
@@ -722,7 +722,211 @@ export default function SoldeCaissePage() {
               </CardContent>
             </Card>
 
-        {/* 3️⃣ TABLEAUX & CLASSEMENTS */}
+        {/* 📈 ANALYSES AVANCÉES */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <h2 className="text-2xl font-bold text-gray-800">📈 Analyses Avancées</h2>
+            <Badge variant="outline" className="text-green-600 border-green-200">
+              Filtrage par programme
+            </Badge>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* 📊 Graphique Types de Chambres */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Bed className="h-5 w-5 text-blue-500" />
+                Occupation des Chambres par Type
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80 p-4">
+                {chartsLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : roomsData.length > 0 ? (
+                  <div className="flex items-end justify-center gap-2 h-full">
+                    {roomsData.map((item, index) => {
+                      const maxValue = Math.max(...roomsData.map(r => Math.max(r.nbRoomsReserver, r.nbRoomsRestant)))
+                      const reservedHeight = maxValue > 0 ? (item.nbRoomsReserver / maxValue) * 200 : 0
+                      const availableHeight = maxValue > 0 ? (item.nbRoomsRestant / maxValue) * 200 : 0
+                      
+                      return (
+                        <div key={index} className="flex flex-col items-center gap-2 flex-1">
+                          <div className="flex flex-col items-center gap-1 w-full">
+                            <div 
+                              className="w-full bg-red-500 rounded-t-sm" 
+                              style={{ height: `${reservedHeight}px`, minHeight: '4px' }}
+                              title={`Réservées: ${item.nbRoomsReserver}`}
+                            ></div>
+                            <div 
+                              className="w-full bg-green-500 rounded-b-sm" 
+                              style={{ height: `${availableHeight}px`, minHeight: '4px' }}
+                              title={`Disponibles: ${item.nbRoomsRestant}`}
+                            ></div>
+                          </div>
+                          <span className="text-xs text-gray-600 font-medium">{item.roomType}</span>
+                          <div className="text-xs text-center">
+                            <div className="text-red-600">{item.nbRoomsReserver} réservées</div>
+                            <div className="text-green-600">{item.nbRoomsRestant} libres</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    <p>Aucune donnée disponible</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 🏨 Graphique Hôtels */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <HotelIcon className="h-5 w-5 text-green-500" />
+                Répartition par Hôtel
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80 p-4">
+                {chartsLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                  </div>
+                ) : hotelsData.length > 0 ? (
+                  <div className="flex items-end justify-center gap-2 h-full">
+                    {hotelsData.map((item, index) => {
+                      const maxValue = Math.max(...hotelsData.map(h => h.nbPersonnes))
+                      const height = maxValue > 0 ? (item.nbPersonnes / maxValue) * 200 : 0
+                      const colors = ['bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-red-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-orange-500']
+                      
+                      return (
+                        <div key={index} className="flex flex-col items-center gap-2 flex-1">
+                          <div 
+                            className={`w-full ${colors[index % colors.length]} rounded-sm`}
+                            style={{ height: `${height}px`, minHeight: '4px' }}
+                            title={`${item.nbPersonnes} personnes`}
+                          ></div>
+                          <span className="text-xs text-gray-600 font-medium text-center">{item.hotelName}</span>
+                          <div className="text-xs text-center text-gray-700 font-semibold">
+                            {item.nbPersonnes} personnes
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    <p>Aucune donnée disponible</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 👥 Graphique Genres */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Users className="h-5 w-5 text-purple-500" />
+                Répartition par Genre
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80 p-4">
+                {chartsLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                  </div>
+                ) : genderData.length > 0 ? (
+                  <div className="flex items-end justify-center gap-8 h-full">
+                    {genderData.map((item, index) => {
+                      const maxValue = Math.max(...genderData.map(g => g.nbReservations))
+                      const height = maxValue > 0 ? (item.nbReservations / maxValue) * 200 : 0
+                      const colors = ['bg-blue-500', 'bg-pink-500']
+                      const icons = ['👨', '👩']
+                      
+                      return (
+                        <div key={index} className="flex flex-col items-center gap-2 flex-1">
+                          <div className="text-3xl mb-2">{icons[index] || '👤'}</div>
+                          <div 
+                            className={`w-16 ${colors[index % colors.length]} rounded-sm`}
+                            style={{ height: `${height}px`, minHeight: '4px' }}
+                            title={`${item.nbReservations} réservations`}
+                          ></div>
+                          <span className="text-sm text-gray-600 font-medium">{item.gender}</span>
+                          <div className="text-sm text-center text-gray-700 font-semibold">
+                            {item.nbReservations} réservations
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    <p>Aucune donnée disponible</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 💰 Graphique Solde Financier */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-yellow-500" />
+                Solde Financier
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80 p-4">
+                {chartsLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
+                  </div>
+                ) : soldeData.length > 0 ? (
+                  <div className="flex items-end justify-center gap-4 h-full">
+                    {soldeData.map((item, index) => {
+                      const maxValue = Math.max(...soldeData.map(s => s.montant))
+                      const height = maxValue > 0 ? (item.montant / maxValue) * 200 : 0
+                      const colors = ['bg-blue-500', 'bg-green-500', 'bg-red-500']
+                      const icons = ['💰', '💳', '💸']
+                      
+                      return (
+                        <div key={index} className="flex flex-col items-center gap-2 flex-1">
+                          <div className="text-2xl mb-2">{icons[index] || '💼'}</div>
+                          <div 
+                            className={`w-20 ${colors[index % colors.length]} rounded-sm`}
+                            style={{ height: `${height}px`, minHeight: '4px' }}
+                            title={`${item.montant.toLocaleString()} DH`}
+                          ></div>
+                          <span className="text-xs text-gray-600 font-medium text-center">{item.type}</span>
+                          <div className="text-xs text-center text-gray-700 font-semibold">
+                            {item.montant.toLocaleString()} DH
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    <p>Aucune donnée disponible</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* 🏆 TABLEAUX & CLASSEMENTS */}
         {analyticsData && analyticsData.programRanking && analyticsData.agentRanking && (
           <>
             <div className="mb-8">

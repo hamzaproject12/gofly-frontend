@@ -66,6 +66,7 @@ router.get('/', async (req, res) => {
     const totalDepenses = expensesStats._sum.amount || 0;
     const gainPrevu = gainPrevuStats._sum.price || 0;
     const soldeFinal = totalPaiements - totalDepenses;
+    const soldeFinalPrevu = gainPrevu - totalDepenses;
 
     // 📈 2. Données par mois (avec Prisma groupBy - OPTIMISÉ)
     const moisData = await calculateMonthlyDataOptimized(dateFilter, programFilter, periode as string);
@@ -149,6 +150,7 @@ router.get('/', async (req, res) => {
         totalDepenses,
         gainPrevu,
         soldeFinal,
+        soldeFinalPrevu,
         countPaiements: paymentsStats._count.id || 0,
         countDepenses: expensesStats._count.id || 0,
         countReservations: gainPrevuStats._count.id || 0
@@ -196,6 +198,7 @@ router.get('/', async (req, res) => {
       totalDepenses,
       gainPrevu,
       soldeFinal,
+      soldeFinalPrevu,
       moisCount: moisData.length
     });
 

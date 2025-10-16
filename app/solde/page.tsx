@@ -65,6 +65,7 @@ type BalanceData = {
     totalDepenses: number
     gainPrevu: number
     soldeFinal: number
+    soldeFinalPrevu: number
     countPaiements: number
     countDepenses: number
     countReservations: number
@@ -349,7 +350,7 @@ export default function SoldeCaissePage() {
 
   // Données par défaut si pas encore chargées
   const data = balanceData || {
-    statistics: { totalPaiements: 0, totalDepenses: 0, gainPrevu: 0, soldeFinal: 0, countPaiements: 0, countDepenses: 0, countReservations: 0 },
+    statistics: { totalPaiements: 0, totalDepenses: 0, gainPrevu: 0, soldeFinal: 0, soldeFinalPrevu: 0, countPaiements: 0, countDepenses: 0, countReservations: 0 },
     parMois: [],
     details: [],
     summary: { 
@@ -366,7 +367,7 @@ export default function SoldeCaissePage() {
 
 
   const { statistics, parMois, summary, parMethodePaiement, parTypeDepense, parAgent } = data
-  const { totalPaiements, totalDepenses, gainPrevu, soldeFinal } = statistics || { totalPaiements: 0, totalDepenses: 0, gainPrevu: 0, soldeFinal: 0 }
+  const { totalPaiements, totalDepenses, gainPrevu, soldeFinal, soldeFinalPrevu } = statistics || { totalPaiements: 0, totalDepenses: 0, gainPrevu: 0, soldeFinal: 0, soldeFinalPrevu: 0 }
   const { moisMaxBenefice } = summary || { moisMaxBenefice: { mois: "", solde: 0 } }
 
 
@@ -424,7 +425,38 @@ export default function SoldeCaissePage() {
         </div>
 
         {/* Statistiques */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+          {/* 1. Solde Final */}
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-blue-700">Solde Final</p>
+                  <p className="text-3xl font-bold text-blue-800">{soldeFinal.toLocaleString()} DH</p>
+                </div>
+                <div className="bg-blue-200 p-3 rounded-full">
+                  <Wallet className="h-6 w-6 text-blue-700" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 2. Solde Final Prévu */}
+          <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-indigo-700">Solde Final Prévu</p>
+                  <p className="text-3xl font-bold text-indigo-800">{soldeFinalPrevu.toLocaleString()} DH</p>
+                </div>
+                <div className="bg-indigo-200 p-3 rounded-full">
+                  <TrendingUp className="h-6 w-6 text-indigo-700" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 3. Total Paiements */}
           <Card className="bg-gradient-to-br from-green-50 to-green-100 border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -439,6 +471,7 @@ export default function SoldeCaissePage() {
             </CardContent>
           </Card>
 
+          {/* 4. Gain prévu */}
           <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -453,6 +486,7 @@ export default function SoldeCaissePage() {
             </CardContent>
           </Card>
 
+          {/* 5. Total Dépenses */}
           <Card className="bg-gradient-to-br from-red-50 to-red-100 border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -462,20 +496,6 @@ export default function SoldeCaissePage() {
                 </div>
                 <div className="bg-red-200 p-3 rounded-full">
                   <FileText className="h-6 w-6 text-red-700" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-blue-700">Solde Final</p>
-                  <p className="text-3xl font-bold text-blue-800">{soldeFinal.toLocaleString()} DH</p>
-                </div>
-                <div className="bg-blue-200 p-3 rounded-full">
-                  <Wallet className="h-6 w-6 text-blue-700" />
                 </div>
               </div>
             </CardContent>

@@ -391,8 +391,7 @@ export default function EditReservation() {
             const paymentBody = {
               reservationId: Number(reservationId),
               amount: parseFloat(paiement.montant),
-              paymentMethod: paiement.type,
-              paymentDate: paiement.date,
+              type: paiement.type,
             }
 
             const paymentResponse = await fetch(api.url('/api/payments'), {

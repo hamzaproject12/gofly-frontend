@@ -22,7 +22,9 @@ router.get('/dashboard', async (req, res) => {
     // 🏢 Filtre par programme
     const programFilter: any = {}
     if (programme && programme !== 'tous') {
-      programFilter.programId = parseInt(programme as string)
+      programFilter.program = {
+        name: programme as string
+      }
     }
 
     // 📈 1. CLASSEMENT PAR PROGRAMME (qui rapporte le plus)

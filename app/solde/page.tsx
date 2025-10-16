@@ -424,122 +424,106 @@ export default function SoldeCaissePage() {
           </Button>
         </div>
 
-        {/* Statistiques */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-          {/* 1. Solde Final */}
-          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-blue-700">Solde Final</p>
-                  <p className="text-3xl font-bold text-blue-800">{soldeFinal.toLocaleString()} DH</p>
+        {/* 1️⃣ RÉSUMÉ GLOBAL (Header) */}
+        <div className="mb-8">
+          <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-8 text-white shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-3xl font-bold mb-2">💰 Calcul du Solde de Caisse</h1>
+                <p className="text-slate-300">État financier en temps réel</p>
+              </div>
+              <div className="text-right">
+                <div className={`text-4xl font-bold ${soldeFinal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {soldeFinal.toLocaleString()} DH
                 </div>
-                <div className="bg-blue-200 p-3 rounded-full">
-                  <Wallet className="h-6 w-6 text-blue-700" />
+                <p className="text-slate-300 text-sm">Solde Final</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Total Paiements */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-slate-300 text-sm">Total Paiements</p>
+                    <p className="text-2xl font-bold text-green-400">{totalPaiements.toLocaleString()} DH</p>
+                  </div>
+                  <CreditCard className="h-8 w-8 text-green-400" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* 2. Solde Final Prévu */}
-          <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-indigo-700">Solde Final Prévu</p>
-                  <p className="text-3xl font-bold text-indigo-800">{soldeFinalPrevu.toLocaleString()} DH</p>
-                </div>
-                <div className="bg-indigo-200 p-3 rounded-full">
-                  <TrendingUp className="h-6 w-6 text-indigo-700" />
+              {/* Total Dépenses */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-slate-300 text-sm">Total Dépenses</p>
+                    <p className="text-2xl font-bold text-red-400">{Math.abs(totalDepenses).toLocaleString()} DH</p>
+                  </div>
+                  <FileText className="h-8 w-8 text-red-400" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* 3. Total Paiements */}
-          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-green-700">Total Paiements</p>
-                  <p className="text-3xl font-bold text-green-800">{totalPaiements.toLocaleString()} DH</p>
-                </div>
-                <div className="bg-green-200 p-3 rounded-full">
-                  <CreditCard className="h-6 w-6 text-green-700" />
+              {/* Solde Final Prévu */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-slate-300 text-sm">Solde Final Prévu</p>
+                    <p className="text-2xl font-bold text-blue-400">{soldeFinalPrevu.toLocaleString()} DH</p>
+                  </div>
+                  <TrendingUp className="h-8 w-8 text-blue-400" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* 4. Gain prévu */}
-          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-purple-700">Gain prévu</p>
-                  <p className="text-3xl font-bold text-purple-800">{gainPrevu.toLocaleString()} DH</p>
-                </div>
-                <div className="bg-purple-200 p-3 rounded-full">
-                  <DollarSign className="h-6 w-6 text-purple-700" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 5. Total Dépenses */}
-          <Card className="bg-gradient-to-br from-red-50 to-red-100 border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-red-700">Total Dépenses</p>
-                  <p className="text-3xl font-bold text-red-800">{Math.abs(totalDepenses).toLocaleString()} DH</p>
-                </div>
-                <div className="bg-red-200 p-3 rounded-full">
-                  <FileText className="h-6 w-6 text-red-700" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
 
-        {/* Filtres */}
-        <Card className="mb-6 border-0 shadow-lg">
+        {/* 2️⃣ FILTRES */}
+        <Card className="mb-8 border-0 shadow-lg">
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Filter className="h-5 w-5 text-gray-500" />
-              Filtres
+            <CardTitle className="text-xl flex items-center gap-3">
+              <Filter className="h-6 w-6 text-blue-600" />
+              <span>Filtres d'analyse</span>
+              <Badge variant="secondary" className="ml-auto">
+                Analyse ciblée
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="dateDebut">Date début</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="space-y-3">
+                <Label htmlFor="dateDebut" className="text-sm font-semibold text-gray-700">
+                  📅 Date début
+                </Label>
                 <Input
                   id="dateDebut"
                   type="date"
                   value={dateDebut}
                   onChange={(e) => setDateDebut(e.target.value)}
-                  className="border-2"
+                  className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-11"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="dateFin">Date fin</Label>
+              <div className="space-y-3">
+                <Label htmlFor="dateFin" className="text-sm font-semibold text-gray-700">
+                  📅 Date fin
+                </Label>
                 <Input
                   id="dateFin"
                   type="date"
                   value={dateFin}
                   onChange={(e) => setDateFin(e.target.value)}
-                  className="border-2"
+                  className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-11"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="programme">Programme</Label>
+              <div className="space-y-3">
+                <Label htmlFor="programme" className="text-sm font-semibold text-gray-700">
+                  🏢 Programme
+                </Label>
                 <Select value={programmeFilter} onValueChange={(value) => setProgrammeFilter(value)}>
-                  <SelectTrigger id="programme" className="border-2">
+                  <SelectTrigger id="programme" className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-11">
                     <SelectValue placeholder="Tous les programmes" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="tous">Tous les programmes</SelectItem>
+                    <SelectItem value="tous">🌐 Tous les programmes</SelectItem>
                     {(programmes || []).map((programme) => (
                       <SelectItem key={programme.id} value={programme.name}>
                         {programme.name}
@@ -548,16 +532,18 @@ export default function SoldeCaissePage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="periode">Période</Label>
+              <div className="space-y-3">
+                <Label htmlFor="periode" className="text-sm font-semibold text-gray-700">
+                  📊 Période
+                </Label>
                 <Select value={periodeFilter} onValueChange={(value) => setPeriodeFilter(value)}>
-                  <SelectTrigger id="periode" className="border-2">
+                  <SelectTrigger id="periode" className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-11">
                     <SelectValue placeholder="Par mois" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="mois">Par mois</SelectItem>
-                    <SelectItem value="trimestre">Par trimestre</SelectItem>
-                    <SelectItem value="annee">Par année</SelectItem>
+                    <SelectItem value="mois">📅 Par mois</SelectItem>
+                    <SelectItem value="trimestre">📊 Par trimestre</SelectItem>
+                    <SelectItem value="annee">📈 Par année</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -566,9 +552,17 @@ export default function SoldeCaissePage() {
         </Card>
 
 
-        {/* Analyse par mois */}
+        {/* 3️⃣ GRAPHIQUES */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <h2 className="text-2xl font-bold text-gray-800">📊 Visualisation des Tendances</h2>
+            <Badge variant="outline" className="text-blue-600 border-blue-200">
+              Données en temps réel
+            </Badge>
+          </div>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           {/* Bar Chart - Entrées vs Sorties */}
           <div className="lg:col-span-2">
             <Card className="border-0 shadow-lg h-full">
@@ -728,11 +722,19 @@ export default function SoldeCaissePage() {
               </CardContent>
             </Card>
 
-        {/* 🎯 NOUVELLES SECTIONS ANALYTICS DÉCISIONNELLES */}
+        {/* 4️⃣ TABLEAUX & CLASSEMENTS */}
         {analyticsData && analyticsData.programRanking && analyticsData.agentRanking && (
           <>
-            {/* 📊 Classements et Performance */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div className="mb-8">
+              <div className="flex items-center gap-3 mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">🏆 Tableaux & Classements</h2>
+                <Badge variant="outline" className="text-purple-600 border-purple-200">
+                  Analyses décisionnelles
+                </Badge>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
               {/* 🏆 Classement par Programme */}
               <Card className="border-0 shadow-lg">
                 <CardHeader>
@@ -949,8 +951,17 @@ export default function SoldeCaissePage() {
           </>
         )}
 
-        {/* 🆕 NOUVEAUX GRAPHIQUES AVEC FILTRE PROGRAMME */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* 📈 Graphiques Avancés */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <h3 className="text-xl font-bold text-gray-700">📈 Analyses Avancées</h3>
+            <Badge variant="outline" className="text-green-600 border-green-200">
+              Filtrage par programme
+            </Badge>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* 📊 Graphique Types de Chambres */}
           <Card className="border-0 shadow-lg">
             <CardHeader>

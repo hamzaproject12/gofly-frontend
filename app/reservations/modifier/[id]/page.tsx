@@ -291,13 +291,39 @@ export default function EditReservation() {
       const hasExistingPassport = getDocumentUrl('passport') !== null;
       const shouldUpdateStatutPasseport = hasNewPassport || hasExistingPassport;
       
+      // Vérifier si la réservation est complète pour mettre le statut à "Complet"
+      const isPassportAttached = shouldUpdateStatutPasseport;
+      const isVisaComplete = formData.statutVisa;
+      const isHotelComplete = formData.statutHotel;
+      const isFlightComplete = formData.statutVol;
+      const isPaymentComplete = reservationData.paidAmount >= parseFloat(formData.prix);
+      
+      const isReservationComplete = isPassportAttached && 
+                                   isVisaComplete && 
+                                   isHotelComplete && 
+                                   isFlightComplete && 
+                                   isPaymentComplete;
+      
+      console.log('📊 Vérification statut complet:', {
+        isPassportAttached,
+        isVisaComplete,
+        isHotelComplete,
+        isFlightComplete,
+        isPaymentComplete,
+        paidAmount: reservationData.paidAmount,
+        price: parseFloat(formData.prix),
+        isReservationComplete
+      });
+      
       const body = {
         price: parseFloat(formData.prix),
         reservationDate: formData.dateReservation,
         statutVisa: formData.statutVisa,
         statutHotel: formData.statutHotel,
         statutVol: formData.statutVol,
-        statutPasseport: shouldUpdateStatutPasseport
+        statutPasseport: shouldUpdateStatutPasseport,
+        // Mettre à jour le statut global si toutes les conditions sont remplies
+        ...(isReservationComplete && { status: 'Complet' })
       }
 
       console.log('📝 Mise à jour réservation:', {

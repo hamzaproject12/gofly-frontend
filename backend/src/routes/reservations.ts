@@ -408,7 +408,8 @@ router.put('/:id', async (req, res) => {
       statutPasseport,
       statutVisa,
       statutHotel,
-      statutVol
+      statutVol,
+      status
     } = req.body;
 
     console.log('📝 PUT /api/reservations/:id - Données reçues:', {
@@ -418,7 +419,8 @@ router.put('/:id', async (req, res) => {
       statutPasseport,
       statutVisa,
       statutHotel,
-      statutVol
+      statutVol,
+      status
     });
 
     // Calculer le paidAmount à partir de tous les paiements de cette réservation
@@ -451,6 +453,9 @@ router.put('/:id', async (req, res) => {
     if (statutHotel !== undefined) updateData.statutHotel = statutHotel;
     if (statutVol !== undefined) updateData.statutVol = statutVol;
     
+    // Mettre à jour le statut global si fourni
+    if (status !== undefined) updateData.status = status;
+    
     // Mettre à jour paidAmount avec le total calculé
     updateData.paidAmount = totalPaid;
 
@@ -464,9 +469,11 @@ router.put('/:id', async (req, res) => {
 
     console.log('✅ Réservation mise à jour:', {
       id: reservation.id,
+      status: reservation.status,
       statutVisa: reservation.statutVisa,
       statutHotel: reservation.statutHotel,
       statutVol: reservation.statutVol,
+      statutPasseport: reservation.statutPasseport,
       paidAmount: reservation.paidAmount
     });
 

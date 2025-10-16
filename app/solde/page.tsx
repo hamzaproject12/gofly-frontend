@@ -71,19 +71,6 @@ type BalanceData = {
     count: number
   }>
 
-  // 📋 Détails des transactions
-  details: Array<{
-    id: string
-    date: string
-    type: string
-    description: string
-    montant: number
-    programme: string
-    reservationId?: number
-    programId?: number
-    methodePaiement?: string
-    typeDepense?: string
-  }>
 
   // 🏆 Résumé et métriques
   summary: {
@@ -305,13 +292,11 @@ export default function SoldeCaissePage() {
   }
 
 
-  const { statistics, parMois, details, summary, parMethodePaiement, parTypeDepense, parAgent } = data
+  const { statistics, parMois, summary, parMethodePaiement, parTypeDepense, parAgent } = data
   const { totalPaiements, totalDepenses, soldeFinal } = statistics || { totalPaiements: 0, totalDepenses: 0, soldeFinal: 0 }
   const { moisMaxBenefice } = summary || { moisMaxBenefice: { mois: "", solde: 0 } }
 
 
-  // Filtrage des données par programme (fait côté serveur maintenant)
-  const filteredDetails = details
 
   if (loading) {
     return (
@@ -521,7 +506,7 @@ export default function SoldeCaissePage() {
                           </div>
                         )
                       })}
-                    </div>
+                        </div>
                   ) : (
                     <div className="flex items-center justify-center h-full text-gray-500">
                       <p>Aucune donnée disponible pour cette période</p>
@@ -602,39 +587,39 @@ export default function SoldeCaissePage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h3 className="text-sm font-medium text-blue-700 mb-2">Mois le plus rentable</h3>
-                <div className="flex justify-between items-center">
-                  <span className="text-lg font-bold">{moisMaxBenefice.mois}</span>
-                  <span className="text-lg font-bold text-green-600">
-                    {moisMaxBenefice.solde.toLocaleString()} DH
-                  </span>
-                </div>
-              </div>
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h3 className="text-sm font-medium text-blue-700 mb-2">Mois le plus rentable</h3>
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-bold">{moisMaxBenefice.mois}</span>
+                      <span className="text-lg font-bold text-green-600">
+                        {moisMaxBenefice.solde.toLocaleString()} DH
+                      </span>
+                    </div>
+                  </div>
 
-              <div className="bg-green-50 p-4 rounded-lg">
-                <h3 className="text-sm font-medium text-green-700 mb-2">Total des paiements</h3>
-                <p className="text-2xl font-bold text-green-700">
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <h3 className="text-sm font-medium text-green-700 mb-2">Total des paiements</h3>
+                    <p className="text-2xl font-bold text-green-700">
                   {summary.totalPaiements.toLocaleString()} DH
-                </p>
-              </div>
+                    </p>
+                  </div>
 
-              <div className="bg-red-50 p-4 rounded-lg">
-                <h3 className="text-sm font-medium text-red-700 mb-2">Total des dépenses</h3>
-                <p className="text-2xl font-bold text-red-700">
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <h3 className="text-sm font-medium text-red-700 mb-2">Total des dépenses</h3>
+                    <p className="text-2xl font-bold text-red-700">
                   {summary.totalDepenses.toLocaleString()} DH
-                </p>
-              </div>
+                    </p>
+                  </div>
 
-              <div className="bg-yellow-50 p-4 rounded-lg">
-                <h3 className="text-sm font-medium text-yellow-700 mb-2">Solde total</h3>
-                <p className="text-2xl font-bold text-yellow-700">
+                  <div className="bg-yellow-50 p-4 rounded-lg">
+                    <h3 className="text-sm font-medium text-yellow-700 mb-2">Solde total</h3>
+                    <p className="text-2xl font-bold text-yellow-700">
                   {summary.soldeTotal.toLocaleString()} DH
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
         {/* 🎯 NOUVELLES SECTIONS ANALYTICS DÉCISIONNELLES */}
         {analyticsData && analyticsData.programRanking && analyticsData.agentRanking && (
@@ -672,23 +657,23 @@ export default function SoldeCaissePage() {
                         <div className="text-right">
                           <p className="font-bold text-green-600">{program.totalAmount.toLocaleString()} DH</p>
                           <p className="text-sm text-gray-500">Moy: {program.avgAmount.toLocaleString()} DH</p>
-                        </div>
-                      </div>
+          </div>
+        </div>
                     ))}
                   </div>
                 </CardContent>
               </Card>
 
               {/* 👥 Classement par Agent */}
-              <Card className="border-0 shadow-lg">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
+        <Card className="border-0 shadow-lg">
+          <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
                     <Award className="h-5 w-5 text-blue-500" />
                     Top Agents
                     <Badge variant="secondary" className="ml-auto">
                       {analyticsData.agentRanking?.summary?.totalAgents || 0} agents
                     </Badge>
-                  </CardTitle>
+              </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
@@ -736,8 +721,8 @@ export default function SoldeCaissePage() {
                       {analyticsData.cashflow?.summary?.trend === 'positive' ? '↗' : '↘'} {Math.abs(analyticsData.cashflow?.summary?.avgMonthly || 0).toLocaleString()} DH/mois
                     </Badge>
                   </CardTitle>
-                </CardHeader>
-                <CardContent>
+          </CardHeader>
+          <CardContent>
                   <div className="space-y-4">
                     {/* Métriques clés */}
                     <div className="grid grid-cols-2 gap-4">
@@ -837,8 +822,8 @@ export default function SoldeCaissePage() {
                         <div className="text-right">
                           <p className="text-sm text-gray-600">{analyticsData.performance?.programDiversity?.activePrograms || 0}/{analyticsData.performance?.programDiversity?.totalPrograms || 0} actifs</p>
                         </div>
-                      </div>
-                    </div>
+          </div>
+        </div>
 
                     {/* Meilleur jour */}
                     {analyticsData.performance?.bestPeriod && (
@@ -850,74 +835,13 @@ export default function SoldeCaissePage() {
                         </div>
                       </div>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
+            </div>
+          </CardContent>
+        </Card>
             </div>
           </>
         )}
 
-        {/* Détails des transactions */}
-        <Card className="border-0 shadow-lg">
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5 text-gray-500" />
-                Détails des transactions
-              </CardTitle>
-              <Button variant="ghost" size="sm" className="text-gray-700">
-                <ArrowUpDown className="h-4 w-4 mr-1" />
-                Trier
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Date</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Type</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Description</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Programme</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-gray-500">Montant</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {(filteredDetails || []).map((item, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="py-3 px-4 text-sm">
-                        {new Date(item.date).toLocaleDateString("fr-FR", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </td>
-                      <td className="py-3 px-4 text-sm">
-                        <span
-                          className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                            item.type === "paiement" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {item.type === "paiement" ? "Paiement" : "Dépense"}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-sm">{item.description}</td>
-                      <td className="py-3 px-4 text-sm">{item.programme}</td>
-                      <td
-                        className={`py-3 px-4 text-sm font-medium text-right ${
-                          item.montant > 0 ? "text-green-600" : "text-red-600"
-                        }`}
-                      >
-                        {item.montant.toLocaleString()} DH
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
     </RoleProtectedRoute>

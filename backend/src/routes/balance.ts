@@ -117,44 +117,6 @@ router.get('/', async (req, res) => {
       };
     });
 
-    // 📋 6. Détails des transactions (limitée pour performance)
-    const [recentPayments, recentExpenses] = await Promise.all([
-      prisma.payment.findMany({
-        where: {
-          ...(Object.keys(dateFilter).length > 0 && { paymentDate: dateFilter }),
-          ...(programFilter && { 
-            reservation: { 
-              program: programFilter 
-            } 
-          })
-        },
-        include: {
-          reservation: {
-            select: {
-              firstName: true,
-              lastName: true,
-              program: { select: { name: true } }
-            }
-          }
-        },
-        orderBy: { paymentDate: 'desc' },
-        take: 50 // Limite pour performance
-      }),
-      
-      prisma.expense.findMany({
-        where: {
-          ...(Object.keys(dateFilter).length > 0 && { date: dateFilter }),
-          ...(programFilter && { 
-            program: programFilter 
-          })
-        },
-        include: {
-          program: { select: { name: true } }
-        },
-        orderBy: { date: 'desc' },
-        take: 50 // Limite pour performance
-      })
-    ]);
 
     // 🎯 7. Trouver le mois le plus rentable
     const moisMaxBenefice = moisData.length > 0 
@@ -195,8 +157,6 @@ router.get('/', async (req, res) => {
 
       parAgent: paiementsParAgentAvecNoms.sort((a, b) => b.total - a.total),
 
-      // 📋 Détails des transactions
-      details: createTransactionDetails(recentPayments, recentExpenses),
 
       // 🏆 Résumé et métriques
       summary: {
@@ -220,8 +180,7 @@ router.get('/', async (req, res) => {
       totalPaiements,
       totalDepenses,
       soldeFinal,
-      moisCount: moisData.length,
-      transactionsCount: response.details.length
+      moisCount: moisData.length
     });
 
     res.json(response);
@@ -314,40 +273,5 @@ async function calculateMonthlyDataOptimized(dateFilter: any, programFilter: any
   return moisData;
 }
 
-// 📋 Créer les détails des transactions
-function createTransactionDetails(payments: any[], expenses: any[]) {
-  const details: any[] = [];
-  
-  // Ajouter les paiements
-  payments.forEach(payment => {
-    details.push({
-      id: `payment_${payment.id}`,
-      date: payment.paymentDate,
-      type: 'paiement',
-      description: `Paiement - ${payment.reservation.firstName} ${payment.reservation.lastName}`,
-      montant: payment.amount,
-      programme: payment.reservation.program.name,
-      reservationId: payment.reservationId,
-      methodePaiement: payment.paymentMethod
-    });
-  });
-  
-  // Ajouter les dépenses
-  expenses.forEach(expense => {
-    details.push({
-      id: `expense_${expense.id}`,
-      date: expense.date,
-      type: 'depense',
-      description: expense.description,
-      montant: -expense.amount, // Négatif pour les dépenses
-      programme: expense.program?.name || 'Programme non spécifié',
-      programId: expense.programId,
-      typeDepense: expense.type
-    });
-  });
-  
-  // Trier par date (plus récent en premier)
-  return details.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-}
 
 export default router;

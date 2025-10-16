@@ -223,43 +223,42 @@ export default function HomePage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-4xl font-bold text-gray-900 mb-2">
-                🏨 GoodFly Dashboard
+                🏨 GoFly Dashboard
               </h1>
               <p className="text-lg text-gray-600">
                 Gestion des programmes Omra - Disponibilité des chambres
               </p>
             </div>
             <div className="flex items-center gap-4">
-              {/* Toggle des vues */}
-              <div className="flex bg-gray-100 rounded-lg p-1">
+              {/* Toggle des vues avec design amélioré */}
+              <div className="flex bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-1 shadow-lg border border-blue-200">
                 <Button
                   variant={viewMode === 'dashboard' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('dashboard')}
-                  className="flex items-center gap-2"
+                  className={`flex items-center gap-2 px-4 py-2 transition-all duration-200 ${
+                    viewMode === 'dashboard' 
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:from-blue-700 hover:to-indigo-700' 
+                      : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+                  }`}
                 >
                   <LayoutDashboard className="h-4 w-4" />
-                  Vue Dashboard
+                  <span className="font-medium">Vue Dashboard</span>
                 </Button>
                 <Button
                   variant={viewMode === 'hotel-detail' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('hotel-detail')}
-                  className="flex items-center gap-2"
+                  className={`flex items-center gap-2 px-4 py-2 transition-all duration-200 ${
+                    viewMode === 'hotel-detail' 
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:from-blue-700 hover:to-indigo-700' 
+                      : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+                  }`}
                 >
                   <List className="h-4 w-4" />
-                  Vue Types Chambres
+                  <span className="font-medium">Vue Types Chambres</span>
                 </Button>
               </div>
-              {agent && (
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">Connecté en tant que</p>
-                  <p className="font-semibold text-gray-900">{agent.nom}</p>
-                  <Badge variant={agent.isActive ? "default" : "destructive"} className="mt-1">
-                    {agent.isActive ? '🟢 Actif' : '🔴 Inactif'}
-                  </Badge>
-                </div>
-              )}
             </div>
           </div>
         </div>

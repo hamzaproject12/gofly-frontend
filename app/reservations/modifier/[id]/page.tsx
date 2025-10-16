@@ -285,7 +285,71 @@ export default function EditReservation() {
     try {
       const fileUploadErrors: string[] = []
       
-      // 1. Mettre à jour les informations de la réservation (seulement les champs modifiables)
+      // 1. Créer les nouveaux paiements d'abord (pour que le paidAmount soit calculé correctement)
+      const newPaymentIds: number[] = []
+      if (reservationId) {
+        for (let i = 0; i < paiements.length; i++) {
+          const paiement = paiements[i];
+          // Si le paiement n'a pas d'ID, c'est un nouveau paiement
+          if (!paiement.id && paiement.montant && paiement.type && paiement.date) {
+            console.log(`💰 Création nouveau paiement ${i + 1}:`, {
+              montant: paiement.montant,
+              type: paiement.type,
+              date: paiement.date
+            })
+
+            const paymentBody = {
+              reservationId: Number(reservationId),
+              amount: parseFloat(paiement.montant),
+              type: paiement.type,
+              programId: reservationData.programId,
+            }
+
+            const paymentResponse = await fetch(api.url('/api/payments'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(paymentBody)
+            })
+
+            if (!paymentResponse.ok) {
+              const error = await paymentResponse.json()
+              console.error('❌ Erreur création paiement:', error)
+              fileUploadErrors.push(`Erreur lors de l'ajout du paiement ${i + 1}`)
+            } else {
+              const paymentData = await paymentResponse.json()
+              const newPaymentId = paymentData.id
+              newPaymentIds.push(newPaymentId)
+              
+              console.log('✅ Paiement créé avec ID:', newPaymentId)
+              
+              // Upload le reçu si présent et le lier au paiement
+              if (documents.payment[i]) {
+                console.log(`📤 Upload reçu pour paiement ID ${newPaymentId}...`)
+                const formDataPayment = new FormData();
+                formDataPayment.append("file", documents.payment[i] as File);
+                formDataPayment.append("reservationId", reservationId.toString());
+                formDataPayment.append("paymentId", newPaymentId.toString());
+                formDataPayment.append("fileType", "payment");
+
+                const receiptResponse = await fetch(api.url(api.endpoints.uploadCloudinary), {
+                  method: "POST",
+                  body: formDataPayment,
+                });
+                
+                if (!receiptResponse.ok) {
+                  const error = await receiptResponse.json();
+                  console.error('❌ Erreur upload reçu:', error)
+                  fileUploadErrors.push(`Erreur lors de l'upload du reçu de paiement ${i + 1}: ${error.error || 'Erreur inconnue'}`);
+                } else {
+                  console.log('✅ Reçu uploadé et lié au paiement')
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // 2. Maintenant mettre à jour les informations de la réservation (avec le paidAmount recalculé)
       // Vérifier si un nouveau passeport est uploadé OU si un passeport existe déjà
       const hasNewPassport = documents.passport !== null;
       const hasExistingPassport = getDocumentUrl('passport') !== null;
@@ -296,7 +360,9 @@ export default function EditReservation() {
       const isVisaComplete = formData.statutVisa;
       const isHotelComplete = formData.statutHotel;
       const isFlightComplete = formData.statutVol;
-      const isPaymentComplete = reservationData.paidAmount >= parseFloat(formData.prix);
+      
+      // Le paidAmount sera recalculé côté backend avec tous les paiements (existants + nouveaux)
+      const isPaymentComplete = (reservationData.paidAmount + newPaymentIds.reduce((sum, id) => sum + parseFloat(paiements.find(p => !p.id)?.montant || '0'), 0)) >= parseFloat(formData.prix);
       
       const isReservationComplete = isPassportAttached && 
                                    isVisaComplete && 
@@ -311,6 +377,7 @@ export default function EditReservation() {
         isFlightComplete,
         isPaymentComplete,
         paidAmount: reservationData.paidAmount,
+        newPaymentsCount: newPaymentIds.length,
         price: parseFloat(formData.prix),
         isReservationComplete
       });
@@ -355,7 +422,7 @@ export default function EditReservation() {
       const responseData = await response.json()
       console.log('✅ Réponse PUT succès:', responseData)
 
-      // 2. Upload nouveau passeport si présent
+      // 3. Upload nouveau passeport si présent
       if (documents.passport && reservationId) {
         console.log('📤 Upload passeport vers Cloudinary...')
         const formDataPassport = new FormData();
@@ -376,66 +443,6 @@ export default function EditReservation() {
         }
       }
 
-      // 3. Créer les nouveaux paiements et uploader leurs reçus
-      if (reservationId) {
-        for (let i = 0; i < paiements.length; i++) {
-          const paiement = paiements[i];
-          // Si le paiement n'a pas d'ID, c'est un nouveau paiement
-          if (!paiement.id && paiement.montant && paiement.type && paiement.date) {
-            console.log(`💰 Création nouveau paiement ${i + 1}:`, {
-              montant: paiement.montant,
-              type: paiement.type,
-              date: paiement.date
-            })
-
-            const paymentBody = {
-              reservationId: Number(reservationId),
-              amount: parseFloat(paiement.montant),
-              type: paiement.type,
-            }
-
-            const paymentResponse = await fetch(api.url('/api/payments'), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(paymentBody)
-            })
-
-            if (!paymentResponse.ok) {
-              const error = await paymentResponse.json()
-              console.error('❌ Erreur création paiement:', error)
-              fileUploadErrors.push(`Erreur lors de l'ajout du paiement ${i + 1}`)
-            } else {
-              const paymentData = await paymentResponse.json()
-              const newPaymentId = paymentData.id
-              
-              console.log('✅ Paiement créé avec ID:', newPaymentId)
-              
-              // Upload le reçu si présent et le lier au paiement
-              if (documents.payment[i]) {
-                console.log(`📤 Upload reçu pour paiement ID ${newPaymentId}...`)
-                const formDataPayment = new FormData();
-                formDataPayment.append("file", documents.payment[i] as File);
-                formDataPayment.append("reservationId", reservationId.toString());
-                formDataPayment.append("paymentId", newPaymentId.toString());
-                formDataPayment.append("fileType", "payment");
-
-                const receiptResponse = await fetch(api.url(api.endpoints.uploadCloudinary), {
-                  method: "POST",
-                  body: formDataPayment,
-                });
-                
-                if (!receiptResponse.ok) {
-                  const error = await receiptResponse.json();
-                  console.error('❌ Erreur upload reçu:', error)
-                  fileUploadErrors.push(`Erreur lors de l'upload du reçu de paiement ${i + 1}: ${error.error || 'Erreur inconnue'}`);
-                } else {
-                  console.log('✅ Reçu uploadé et lié au paiement')
-                }
-              }
-            }
-          }
-        }
-      }
 
       if (fileUploadErrors.length > 0) {
         toast({

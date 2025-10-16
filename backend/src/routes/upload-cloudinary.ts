@@ -63,7 +63,7 @@ router.post('/', upload.any(), async (req, res) => {
       body: req.body
     });
 
-    const { reservationId, fileType } = req.body;
+    const { reservationId, fileType, paymentId } = req.body;
 
     // reservationId est optionnel - si fourni, vérifier que la réservation existe
     let reservation = null;
@@ -146,6 +146,15 @@ router.post('/', upload.any(), async (req, res) => {
               fileCategory: extension
             }
           });
+
+          // Si un paymentId est fourni, mettre à jour le paiement avec le fichierId
+          if (paymentId && currentFileType === 'payment') {
+            await prisma.payment.update({
+              where: { id: parseInt(paymentId) },
+              data: { fichierId: dbFile.id }
+            });
+            console.log(`🔗 Payment ${paymentId} linked to file ${dbFile.id}`);
+          }
         }
 
         results.push({

@@ -22,7 +22,7 @@ router.get('/', async (req, res) => {
     const programFilter = programme && programme !== 'tous' ? { name: programme as string } : undefined;
 
     // 📊 1. Statistiques globales (avec Prisma aggregate - OPTIMISÉ)
-    const [paymentsStats, expensesStats] = await Promise.all([
+    const [paymentsStats, expensesStats, gainPrevuStats] = await Promise.all([
       // Paiements avec filtres
       prisma.payment.aggregate({
         where: {
@@ -47,11 +47,24 @@ router.get('/', async (req, res) => {
         },
         _sum: { amount: true },
         _count: { id: true }
+      }),
+      
+      // Gain prévu (somme des prix des réservations)
+      prisma.reservation.aggregate({
+        where: {
+          ...(Object.keys(dateFilter).length > 0 && { reservationDate: dateFilter }),
+          ...(programFilter && { 
+            program: programFilter 
+          })
+        },
+        _sum: { price: true },
+        _count: { id: true }
       })
     ]);
 
     const totalPaiements = paymentsStats._sum.amount || 0;
     const totalDepenses = expensesStats._sum.amount || 0;
+    const gainPrevu = gainPrevuStats._sum.price || 0;
     const soldeFinal = totalPaiements - totalDepenses;
 
     // 📈 2. Données par mois (avec Prisma groupBy - OPTIMISÉ)
@@ -134,9 +147,11 @@ router.get('/', async (req, res) => {
       statistics: {
         totalPaiements,
         totalDepenses,
+        gainPrevu,
         soldeFinal,
         countPaiements: paymentsStats._count.id || 0,
-        countDepenses: expensesStats._count.id || 0
+        countDepenses: expensesStats._count.id || 0,
+        countReservations: gainPrevuStats._count.id || 0
       },
 
       // 📈 Données par mois
@@ -179,6 +194,7 @@ router.get('/', async (req, res) => {
     console.log('✅ Balance API - Données générées:', {
       totalPaiements,
       totalDepenses,
+      gainPrevu,
       soldeFinal,
       moisCount: moisData.length
     });

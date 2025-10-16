@@ -63,9 +63,11 @@ type BalanceData = {
   statistics: {
     totalPaiements: number
     totalDepenses: number
+    gainPrevu: number
     soldeFinal: number
     countPaiements: number
     countDepenses: number
+    countReservations: number
   }
 
   // 📈 Données par mois
@@ -347,7 +349,7 @@ export default function SoldeCaissePage() {
 
   // Données par défaut si pas encore chargées
   const data = balanceData || {
-    statistics: { totalPaiements: 0, totalDepenses: 0, soldeFinal: 0, countPaiements: 0, countDepenses: 0 },
+    statistics: { totalPaiements: 0, totalDepenses: 0, gainPrevu: 0, soldeFinal: 0, countPaiements: 0, countDepenses: 0, countReservations: 0 },
     parMois: [],
     details: [],
     summary: { 
@@ -364,7 +366,7 @@ export default function SoldeCaissePage() {
 
 
   const { statistics, parMois, summary, parMethodePaiement, parTypeDepense, parAgent } = data
-  const { totalPaiements, totalDepenses, soldeFinal } = statistics || { totalPaiements: 0, totalDepenses: 0, soldeFinal: 0 }
+  const { totalPaiements, totalDepenses, gainPrevu, soldeFinal } = statistics || { totalPaiements: 0, totalDepenses: 0, gainPrevu: 0, soldeFinal: 0 }
   const { moisMaxBenefice } = summary || { moisMaxBenefice: { mois: "", solde: 0 } }
 
 
@@ -422,7 +424,7 @@ export default function SoldeCaissePage() {
         </div>
 
         {/* Statistiques */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="bg-gradient-to-br from-green-50 to-green-100 border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -432,6 +434,20 @@ export default function SoldeCaissePage() {
                 </div>
                 <div className="bg-green-200 p-3 rounded-full">
                   <CreditCard className="h-6 w-6 text-green-700" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-purple-700">Gain prévu</p>
+                  <p className="text-3xl font-bold text-purple-800">{gainPrevu.toLocaleString()} DH</p>
+                </div>
+                <div className="bg-purple-200 p-3 rounded-full">
+                  <DollarSign className="h-6 w-6 text-purple-700" />
                 </div>
               </div>
             </CardContent>

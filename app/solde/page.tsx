@@ -722,7 +722,7 @@ export default function SoldeCaissePage() {
               </CardContent>
             </Card>
 
-        {/* 4️⃣ TABLEAUX & CLASSEMENTS */}
+        {/* 3️⃣ TABLEAUX & CLASSEMENTS */}
         {analyticsData && analyticsData.programRanking && analyticsData.agentRanking && (
           <>
             <div className="mb-8">
@@ -951,10 +951,10 @@ export default function SoldeCaissePage() {
           </>
         )}
 
-        {/* 📈 Graphiques Avancés */}
+        {/* 4️⃣ ANALYSES AVANCÉES */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-6">
-            <h3 className="text-xl font-bold text-gray-700">📈 Analyses Avancées</h3>
+            <h2 className="text-2xl font-bold text-gray-800">📈 Analyses Avancées</h2>
             <Badge variant="outline" className="text-green-600 border-green-200">
               Filtrage par programme
             </Badge>

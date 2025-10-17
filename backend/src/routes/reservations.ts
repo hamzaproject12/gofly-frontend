@@ -2,6 +2,7 @@ import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import path from 'path';
 import fs from 'fs';
+import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -229,12 +230,16 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create new reservation
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req: any, res) => {
   try {
     const { firstName, lastName, phone, programId, roomType, gender, hotelMadina, hotelMakkah, price, reservationDate, status, statutPasseport, statutVisa, statutHotel, statutVol, paidAmount, reduction, roomMadinaId, roomMakkahId } = req.body;
     
+    // Extraire l'agentId du token d'authentification
+    const agentId = req.user?.agentId;
+    
     // Log des données reçues pour débogage
     console.log('🔍 Données reçues pour création de réservation:');
+    console.log('- agentId:', agentId, 'Type:', typeof agentId);
     console.log('- statutVisa:', statutVisa, 'Type:', typeof statutVisa);
     console.log('- statutHotel:', statutHotel, 'Type:', typeof statutHotel);
     console.log('- statutVol:', statutVol, 'Type:', typeof statutVol);
@@ -259,7 +264,8 @@ router.post('/', async (req, res) => {
         statutVisa,
         statutHotel,
         statutVol,
-        paidAmount: paidAmount ? parseFloat(paidAmount) : 0
+        paidAmount: paidAmount ? parseFloat(paidAmount) : 0,
+        agentId: agentId ? Number(agentId) : null
       },
       include: {
         program: true // Inclure le programme pour récupérer les deadlines
@@ -269,6 +275,7 @@ router.post('/', async (req, res) => {
     // Log de la réservation créée pour débogage
     console.log('✅ Réservation créée avec succès:');
     console.log('- ID:', reservation.id);
+    console.log('- agentId sauvegardé:', reservation.agentId);
     console.log('- statutVisa sauvegardé:', reservation.statutVisa);
     console.log('- statutHotel sauvegardé:', reservation.statutHotel);
     console.log('- statutVol sauvegardé:', reservation.statutVol);
@@ -391,7 +398,7 @@ router.post('/', async (req, res) => {
 });
 
 // Update reservation
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticateToken, async (req: any, res) => {
   try {
     const {
       firstName,

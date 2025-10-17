@@ -2,7 +2,7 @@ import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import path from 'path';
 import fs from 'fs';
-import { authenticateToken } from '../middleware/auth';
+import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -11,6 +11,39 @@ const prisma = new PrismaClient();
 function getPlacesByRoomType(roomType: string): number {
   // Chaque réservation décrémente de 1 place
   return 1;
+}
+
+// Fonction helper pour extraire l'agentId du token JWT
+function extractAgentIdFromToken(req: express.Request): number | null {
+  try {
+    // Try to get token from Authorization header first
+    const authHeader = req.headers['authorization'];
+    let token = authHeader && authHeader.split(' ')[1];
+
+    // If no token in header, try to get from cookies
+    if (!token) {
+      token = req.cookies?.authToken;
+    }
+
+    if (!token) {
+      console.log('⚠️ No token found in request');
+      return null;
+    }
+
+    // Verify and decode the token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    
+    if (decoded && decoded.agentId) {
+      console.log('✅ AgentId extracted from token:', decoded.agentId);
+      return decoded.agentId;
+    } else {
+      console.log('⚠️ No agentId found in token');
+      return null;
+    }
+  } catch (error) {
+    console.log('⚠️ Error extracting agentId from token:', error);
+    return null;
+  }
 }
 
 // Get all reservations with pagination and advanced filters
@@ -230,12 +263,12 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create new reservation
-router.post('/', authenticateToken, async (req: any, res) => {
+router.post('/', async (req, res) => {
   try {
     const { firstName, lastName, phone, programId, roomType, gender, hotelMadina, hotelMakkah, price, reservationDate, status, statutPasseport, statutVisa, statutHotel, statutVol, paidAmount, reduction, roomMadinaId, roomMakkahId } = req.body;
     
-    // Extraire l'agentId du token d'authentification
-    const agentId = req.user?.agentId;
+    // Extraire l'agentId du token JWT
+    const agentId = extractAgentIdFromToken(req);
     
     // Log des données reçues pour débogage
     console.log('🔍 Données reçues pour création de réservation:');
@@ -265,7 +298,7 @@ router.post('/', authenticateToken, async (req: any, res) => {
         statutHotel,
         statutVol,
         paidAmount: paidAmount ? parseFloat(paidAmount) : 0,
-        agentId: agentId ? Number(agentId) : null
+        agentId: agentId // Ajouter l'agentId extrait du token
       },
       include: {
         program: true // Inclure le programme pour récupérer les deadlines
@@ -275,7 +308,7 @@ router.post('/', authenticateToken, async (req: any, res) => {
     // Log de la réservation créée pour débogage
     console.log('✅ Réservation créée avec succès:');
     console.log('- ID:', reservation.id);
-    console.log('- agentId sauvegardé:', reservation.agentId);
+    console.log('- agentId:', reservation.agentId);
     console.log('- statutVisa sauvegardé:', reservation.statutVisa);
     console.log('- statutHotel sauvegardé:', reservation.statutHotel);
     console.log('- statutVol sauvegardé:', reservation.statutVol);
@@ -398,7 +431,7 @@ router.post('/', authenticateToken, async (req: any, res) => {
 });
 
 // Update reservation
-router.put('/:id', authenticateToken, async (req: any, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const {
       firstName,

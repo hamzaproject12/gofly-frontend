@@ -38,6 +38,11 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok) {
+        // Stocker le token dans localStorage pour l'utiliser dans les requêtes API
+        if (data.token) {
+          localStorage.setItem('authToken', data.token);
+          console.log('✅ Token stocké dans localStorage:', data.token.substring(0, 20) + '...');
+        }
         router.push('/');
         router.refresh();
       } else {

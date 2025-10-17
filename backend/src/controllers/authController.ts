@@ -157,7 +157,7 @@ export const login = async (req: Request, res: Response) => {
         isActive: agent.isActive,
         createdAt: agent.createdAt
       },
-      token
+      token // Token accessible côté frontend
     });
 
   } catch (error) {

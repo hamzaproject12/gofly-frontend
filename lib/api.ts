@@ -1,16 +1,17 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://gofly-backend-production.up.railway.app';
 
-// Fonction pour récupérer le token depuis les cookies
+// Fonction pour récupérer le token depuis localStorage
 function getAuthToken(): string | null {
-  if (typeof document === 'undefined') return null;
+  if (typeof window === 'undefined') return null;
   
-  const cookies = document.cookie.split(';');
-  const authCookie = cookies.find(cookie => 
-    cookie.trim().startsWith('authToken=')
-  );
-  
-  if (authCookie) {
-    return authCookie.split('=')[1];
+  try {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      console.log('🔑 Token récupéré depuis localStorage:', token.substring(0, 20) + '...');
+      return token;
+    }
+  } catch (error) {
+    console.warn('⚠️ Erreur lors de la récupération du token:', error);
   }
   
   return null;

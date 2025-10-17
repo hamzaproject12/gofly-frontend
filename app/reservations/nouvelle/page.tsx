@@ -1012,11 +1012,8 @@ export default function NouvelleReservation() {
 
       // 1. Créer d'abord la réservation
       
-      const reservationResponse = await fetch(api.url(api.endpoints.reservations), {
+      const reservationResponse = await api.request(api.url(api.endpoints.reservations), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           firstName: formData.prenom,
           lastName: formData.nom,

@@ -49,6 +49,8 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use((req, res, next) => {
   console.log(`🌐 ${new Date().toISOString()} - ${req.method} ${req.url}`);
   console.log(`📝 Query params:`, req.query);
+  console.log(`🍪 Cookies:`, req.cookies);
+  console.log(`🔑 Authorization header:`, req.headers.authorization);
   console.log(`📦 Body:`, req.body);
   next();
 });

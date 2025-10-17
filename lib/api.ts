@@ -1,17 +1,42 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://gofly-backend-production.up.railway.app';
 
+// Fonction pour récupérer le token depuis les cookies
+function getAuthToken(): string | null {
+  if (typeof document === 'undefined') return null;
+  
+  const cookies = document.cookie.split(';');
+  const authCookie = cookies.find(cookie => 
+    cookie.trim().startsWith('authToken=')
+  );
+  
+  if (authCookie) {
+    return authCookie.split('=')[1];
+  }
+  
+  return null;
+}
+
 export const api = {
   url: (endpoint: string) => {
     return `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
   },
-  // Fonction pour faire des requêtes avec les cookies d'authentification
+  // Fonction pour faire des requêtes avec l'authentification
   request: async (url: string, options: RequestInit = {}) => {
+    const token = getAuthToken();
+    
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+    
+    // Ajouter le token dans l'Authorization header si disponible
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
     const defaultOptions: RequestInit = {
-      credentials: 'include', // Inclure les cookies automatiquement
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      credentials: 'include', // Inclure les cookies aussi
+      headers,
     };
     
     return fetch(url, { ...defaultOptions, ...options });

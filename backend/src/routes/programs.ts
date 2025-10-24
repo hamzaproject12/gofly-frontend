@@ -388,7 +388,12 @@ router.delete('/:id/hard', async (req, res) => {
         where: { programId: programId }
       });
 
-      // 3. Supprimer les relations programme-hôtels
+      // 3. Supprimer les réservations liées au programme
+      await tx.reservation.deleteMany({
+        where: { programId: programId }
+      });
+
+      // 4. Supprimer les relations programme-hôtels
       await tx.programHotelMadina.deleteMany({
         where: { programId: programId }
       });
@@ -397,12 +402,12 @@ router.delete('/:id/hard', async (req, res) => {
         where: { programId: programId }
       });
 
-      // 4. Supprimer les chambres du programme
+      // 5. Supprimer les chambres du programme
       await tx.room.deleteMany({
         where: { programId: programId }
       });
 
-      // 5. Supprimer le programme lui-même
+      // 6. Supprimer le programme lui-même
       await tx.program.delete({
         where: { id: programId }
       });
@@ -417,7 +422,8 @@ router.delete('/:id/hard', async (req, res) => {
       },
       deletedItems: {
         expenses: 'Supprimées',
-        payments: 'Supprimés', 
+        payments: 'Supprimés',
+        reservations: 'Supprimées',
         programHotels: 'Supprimées',
         rooms: 'Supprimées',
         program: 'Supprimé'

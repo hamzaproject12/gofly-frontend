@@ -133,6 +133,8 @@ model Fichier {
   filePath      String
   uploaded_at   DateTime    @default(now()) @map("uploaded_at")
   fileCategory  String
+  cloudinaryId  String?     // ID du fichier sur Cloudinary
+  cloudinaryUrl String?     // URL du fichier sur Cloudinary
   expenses      Expense[]
   reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
   payment       Payment?
@@ -165,6 +167,7 @@ model Expense {
   program       Program?     @relation(fields: [programId], references: [id])
   reservation   Reservation? @relation(fields: [reservationId], references: [id])
 }
+
 
 
 enum RoomType {

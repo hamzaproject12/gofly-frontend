@@ -453,7 +453,7 @@ export default function HomePage() {
                                   </span>
                                   <span className={`font-medium ${roomStyle.textColor}`}>
                                     {room.prixRoom.toLocaleString()} DH
-                                  </span>
+                      </span>
                                 </div>
                               </div>
                             );
@@ -558,8 +558,8 @@ export default function HomePage() {
                                       <span className={`font-medium ${roomStyle.textColor}`}>
                                         {roomType.placesRestantes}
                                       </span>
-                                    </div>
-                                  </div>
+                  </div>
+                </div>
                                   
                                   {/* Indicateur visuel global */}
                                   <div className="mb-3">
@@ -582,8 +582,8 @@ export default function HomePage() {
                                         <span className={`text-xs ${roomStyle.textColor} ml-1`}>
                                           +{roomType.totalPlaces - 10}
                                         </span>
-                                      )}
-                                    </div>
+              )}
+            </div>
                                     <p className={`text-xs text-center mt-1 ${roomStyle.textColor}`}>
                                       {roomType.placesOccupees}/{roomType.totalPlaces} places
                                     </p>
@@ -627,8 +627,8 @@ export default function HomePage() {
                                   {Math.round((hotel.rooms.reduce((sum, room) => sum + room.placesOccupees, 0) / hotel.rooms.reduce((sum, room) => sum + room.totalPlaces, 0)) * 100)}%
                                 </p>
                                 <p className="text-gray-600">Taux occupation</p>
-                              </div>
-                            </div>
+          </div>
+        </div>
                           </div>
                         </div>
                       );

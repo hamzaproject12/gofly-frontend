@@ -25,6 +25,7 @@ import {
   Bell,
   Settings,
   Trash2,
+  AlertTriangle,
 } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/hooks/useAuth"
@@ -116,9 +117,11 @@ export default function ProgrammesPage() {
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
     isOpen: boolean
     programme: ProgramOverview | null
+    isHardDelete?: boolean
   }>({
     isOpen: false,
-    programme: null
+    programme: null,
+    isHardDelete: false
   })
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -158,7 +161,16 @@ export default function ProgrammesPage() {
   const handleDeleteClick = (programme: ProgramOverview) => {
     setDeleteConfirmation({
       isOpen: true,
-      programme
+      programme,
+      isHardDelete: false
+    })
+  }
+
+  const handleHardDeleteClick = (programme: ProgramOverview) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      programme,
+      isHardDelete: true
     })
   }
 
@@ -167,24 +179,39 @@ export default function ProgrammesPage() {
     
     setIsDeleting(true)
     try {
-      // TODO: Implémenter l'API de suppression
-      console.log('Suppression confirmée du programme:', deleteConfirmation.programme.id)
+      const isHardDelete = deleteConfirmation.isHardDelete
+      const endpoint = isHardDelete 
+        ? `/api/programs/${deleteConfirmation.programme.id}/hard`
+        : `/api/programs/${deleteConfirmation.programme.id}`
       
-      // Simulation d'une suppression
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Appel à l'API de suppression
+      const response = await api.request(api.url(endpoint), {
+        method: 'DELETE'
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erreur lors de la suppression')
+      }
+      
+      const result = await response.json()
+      console.log('Programme supprimé:', result)
       
       // Supprimer le programme de la liste locale
       setProgrammes(prev => prev.filter(p => p.id !== deleteConfirmation.programme!.id))
       
       // Fermer la confirmation
-      setDeleteConfirmation({ isOpen: false, programme: null })
+      setDeleteConfirmation({ isOpen: false, programme: null, isHardDelete: false })
       
-      // Message de succès (vous pouvez remplacer par un toast)
-      alert('Programme supprimé avec succès')
+      // Message de succès
+      const message = isHardDelete 
+        ? `Programme "${deleteConfirmation.programme.name}" supprimé définitivement avec succès`
+        : `Programme "${deleteConfirmation.programme.name}" supprimé avec succès`
+      alert(message)
       
     } catch (error) {
       console.error('Erreur lors de la suppression:', error)
-      alert('Erreur lors de la suppression du programme')
+      alert(`Erreur lors de la suppression: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
     } finally {
       setIsDeleting(false)
     }
@@ -750,16 +777,32 @@ export default function ProgrammesPage() {
                     )}
                   </div>
                   
-                  {/* Bouton de suppression à droite */}
+                {/* Boutons de suppression à droite */}
+                <div className="flex gap-2">
+                  {/* Soft Delete */}
                   <Button
                     variant="outline"
                     size="sm"
-                    className="border-red-200 text-red-700 hover:bg-red-50"
+                    className="border-orange-200 text-orange-700 hover:bg-orange-50"
                     onClick={() => handleDeleteClick(programme)}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Supprimer
                   </Button>
+                  
+                  {/* Hard Delete - Visible seulement pour les ADMIN */}
+                  {isAdmin && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-red-200 text-red-700 hover:bg-red-50"
+                      onClick={() => handleHardDeleteClick(programme)}
+                    >
+                      <AlertTriangle className="h-4 w-4 mr-2" />
+                      Supprimer définitivement
+                    </Button>
+                  )}
+                </div>
                 </div>
               </CardContent>
             </Card>
@@ -768,15 +811,19 @@ export default function ProgrammesPage() {
       </div>
       
       {/* Composant de confirmation de suppression */}
-      <DeleteConfirmation
-        isOpen={deleteConfirmation.isOpen}
-        onClose={handleDeleteCancel}
-        onConfirm={handleDeleteConfirm}
-        title="Supprimer le programme"
-        description="Cette action supprimera définitivement le programme et toutes ses données associées."
-        itemName={deleteConfirmation.programme?.name || ""}
-        loading={isDeleting}
-      />
+        <DeleteConfirmation
+          isOpen={deleteConfirmation.isOpen}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          title={deleteConfirmation.isHardDelete ? "Supprimer définitivement le programme" : "Supprimer le programme"}
+          description={deleteConfirmation.isHardDelete 
+            ? "⚠️ ATTENTION : Cette action supprimera DÉFINITIVEMENT le programme et TOUTES ses données associées. Cette action est IRRÉVERSIBLE et ne peut pas être annulée."
+            : "Cette action masquera le programme de la liste. Les données seront préservées et pourront être récupérées si nécessaire."
+          }
+          itemName={deleteConfirmation.programme?.name || ""}
+          loading={isDeleting}
+          isHardDelete={deleteConfirmation.isHardDelete}
+        />
     </div>
     </>
   )

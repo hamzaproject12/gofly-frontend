@@ -5,10 +5,13 @@ import { ProgramOverviewController } from '../controllers/programOverviewControl
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Get all programs with their hotels
+// Get all programs with their hotels (excluding soft deleted)
 router.get('/', async (req, res) => {
   try {
     const programs = await prisma.program.findMany({
+      where: {
+        isDeleted: false
+      },
       include: {
         hotelsMadina: { include: { hotel: true } },
         hotelsMakkah: { include: { hotel: true } },
@@ -22,12 +25,15 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get a single program with its hotels
+// Get a single program with its hotels (excluding soft deleted)
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const program = await prisma.program.findUnique({
-      where: { id: Number(id) },
+    const program = await prisma.program.findFirst({
+      where: { 
+        id: Number(id),
+        isDeleted: false
+      },
       include: {
         hotelsMadina: { include: { hotel: true } },
         hotelsMakkah: { include: { hotel: true } },
@@ -295,15 +301,134 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Delete program
+// Soft delete program
 router.delete('/:id', async (req, res) => {
   try {
-    await prisma.program.delete({
-      where: { id: parseInt(req.params.id) },
+    const programId = parseInt(req.params.id);
+    
+    // Vérifier que le programme existe et n'est pas déjà supprimé
+    const program = await prisma.program.findUnique({
+      where: { id: programId },
+      select: { id: true, name: true, isDeleted: true }
     });
-    res.status(204).send();
+
+    if (!program) {
+      return res.status(404).json({ error: 'Programme non trouvé' });
+    }
+
+    if (program.isDeleted) {
+      return res.status(400).json({ error: 'Le programme est déjà supprimé' });
+    }
+
+    // Effectuer le soft delete
+    await prisma.program.update({
+      where: { id: programId },
+      data: {
+        isDeleted: true,
+        deletedAt: new Date()
+      }
+    });
+
+    res.json({ 
+      message: 'Programme supprimé avec succès',
+      program: {
+        id: program.id,
+        name: program.name,
+        deletedAt: new Date()
+      }
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Error deleting program' });
+    console.error('Erreur lors de la suppression du programme:', error);
+    res.status(500).json({ error: 'Erreur lors de la suppression du programme' });
+  }
+});
+
+// Hard delete program (suppression définitive avec gestion des dépendances)
+router.delete('/:id/hard', async (req, res) => {
+  try {
+    const programId = parseInt(req.params.id);
+    
+    // Vérifier que le programme existe
+    const program = await prisma.program.findUnique({
+      where: { id: programId },
+      select: { 
+        id: true, 
+        name: true,
+        isDeleted: true,
+        reservations: {
+          select: { id: true, firstName: true, lastName: true }
+        }
+      }
+    });
+
+    if (!program) {
+      return res.status(404).json({ error: 'Programme non trouvé' });
+    }
+
+    // Vérifier s'il y a des réservations actives
+    const activeReservations = program.reservations.filter(r => r.id);
+    if (activeReservations.length > 0) {
+      return res.status(400).json({ 
+        error: `Impossible de supprimer définitivement le programme. Il contient ${activeReservations.length} réservation(s) active(s).`,
+        details: {
+          reservations: activeReservations.map(r => `${r.firstName} ${r.lastName}`)
+        }
+      });
+    }
+
+    // Effectuer la suppression en cascade dans une transaction
+    await prisma.$transaction(async (tx) => {
+      // 1. Supprimer les dépenses liées au programme
+      await tx.expense.deleteMany({
+        where: { programId: programId }
+      });
+
+      // 2. Supprimer les paiements liés au programme
+      await tx.payment.deleteMany({
+        where: { programId: programId }
+      });
+
+      // 3. Supprimer les relations programme-hôtels
+      await tx.programHotelMadina.deleteMany({
+        where: { programId: programId }
+      });
+
+      await tx.programHotelMakkah.deleteMany({
+        where: { programId: programId }
+      });
+
+      // 4. Supprimer les chambres du programme
+      await tx.room.deleteMany({
+        where: { programId: programId }
+      });
+
+      // 5. Supprimer le programme lui-même
+      await tx.program.delete({
+        where: { id: programId }
+      });
+    });
+
+    res.json({ 
+      message: 'Programme supprimé définitivement avec succès',
+      program: {
+        id: program.id,
+        name: program.name,
+        deletedAt: new Date()
+      },
+      deletedItems: {
+        expenses: 'Supprimées',
+        payments: 'Supprimés', 
+        programHotels: 'Supprimées',
+        rooms: 'Supprimées',
+        program: 'Supprimé'
+      }
+    });
+  } catch (error) {
+    console.error('Erreur lors de la suppression définitive du programme:', error);
+    res.status(500).json({ 
+      error: 'Erreur lors de la suppression définitive du programme',
+      details: error instanceof Error ? error.message : 'Erreur inconnue'
+    });
   }
 });
 

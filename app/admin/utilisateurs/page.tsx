@@ -254,7 +254,7 @@ export default function GestionUtilisateursPage() {
                   <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200">
                     <CardTitle className="flex items-center gap-2 text-blue-900">
                       <Users className="h-5 w-5" />
-                      {editingAgent ? 'Modifier l\'utilisateur' : 'Créer un nouvel utilisateur'}
+                    {editingAgent ? 'Modifier l\'utilisateur' : 'Créer un nouvel utilisateur'}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6">
@@ -268,15 +268,15 @@ export default function GestionUtilisateursPage() {
                           </Label>
                           <Input
                             id="user-name"
-                            type="text"
-                            required
-                            value={formData.nom}
-                            onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
+                        type="text"
+                        required
+                        value={formData.nom}
+                        onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
                             className="h-12 text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm"
                             placeholder="Ex: Jean Dupont"
-                          />
-                        </div>
-                        
+                      />
+                    </div>
+                    
                         <div className="space-y-2">
                           <Label htmlFor="user-email" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                             <Mail className="h-4 w-4" />
@@ -284,65 +284,65 @@ export default function GestionUtilisateursPage() {
                           </Label>
                           <Input
                             id="user-email"
-                            type="email"
-                            required
-                            value={formData.email}
-                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        type="email"
+                        required
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                             className="h-12 text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm"
                             placeholder="Ex: jean.dupont@example.com"
-                          />
-                        </div>
-                        
+                      />
+                    </div>
+                    
                         <div className="space-y-2">
                           <Label htmlFor="user-password" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                             <Shield className="h-4 w-4" />
-                            Mot de passe {editingAgent && '(laisser vide pour ne pas changer)'}
+                        Mot de passe {editingAgent && '(laisser vide pour ne pas changer)'}
                           </Label>
                           <Input
                             id="user-password"
-                            type="password"
-                            required={!editingAgent}
-                            value={formData.motDePasse}
-                            onChange={(e) => setFormData({ ...formData, motDePasse: e.target.value })}
+                        type="password"
+                        required={!editingAgent}
+                        value={formData.motDePasse}
+                        onChange={(e) => setFormData({ ...formData, motDePasse: e.target.value })}
                             className="h-12 text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm"
                             placeholder="••••••••"
-                          />
-                        </div>
-                        
+                      />
+                    </div>
+                    
                         <div className="space-y-2">
                           <Label htmlFor="user-role" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                             <Shield className="h-4 w-4" />
                             Rôle
                           </Label>
-                          <select
+                      <select
                             id="user-role"
-                            value={formData.role}
-                            onChange={(e) => setFormData({ ...formData, role: e.target.value as 'ADMIN' | 'AGENT' })}
+                        value={formData.role}
+                        onChange={(e) => setFormData({ ...formData, role: e.target.value as 'ADMIN' | 'AGENT' })}
                             className="h-12 w-full text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm bg-white px-3"
-                          >
-                            <option value="AGENT">Agent</option>
-                            <option value="ADMIN">Admin</option>
-                          </select>
-                        </div>
-                      </div>
-                      
+                      >
+                        <option value="AGENT">Agent</option>
+                        <option value="ADMIN">Admin</option>
+                      </select>
+                    </div>
+                  </div>
+                  
                       <div className="flex justify-end space-x-3 pt-4">
                         <Button
-                          type="button"
+                      type="button"
                           variant="outline"
-                          onClick={() => {
-                            setShowCreateForm(false);
-                            setEditingAgent(null);
-                            setFormData({ nom: '', email: '', motDePasse: '', role: 'AGENT' });
-                          }}
+                      onClick={() => {
+                        setShowCreateForm(false);
+                        setEditingAgent(null);
+                        setFormData({ nom: '', email: '', motDePasse: '', role: 'AGENT' });
+                      }}
                           className="h-11 px-6 border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 rounded-xl font-medium transition-all duration-200"
-                        >
+                    >
                           <X className="h-4 w-4 mr-2" />
-                          Annuler
+                      Annuler
                         </Button>
                         <Button
-                          type="submit"
-                          disabled={loading}
+                      type="submit"
+                      disabled={loading}
                           className="h-11 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50"
                         >
                           {loading ? (
@@ -357,8 +357,8 @@ export default function GestionUtilisateursPage() {
                             </>
                           )}
                         </Button>
-                      </div>
-                    </form>
+                  </div>
+                </form>
                   </CardContent>
                 </Card>
               )}
@@ -389,9 +389,9 @@ export default function GestionUtilisateursPage() {
                           <Badge 
                             variant="secondary" 
                             className={`inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full ${
-                              agent.role === 'ADMIN' 
-                                ? 'bg-purple-100 text-purple-800' 
-                                : 'bg-blue-100 text-blue-800'
+                            agent.role === 'ADMIN' 
+                              ? 'bg-purple-100 text-purple-800' 
+                              : 'bg-blue-100 text-blue-800'
                             } border-0`}
                           >
                             <Shield className="h-3 w-3 mr-1" />
@@ -402,9 +402,9 @@ export default function GestionUtilisateursPage() {
                           <Badge 
                             variant="secondary" 
                             className={`inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full ${
-                              agent.isActive 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
+                            agent.isActive 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
                             } border-0`}
                           >
                             {agent.isActive ? (
@@ -421,20 +421,20 @@ export default function GestionUtilisateursPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex items-center space-x-2">
                             <Button
-                              onClick={() => startEdit(agent)}
+                            onClick={() => startEdit(agent)}
                               variant="outline"
                               size="sm"
                               className="h-8 px-3 text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300 rounded-lg font-medium transition-all duration-200"
-                            >
+                          >
                               <Edit className="h-3 w-3 mr-1" />
-                              Modifier
+                            Modifier
                             </Button>
                             <Button
-                              onClick={() => handleToggleActive(agent)}
+                            onClick={() => handleToggleActive(agent)}
                               variant="outline"
                               size="sm"
                               className={`h-8 px-3 rounded-lg font-medium transition-all duration-200 ${
-                                agent.isActive 
+                              agent.isActive 
                                   ? 'text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300' 
                                   : 'text-green-600 border-green-200 hover:bg-green-50 hover:border-green-300'
                               }`}
@@ -452,13 +452,13 @@ export default function GestionUtilisateursPage() {
                               )}
                             </Button>
                             <Button
-                              onClick={() => handleDeleteAgent(agent)}
+                            onClick={() => handleDeleteAgent(agent)}
                               variant="outline"
                               size="sm"
                               className="h-8 px-3 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 rounded-lg font-medium transition-all duration-200"
-                            >
+                          >
                               <Trash2 className="h-3 w-3 mr-1" />
-                              Supprimer
+                            Supprimer
                             </Button>
                           </div>
                         </td>

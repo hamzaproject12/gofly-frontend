@@ -80,9 +80,12 @@ export interface ProgramOverview {
 export class ProgramOverviewService {
   static async getProgramOverview(programId: number): Promise<ProgramOverview | null> {
     try {
-      // 1. Récupérer les informations de base du programme
-      const program = await prisma.program.findUnique({
-        where: { id: programId },
+      // 1. Récupérer les informations de base du programme (vérifier qu'il n'est pas supprimé)
+      const program = await prisma.program.findFirst({
+        where: { 
+          id: programId,
+          isDeleted: false
+        },
         include: {
           hotelsMadina: {
             include: {
@@ -274,10 +277,13 @@ export class ProgramOverviewService {
     return breakdown;
   }
 
-  // Méthode pour récupérer tous les programmes avec leurs statistiques
+  // Méthode pour récupérer tous les programmes avec leurs statistiques (excluant les supprimés)
   static async getAllProgramsOverview(): Promise<ProgramOverview[]> {
     try {
       const programs = await prisma.program.findMany({
+        where: {
+          isDeleted: false
+        },
         orderBy: { created_at: 'desc' }
       });
 

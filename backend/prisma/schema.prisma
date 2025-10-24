@@ -12,16 +12,6 @@ enum Role {
   AGENT
 }
 
-model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
-  name      String
-  role      Role     @default(AGENT)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 model Agent {
   id           Int           @id @default(autoincrement())
   nom          String        @db.VarChar(100)
@@ -49,6 +39,8 @@ model Program {
   prixAvionDH      Float                @default(0)
   prixVisaRiyal    Float                @default(0)
   profit           Float                @default(0)
+  isDeleted        Boolean              @default(false)
+  deletedAt        DateTime?
   expenses         Expense[]
   hotelsMadina     ProgramHotelMadina[]
   hotelsMakkah     ProgramHotelMakkah[]
@@ -138,9 +130,7 @@ model Fichier {
   fileType      String
   fileName      String
   storedName    String
-  filePath      String      // Chemin local (pour compatibilité)
-  cloudinaryId  String?     // ID Cloudinary (nouveau)
-  cloudinaryUrl String?     // URL Cloudinary (nouveau)
+  filePath      String
   uploaded_at   DateTime    @default(now()) @map("uploaded_at")
   fileCategory  String
   expenses      Expense[]
@@ -175,6 +165,7 @@ model Expense {
   program       Program?     @relation(fields: [programId], references: [id])
   reservation   Reservation? @relation(fields: [reservationId], references: [id])
 }
+
 
 enum RoomType {
   SINGLE

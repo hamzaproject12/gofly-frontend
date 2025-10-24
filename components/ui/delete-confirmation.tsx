@@ -11,6 +11,7 @@ interface DeleteConfirmationProps {
   description: string
   itemName: string
   loading?: boolean
+  isHardDelete?: boolean
 }
 
 export function DeleteConfirmation({
@@ -20,7 +21,8 @@ export function DeleteConfirmation({
   title,
   description,
   itemName,
-  loading = false
+  loading = false,
+  isHardDelete = false
 }: DeleteConfirmationProps) {
   if (!isOpen) return null
 
@@ -35,8 +37,12 @@ export function DeleteConfirmation({
       {/* Modal */}
       <Card className="relative w-full max-w-md mx-4 border-0 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-200">
         <CardHeader className="text-center pb-4">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-            <AlertTriangle className="h-6 w-6 text-red-600" />
+          <div className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full ${
+            isHardDelete ? 'bg-red-100' : 'bg-orange-100'
+          }`}>
+            <AlertTriangle className={`h-6 w-6 ${
+              isHardDelete ? 'text-red-600' : 'text-orange-600'
+            }`} />
           </div>
           <CardTitle className="text-xl font-semibold text-gray-900">
             {title}
@@ -47,18 +53,35 @@ export function DeleteConfirmation({
         </CardHeader>
         
         <CardContent className="space-y-4">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-800 font-medium">
+          <div className={`border rounded-lg p-4 ${
+            isHardDelete 
+              ? 'bg-red-50 border-red-200' 
+              : 'bg-orange-50 border-orange-200'
+          }`}>
+            <p className={`text-sm font-medium ${
+              isHardDelete ? 'text-red-800' : 'text-orange-800'
+            }`}>
               Élément à supprimer :
             </p>
-            <p className="text-sm text-red-700 mt-1">
+            <p className={`text-sm mt-1 ${
+              isHardDelete ? 'text-red-700' : 'text-orange-700'
+            }`}>
               "{itemName}"
             </p>
           </div>
           
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-            <p className="text-xs text-yellow-800">
-              ⚠️ Cette action est irréversible et supprimera toutes les données associées.
+          <div className={`border rounded-lg p-3 ${
+            isHardDelete 
+              ? 'bg-red-50 border-red-200' 
+              : 'bg-yellow-50 border-yellow-200'
+          }`}>
+            <p className={`text-xs ${
+              isHardDelete ? 'text-red-800' : 'text-yellow-800'
+            }`}>
+              {isHardDelete 
+                ? '🚨 ATTENTION : Cette action est IRRÉVERSIBLE et supprimera DÉFINITIVEMENT toutes les données associées.'
+                : '⚠️ Cette action masquera l\'élément de la liste. Les données seront préservées.'
+              }
             </p>
           </div>
           
@@ -73,18 +96,22 @@ export function DeleteConfirmation({
             </Button>
             <Button
               onClick={onConfirm}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              className={`flex-1 text-white ${
+                isHardDelete 
+                  ? 'bg-red-600 hover:bg-red-700' 
+                  : 'bg-orange-600 hover:bg-orange-700'
+              }`}
               disabled={loading}
             >
               {loading ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                  Suppression...
+                  {isHardDelete ? 'Suppression définitive...' : 'Suppression...'}
                 </>
               ) : (
                 <>
                   <AlertTriangle className="w-4 h-4 mr-2" />
-                  Supprimer
+                  {isHardDelete ? 'Supprimer définitivement' : 'Supprimer'}
                 </>
               )}
             </Button>

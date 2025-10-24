@@ -24,8 +24,10 @@ import {
   FileText,
   Bell,
   Settings,
+  Trash2,
 } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/hooks/useAuth"
 
 // Types pour les données de l'API
 interface ProgramOverview {
@@ -99,6 +101,9 @@ interface ProgramOverview {
 }
 
 export default function ProgrammesPage() {
+  // Hook pour gérer l'authentification
+  const { isAdmin, loading: authLoading } = useAuth()
+  
   // États pour les filtres
   const [searchQuery, setSearchQuery] = useState("")
   const [programmeFilter, setProgrammeFilter] = useState("tous")
@@ -389,9 +394,11 @@ export default function ProgrammesPage() {
                     <TabsTrigger value="reservations" className="data-[state=active]:bg-white">
                       Réservations
                     </TabsTrigger>
-                    <TabsTrigger value="finances" className="data-[state=active]:bg-white">
-                      Finances
-                    </TabsTrigger>
+                    {isAdmin && (
+                      <TabsTrigger value="finances" className="data-[state=active]:bg-white">
+                        Finances
+                      </TabsTrigger>
+                    )}
                   </TabsList>
 
                   <TabsContent value="details" className="p-6 space-y-6">
@@ -654,7 +661,8 @@ export default function ProgrammesPage() {
                 </Tabs>
 
                 <div className="p-6 pt-0 flex flex-wrap gap-2">
-                  <Link href={`/programmes/${programme.id}`}>
+                  {/* Boutons commentés temporairement */}
+                  {/* <Link href={`/programmes/${programme.id}`}>
                     <Button variant="outline" size="sm" className="border-blue-200 text-blue-700 hover:bg-blue-50">
                       Voir détails
                       <ChevronRight className="ml-1 h-4 w-4" />
@@ -665,7 +673,8 @@ export default function ProgrammesPage() {
                       Modifier
                       <ChevronRight className="ml-1 h-4 w-4" />
                     </Button>
-                  </Link>
+                  </Link> */}
+                  
                   <Link href={`/reservations?programme=${programme.id}`}>
                     <Button
                       variant="outline"
@@ -676,12 +685,36 @@ export default function ProgrammesPage() {
                       <ChevronRight className="ml-1 h-4 w-4" />
                     </Button>
                   </Link>
-                  <Link href={`/depenses?programme=${programme.id}`}>
-                    <Button variant="outline" size="sm" className="border-red-200 text-red-700 hover:bg-red-50">
-                      Voir dépenses
-                      <ChevronRight className="ml-1 h-4 w-4" />
-                    </Button>
-                  </Link>
+                  
+                  {/* Bouton "Voir dépenses" visible seulement pour les ADMIN */}
+                  {isAdmin && (
+                    <Link href={`/depenses?programme=${programme.id}`}>
+                      <Button variant="outline" size="sm" className="border-red-200 text-red-700 hover:bg-red-50">
+                        Voir dépenses
+                        <ChevronRight className="ml-1 h-4 w-4" />
+                      </Button>
+                    </Link>
+                  )}
+                  
+                  {/* Icône de suppression avec confirmation */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-red-200 text-red-700 hover:bg-red-50"
+                    onClick={() => {
+                      const confirmed = window.confirm(
+                        `Êtes-vous sûr de vouloir supprimer le programme "${programme.name}" ?\n\nCette action est irréversible et supprimera toutes les données associées.`
+                      );
+                      
+                      if (confirmed) {
+                        // TODO: Implémenter la logique de suppression
+                        console.log('Suppression confirmée du programme:', programme.id);
+                        alert('Fonctionnalité de suppression en cours de développement');
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </CardContent>
             </Card>

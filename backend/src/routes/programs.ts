@@ -354,10 +354,7 @@ router.delete('/:id/hard', async (req, res) => {
       select: { 
         id: true, 
         name: true,
-        isDeleted: true,
-        reservations: {
-          select: { id: true, firstName: true, lastName: true, status: true }
-        }
+        isDeleted: true
       }
     });
 
@@ -365,19 +362,8 @@ router.delete('/:id/hard', async (req, res) => {
       return res.status(404).json({ error: 'Programme non trouvé' });
     }
 
-    // Vérifier s'il y a des réservations actives (non annulées)
-    const activeReservations = program.reservations.filter(r => 
-      r.status !== 'Annulée' && r.status !== 'Terminée'
-    );
-    
-    if (activeReservations.length > 0) {
-      return res.status(400).json({ 
-        error: `Impossible de supprimer définitivement le programme. Il contient ${activeReservations.length} réservation(s) active(s) (non annulées).`,
-        details: {
-          reservations: activeReservations.map(r => `${r.firstName} ${r.lastName} (${r.status})`)
-        }
-      });
-    }
+    // Note: Toutes les réservations liées au programme seront supprimées définitivement
+    // peu importe leur statut, comme les autres dépendances
 
     // Effectuer la suppression en cascade dans une transaction
     await prisma.$transaction(async (tx) => {

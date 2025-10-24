@@ -356,7 +356,7 @@ router.delete('/:id/hard', async (req, res) => {
         name: true,
         isDeleted: true,
         reservations: {
-          select: { id: true, firstName: true, lastName: true }
+          select: { id: true, firstName: true, lastName: true, status: true }
         }
       }
     });
@@ -365,13 +365,16 @@ router.delete('/:id/hard', async (req, res) => {
       return res.status(404).json({ error: 'Programme non trouvé' });
     }
 
-    // Vérifier s'il y a des réservations actives
-    const activeReservations = program.reservations.filter(r => r.id);
+    // Vérifier s'il y a des réservations actives (non annulées)
+    const activeReservations = program.reservations.filter(r => 
+      r.status !== 'Annulée' && r.status !== 'Terminée'
+    );
+    
     if (activeReservations.length > 0) {
       return res.status(400).json({ 
-        error: `Impossible de supprimer définitivement le programme. Il contient ${activeReservations.length} réservation(s) active(s).`,
+        error: `Impossible de supprimer définitivement le programme. Il contient ${activeReservations.length} réservation(s) active(s) (non annulées).`,
         details: {
-          reservations: activeReservations.map(r => `${r.firstName} ${r.lastName}`)
+          reservations: activeReservations.map(r => `${r.firstName} ${r.lastName} (${r.status})`)
         }
       });
     }

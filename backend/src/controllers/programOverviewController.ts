@@ -36,6 +36,13 @@ export class ProgramOverviewController {
     try {
       const overviews = await ProgramOverviewService.getAllProgramsOverview();
       
+      // Log pour debug
+      const deletedPrograms = overviews.filter(p => p.isDeleted);
+      console.log(`📊 Total programmes: ${overviews.length}, Supprimés: ${deletedPrograms.length}`);
+      if (deletedPrograms.length > 0) {
+        console.log('🗑️ Programmes supprimés:', deletedPrograms.map(p => ({ id: p.id, name: p.name, deletedAt: p.deletedAt })));
+      }
+      
       res.json({
         programs: overviews,
         total: overviews.length

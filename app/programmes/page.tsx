@@ -137,6 +137,9 @@ export default function ProgrammesPage() {
           throw new Error('Erreur lors du chargement des programmes')
         }
         const data = await response.json()
+        console.log('📥 Programmes reçus:', data.programs)
+        const deletedProgs = data.programs?.filter((p: any) => p.isDeleted) || []
+        console.log('🗑️ Programmes supprimés dans les données:', deletedProgs)
         setProgrammes(data.programs || [])
       } catch (err) {
         console.error('Error fetching programmes:', err)

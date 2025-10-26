@@ -75,16 +75,19 @@ export interface ProgramOverview {
   totalReservations: number;
   completedReservations: number;
   pendingReservations: number;
+  
+  // Soft delete
+  isDeleted?: boolean;
+  deletedAt?: string | null;
 }
 
 export class ProgramOverviewService {
   static async getProgramOverview(programId: number): Promise<ProgramOverview | null> {
     try {
-      // 1. Récupérer les informations de base du programme (vérifier qu'il n'est pas supprimé)
-      const program = await prisma.program.findFirst({
+      // 1. Récupérer les informations de base du programme (y compris les supprimés)
+      const program = await prisma.program.findUnique({
         where: { 
-          id: programId,
-          isDeleted: false
+          id: programId
         },
         include: {
           hotelsMadina: {
@@ -192,7 +195,10 @@ export class ProgramOverviewService {
         
         totalReservations: reservationsStats._count.id,
         completedReservations,
-        pendingReservations: reservationsStats._count.id - completedReservations
+        pendingReservations: reservationsStats._count.id - completedReservations,
+        
+        isDeleted: program.isDeleted,
+        deletedAt: program.deletedAt?.toISOString() || null
       };
 
       return overview;
@@ -277,13 +283,10 @@ export class ProgramOverviewService {
     return breakdown;
   }
 
-  // Méthode pour récupérer tous les programmes avec leurs statistiques (excluant les supprimés)
+  // Méthode pour récupérer tous les programmes avec leurs statistiques (actifs et supprimés)
   static async getAllProgramsOverview(): Promise<ProgramOverview[]> {
     try {
       const programs = await prisma.program.findMany({
-        where: {
-          isDeleted: false
-        },
         orderBy: { created_at: 'desc' }
       });
 

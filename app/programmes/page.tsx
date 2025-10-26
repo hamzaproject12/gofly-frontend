@@ -100,6 +100,8 @@ interface ProgramOverview {
   totalReservations: number;
   completedReservations: number;
   pendingReservations: number;
+  isDeleted?: boolean;
+  deletedAt?: string | null;
 }
 
 export default function ProgrammesPage() {
@@ -150,12 +152,16 @@ export default function ProgrammesPage() {
   // Liste des programmes pour le filtre
   const programmesNoms = ["Tous", ...programmes.map((p) => p.name)]
 
-  // Filtrage des programmes
+  // Filtrage des programmes (actifs et supprimés séparés)
   const filteredProgrammes = programmes.filter((programme) => {
     const searchMatch = programme.name.toLowerCase().includes(searchQuery.toLowerCase())
     const programmeMatch = programmeFilter === "tous" || programme.name === programmeFilter
     return searchMatch && programmeMatch
   })
+  
+  // Séparer les programmes actifs et supprimés
+  const activeProgrammes = filteredProgrammes.filter(p => !p.isDeleted)
+  const deletedProgrammes = filteredProgrammes.filter(p => p.isDeleted)
 
   // Fonctions pour la suppression
   const handleDeleteClick = (programme: ProgramOverview) => {
@@ -197,8 +203,18 @@ export default function ProgrammesPage() {
       const result = await response.json()
       console.log('Programme supprimé:', result)
       
-      // Supprimer le programme de la liste locale
-      setProgrammes(prev => prev.filter(p => p.id !== deleteConfirmation.programme!.id))
+      // Mettre à jour la liste locale : supprimer le programme pour hard delete, marquer comme supprimé pour soft delete
+      if (isHardDelete) {
+        // Supprimer complètement de la liste pour hard delete
+        setProgrammes(prev => prev.filter(p => p.id !== deleteConfirmation.programme!.id))
+      } else {
+        // Marquer comme supprimé pour soft delete
+        setProgrammes(prev => prev.map(p => 
+          p.id === deleteConfirmation.programme!.id 
+            ? { ...p, isDeleted: true, deletedAt: result.program.deletedAt }
+            : p
+        ))
+      }
       
       // Fermer la confirmation
       setDeleteConfirmation({ isOpen: false, programme: null, isHardDelete: false })
@@ -443,9 +459,9 @@ export default function ProgrammesPage() {
           </Card>
         </div>
 
-        {/* Liste des programmes */}
+        {/* Liste des programmes actifs */}
         <div className="space-y-6">
-          {filteredProgrammes.map((programme) => (
+          {activeProgrammes.map((programme) => (
             <Card key={programme.id} className="border-none shadow-lg hover:shadow-xl transition-all overflow-hidden">
               <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 pb-4">
                 <div className="flex justify-between items-start">
@@ -808,6 +824,54 @@ export default function ProgrammesPage() {
             </Card>
           ))}
         </div>
+
+        {/* Liste des programmes supprimés */}
+        {deletedProgrammes.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              Programmes supprimés (Soft Delete)
+            </h2>
+            <div className="space-y-6">
+              {deletedProgrammes.map((programme) => (
+                <Card key={programme.id} className="border-2 border-yellow-300 bg-yellow-50 shadow-lg hover:shadow-xl transition-all overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-yellow-100 to-yellow-200 pb-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-yellow-500 text-white">Supprimé</Badge>
+                          <CardTitle className="text-xl text-yellow-800">{programme.name}</CardTitle>
+                        </div>
+                        <CardDescription className="mt-1">
+                          Créé le {new Date(programme.created_at).toLocaleDateString("fr-FR")}
+                          {programme.deletedAt && (
+                            <span className="ml-2 text-orange-700">
+                              - Supprimé le {new Date(programme.deletedAt).toLocaleDateString("fr-FR")}
+                            </span>
+                          )}
+                        </CardDescription>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-yellow-700">
+                          {(programme.totalRevenue || 0).toLocaleString()} DH
+                        </div>
+                        <p className="text-sm text-yellow-800">{programme.reservationsByRoom?.total?.occupied || 0} réservations</p>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-4">
+                      <p className="text-sm text-yellow-900">
+                        <AlertTriangle className="h-4 w-4 inline mr-2" />
+                        Ce programme a été supprimé temporairement (soft delete). Les données sont préservées et peuvent être récupérées si nécessaire.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       
       {/* Composant de confirmation de suppression */}

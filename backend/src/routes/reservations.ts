@@ -74,7 +74,16 @@ router.get('/', async (req, res) => {
     }
     
     if (status && status !== 'all') {
-      where.status = status;
+      // Le statut "Urgent" n'existe pas en base, il est calculé dynamiquement
+      // Donc on ne filtre pas par status quand c'est "Urgent"
+      if (status !== 'Urgent') {
+        where.status = status;
+      } else {
+        // Pour "Urgent", exclure les réservations "Complet" qui ne peuvent pas être urgentes
+        where.status = {
+          not: 'Complet'
+        };
+      }
     }
     
     if (roomType && roomType !== 'toutes') {

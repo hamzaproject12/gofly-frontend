@@ -101,13 +101,26 @@ export default function HomePage() {
         const profileData = await profileResponse.json();
         setAgent(profileData.agent);
         
-        // Filtrer les programmes après avoir reçu l'agent
+        // Filtrer et trier les programmes après avoir reçu l'agent
         if (roomResponse.ok) {
           const roomData = await roomResponse.json();
           const isAdmin = profileData.agent?.role === 'ADMIN';
+          
+          // Filtrer les programmes supprimés si pas admin
+          let filteredPrograms = isAdmin 
+            ? roomData.data 
+            : roomData.data.filter((p: Program) => !p.isDeleted);
+          
+          // Trier : actifs en premier, supprimés en bas
+          filteredPrograms = filteredPrograms.sort((a: Program, b: Program) => {
+            if (a.isDeleted && !b.isDeleted) return 1;
+            if (!a.isDeleted && b.isDeleted) return -1;
+            return 0;
+          });
+          
           const filteredData = {
             ...roomData,
-            data: roomData.data.filter((p: Program) => isAdmin || !p.isDeleted)
+            data: filteredPrograms
           };
           setRoomData(filteredData);
         }

@@ -75,6 +75,8 @@ router.get('/', async (req, res) => {
         id: program.id,
         name: program.name,
         created_at: program.created_at,
+        isDeleted: (program as any).isDeleted || false,
+        deletedAt: (program as any).deletedAt || null,
         statistics: {
           totalRooms,
           totalPlaces,

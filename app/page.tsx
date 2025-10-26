@@ -58,6 +58,8 @@ interface Program {
     occupancyRate: string;
   };
   hotels: HotelData[];
+  isDeleted: boolean;
+  deletedAt?: string;
 }
 
 interface RoomAvailabilityData {
@@ -470,15 +472,21 @@ export default function HomePage() {
           /* Vue Détail Hôtels - Programmes → Hôtels → Types de chambres horizontaux */
           <div className="space-y-6">
             {roomData?.data.map((program) => (
-              <Card key={program.id} className="border-0 shadow-lg">
-                <CardHeader className="bg-gradient-to-r from-indigo-50 to-blue-50">
+              <Card key={program.id} className={`border-0 shadow-lg ${program.isDeleted ? 'border-2 border-yellow-300 bg-yellow-50' : ''}`}>
+                <CardHeader className={`${program.isDeleted ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' : 'bg-gradient-to-r from-indigo-50 to-blue-50'}`}>
                   <CardTitle className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">🎯</span>
                       <div>
-                        <h2 className="text-xl font-bold text-gray-900">{program.name}</h2>
-                        <p className="text-sm text-gray-600">
+                        {program.isDeleted && (
+                          <Badge className="bg-yellow-500 text-white mb-1 mr-2">Supprimé</Badge>
+                        )}
+                        <h2 className={`text-xl font-bold ${program.isDeleted ? 'text-yellow-900' : 'text-gray-900'}`}>{program.name}</h2>
+                        <p className={`text-sm ${program.isDeleted ? 'text-yellow-700' : 'text-gray-600'}`}>
                           Créé le {new Date(program.created_at).toLocaleDateString('fr-FR')}
+                          {program.deletedAt && (
+                            <span className="ml-2 text-orange-700">- Supprimé le {new Date(program.deletedAt).toLocaleDateString('fr-FR')}</span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -486,7 +494,7 @@ export default function HomePage() {
                       <Badge variant="outline" className="text-lg px-3 py-1">
                         {program.statistics.placesRestantes} / {program.statistics.totalPlaces}
                       </Badge>
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className={`text-sm mt-1 ${program.isDeleted ? 'text-yellow-700' : 'text-gray-600'}`}>
                         Taux d'occupation: {program.statistics.occupancyRate}%
                       </p>
                     </div>

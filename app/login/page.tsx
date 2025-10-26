@@ -125,11 +125,11 @@ export default function LoginPage() {
           <div className="text-center mb-6">
             <h2 className="text-3xl font-bold text-white mb-2">
               Connexion
-            </h2>
+          </h2>
             <p className="text-gray-400 text-sm">
               Accédez à votre espace de gestion
-            </p>
-          </div>
+          </p>
+        </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Champ Email */}
@@ -139,18 +139,18 @@ export default function LoginPage() {
               </label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-[hsl(44.38deg_86.67%_61.76%)] transition-colors duration-300" />
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={formData.email}
+                onChange={handleChange}
                   className="w-full pl-12 pr-4 py-3.5 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[hsl(44.38deg_86.67%_61.76%)] focus:border-transparent transition-all duration-300 hover:bg-white/10"
                   placeholder="votre@email.com"
-                />
-              </div>
+              />
+            </div>
             </div>
 
             {/* Champ Mot de passe */}
@@ -160,26 +160,26 @@ export default function LoginPage() {
               </label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-[hsl(44.38deg_86.67%_61.76%)] transition-colors duration-300" />
-                <input
-                  id="motDePasse"
-                  name="motDePasse"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={formData.motDePasse}
-                  onChange={handleChange}
+              <input
+                id="motDePasse"
+                name="motDePasse"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={formData.motDePasse}
+                onChange={handleChange}
                   className="w-full pl-12 pr-4 py-3.5 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[hsl(44.38deg_86.67%_61.76%)] focus:border-transparent transition-all duration-300 hover:bg-white/10"
                   placeholder="••••••••••"
-                />
-              </div>
+              />
             </div>
+          </div>
 
             {/* Message d'erreur */}
-            {error && (
+          {error && (
               <div className="bg-red-500/20 border-2 border-red-500/50 rounded-xl p-4 animate-shake">
                 <p className="text-sm text-red-300 text-center font-medium">{error}</p>
-              </div>
-            )}
+            </div>
+          )}
 
             {/* Bouton de connexion */}
             <button
@@ -199,7 +199,7 @@ export default function LoginPage() {
                 </>
               )}
             </button>
-          </form>
+        </form>
         </div>
 
         {/* Footer */}

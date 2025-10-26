@@ -23,6 +23,7 @@ interface Agent {
   id: number;
   nom: string;
   email: string;
+  role: 'ADMIN' | 'AGENT';
   isActive: boolean;
   createdAt: string;
 }
@@ -99,12 +100,26 @@ export default function HomePage() {
       if (profileResponse.ok) {
         const profileData = await profileResponse.json();
         setAgent(profileData.agent);
+        
+        // Filtrer les programmes après avoir reçu l'agent
+        if (roomResponse.ok) {
+          const roomData = await roomResponse.json();
+          const isAdmin = profileData.agent?.role === 'ADMIN';
+          const filteredData = {
+            ...roomData,
+            data: roomData.data.filter((p: Program) => isAdmin || !p.isDeleted)
+          };
+          setRoomData(filteredData);
+        }
       }
 
-      if (roomResponse.ok) {
-        const roomData = await roomResponse.json();
-        setRoomData(roomData);
-      } else {
+      if (!profileResponse.ok) {
+        // Si l'agent n'est pas connecté, récupérer quand même les données
+        if (roomResponse.ok) {
+          const roomData = await roomResponse.json();
+          setRoomData(roomData);
+        }
+      } else if (!roomResponse.ok) {
         throw new Error('Erreur lors du chargement de la disponibilité des chambres');
       }
     } catch (error) {
@@ -382,15 +397,21 @@ export default function HomePage() {
           /* Vue Dashboard - Liste des programmes */
           <div className="space-y-6">
             {roomData?.data.map((program) => (
-              <Card key={program.id} className="border-0 shadow-lg">
-                <CardHeader className="bg-gradient-to-r from-indigo-50 to-blue-50">
+              <Card key={program.id} className={`border-0 shadow-lg ${program.isDeleted ? 'border-2 border-yellow-300 bg-yellow-50' : ''}`}>
+                <CardHeader className={`${program.isDeleted ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' : 'bg-gradient-to-r from-indigo-50 to-blue-50'}`}>
                   <CardTitle className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">🎯</span>
                       <div>
-                        <h2 className="text-xl font-bold text-gray-900">{program.name}</h2>
-                        <p className="text-sm text-gray-600">
+                        {program.isDeleted && (
+                          <Badge className="bg-yellow-500 text-white mb-1 mr-2">Supprimé</Badge>
+                        )}
+                        <h2 className={`text-xl font-bold ${program.isDeleted ? 'text-yellow-900' : 'text-gray-900'}`}>{program.name}</h2>
+                        <p className={`text-sm ${program.isDeleted ? 'text-yellow-700' : 'text-gray-600'}`}>
                           Créé le {new Date(program.created_at).toLocaleDateString('fr-FR')}
+                          {program.deletedAt && (
+                            <span className="ml-2 text-orange-700">- Supprimé le {new Date(program.deletedAt).toLocaleDateString('fr-FR')}</span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -398,7 +419,7 @@ export default function HomePage() {
                       <Badge variant="outline" className="text-lg px-3 py-1">
                         {program.statistics.placesRestantes} / {program.statistics.totalPlaces}
                       </Badge>
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className={`text-sm mt-1 ${program.isDeleted ? 'text-yellow-700' : 'text-gray-600'}`}>
                         Taux d'occupation: {program.statistics.occupancyRate}%
                       </p>
                     </div>
@@ -453,9 +474,6 @@ export default function HomePage() {
                                   <span className={roomStyle.textColor}>
                                     {room.placesOccupees} occupé{room.placesOccupees > 1 ? 's' : ''}
                                   </span>
-                                  <span className={`font-medium ${roomStyle.textColor}`}>
-                                    {room.prixRoom.toLocaleString()} DH
-                      </span>
                                 </div>
                               </div>
                             );
@@ -595,14 +613,6 @@ export default function HomePage() {
                                     <p className={`text-xs text-center mt-1 ${roomStyle.textColor}`}>
                                       {roomType.placesOccupees}/{roomType.totalPlaces} places
                                     </p>
-                                  </div>
-                                  
-                                  {/* Prix moyen */}
-                                  <div className="text-center">
-                                    <span className={`text-sm font-medium ${roomStyle.textColor}`}>
-                                      {Math.round(roomType.rooms.reduce((sum: number, room: any) => sum + room.prixRoom, 0) / roomType.rooms.length).toLocaleString()} DH
-                                    </span>
-                                    <p className="text-xs text-gray-500">prix moyen</p>
                                   </div>
                                 </div>
                               );

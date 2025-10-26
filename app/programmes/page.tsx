@@ -132,6 +132,15 @@ export default function ProgrammesPage() {
     const fetchProgrammes = async () => {
       try {
         setLoading(true)
+        
+        // Récupérer le profil de l'agent pour vérifier le rôle
+        const profileResponse = await fetch('/api/auth/profile', { credentials: 'include' })
+        let isAdmin = false
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json()
+          isAdmin = profileData.agent?.role === 'ADMIN'
+        }
+        
         const response = await fetch(api.url(api.endpoints.allProgramsOverview))
         if (!response.ok) {
           throw new Error('Erreur lors du chargement des programmes')
@@ -139,13 +148,19 @@ export default function ProgrammesPage() {
         const data = await response.json()
         console.log('📥 Programmes reçus:', data.programs)
         console.log('📥 TOTAL PROGRAMMES:', data.programs?.length || 0)
-        const deletedProgs = data.programs?.filter((p: any) => p.isDeleted) || []
+        
+        // Filtrer les programmes supprimés si l'agent n'est pas ADMIN
+        const filteredPrograms = isAdmin 
+          ? data.programs || []
+          : (data.programs || []).filter((p: any) => !p.isDeleted)
+        
+        const deletedProgs = filteredPrograms.filter((p: any) => p.isDeleted) || []
         console.log('🗑️ PROGRAMMES SUPPRIMÉS dans les données:', deletedProgs.length)
         console.log('🗑️ Détail programmes supprimés:', deletedProgs)
-        setProgrammes(data.programs || [])
+        setProgrammes(filteredPrograms)
         
         // Log supplémentaire pour voir si les programmes sont bien filtrés
-        const activeProgs = data.programs?.filter((p: any) => !p.isDeleted) || []
+        const activeProgs = filteredPrograms.filter((p: any) => !p.isDeleted) || []
         console.log('✅ PROGRAMMES ACTIFS:', activeProgs.length)
       } catch (err) {
         console.error('Error fetching programmes:', err)

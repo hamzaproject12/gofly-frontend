@@ -751,6 +751,20 @@ export default function ReservationsPage() {
                           </span>
                         </div>
                         <div className="flex items-center gap-2 ml-auto">
+                          {/* Afficher le reste à payer seulement si le statut n'est pas "Complet" */}
+                          {reservation.statut !== "Complet" && (() => {
+                            const resteAPayer = reservation.prixEngage - reservation.paiementRecu;
+                            if (resteAPayer > 0) {
+                              return (
+                                <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-800 border border-orange-200 rounded px-3 py-1 text-lg font-bold">
+                                  <Wallet className="h-4 w-4" />
+                                  -{resteAPayer.toLocaleString()} DH
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                          
                           {reservation.statut === "Complet" && (
                             <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 border border-green-200 rounded px-4 py-1 text-lg font-bold">
                               <CheckCircle className="h-5 w-5" /> Complet

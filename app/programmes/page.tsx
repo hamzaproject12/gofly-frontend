@@ -138,9 +138,15 @@ export default function ProgrammesPage() {
         }
         const data = await response.json()
         console.log('📥 Programmes reçus:', data.programs)
+        console.log('📥 TOTAL PROGRAMMES:', data.programs?.length || 0)
         const deletedProgs = data.programs?.filter((p: any) => p.isDeleted) || []
-        console.log('🗑️ Programmes supprimés dans les données:', deletedProgs)
+        console.log('🗑️ PROGRAMMES SUPPRIMÉS dans les données:', deletedProgs.length)
+        console.log('🗑️ Détail programmes supprimés:', deletedProgs)
         setProgrammes(data.programs || [])
+        
+        // Log supplémentaire pour voir si les programmes sont bien filtrés
+        const activeProgs = data.programs?.filter((p: any) => !p.isDeleted) || []
+        console.log('✅ PROGRAMMES ACTIFS:', activeProgs.length)
       } catch (err) {
         console.error('Error fetching programmes:', err)
         setError(err instanceof Error ? err.message : 'Erreur inconnue')
@@ -165,6 +171,9 @@ export default function ProgrammesPage() {
   // Séparer les programmes actifs et supprimés
   const activeProgrammes = filteredProgrammes.filter(p => !p.isDeleted)
   const deletedProgrammes = filteredProgrammes.filter(p => p.isDeleted)
+  
+  // Log pour debug
+  console.log('🔍 Filtrage - Actifs:', activeProgrammes.length, 'Supprimés:', deletedProgrammes.length)
 
   // Fonctions pour la suppression
   const handleDeleteClick = (programme: ProgramOverview) => {

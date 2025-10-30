@@ -822,8 +822,8 @@ export default function ProgrammesPage() {
                   
                 {/* Boutons de suppression à droite */}
                 <div className="flex gap-2">
-                  {/* Soft Delete */}
-                  <Button
+                  {/* Soft Delete - Commenté */}
+                  {/* <Button
                     variant="outline"
                     size="sm"
                     className="border-orange-200 text-orange-700 hover:bg-orange-50"
@@ -831,7 +831,7 @@ export default function ProgrammesPage() {
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Supprimer
-                  </Button>
+                  </Button> */}
                   
                   {/* Hard Delete - Visible seulement pour les ADMIN */}
                   {isAdmin && (

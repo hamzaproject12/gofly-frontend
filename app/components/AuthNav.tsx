@@ -198,16 +198,18 @@ export default function AuthNav() {
                     </svg>
                     Nouvelle Réservation
                   </Link>
-                  <Link
-                    href="/programmes/nouveau"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                    onClick={() => setShowCommercialMenu(false)}
-                  >
-                    <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    Nouveau Programme
-                  </Link>
+                  {agent.role === 'ADMIN' && (
+                    <Link
+                      href="/programmes/nouveau"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                      onClick={() => setShowCommercialMenu(false)}
+                    >
+                      <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      Nouveau Programme
+                    </Link>
+                  )}
                   <Link
                     href="/reservations"
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
@@ -428,13 +430,15 @@ export default function AuthNav() {
               >
                 Nouvelle Réservation
               </Link>
-              <Link
-                href="/programmes/nouveau"
-                className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
-                onClick={() => setShowMobileMenu(false)}
-              >
-                Nouveau Programme
-              </Link>
+              {agent.role === 'ADMIN' && (
+                <Link
+                  href="/programmes/nouveau"
+                  className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
+                  onClick={() => setShowMobileMenu(false)}
+                >
+                  Nouveau Programme
+                </Link>
+              )}
               <Link
                 href="/reservations"
                 className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"

@@ -389,12 +389,14 @@ export default function ProgrammesPage() {
             <h1 className="text-2xl font-bold text-gray-900">Gestion des Programmes</h1>
             <p className="text-gray-500 mt-1">Créez et gérez vos programmes de voyage Omra</p>
           </div>
-          <Link href="/programmes/nouveau">
-            <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transition-all">
-              <Plus className="mr-2 h-4 w-4" />
-              Nouveau Programme
-            </Button>
-          </Link>
+          {isAdmin && (
+            <Link href="/programmes/nouveau">
+              <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transition-all">
+                <Plus className="mr-2 h-4 w-4" />
+                Nouveau Programme
+              </Button>
+            </Link>
+          )}
         </div>
 
         {/* Filtres et recherche */}

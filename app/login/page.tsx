@@ -131,7 +131,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5" autoComplete="on">
             {/* Champ Email */}
             <div className="group">
               <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">

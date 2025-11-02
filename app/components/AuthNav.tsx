@@ -264,16 +264,19 @@ export default function AuthNav() {
               </button>
               {showFinancesMenu && (
                 <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 dropdown-menu">
-                  <Link
-                    href="/depenses"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                    onClick={() => setShowFinancesMenu(false)}
-                  >
-                    <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Dépenses
-                  </Link>
+                  {/* Admin only - Dépenses */}
+                  {agent.role === 'ADMIN' && (
+                    <Link
+                      href="/depenses"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                      onClick={() => setShowFinancesMenu(false)}
+                    >
+                      <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Dépenses
+                    </Link>
+                  )}
                   <Link
                     href="/paiements"
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
@@ -467,13 +470,16 @@ export default function AuthNav() {
               <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Finances
               </div>
-              <Link
-                href="/depenses"
-                className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
-                onClick={() => setShowMobileMenu(false)}
-              >
-                Dépenses
-              </Link>
+              {/* Admin only - Dépenses */}
+              {agent.role === 'ADMIN' && (
+                <Link
+                  href="/depenses"
+                  className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
+                  onClick={() => setShowMobileMenu(false)}
+                >
+                  Dépenses
+                </Link>
+              )}
               <Link
                 href="/paiements"
                 className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"

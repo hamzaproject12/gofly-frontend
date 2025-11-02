@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, Plane, Building, Receipt, Bell, Settings, Calendar, Users, Wallet, CheckCircle, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { api } from "@/lib/api"
+import { useAuth } from "@/hooks/useAuth"
 
 // Types
 type Expense = {
@@ -43,6 +44,9 @@ type Stats = {
 }
 
 export default function DepensesPage() {
+  // Hook pour gérer l'authentification
+  const { isAdmin, loading: authLoading } = useAuth()
+  
   // États pour les données
   const [depenses, setDepenses] = useState<Expense[]>([])
   const [programmes, setProgrammes] = useState<Program[]>([])
@@ -175,7 +179,7 @@ export default function DepensesPage() {
     }
   }
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-8">
         <div className="max-w-7xl mx-auto">
@@ -183,6 +187,30 @@ export default function DepensesPage() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
             <p className="mt-4 text-gray-600">Chargement des dépenses...</p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Contrôle d'accès ADMIN uniquement
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-8">
+        <div className="max-w-7xl mx-auto">
+          <Card className="p-8 text-center border-2 border-red-200 bg-red-50">
+            <CardContent>
+              <AlertCircle className="h-16 w-16 text-red-600 mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-red-800 mb-2">Accès Refusé</h2>
+              <p className="text-gray-700">
+                Cette page est réservée aux administrateurs uniquement.
+              </p>
+              <Link href="/">
+                <Button className="mt-6">
+                  Retour au Dashboard
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );

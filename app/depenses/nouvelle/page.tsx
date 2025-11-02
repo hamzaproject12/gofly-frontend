@@ -8,10 +8,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, ArrowLeft, Receipt, Calendar, DollarSign, Building, Plane } from "lucide-react"
+import { Plus, ArrowLeft, Receipt, Calendar, DollarSign, Building, Plane, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { api } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
+import { useAuth } from "@/hooks/useAuth"
 
 type Program = {
   id: number
@@ -21,6 +22,7 @@ type Program = {
 export default function NouvelleDepensePage() {
   const router = useRouter()
   const { toast } = useToast()
+  const { isAdmin, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(false)
   const [programmes, setProgrammes] = useState<Program[]>([])
 
@@ -100,6 +102,41 @@ export default function NouvelleDepensePage() {
       default:
         return <Receipt className="h-4 w-4" />
     }
+  }
+
+  // Contrôle d'accès ADMIN uniquement
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 p-8">
+        <div className="max-w-7xl mx-auto text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 p-8">
+        <div className="max-w-7xl mx-auto">
+          <Card className="p-8 text-center border-2 border-red-200 bg-red-50">
+            <CardContent>
+              <AlertCircle className="h-16 w-16 text-red-600 mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-red-800 mb-2">Accès Refusé</h2>
+              <p className="text-gray-700">
+                Cette page est réservée aux administrateurs uniquement.
+              </p>
+              <Link href="/">
+                <Button className="mt-6">
+                  Retour au Dashboard
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
   }
 
   return (

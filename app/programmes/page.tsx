@@ -133,14 +133,6 @@ export default function ProgrammesPage() {
       try {
         setLoading(true)
         
-        // Récupérer le profil de l'agent pour vérifier le rôle
-        const profileResponse = await fetch('/api/auth/profile', { credentials: 'include' })
-        let isAdmin = false
-        if (profileResponse.ok) {
-          const profileData = await profileResponse.json()
-          isAdmin = profileData.agent?.role === 'ADMIN'
-        }
-        
         const response = await fetch(api.url(api.endpoints.allProgramsOverview))
         if (!response.ok) {
           throw new Error('Erreur lors du chargement des programmes')
@@ -171,7 +163,7 @@ export default function ProgrammesPage() {
     }
 
     fetchProgrammes()
-  }, [])
+  }, [isAdmin])
 
   // Liste des programmes pour le filtre
   const programmesNoms = ["Tous", ...programmes.map((p) => p.name)]

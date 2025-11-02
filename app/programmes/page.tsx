@@ -716,71 +716,73 @@ export default function ProgrammesPage() {
                     </div>
                   </TabsContent>
 
-                  <TabsContent value="finances" className="p-6">
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-                          <h4 className="text-sm font-medium text-gray-500 mb-2">Revenus</h4>
-                          <p className="text-2xl font-bold text-green-600">
-                            {(programme.totalRevenue || 0).toLocaleString()} DH
-                          </p>
-                          <p className="text-xs text-gray-500">Total des paiements</p>
+                  {isAdmin && (
+                    <TabsContent value="finances" className="p-6">
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                            <h4 className="text-sm font-medium text-gray-500 mb-2">Revenus</h4>
+                            <p className="text-2xl font-bold text-green-600">
+                              {(programme.totalRevenue || 0).toLocaleString()} DH
+                            </p>
+                            <p className="text-xs text-gray-500">Total des paiements</p>
+                          </div>
+
+                          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                            <h4 className="text-sm font-medium text-gray-500 mb-2">Dépenses</h4>
+                            <p className="text-2xl font-bold text-red-600">
+                              {(programme.totalExpenses || 0).toLocaleString()} DH
+                            </p>
+                            <p className="text-xs text-gray-500">Total des coûts</p>
+                          </div>
+
+                          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                            <h4 className="text-sm font-medium text-gray-500 mb-2">Bénéfice</h4>
+                            <p className="text-2xl font-bold text-blue-600">
+                              {(programme.netProfit || 0).toLocaleString()} DH
+                            </p>
+                            <p className="text-xs text-gray-500">Revenus - Dépenses</p>
+                          </div>
                         </div>
 
                         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-                          <h4 className="text-sm font-medium text-gray-500 mb-2">Dépenses</h4>
-                          <p className="text-2xl font-bold text-red-600">
-                            {(programme.totalExpenses || 0).toLocaleString()} DH
-                          </p>
-                          <p className="text-xs text-gray-500">Total des coûts</p>
-                        </div>
-
-                        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-                          <h4 className="text-sm font-medium text-gray-500 mb-2">Bénéfice</h4>
-                          <p className="text-2xl font-bold text-blue-600">
-                            {(programme.netProfit || 0).toLocaleString()} DH
-                          </p>
-                          <p className="text-xs text-gray-500">Revenus - Dépenses</p>
-                        </div>
-                      </div>
-
-                      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-                        <h4 className="text-sm font-medium text-gray-500 mb-3">Répartition des dépenses</h4>
-                        <div className="space-y-3">
-                          {getExpensesForDisplay(programme).map((depense, index) => (
-                            <div key={index} className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                {depense.type === "hotel" && <Building className="h-4 w-4 text-yellow-600" />}
-                                {depense.type === "vol" && <Plane className="h-4 w-4 text-blue-600" />}
-                                {depense.type === "visa" && <FileText className="h-4 w-4 text-green-600" />}
-                                {depense.type === "autre" && <FileText className="h-4 w-4 text-gray-600" />}
-                                <span className="text-sm capitalize">{depense.type}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <div className="w-24 bg-gray-200 rounded-full h-2">
-                                  <div
-                                    className={`${
-                                      depense.type === "hotel"
-                                        ? "bg-yellow-600"
-                                        : depense.type === "vol"
-                                          ? "bg-blue-600"
-                                          : depense.type === "visa"
-                                            ? "bg-green-600"
-                                            : "bg-gray-600"
-                                    } h-2 rounded-full`}
-                                    style={{
-                                      width: `${(programme.totalExpenses || 0) > 0 ? (depense.montant / (programme.totalExpenses || 1)) * 100 : 0}%`,
-                                    }}
-                                  ></div>
+                          <h4 className="text-sm font-medium text-gray-500 mb-3">Répartition des dépenses</h4>
+                          <div className="space-y-3">
+                            {getExpensesForDisplay(programme).map((depense, index) => (
+                              <div key={index} className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  {depense.type === "hotel" && <Building className="h-4 w-4 text-yellow-600" />}
+                                  {depense.type === "vol" && <Plane className="h-4 w-4 text-blue-600" />}
+                                  {depense.type === "visa" && <FileText className="h-4 w-4 text-green-600" />}
+                                  {depense.type === "autre" && <FileText className="h-4 w-4 text-gray-600" />}
+                                  <span className="text-sm capitalize">{depense.type}</span>
                                 </div>
-                                <span className="text-sm font-medium">{depense.montant.toLocaleString()} DH</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-24 bg-gray-200 rounded-full h-2">
+                                    <div
+                                      className={`${
+                                        depense.type === "hotel"
+                                          ? "bg-yellow-600"
+                                          : depense.type === "vol"
+                                            ? "bg-blue-600"
+                                            : depense.type === "visa"
+                                              ? "bg-green-600"
+                                              : "bg-gray-600"
+                                      } h-2 rounded-full`}
+                                      style={{
+                                        width: `${(programme.totalExpenses || 0) > 0 ? (depense.montant / (programme.totalExpenses || 1)) * 100 : 0}%`,
+                                      }}
+                                    ></div>
+                                  </div>
+                                  <span className="text-sm font-medium">{depense.montant.toLocaleString()} DH</span>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </TabsContent>
+                    </TabsContent>
+                  )}
                 </Tabs>
 
                 <div className="p-6 pt-0 flex justify-between items-center">

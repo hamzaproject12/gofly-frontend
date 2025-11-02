@@ -31,6 +31,7 @@ import {
 import Link from "next/link"
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/hooks/useAuth"
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -140,6 +141,7 @@ const statusMapping = {
 } as const;
 
 export default function ReservationsPage() {
+  const { isAdmin } = useAuth()
   const [mounted, setMounted] = useState(false)
   const [reservations, setReservations] = useState<TransformedReservation[]>([])
   const [programs, setPrograms] = useState<Program[]>([])
@@ -885,42 +887,44 @@ export default function ReservationsPage() {
                                   </button>
                                 </a>
                               </Link>
-                              <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                                <DialogTrigger asChild>
-                                  <button
-                                    type="button"
-                                    title="Supprimer"
-                                    className="rounded-full p-1.5 bg-white shadow hover:bg-red-100 transition-all border border-red-200 group-hover:scale-110"
-                                    onClick={e => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      setReservationToDelete(reservation.id);
-                                      setDeleteDialogOpen(true);
-                                    }}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-600 group-hover:text-red-800 transition-colors" />
-                                  </button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-sm rounded-2xl bg-white p-8 shadow-2xl border border-gray-100">
-                                  <DialogHeader>
-                                    <DialogTitle className="text-lg font-semibold text-gray-800 text-center mb-2">Supprimer la réservation ?</DialogTitle>
-                                    <DialogDescription className="text-center text-gray-500 mb-4">
-                                      Cette action est irréversible.
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  <DialogFooter className="flex flex-row justify-center gap-4 mt-2">
-                                    <DialogClose asChild>
-                                      <button className="px-5 py-2 rounded border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-100 transition">Annuler</button>
-                                    </DialogClose>
+                              {isAdmin && (
+                                <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                                  <DialogTrigger asChild>
                                     <button
-                                      className="px-5 py-2 rounded bg-red-500 text-white font-medium hover:bg-red-600 transition"
-                                      onClick={() => reservationToDelete && handleDeleteReservation(reservationToDelete)}
+                                      type="button"
+                                      title="Supprimer"
+                                      className="rounded-full p-1.5 bg-white shadow hover:bg-red-100 transition-all border border-red-200 group-hover:scale-110"
+                                      onClick={e => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setReservationToDelete(reservation.id);
+                                        setDeleteDialogOpen(true);
+                                      }}
                                     >
-                                      Supprimer
+                                      <Trash2 className="h-4 w-4 text-red-600 group-hover:text-red-800 transition-colors" />
                                     </button>
-                                  </DialogFooter>
-                                </DialogContent>
-                              </Dialog>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-sm rounded-2xl bg-white p-8 shadow-2xl border border-gray-100">
+                                    <DialogHeader>
+                                      <DialogTitle className="text-lg font-semibold text-gray-800 text-center mb-2">Supprimer la réservation ?</DialogTitle>
+                                      <DialogDescription className="text-center text-gray-500 mb-4">
+                                        Cette action est irréversible.
+                                      </DialogDescription>
+                                    </DialogHeader>
+                                    <DialogFooter className="flex flex-row justify-center gap-4 mt-2">
+                                      <DialogClose asChild>
+                                        <button className="px-5 py-2 rounded border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-100 transition">Annuler</button>
+                                      </DialogClose>
+                                      <button
+                                        className="px-5 py-2 rounded bg-red-500 text-white font-medium hover:bg-red-600 transition"
+                                        onClick={() => reservationToDelete && handleDeleteReservation(reservationToDelete)}
+                                      >
+                                        Supprimer
+                                      </button>
+                                    </DialogFooter>
+                                  </DialogContent>
+                                </Dialog>
+                              )}
                             </div>
                           </div>
                         </div>

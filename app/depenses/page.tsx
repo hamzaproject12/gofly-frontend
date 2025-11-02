@@ -357,7 +357,7 @@ export default function DepensesPage() {
         {/* Filtres */}
         <Card className="mb-6">
           <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Select value={programmeFilter} onValueChange={(value) => setProgrammeFilter(value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Tous les programmes" />

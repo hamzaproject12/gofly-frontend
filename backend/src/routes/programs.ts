@@ -629,22 +629,19 @@ router.put('/:id', async (req, res) => {
                 }
                 console.log(`[Room Update] [TX] Hotel: ${hotelName}, Type: ${roomType}, desiredCount: ${desiredCount}, currentTotal: ${currentTotal}`);
 
-                // Ajuster le prix
-                if (desiredPrice > 0) {
-                  if (freeRooms.length > 0) {
-                    await tx.room.updateMany({
-                      where: { id: { in: freeRooms.map(r => r.id) } },
-                      data: { prixRoom: desiredPrice }
-                    });
-                    console.log(`[Room Update] [TX] Updated price for ${freeRooms.length} free rooms to ${desiredPrice}`);
-                  }
-                  if (occupiedRooms.length > 0) {
-                    await tx.room.updateMany({
-                      where: { id: { in: occupiedRooms.map(r => r.id) } },
-                      data: { prixRoom: desiredPrice }
-                    });
-                    console.log(`[Room Update] [TX] Updated price for ${occupiedRooms.length} occupied rooms to ${desiredPrice}`);
-                  }
+                // Ajuster le prix pour TOUTES les rooms (libres et occupées)
+                // Cette mise à jour doit se faire AVANT toute autre opération pour garantir la cohérence
+                if (desiredPrice > 0 && existingRooms.length > 0) {
+                  await tx.room.updateMany({
+                    where: {
+                      programId: program.id,
+                      hotelId: hotel.id,
+                      roomType: roomType,
+                      gender: 'Mixte',
+                    },
+                    data: { prixRoom: desiredPrice }
+                  });
+                  console.log(`[Room Update] [TX] Updated price for all ${existingRooms.length} rooms (free + occupied) to ${desiredPrice}`);
                 }
 
                 if (desiredCount <= 0) {

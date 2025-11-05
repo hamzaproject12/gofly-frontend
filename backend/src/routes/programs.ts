@@ -651,10 +651,10 @@ router.put('/:id', async (req, res) => {
             }
           }
         }
-      }
-      
-      await upsertRoomsForEntriesWithTx('Madina', hotelsMadina);
-      await upsertRoomsForEntriesWithTx('Makkah', hotelsMakkah);
+        
+        // Appeler les fonctions pour mettre à jour les rooms
+        await upsertRoomsForEntriesWithTx('Madina', hotelsMadina);
+        await upsertRoomsForEntriesWithTx('Makkah', hotelsMakkah);
       }, {
         timeout: 30000, // Timeout de 30 secondes pour les transactions longues
       });

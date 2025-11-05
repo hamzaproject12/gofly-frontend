@@ -281,6 +281,42 @@ export default function ModifierProgrammePage() {
         }))
       }
 
+      const normalizedMadina = normalizeHotelChambres(formData.hotelsMadina)
+      const normalizedMakkah = normalizeHotelChambres(formData.hotelsMakkah)
+
+      // Analyser les changements pour chaque hôtel
+      const analyzeRoomChanges = (hotels: typeof normalizedMadina, city: string) => {
+        console.log(`\n📊 === ANALYSE DES CHANGEMENTS - ${city} ===`)
+        hotels.forEach(hotel => {
+          console.log(`\n🏨 Hôtel: ${hotel.name}`)
+          for (let type = 1; type <= 5; type++) {
+            const config = hotel.chambres[type as 1 | 2 | 3 | 4 | 5]
+            if (config) {
+              const nb = parseInt(config.nb || "0", 10)
+              const prix = parseFloat(config.prix || "0")
+              const occupied = roomConstraints[city === "Madina" ? "Madina" : "Makkah"][hotel.name]?.[type]?.occupied || 0
+              const total = roomConstraints[city === "Madina" ? "Madina" : "Makkah"][hotel.name]?.[type]?.total || 0
+              
+              const diff = nb - total
+              let action = ""
+              if (diff > 0) {
+                action = `➕ AJOUT de ${diff} room(s)`
+              } else if (diff < 0) {
+                action = `➖ SUPPRESSION de ${Math.abs(diff)} room(s) (max ${Math.min(Math.abs(diff), total - occupied)} supprimables car ${occupied} occupées)`
+              } else {
+                action = `➡️ PAS DE CHANGEMENT de nombre`
+              }
+              
+              const prixChange = prix > 0 ? ` | Prix: ${prix} DH` : ""
+              console.log(`  Type ${type}: Total actuel=${total}, Occupées=${occupied}, Demandé=${nb} | ${action}${prixChange}`)
+            }
+          }
+        })
+      }
+
+      analyzeRoomChanges(normalizedMadina, "Madina")
+      analyzeRoomChanges(normalizedMakkah, "Makkah")
+
       const payload = {
         name: formData.nom,
         nbJoursMadina: formData.nbJoursMadina ? parseInt(formData.nbJoursMadina) : undefined,
@@ -293,9 +329,13 @@ export default function ModifierProgrammePage() {
         hotelDeadline: formData.datesLimites.hotels ?? undefined,
         flightDeadline: formData.datesLimites.billets ?? undefined,
         passportDeadline: formData.datesLimites.passport ?? undefined,
-        hotelsMadina: normalizeHotelChambres(formData.hotelsMadina),
-        hotelsMakkah: normalizeHotelChambres(formData.hotelsMakkah),
+        hotelsMadina: normalizedMadina,
+        hotelsMakkah: normalizedMakkah,
       }
+
+      console.log(`\n📤 === REQUÊTE ENVOYÉE AU BACKEND ===`)
+      console.log(`URL: PUT /api/programs/${id}`)
+      console.log(`Payload:`, JSON.stringify(payload, null, 2))
 
       const res = await fetch(api.url(`/api/programs/${id}`), {
         method: "PUT",
@@ -304,8 +344,32 @@ export default function ModifierProgrammePage() {
       })
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))
+        console.error(`❌ Erreur backend:`, j)
         throw new Error(j.error || "Erreur lors de la mise à jour du programme")
       }
+      
+      const responseData = await res.json().catch(() => ({}))
+      console.log(`\n✅ === RÉPONSE DU BACKEND ===`)
+      console.log(`Réponse:`, responseData)
+      
+      // Analyser les rooms retournées pour vérifier le résultat
+      if (responseData.rooms) {
+        console.log(`\n📋 === ROOMS RETOURNÉES PAR LE BACKEND ===`)
+        const roomsByHotel = responseData.rooms.reduce((acc: any, room: any) => {
+          const key = `${room.hotel.city}:${room.hotel.name}:${room.roomType}`
+          if (!acc[key]) acc[key] = []
+          acc[key].push(room)
+          return acc
+        }, {})
+        
+        Object.entries(roomsByHotel).forEach(([key, rooms]: [string, any]) => {
+          const [city, hotelName, roomType] = key.split(':')
+          const free = rooms.filter((r: any) => r.nbrPlaceRestantes === r.nbrPlaceTotal).length
+          const occupied = rooms.length - free
+          console.log(`  ${city} - ${hotelName} - ${roomType}: Total=${rooms.length}, Libres=${free}, Occupées=${occupied}`)
+        })
+      }
+      
       toast({ title: "Succès", description: "Programme mis à jour" })
       router.push("/programmes")
     } catch (error) {

@@ -264,6 +264,9 @@ router.post('/', async (req, res) => {
 // Update program
 router.put('/:id', async (req, res) => {
   try {
+    console.log(`\n🔵 === PUT /api/programs/${req.params.id} - REÇU ===`);
+    console.log(`Body:`, JSON.stringify(req.body, null, 2));
+    
     const {
       name,
       nbJoursMadina,
@@ -279,6 +282,10 @@ router.put('/:id', async (req, res) => {
       hotelsMadina,
       hotelsMakkah,
     } = req.body;
+    
+    console.log(`\n📥 Données extraites:`);
+    console.log(`  hotelsMadina:`, hotelsMadina?.length || 0, 'hôtel(s)');
+    console.log(`  hotelsMakkah:`, hotelsMakkah?.length || 0, 'hôtel(s)');
 
     const program = await prisma.program.update({
       where: { id: parseInt(req.params.id) },

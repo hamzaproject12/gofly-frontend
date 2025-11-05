@@ -305,13 +305,13 @@ router.put('/:id', async (req, res) => {
     });
 
     // ---------- Mise à jour non destructive des ROOMS (création/suppression de chambres libres, MAJ prix) ----------
-    const mapTypeToRoomType = (type: number) => {
+    const mapTypeToRoomType = (type: number): 'SINGLE' | 'DOUBLE' | 'TRIPLE' | 'QUAD' | 'QUINT' | undefined => {
       switch (type) {
-        case 1: return 'SINGLE' as const;
-        case 2: return 'DOUBLE' as const;
-        case 3: return 'TRIPLE' as const;
-        case 4: return 'QUAD' as const;
-        case 5: return 'QUINT' as const;
+        case 1: return 'SINGLE';
+        case 2: return 'DOUBLE';
+        case 3: return 'TRIPLE';
+        case 4: return 'QUAD';
+        case 5: return 'QUINT';
         default: return undefined;
       }
     };
@@ -517,6 +517,14 @@ router.put('/:id', async (req, res) => {
             
             try {
               const hotel = await findOrCreateHotelInTx(city, hotelName);
+              
+              // Vérifier que hotel et program ont des IDs valides
+              if (!hotel || !hotel.id) {
+                throw new Error(`Invalid hotel: ${hotelName} in ${city}`);
+              }
+              if (!program || !program.id) {
+                throw new Error(`Invalid program ID`);
+              }
 
               // S'assurer que la table de liaison existe
               try {
@@ -535,17 +543,25 @@ router.put('/:id', async (req, res) => {
                 if (!config) continue;
                 
                 const roomType = mapTypeToRoomType(type);
-                if (!roomType) continue;
+                if (!roomType) {
+                  console.error(`[TX] Invalid roomType for type ${type}`);
+                  continue;
+                }
                 
                 const desiredCount = config?.nb ? Number(config.nb) : 0;
                 const desiredPrice = config?.prix ? parseFloat(config.prix) : 0;
+
+                // Vérifier les valeurs avant la requête
+                if (isNaN(program.id) || isNaN(hotel.id)) {
+                  throw new Error(`Invalid IDs - programId: ${program.id}, hotelId: ${hotel.id}`);
+                }
 
                 // Lire rooms existantes depuis la transaction
                 const existingRooms = await tx.room.findMany({
                   where: {
                     programId: program.id,
                     hotelId: hotel.id,
-                    roomType,
+                    roomType: roomType,
                     gender: 'Mixte',
                   }
                 });

@@ -339,11 +339,15 @@ router.put('/:id', async (req, res) => {
         } catch {}
 
         if (!entry || typeof entry !== 'object' || !entry.chambres) continue;
-        for (const key of Object.keys(entry.chambres)) {
-          const type = Number(key);
+        
+        // Parcourir toutes les clés (1, 2, 3, 4, 5) pour s'assurer qu'elles sont toutes traitées
+        for (let type = 1; type <= 5; type++) {
+          const config = entry.chambres[type];
+          if (!config) continue; // Si pas de configuration pour ce type, passer au suivant
+          
           const roomType = mapTypeToRoomType(type);
           if (!roomType) continue;
-          const config = entry.chambres[type];
+          
           const desiredCount = config?.nb ? Number(config.nb) : 0;
           const desiredPrice = config?.prix ? parseFloat(config.prix) : 0;
 
@@ -361,6 +365,7 @@ router.put('/:id', async (req, res) => {
           const currentTotal = existingRooms.length;
 
           // Ajuster le prix des chambres libres si un prix valide est fourni
+          // Même si desiredCount est 0, on peut vouloir mettre à jour le prix
           if (desiredPrice > 0 && freeRooms.length > 0) {
             await prisma.room.updateMany({
               where: { id: { in: freeRooms.map(r => r.id) } },
@@ -368,8 +373,8 @@ router.put('/:id', async (req, res) => {
             });
           }
 
+          // Si desiredCount est 0, supprimer toutes les chambres libres de ce type
           if (desiredCount <= 0) {
-            // Supprimer toutes les chambres libres de ce type si on demande 0
             if (freeRooms.length > 0) {
               await prisma.room.deleteMany({ where: { id: { in: freeRooms.map(r => r.id) } } });
             }

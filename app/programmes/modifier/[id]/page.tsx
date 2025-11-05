@@ -267,6 +267,20 @@ export default function ModifierProgrammePage() {
     if (!isFormValid) return
     setIsSubmitting(true)
     try {
+      // S'assurer que toutes les clés numériques sont présentes dans chambres (1-5)
+      const normalizeHotelChambres = (hotels: typeof formData.hotelsMadina) => {
+        return hotels.map(hotel => ({
+          ...hotel,
+          chambres: {
+            1: hotel.chambres[1] || { nb: "0", prix: "" },
+            2: hotel.chambres[2] || { nb: "0", prix: "" },
+            3: hotel.chambres[3] || { nb: "0", prix: "" },
+            4: hotel.chambres[4] || { nb: "0", prix: "" },
+            5: hotel.chambres[5] || { nb: "0", prix: "" },
+          }
+        }))
+      }
+
       const payload = {
         name: formData.nom,
         nbJoursMadina: formData.nbJoursMadina ? parseInt(formData.nbJoursMadina) : undefined,
@@ -279,8 +293,8 @@ export default function ModifierProgrammePage() {
         hotelDeadline: formData.datesLimites.hotels ?? undefined,
         flightDeadline: formData.datesLimites.billets ?? undefined,
         passportDeadline: formData.datesLimites.passport ?? undefined,
-        hotelsMadina: formData.hotelsMadina,
-        hotelsMakkah: formData.hotelsMakkah,
+        hotelsMadina: normalizeHotelChambres(formData.hotelsMadina),
+        hotelsMakkah: normalizeHotelChambres(formData.hotelsMakkah),
       }
 
       const res = await fetch(api.url(`/api/programs/${id}`), {

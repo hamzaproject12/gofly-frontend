@@ -322,104 +322,112 @@ router.put('/:id', async (req, res) => {
       }
     }
 
-    async function upsertRoomsForEntries(city: 'Madina' | 'Makkah', entries: any[]) {
-      if (!Array.isArray(entries)) return;
-      for (const entry of entries) {
-        const hotelName = typeof entry === 'string' ? entry : entry?.name;
-        if (!hotelName) continue;
-        const hotel = await findOrCreateHotel(city, hotelName);
 
-        // S'assurer que la table de liaison existe
-        try {
-          if (city === 'Madina') {
-            await prisma.programHotelMadina.create({ data: { programId: program.id, hotelId: hotel.id } });
-          } else {
-            await prisma.programHotelMakkah.create({ data: { programId: program.id, hotelId: hotel.id } });
-          }
-        } catch {}
+    // Appliquer les changements Rooms dans une transaction
+    await prisma.$transaction(async (tx) => {
+      // Créer une version de la fonction qui utilise la transaction
+      const upsertRoomsForEntriesTx = async (city: 'Madina' | 'Makkah', entries: any[]) => {
+        if (!Array.isArray(entries)) return;
+        for (const entry of entries) {
+          const hotelName = typeof entry === 'string' ? entry : entry?.name;
+          if (!hotelName) continue;
+          const hotel = await findOrCreateHotel(city, hotelName);
 
-        if (!entry || typeof entry !== 'object' || !entry.chambres) continue;
-        
-        // Parcourir toutes les clés (1, 2, 3, 4, 5) pour s'assurer qu'elles sont toutes traitées
-        for (let type = 1; type <= 5; type++) {
-          const config = entry.chambres[type];
-          if (!config) continue; // Si pas de configuration pour ce type, passer au suivant
-          
-          const roomType = mapTypeToRoomType(type);
-          if (!roomType) continue;
-          
-          const desiredCount = config?.nb ? Number(config.nb) : 0;
-          const desiredPrice = config?.prix ? parseFloat(config.prix) : 0;
-
-          // Lire rooms existantes
-          const existingRooms = await prisma.room.findMany({
-            where: {
-              programId: program.id,
-              hotelId: hotel.id,
-              roomType,
-              gender: 'Mixte',
+          // S'assurer que la table de liaison existe
+          try {
+            if (city === 'Madina') {
+              await tx.programHotelMadina.create({ data: { programId: program.id, hotelId: hotel.id } });
+            } else {
+              await tx.programHotelMakkah.create({ data: { programId: program.id, hotelId: hotel.id } });
             }
-          });
+          } catch {}
+          
+          if (!entry || typeof entry !== 'object' || !entry.chambres) continue;
+          
+          for (let type = 1; type <= 5; type++) {
+            const config = entry.chambres[type];
+            if (!config) continue;
+            
+            const roomType = mapTypeToRoomType(type);
+            if (!roomType) continue;
+            
+            const desiredCount = config?.nb ? Number(config.nb) : 0;
+            const desiredPrice = config?.prix ? parseFloat(config.prix) : 0;
 
-          const freeRooms = existingRooms.filter(r => r.nbrPlaceRestantes === r.nbrPlaceTotal);
-          const currentTotal = existingRooms.length;
-
-          // Ajuster le prix des chambres libres si un prix valide est fourni
-          // Même si desiredCount est 0, on peut vouloir mettre à jour le prix
-          if (desiredPrice > 0 && freeRooms.length > 0) {
-            await prisma.room.updateMany({
-              where: { id: { in: freeRooms.map(r => r.id) } },
-              data: { prixRoom: desiredPrice }
+            const existingRooms = await tx.room.findMany({
+              where: {
+                programId: program.id,
+                hotelId: hotel.id,
+                roomType,
+                gender: 'Mixte',
+              }
             });
-          }
 
-          // Si desiredCount est 0, supprimer toutes les chambres libres de ce type
-          if (desiredCount <= 0) {
-            if (freeRooms.length > 0) {
-              await prisma.room.deleteMany({ where: { id: { in: freeRooms.map(r => r.id) } } });
-            }
-            continue;
-          }
+            const freeRooms = existingRooms.filter(r => r.nbrPlaceRestantes === r.nbrPlaceTotal);
+            const occupiedRooms = existingRooms.filter(r => r.nbrPlaceRestantes < r.nbrPlaceTotal);
+            const currentTotal = existingRooms.length;
 
-          if (desiredCount > currentTotal) {
-            // Créer des rooms supplémentaires
-            const toCreate = desiredCount - currentTotal;
-            for (let i = 0; i < toCreate; i++) {
-              await prisma.room.create({
-                data: {
+            console.log(`[TX UPDATE ROOMS] Hotel: ${hotelName}, Type: ${roomType}, CurrentTotal: ${currentTotal}, Free: ${freeRooms.length}, Occupied: ${occupiedRooms.length}, DesiredCount: ${desiredCount}, DesiredPrice: ${desiredPrice}`);
+
+            if (desiredPrice > 0 && existingRooms.length > 0) {
+              await tx.room.updateMany({
+                where: { 
                   programId: program.id,
                   hotelId: hotel.id,
                   roomType,
                   gender: 'Mixte',
-                  nbrPlaceTotal: type,
-                  nbrPlaceRestantes: type,
-                  prixRoom: desiredPrice > 0 ? desiredPrice : (freeRooms[0]?.prixRoom ?? 0),
-                  listeIdsReservation: [],
-                }
+                },
+                data: { prixRoom: desiredPrice }
               });
             }
-          } else if (desiredCount < currentTotal) {
-            // Supprimer uniquement des rooms libres en trop
-            const toRemove = currentTotal - desiredCount;
-            if (toRemove > 0 && freeRooms.length > 0) {
-              const deletable = freeRooms.slice(0, Math.min(toRemove, freeRooms.length));
-              await prisma.room.deleteMany({ where: { id: { in: deletable.map(r => r.id) } } });
+
+            if (desiredCount <= 0) {
+              if (freeRooms.length > 0) {
+                await tx.room.deleteMany({ where: { id: { in: freeRooms.map(r => r.id) } } });
+              }
+              continue;
+            }
+
+            if (desiredCount > currentTotal) {
+              const toCreate = desiredCount - currentTotal;
+              console.log(`[TX CREATE ROOMS] Creating ${toCreate} new rooms (${currentTotal} existing -> ${desiredCount} desired)`);
+              for (let i = 0; i < toCreate; i++) {
+                const newRoom = await tx.room.create({
+                  data: {
+                    programId: program.id,
+                    hotelId: hotel.id,
+                    roomType,
+                    gender: 'Mixte',
+                    nbrPlaceTotal: type,
+                    nbrPlaceRestantes: type,
+                    prixRoom: desiredPrice > 0 ? desiredPrice : (existingRooms[0]?.prixRoom ?? 0),
+                    listeIdsReservation: [],
+                  }
+                });
+                console.log(`[TX CREATE ROOM] Created room ID: ${newRoom.id}`);
+              }
+            } else if (desiredCount < currentTotal) {
+              const toRemove = currentTotal - desiredCount;
+              if (toRemove > 0 && freeRooms.length > 0) {
+                const deletable = freeRooms.slice(0, Math.min(toRemove, freeRooms.length));
+                await tx.room.deleteMany({ where: { id: { in: deletable.map(r => r.id) } } });
+              }
             }
           }
         }
-      }
-    }
-
-    // Appliquer les changements Rooms dans une transaction
-    await prisma.$transaction(async () => {
-      await upsertRoomsForEntries('Madina', hotelsMadina);
-      await upsertRoomsForEntries('Makkah', hotelsMakkah);
+      };
+      
+      await upsertRoomsForEntriesTx('Madina', hotelsMadina);
+      await upsertRoomsForEntriesTx('Makkah', hotelsMakkah);
     });
 
+    // Relire les données après la transaction pour s'assurer qu'elles sont à jour
     const updated = await prisma.program.findUnique({
       where: { id: program.id },
       include: { hotelsMadina: { include: { hotel: true } }, hotelsMakkah: { include: { hotel: true } }, rooms: { include: { hotel: true } } }
     });
+    
+    console.log(`[FINAL] Program ${program.id} has ${updated?.rooms?.length || 0} total rooms after update`);
 
     res.json(updated);
   } catch (error) {

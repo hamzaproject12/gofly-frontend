@@ -527,29 +527,40 @@ router.put('/:id', async (req, res) => {
               }
 
               // S'assurer que la table de liaison existe (ne pas créer si elle existe déjà)
+              // Utiliser findFirst au lieu de findUnique pour éviter les erreurs de clé composite
               try {
+                let existingLink = null;
                 if (city === 'Madina') {
-                  const existingLink = await tx.programHotelMadina.findUnique({
-                    where: { programId_hotelId: { programId: program.id, hotelId: hotel.id } }
+                  existingLink = await tx.programHotelMadina.findFirst({
+                    where: { programId: program.id, hotelId: hotel.id }
                   });
                   if (!existingLink) {
-                    await tx.programHotelMadina.create({ data: { programId: program.id, hotelId: hotel.id } });
+                    await tx.programHotelMadina.create({ 
+                      data: { programId: program.id, hotelId: hotel.id } 
+                    });
+                    console.log(`[TX] Created link for program ${program.id} and hotel ${hotel.id} in ${city}`);
                   }
                 } else {
-                  const existingLink = await tx.programHotelMakkah.findUnique({
-                    where: { programId_hotelId: { programId: program.id, hotelId: hotel.id } }
+                  existingLink = await tx.programHotelMakkah.findFirst({
+                    where: { programId: program.id, hotelId: hotel.id }
                   });
                   if (!existingLink) {
-                    await tx.programHotelMakkah.create({ data: { programId: program.id, hotelId: hotel.id } });
+                    await tx.programHotelMakkah.create({ 
+                      data: { programId: program.id, hotelId: hotel.id } 
+                    });
+                    console.log(`[TX] Created link for program ${program.id} and hotel ${hotel.id} in ${city}`);
                   }
                 }
               } catch (linkError: any) {
-                // Si c'est une erreur de contrainte unique, c'est OK (la relation existe déjà)
+                // Si c'est une erreur de contrainte unique (P2002), c'est OK (la relation existe déjà)
+                // Dans PostgreSQL, une erreur de contrainte unique peut faire échouer la transaction
+                // mais Prisma la gère généralement correctement
                 if (linkError?.code === 'P2002' || linkError?.message?.includes('Unique constraint')) {
-                  console.log(`[TX] Link already exists for program ${program.id} and hotel ${hotel.id} in ${city}`);
+                  console.log(`[TX] Link already exists for program ${program.id} and hotel ${hotel.id} in ${city} (ignored)`);
                 } else {
-                  // Pour toute autre erreur, la logger mais ne pas faire échouer la transaction
+                  // Pour toute autre erreur, la logger et re-throw pour que la transaction soit rollback
                   console.error(`[TX] Error creating link for program ${program.id} and hotel ${hotel.id} in ${city}:`, linkError);
+                  throw linkError; // Re-throw pour rollback propre de la transaction
                 }
               }
 

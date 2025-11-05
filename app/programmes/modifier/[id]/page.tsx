@@ -251,6 +251,8 @@ export default function ModifierProgrammePage() {
         hotelDeadline: formData.datesLimites.hotels ?? undefined,
         flightDeadline: formData.datesLimites.billets ?? undefined,
         passportDeadline: formData.datesLimites.passport ?? undefined,
+        hotelsMadina: formData.hotelsMadina,
+        hotelsMakkah: formData.hotelsMakkah,
       }
 
       const res = await fetch(api.url(`/api/programs/${id}`), {

@@ -167,20 +167,24 @@ export default function ModifierProgrammePage() {
         const constraintsMakkah: Record<string, Record<number, { occupied: number; total: number }>> = {}
 
         // Agréger les rooms → nb (compte), prix (première valeur), contraintes
+        // Utiliser un compteur séparé pour éviter les problèmes de mutation
+        const roomCounts: Record<string, Record<number, { count: number; prix: string }>> = {}
+        
         for (const room of program.rooms) {
           const typeIndex = mapRoomTypeToIndex(room.roomType)
           const hotelName = room.hotel.name
           const city = room.hotel.city
+          const key = `${city}:${hotelName}`
 
-          const targetArr = city === "Madina" ? selectedMadina : selectedMakkah
-          const target = targetArr.find(h => h.name === hotelName)
-          if (target) {
-            // Incrémenter le compteur de rooms pour ce type
-            const currentCount = parseInt(target.chambres[typeIndex]?.nb || "0", 10)
-            target.chambres[typeIndex] = {
-              nb: String(currentCount + 1),
-              prix: target.chambres[typeIndex]?.prix || String(room.prixRoom ?? ""),
-            }
+          if (!roomCounts[key]) {
+            roomCounts[key] = { 1: { count: 0, prix: "" }, 2: { count: 0, prix: "" }, 3: { count: 0, prix: "" }, 4: { count: 0, prix: "" }, 5: { count: 0, prix: "" } }
+          }
+
+          // Incrémenter le compteur
+          roomCounts[key][typeIndex].count += 1
+          // Utiliser le prix de la première room rencontrée
+          if (roomCounts[key][typeIndex].prix === "") {
+            roomCounts[key][typeIndex].prix = String(room.prixRoom ?? "")
           }
 
           // Mettre à jour contraintes
@@ -192,6 +196,30 @@ export default function ModifierProgrammePage() {
             entry.occupied += 1
           }
           mapRef[hotelName][typeIndex] = entry
+        }
+
+        // Appliquer les compteurs aux structures d'hôtels
+        for (const hotel of selectedMadina) {
+          const key = `Madina:${hotel.name}`
+          if (roomCounts[key]) {
+            for (let type = 1; type <= 5; type++) {
+              hotel.chambres[type as 1 | 2 | 3 | 4 | 5] = {
+                nb: String(roomCounts[key][type].count),
+                prix: roomCounts[key][type].prix,
+              }
+            }
+          }
+        }
+        for (const hotel of selectedMakkah) {
+          const key = `Makkah:${hotel.name}`
+          if (roomCounts[key]) {
+            for (let type = 1; type <= 5; type++) {
+              hotel.chambres[type as 1 | 2 | 3 | 4 | 5] = {
+                nb: String(roomCounts[key][type].count),
+                prix: roomCounts[key][type].prix,
+              }
+            }
+          }
         }
 
         setFormData({

@@ -585,23 +585,48 @@ router.put('/:id', async (req, res) => {
                   throw new Error(`Invalid IDs - programId: ${program.id}, hotelId: ${hotel.id}`);
                 }
 
-                // Lire rooms existantes depuis la transaction
+                // Lire rooms existantes depuis la transaction avec une requête explicite
+                // Utiliser une requête directe pour éviter les problèmes de cache
                 const existingRooms = await tx.room.findMany({
                   where: {
                     programId: program.id,
                     hotelId: hotel.id,
                     roomType: roomType,
                     gender: 'Mixte',
-                  }
+                  },
+                  // Ne pas utiliser de cache, forcer une lecture fraîche
+                  orderBy: { id: 'asc' }
                 });
                 
                 console.log(`[Room Update] [TX] DB Query - Found ${existingRooms.length} existing rooms for ${hotelName} ${roomType}`);
                 
-                const freeRooms = existingRooms.filter(r => r.nbrPlaceRestantes === r.nbrPlaceTotal);
-                const occupiedRooms = existingRooms.filter(r => r.nbrPlaceRestantes < r.nbrPlaceTotal);
+                // Détecter les rooms occupées de manière plus robuste :
+                // 1. Par listeIdsReservation (plus fiable car mis à jour lors de la réservation)
+                // 2. Par nbrPlaceRestantes < nbrPlaceTotal (fallback)
+                const occupiedRooms = existingRooms.filter(r => {
+                  const hasReservations = r.listeIdsReservation && r.listeIdsReservation.length > 0;
+                  const hasOccupiedPlaces = r.nbrPlaceRestantes < r.nbrPlaceTotal;
+                  return hasReservations || hasOccupiedPlaces;
+                });
+                
+                const freeRooms = existingRooms.filter(r => {
+                  const hasReservations = r.listeIdsReservation && r.listeIdsReservation.length > 0;
+                  const hasOccupiedPlaces = r.nbrPlaceRestantes < r.nbrPlaceTotal;
+                  return !hasReservations && !hasOccupiedPlaces;
+                });
+                
                 const currentTotal = existingRooms.length;
                 
+                // Log détaillé pour debugging
                 console.log(`[Room Update] [TX] Breakdown - Free: ${freeRooms.length}, Occupied: ${occupiedRooms.length}, Total: ${currentTotal}`);
+                if (occupiedRooms.length > 0) {
+                  console.log(`[Room Update] [TX] Occupied rooms details:`, occupiedRooms.map(r => ({
+                    id: r.id,
+                    nbrPlaceRestantes: r.nbrPlaceRestantes,
+                    nbrPlaceTotal: r.nbrPlaceTotal,
+                    listeIdsReservation: r.listeIdsReservation
+                  })));
+                }
                 console.log(`[Room Update] [TX] Hotel: ${hotelName}, Type: ${roomType}, desiredCount: ${desiredCount}, currentTotal: ${currentTotal}`);
 
                 // Ajuster le prix
@@ -630,27 +655,14 @@ router.put('/:id', async (req, res) => {
                   continue;
                 }
 
+                // Gérer la création/suppression de rooms
                 if (desiredCount > currentTotal) {
                   const toCreate = desiredCount - currentTotal;
                   console.log(`[Room Update] [TX] Need to create ${toCreate} new rooms (desiredCount=${desiredCount}, currentTotal=${currentTotal})`);
                   
-                  // Vérifier à nouveau après la mise à jour du prix
-                  const verifyAfterPriceUpdate = await tx.room.findMany({
-                    where: {
-                      programId: program.id,
-                      hotelId: hotel.id,
-                      roomType,
-                      gender: 'Mixte',
-                    }
-                  });
-                  const actualCurrentTotal = verifyAfterPriceUpdate.length;
-                  console.log(`[Room Update] [TX] Verification after price update: actualCurrentTotal=${actualCurrentTotal}`);
-                  
-                  const actualToCreate = desiredCount - actualCurrentTotal;
-                  console.log(`[Room Update] [TX] Actual rooms to create: ${actualToCreate}`);
-                  
-                  if (actualToCreate > 0) {
-                    for (let i = 0; i < actualToCreate; i++) {
+                  if (toCreate > 0) {
+                    const basePrice = desiredPrice > 0 ? desiredPrice : (existingRooms.length > 0 ? existingRooms[0].prixRoom : 0);
+                    for (let i = 0; i < toCreate; i++) {
                       const newRoom = await tx.room.create({
                         data: {
                           programId: program.id,
@@ -659,35 +671,34 @@ router.put('/:id', async (req, res) => {
                           gender: 'Mixte',
                           nbrPlaceTotal: type,
                           nbrPlaceRestantes: type,
-                          prixRoom: desiredPrice > 0 ? desiredPrice : (freeRooms[0]?.prixRoom ?? 0),
+                          prixRoom: basePrice,
                           listeIdsReservation: [],
                         }
                       });
                       console.log(`[Room Update] [TX] Created room ID: ${newRoom.id}`);
                     }
-                    console.log(`[Room Update] [TX] Created ${actualToCreate} new rooms`);
-                    
-                    // Vérification finale
-                    const finalCheck = await tx.room.count({
-                      where: {
-                        programId: program.id,
-                        hotelId: hotel.id,
-                        roomType,
-                        gender: 'Mixte',
-                      }
-                    });
-                    console.log(`[Room Update] [TX] Final count after creation: ${finalCheck} (expected: ${desiredCount})`);
-                  } else {
-                    console.log(`[Room Update] [TX] No rooms to create (actualCurrentTotal=${actualCurrentTotal} >= desiredCount=${desiredCount})`);
+                    console.log(`[Room Update] [TX] Created ${toCreate} new rooms`);
                   }
                 } else if (desiredCount < currentTotal) {
                   const toRemove = currentTotal - desiredCount;
-                  console.log(`[Room Update] [TX] Need to remove ${toRemove} rooms (available free: ${freeRooms.length})`);
-                  if (toRemove > 0 && freeRooms.length > 0) {
-                    const deletable = freeRooms.slice(0, Math.min(toRemove, freeRooms.length));
-                    await tx.room.deleteMany({ where: { id: { in: deletable.map(r => r.id) } } });
-                    console.log(`[Room Update] [TX] Deleted ${deletable.length} free rooms`);
+                  console.log(`[Room Update] [TX] Need to remove ${toRemove} rooms (available free: ${freeRooms.length}, occupied: ${occupiedRooms.length})`);
+                  
+                  if (toRemove > 0) {
+                    // Ne supprimer QUE les rooms libres, jamais les occupées
+                    if (freeRooms.length > 0) {
+                      const deletable = freeRooms.slice(0, Math.min(toRemove, freeRooms.length));
+                      await tx.room.deleteMany({ 
+                        where: { 
+                          id: { in: deletable.map(r => r.id) } 
+                        } 
+                      });
+                      console.log(`[Room Update] [TX] Deleted ${deletable.length} free rooms (requested: ${toRemove})`);
+                    } else {
+                      console.warn(`[Room Update] [TX] WARNING: Cannot remove ${toRemove} rooms - all ${currentTotal} rooms are occupied!`);
+                    }
                   }
+                } else {
+                  console.log(`[Room Update] [TX] No change needed - desiredCount=${desiredCount} equals currentTotal=${currentTotal}`);
                 }
               }
             } catch (err) {

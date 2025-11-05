@@ -306,15 +306,6 @@ export default function ModifierProgrammePage() {
         const j = await res.json().catch(() => ({}))
         throw new Error(j.error || "Erreur lors de la mise à jour du programme")
       }
-      
-      const updatedProgram = await res.json()
-      console.log('[FRONTEND] Program updated, received rooms:', updatedProgram.rooms?.length)
-      console.log('[FRONTEND] Rooms by type:', updatedProgram.rooms?.reduce((acc: any, r: any) => {
-        const key = `${r.hotel.name}:${r.roomType}`
-        acc[key] = (acc[key] || 0) + 1
-        return acc
-      }, {}))
-      
       toast({ title: "Succès", description: "Programme mis à jour" })
       router.push("/programmes")
     } catch (error) {

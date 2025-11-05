@@ -491,135 +491,57 @@ router.put('/:id', async (req, res) => {
     // Appliquer les changements Rooms dans une transaction
     // Utiliser le client de transaction explicitement (tx) pour garantir l'isolation
     // et éviter les problèmes de synchronisation qui causaient la création de rooms en double
-    await prisma.$transaction(async (tx) => {
-      // Fonction helper pour trouver ou créer un hôtel dans la transaction
-      async function findOrCreateHotelInTx(city: 'Madina' | 'Makkah', name: string) {
-        const existing = await tx.hotel.findFirst({ where: { city, name } });
-        if (existing) return existing;
-        try {
-          return await tx.hotel.create({ data: { name, city } });
-        } catch {
-          // Conflit d'unicité, relire
-          const retry = await tx.hotel.findFirst({ where: { city, name } });
-          if (retry) return retry;
-          throw new Error('Unable to create or find hotel');
-        }
-      }
-      
-      // Créer une version de la fonction qui utilise le client de transaction
-      async function upsertRoomsForEntriesWithTx(city: 'Madina' | 'Makkah', entries: any[]) {
-        if (!Array.isArray(entries)) return;
-        for (const entry of entries) {
-          const hotelName = typeof entry === 'string' ? entry : entry?.name;
-          if (!hotelName) continue;
-          const hotel = await findOrCreateHotelInTx(city, hotelName);
-
-          // S'assurer que la table de liaison existe
+    try {
+      await prisma.$transaction(async (tx) => {
+        // Fonction helper pour trouver ou créer un hôtel dans la transaction
+        async function findOrCreateHotelInTx(city: 'Madina' | 'Makkah', name: string) {
+          const existing = await tx.hotel.findFirst({ where: { city, name } });
+          if (existing) return existing;
           try {
-            if (city === 'Madina') {
-              await tx.programHotelMadina.create({ data: { programId: program.id, hotelId: hotel.id } });
-            } else {
-              await tx.programHotelMakkah.create({ data: { programId: program.id, hotelId: hotel.id } });
-            }
-          } catch {}
-
-          if (!entry || typeof entry !== 'object' || !entry.chambres) continue;
-          
-          // Parcourir toutes les clés (1, 2, 3, 4, 5) pour s'assurer qu'elles sont toutes traitées
-          for (let type = 1; type <= 5; type++) {
-            const config = entry.chambres[type];
-            if (!config) continue;
+            return await tx.hotel.create({ data: { name, city } });
+          } catch (err) {
+            console.error(`[TX] Error creating hotel ${name} in ${city}:`, err);
+            // Conflit d'unicité, relire
+            const retry = await tx.hotel.findFirst({ where: { city, name } });
+            if (retry) return retry;
+            throw new Error(`Unable to create or find hotel: ${name} in ${city}`);
+          }
+        }
+        
+        // Créer une version de la fonction qui utilise le client de transaction
+        async function upsertRoomsForEntriesWithTx(city: 'Madina' | 'Makkah', entries: any[]) {
+          if (!Array.isArray(entries)) return;
+          for (const entry of entries) {
+            const hotelName = typeof entry === 'string' ? entry : entry?.name;
+            if (!hotelName) continue;
             
-            const roomType = mapTypeToRoomType(type);
-            if (!roomType) continue;
-            
-            const desiredCount = config?.nb ? Number(config.nb) : 0;
-            const desiredPrice = config?.prix ? parseFloat(config.prix) : 0;
+            try {
+              const hotel = await findOrCreateHotelInTx(city, hotelName);
 
-            // Lire rooms existantes depuis la transaction
-            const existingRooms = await tx.room.findMany({
-              where: {
-                programId: program.id,
-                hotelId: hotel.id,
-                roomType,
-                gender: 'Mixte',
-              }
-            });
-            
-            console.log(`[Room Update] [TX] DB Query - Found ${existingRooms.length} existing rooms for ${hotelName} ${roomType}`);
-            
-            const freeRooms = existingRooms.filter(r => r.nbrPlaceRestantes === r.nbrPlaceTotal);
-            const occupiedRooms = existingRooms.filter(r => r.nbrPlaceRestantes < r.nbrPlaceTotal);
-            const currentTotal = existingRooms.length;
-            
-            console.log(`[Room Update] [TX] Breakdown - Free: ${freeRooms.length}, Occupied: ${occupiedRooms.length}, Total: ${currentTotal}`);
-            console.log(`[Room Update] [TX] Hotel: ${hotelName}, Type: ${roomType}, desiredCount: ${desiredCount}, currentTotal: ${currentTotal}`);
-
-            // Ajuster le prix
-            if (desiredPrice > 0) {
-              if (freeRooms.length > 0) {
-                await tx.room.updateMany({
-                  where: { id: { in: freeRooms.map(r => r.id) } },
-                  data: { prixRoom: desiredPrice }
-                });
-                console.log(`[Room Update] [TX] Updated price for ${freeRooms.length} free rooms to ${desiredPrice}`);
-              }
-              if (occupiedRooms.length > 0) {
-                await tx.room.updateMany({
-                  where: { id: { in: occupiedRooms.map(r => r.id) } },
-                  data: { prixRoom: desiredPrice }
-                });
-                console.log(`[Room Update] [TX] Updated price for ${occupiedRooms.length} occupied rooms to ${desiredPrice}`);
-              }
-            }
-
-            if (desiredCount <= 0) {
-              if (freeRooms.length > 0) {
-                await tx.room.deleteMany({ where: { id: { in: freeRooms.map(r => r.id) } } });
-                console.log(`[Room Update] [TX] Deleted ${freeRooms.length} free rooms (desiredCount = 0)`);
-              }
-              continue;
-            }
-
-            if (desiredCount > currentTotal) {
-              const toCreate = desiredCount - currentTotal;
-              console.log(`[Room Update] [TX] Need to create ${toCreate} new rooms (desiredCount=${desiredCount}, currentTotal=${currentTotal})`);
-              
-              // Vérifier à nouveau après la mise à jour du prix
-              const verifyAfterPriceUpdate = await tx.room.findMany({
-                where: {
-                  programId: program.id,
-                  hotelId: hotel.id,
-                  roomType,
-                  gender: 'Mixte',
+              // S'assurer que la table de liaison existe
+              try {
+                if (city === 'Madina') {
+                  await tx.programHotelMadina.create({ data: { programId: program.id, hotelId: hotel.id } });
+                } else {
+                  await tx.programHotelMakkah.create({ data: { programId: program.id, hotelId: hotel.id } });
                 }
-              });
-              const actualCurrentTotal = verifyAfterPriceUpdate.length;
-              console.log(`[Room Update] [TX] Verification after price update: actualCurrentTotal=${actualCurrentTotal}`);
+              } catch {}
+
+              if (!entry || typeof entry !== 'object' || !entry.chambres) continue;
               
-              const actualToCreate = desiredCount - actualCurrentTotal;
-              console.log(`[Room Update] [TX] Actual rooms to create: ${actualToCreate}`);
-              
-              if (actualToCreate > 0) {
-                for (let i = 0; i < actualToCreate; i++) {
-                  const newRoom = await tx.room.create({
-                    data: {
-                      programId: program.id,
-                      hotelId: hotel.id,
-                      roomType,
-                      gender: 'Mixte',
-                      nbrPlaceTotal: type,
-                      nbrPlaceRestantes: type,
-                      prixRoom: desiredPrice > 0 ? desiredPrice : (freeRooms[0]?.prixRoom ?? 0),
-                      listeIdsReservation: [],
-                    }
-                  });
-                  console.log(`[Room Update] [TX] Created room ID: ${newRoom.id}`);
-                }
-                console.log(`[Room Update] [TX] Created ${actualToCreate} new rooms`);
+              // Parcourir toutes les clés (1, 2, 3, 4, 5) pour s'assurer qu'elles sont toutes traitées
+              for (let type = 1; type <= 5; type++) {
+                const config = entry.chambres[type];
+                if (!config) continue;
                 
-                // Vérification finale
-                const finalCheck = await tx.room.count({
+                const roomType = mapTypeToRoomType(type);
+                if (!roomType) continue;
+                
+                const desiredCount = config?.nb ? Number(config.nb) : 0;
+                const desiredPrice = config?.prix ? parseFloat(config.prix) : 0;
+
+                // Lire rooms existantes depuis la transaction
+                const existingRooms = await tx.room.findMany({
                   where: {
                     programId: program.id,
                     hotelId: hotel.id,
@@ -627,18 +549,105 @@ router.put('/:id', async (req, res) => {
                     gender: 'Mixte',
                   }
                 });
-                console.log(`[Room Update] [TX] Final count after creation: ${finalCheck} (expected: ${desiredCount})`);
-              } else {
-                console.log(`[Room Update] [TX] No rooms to create (actualCurrentTotal=${actualCurrentTotal} >= desiredCount=${desiredCount})`);
+                
+                console.log(`[Room Update] [TX] DB Query - Found ${existingRooms.length} existing rooms for ${hotelName} ${roomType}`);
+                
+                const freeRooms = existingRooms.filter(r => r.nbrPlaceRestantes === r.nbrPlaceTotal);
+                const occupiedRooms = existingRooms.filter(r => r.nbrPlaceRestantes < r.nbrPlaceTotal);
+                const currentTotal = existingRooms.length;
+                
+                console.log(`[Room Update] [TX] Breakdown - Free: ${freeRooms.length}, Occupied: ${occupiedRooms.length}, Total: ${currentTotal}`);
+                console.log(`[Room Update] [TX] Hotel: ${hotelName}, Type: ${roomType}, desiredCount: ${desiredCount}, currentTotal: ${currentTotal}`);
+
+                // Ajuster le prix
+                if (desiredPrice > 0) {
+                  if (freeRooms.length > 0) {
+                    await tx.room.updateMany({
+                      where: { id: { in: freeRooms.map(r => r.id) } },
+                      data: { prixRoom: desiredPrice }
+                    });
+                    console.log(`[Room Update] [TX] Updated price for ${freeRooms.length} free rooms to ${desiredPrice}`);
+                  }
+                  if (occupiedRooms.length > 0) {
+                    await tx.room.updateMany({
+                      where: { id: { in: occupiedRooms.map(r => r.id) } },
+                      data: { prixRoom: desiredPrice }
+                    });
+                    console.log(`[Room Update] [TX] Updated price for ${occupiedRooms.length} occupied rooms to ${desiredPrice}`);
+                  }
+                }
+
+                if (desiredCount <= 0) {
+                  if (freeRooms.length > 0) {
+                    await tx.room.deleteMany({ where: { id: { in: freeRooms.map(r => r.id) } } });
+                    console.log(`[Room Update] [TX] Deleted ${freeRooms.length} free rooms (desiredCount = 0)`);
+                  }
+                  continue;
+                }
+
+                if (desiredCount > currentTotal) {
+                  const toCreate = desiredCount - currentTotal;
+                  console.log(`[Room Update] [TX] Need to create ${toCreate} new rooms (desiredCount=${desiredCount}, currentTotal=${currentTotal})`);
+                  
+                  // Vérifier à nouveau après la mise à jour du prix
+                  const verifyAfterPriceUpdate = await tx.room.findMany({
+                    where: {
+                      programId: program.id,
+                      hotelId: hotel.id,
+                      roomType,
+                      gender: 'Mixte',
+                    }
+                  });
+                  const actualCurrentTotal = verifyAfterPriceUpdate.length;
+                  console.log(`[Room Update] [TX] Verification after price update: actualCurrentTotal=${actualCurrentTotal}`);
+                  
+                  const actualToCreate = desiredCount - actualCurrentTotal;
+                  console.log(`[Room Update] [TX] Actual rooms to create: ${actualToCreate}`);
+                  
+                  if (actualToCreate > 0) {
+                    for (let i = 0; i < actualToCreate; i++) {
+                      const newRoom = await tx.room.create({
+                        data: {
+                          programId: program.id,
+                          hotelId: hotel.id,
+                          roomType,
+                          gender: 'Mixte',
+                          nbrPlaceTotal: type,
+                          nbrPlaceRestantes: type,
+                          prixRoom: desiredPrice > 0 ? desiredPrice : (freeRooms[0]?.prixRoom ?? 0),
+                          listeIdsReservation: [],
+                        }
+                      });
+                      console.log(`[Room Update] [TX] Created room ID: ${newRoom.id}`);
+                    }
+                    console.log(`[Room Update] [TX] Created ${actualToCreate} new rooms`);
+                    
+                    // Vérification finale
+                    const finalCheck = await tx.room.count({
+                      where: {
+                        programId: program.id,
+                        hotelId: hotel.id,
+                        roomType,
+                        gender: 'Mixte',
+                      }
+                    });
+                    console.log(`[Room Update] [TX] Final count after creation: ${finalCheck} (expected: ${desiredCount})`);
+                  } else {
+                    console.log(`[Room Update] [TX] No rooms to create (actualCurrentTotal=${actualCurrentTotal} >= desiredCount=${desiredCount})`);
+                  }
+                } else if (desiredCount < currentTotal) {
+                  const toRemove = currentTotal - desiredCount;
+                  console.log(`[Room Update] [TX] Need to remove ${toRemove} rooms (available free: ${freeRooms.length})`);
+                  if (toRemove > 0 && freeRooms.length > 0) {
+                    const deletable = freeRooms.slice(0, Math.min(toRemove, freeRooms.length));
+                    await tx.room.deleteMany({ where: { id: { in: deletable.map(r => r.id) } } });
+                    console.log(`[Room Update] [TX] Deleted ${deletable.length} free rooms`);
+                  }
+                }
               }
-            } else if (desiredCount < currentTotal) {
-              const toRemove = currentTotal - desiredCount;
-              console.log(`[Room Update] [TX] Need to remove ${toRemove} rooms (available free: ${freeRooms.length})`);
-              if (toRemove > 0 && freeRooms.length > 0) {
-                const deletable = freeRooms.slice(0, Math.min(toRemove, freeRooms.length));
-                await tx.room.deleteMany({ where: { id: { in: deletable.map(r => r.id) } } });
-                console.log(`[Room Update] [TX] Deleted ${deletable.length} free rooms`);
-              }
+            } catch (err) {
+              console.error(`[TX] Error processing hotel ${hotelName} in ${city}:`, err);
+              throw err; // Re-throw pour que la transaction soit rollback
             }
           }
         }
@@ -646,7 +655,13 @@ router.put('/:id', async (req, res) => {
       
       await upsertRoomsForEntriesWithTx('Madina', hotelsMadina);
       await upsertRoomsForEntriesWithTx('Makkah', hotelsMakkah);
-    });
+      }, {
+        timeout: 30000, // Timeout de 30 secondes pour les transactions longues
+      });
+    } catch (transactionError) {
+      console.error('❌ Transaction error:', transactionError);
+      throw transactionError; // Re-throw pour être capturé par le catch externe
+    }
 
     const updated = await prisma.program.findUnique({
       where: { id: program.id },
@@ -655,7 +670,13 @@ router.put('/:id', async (req, res) => {
 
     res.json(updated);
   } catch (error) {
-    res.status(500).json({ error: 'Error updating program' });
+    console.error('❌ Error updating program:', error);
+    console.error('Error details:', error instanceof Error ? error.message : String(error));
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    res.status(500).json({ 
+      error: 'Error updating program',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 });
 

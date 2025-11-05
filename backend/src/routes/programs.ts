@@ -358,19 +358,35 @@ router.put('/:id', async (req, res) => {
           const desiredCount = config?.nb ? Number(config.nb) : 0;
           const desiredPrice = config?.prix ? parseFloat(config.prix) : 0;
 
-          // Lire rooms existantes
+          // Lire rooms existantes - FORCER une lecture fraîche depuis la DB
+          // Utiliser findMany avec un cache désactivé pour éviter les problèmes de synchronisation
           const existingRooms = await prisma.room.findMany({
             where: {
               programId: program.id,
               hotelId: hotel.id,
               roomType,
               gender: 'Mixte',
-            }
+            },
+            // Pas d'options de cache, lecture directe
           });
+          
+          console.log(`[Room Update] DB Query - Found ${existingRooms.length} existing rooms for ${hotelName} ${roomType}`);
+          if (existingRooms.length > 0) {
+            console.log(`[Room Update] Room IDs: ${existingRooms.map(r => r.id).join(', ')}`);
+            console.log(`[Room Update] Room details:`, existingRooms.map(r => ({
+              id: r.id,
+              nbrPlaceTotal: r.nbrPlaceTotal,
+              nbrPlaceRestantes: r.nbrPlaceRestantes,
+              prixRoom: r.prixRoom,
+              gender: r.gender
+            })));
+          }
 
           const freeRooms = existingRooms.filter(r => r.nbrPlaceRestantes === r.nbrPlaceTotal);
           const occupiedRooms = existingRooms.filter(r => r.nbrPlaceRestantes < r.nbrPlaceTotal);
           const currentTotal = existingRooms.length;
+          
+          console.log(`[Room Update] Breakdown - Free: ${freeRooms.length}, Occupied: ${occupiedRooms.length}, Total: ${currentTotal}`);
 
           console.log(`[Room Update] Hotel: ${hotelName}, Type: ${roomType}, desiredCount: ${desiredCount}, currentTotal: ${currentTotal}, freeRooms: ${freeRooms.length}, occupiedRooms: ${occupiedRooms.length}`);
 

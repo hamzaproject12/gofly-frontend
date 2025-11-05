@@ -405,22 +405,43 @@ router.put('/:id', async (req, res) => {
           if (desiredCount > currentTotal) {
             // Créer des rooms supplémentaires
             const toCreate = desiredCount - currentTotal;
-            console.log(`[Room Update] Need to create ${toCreate} new rooms`);
-            for (let i = 0; i < toCreate; i++) {
-              await prisma.room.create({
-                data: {
-                  programId: program.id,
-                  hotelId: hotel.id,
-                  roomType,
-                  gender: 'Mixte',
-                  nbrPlaceTotal: type,
-                  nbrPlaceRestantes: type,
-                  prixRoom: desiredPrice > 0 ? desiredPrice : (freeRooms[0]?.prixRoom ?? 0),
-                  listeIdsReservation: [],
-                }
-              });
+            console.log(`[Room Update] Need to create ${toCreate} new rooms (desiredCount=${desiredCount}, currentTotal=${currentTotal})`);
+            
+            // Vérifier à nouveau après la mise à jour du prix pour éviter les doublons
+            const verifyAfterPriceUpdate = await prisma.room.findMany({
+              where: {
+                programId: program.id,
+                hotelId: hotel.id,
+                roomType,
+                gender: 'Mixte',
+              }
+            });
+            const actualCurrentTotal = verifyAfterPriceUpdate.length;
+            console.log(`[Room Update] Verification after price update: actualCurrentTotal=${actualCurrentTotal}`);
+            
+            // Recalculer toCreate avec le total actuel réel
+            const actualToCreate = desiredCount - actualCurrentTotal;
+            console.log(`[Room Update] Actual rooms to create: ${actualToCreate}`);
+            
+            if (actualToCreate > 0) {
+              for (let i = 0; i < actualToCreate; i++) {
+                await prisma.room.create({
+                  data: {
+                    programId: program.id,
+                    hotelId: hotel.id,
+                    roomType,
+                    gender: 'Mixte',
+                    nbrPlaceTotal: type,
+                    nbrPlaceRestantes: type,
+                    prixRoom: desiredPrice > 0 ? desiredPrice : (freeRooms[0]?.prixRoom ?? 0),
+                    listeIdsReservation: [],
+                  }
+                });
+              }
+              console.log(`[Room Update] Created ${actualToCreate} new rooms`);
+            } else {
+              console.log(`[Room Update] No rooms to create (actualCurrentTotal=${actualCurrentTotal} >= desiredCount=${desiredCount})`);
             }
-            console.log(`[Room Update] Created ${toCreate} new rooms`);
           } else if (desiredCount < currentTotal) {
             // Supprimer uniquement des rooms libres en trop
             const toRemove = currentTotal - desiredCount;

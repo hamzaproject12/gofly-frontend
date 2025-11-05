@@ -20,6 +20,7 @@ import {
   Clock,
   Wallet,
   Building,
+  Pencil,
   Plane,
   FileText,
   Bell,
@@ -816,8 +817,21 @@ export default function ProgrammesPage() {
                     )}
                   </div>
                   
-                {/* Boutons de suppression à droite */}
+                {/* Boutons d'action à droite */}
                 <div className="flex gap-2">
+                  {/* Éditer */}
+                  {isAdmin && (
+                    <Link href={`/programmes/modifier/${programme.id}`}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                      >
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Éditer
+                      </Button>
+                    </Link>
+                  )}
                   {/* Soft Delete - Commenté */}
                   {/* <Button
                     variant="outline"

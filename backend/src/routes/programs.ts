@@ -526,14 +526,32 @@ router.put('/:id', async (req, res) => {
                 throw new Error(`Invalid program ID`);
               }
 
-              // S'assurer que la table de liaison existe
+              // S'assurer que la table de liaison existe (ne pas créer si elle existe déjà)
               try {
                 if (city === 'Madina') {
-                  await tx.programHotelMadina.create({ data: { programId: program.id, hotelId: hotel.id } });
+                  const existingLink = await tx.programHotelMadina.findUnique({
+                    where: { programId_hotelId: { programId: program.id, hotelId: hotel.id } }
+                  });
+                  if (!existingLink) {
+                    await tx.programHotelMadina.create({ data: { programId: program.id, hotelId: hotel.id } });
+                  }
                 } else {
-                  await tx.programHotelMakkah.create({ data: { programId: program.id, hotelId: hotel.id } });
+                  const existingLink = await tx.programHotelMakkah.findUnique({
+                    where: { programId_hotelId: { programId: program.id, hotelId: hotel.id } }
+                  });
+                  if (!existingLink) {
+                    await tx.programHotelMakkah.create({ data: { programId: program.id, hotelId: hotel.id } });
+                  }
                 }
-              } catch {}
+              } catch (linkError: any) {
+                // Si c'est une erreur de contrainte unique, c'est OK (la relation existe déjà)
+                if (linkError?.code === 'P2002' || linkError?.message?.includes('Unique constraint')) {
+                  console.log(`[TX] Link already exists for program ${program.id} and hotel ${hotel.id} in ${city}`);
+                } else {
+                  // Pour toute autre erreur, la logger mais ne pas faire échouer la transaction
+                  console.error(`[TX] Error creating link for program ${program.id} and hotel ${hotel.id} in ${city}:`, linkError);
+                }
+              }
 
               if (!entry || typeof entry !== 'object' || !entry.chambres) continue;
               

@@ -492,13 +492,27 @@ router.put('/:id', async (req, res) => {
     // Utiliser le client de transaction explicitement (tx) pour garantir l'isolation
     // et éviter les problèmes de synchronisation qui causaient la création de rooms en double
     await prisma.$transaction(async (tx) => {
+      // Fonction helper pour trouver ou créer un hôtel dans la transaction
+      async function findOrCreateHotelInTx(city: 'Madina' | 'Makkah', name: string) {
+        const existing = await tx.hotel.findFirst({ where: { city, name } });
+        if (existing) return existing;
+        try {
+          return await tx.hotel.create({ data: { name, city } });
+        } catch {
+          // Conflit d'unicité, relire
+          const retry = await tx.hotel.findFirst({ where: { city, name } });
+          if (retry) return retry;
+          throw new Error('Unable to create or find hotel');
+        }
+      }
+      
       // Créer une version de la fonction qui utilise le client de transaction
       async function upsertRoomsForEntriesWithTx(city: 'Madina' | 'Makkah', entries: any[]) {
         if (!Array.isArray(entries)) return;
         for (const entry of entries) {
           const hotelName = typeof entry === 'string' ? entry : entry?.name;
           if (!hotelName) continue;
-          const hotel = await findOrCreateHotel(city, hotelName);
+          const hotel = await findOrCreateHotelInTx(city, hotelName);
 
           // S'assurer que la table de liaison existe
           try {

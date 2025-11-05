@@ -489,7 +489,8 @@ router.put('/:id', async (req, res) => {
     }
 
     // Appliquer les changements Rooms dans une transaction
-    // Utiliser le client de transaction explicitement pour garantir l'isolation
+    // Utiliser le client de transaction explicitement (tx) pour garantir l'isolation
+    // et éviter les problèmes de synchronisation qui causaient la création de rooms en double
     await prisma.$transaction(async (tx) => {
       // Créer une version de la fonction qui utilise le client de transaction
       async function upsertRoomsForEntriesWithTx(city: 'Madina' | 'Makkah', entries: any[]) {

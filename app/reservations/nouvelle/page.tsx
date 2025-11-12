@@ -353,14 +353,14 @@ export default function NouvelleReservation() {
       console.log('   - Visa converti:', prixVisa * programInfo.exchange, 'DH');
       
       const prixFinal = prixAvion + programInfo.profit + (prixVisa * programInfo.exchange);
-      
+
       console.log('💰 === RÉSULTAT FINAL (SANS HÔTEL) ===');
       console.log('   - Prix Avion:', prixAvion, 'DH');
       console.log('   - Profit:', programInfo.profit, 'DH');
       console.log('   - Visa converti:', prixVisa * programInfo.exchange, 'DH');
       console.log('   - PRIX FINAL:', prixFinal, 'DH');
       console.log('✅ Prix calculé (sans hôtel):', prixFinal);
-      return Math.round(prixFinal * 100) / 100;
+      return Math.round(prixFinal);
     }
 
     // Utiliser les chambres sélectionnées par l'utilisateur
@@ -517,7 +517,7 @@ export default function NouvelleReservation() {
     console.log('   - Services (Visa + Hôtels) convertis:', (prixVisa + prixHotelMakkah + prixHotelMadina) * programInfo.exchange, 'DH');
     console.log('   - PRIX FINAL:', prixFinal, 'DH');
     console.log('✅ Prix calculé:', prixFinal);
-    return Math.round(prixFinal * 100) / 100; // Arrondir à 2 décimales
+    return Math.round(prixFinal); // Arrondir à l'entier le plus proche
   }, [programInfo, formData.typeChambre, formData.gender, formData.hotelMadina, formData.hotelMakkah, customization]);
 
   // Fonction pour trier les rooms selon l'algorithme spécifié
@@ -635,7 +635,7 @@ export default function NouvelleReservation() {
   // Mettre à jour le prix automatiquement quand le calcul ou la réduction change
   useEffect(() => {
     if (calculatePrice > 0) {
-      const prixFinal = calculatePrice - reduction;
+      const prixFinal = Math.max(0, Math.round(calculatePrice - reduction));
       setFormData(prev => ({ ...prev, prix: prixFinal.toString() }));
     }
   }, [calculatePrice, reduction]);
@@ -1025,7 +1025,7 @@ export default function NouvelleReservation() {
 
     // Déterminer le statut de la réservation
     const allDocsAttached = attachmentStatus.passport && attachmentStatus.visa && attachmentStatus.flightBooked && attachmentStatus.hotelBooked;
-    const isPaid = paidAmount === parseFloat(formData.prix);
+    const isPaid = paidAmount === parseInt(formData.prix, 10);
     const reservationStatus = allDocsAttached && isPaid ? "Complet" : "Incomplet";
 
     // Réinitialiser les statuts d'upload
@@ -1063,7 +1063,7 @@ export default function NouvelleReservation() {
           gender: formData.gender,
           hotelMadina: hotelsMadina.find(h => h.id.toString() === formData.hotelMadina)?.name || formData.hotelMadina,
           hotelMakkah: hotelsMakkah.find(h => h.id.toString() === formData.hotelMakkah)?.name || formData.hotelMakkah,
-          price: parseFloat(formData.prix),
+          price: parseInt(formData.prix, 10),
           reduction: reduction || 0,
           reservationDate: formData.dateReservation,
           status: reservationStatus,
@@ -1449,7 +1449,7 @@ export default function NouvelleReservation() {
                       <span className="text-sm text-white/80 font-medium">Prix:</span>
                       <span className="text-lg font-bold text-white">
                         {formData.prix
-                          ? Math.round(parseFloat(formData.prix)).toLocaleString('fr-FR')
+                          ? parseInt(formData.prix, 10).toLocaleString('fr-FR')
                           : Math.round(calculatePrice).toLocaleString('fr-FR')} DH
                       </span>
                     </div>
@@ -2474,7 +2474,9 @@ export default function NouvelleReservation() {
                 <div className="flex items-center gap-2 bg-gradient-to-r from-emerald-100 to-teal-100 px-3 py-2 rounded-lg border border-emerald-300">
                   <Wallet className="h-4 w-4 text-emerald-600" />
                   <span className="text-sm font-medium text-emerald-700">Total:</span>
-                  <span className="font-bold text-emerald-700 text-lg">{(calculatePrice - reduction).toLocaleString('fr-FR')} DH</span>
+                  <span className="font-bold text-emerald-700 text-lg">
+                    {Math.max(0, Math.round(calculatePrice - reduction)).toLocaleString('fr-FR')} DH
+                  </span>
                 </div>
 
                 {/* Indicateur d'économie si réduction */}

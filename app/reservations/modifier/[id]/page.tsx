@@ -150,6 +150,8 @@ export default function EditReservation() {
     payment: []
   })
 
+  const paymentDocuments = documents.payment;
+
   const fileInputs = useRef<FileInputs>({
     passeport: null,
     visa: null,
@@ -280,6 +282,16 @@ export default function EditReservation() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!arePaymentsValid) {
+      toast({
+        title: "Paiement incomplet",
+        description: "Merci de renseigner le mode, le montant, la date et le reçu pour chaque paiement ajouté.",
+        variant: "destructive",
+      })
+      return;
+    }
+
     setIsSubmitting(true)
 
     try {
@@ -548,8 +560,8 @@ export default function EditReservation() {
     }
   }
 
-  const mettreAJourPaiement = (index: number, field: string, value: string) => {
-    setPaiements(paiements => paiements.map((p, i) => 
+  const mettreAJourPaiement = <K extends keyof Paiement>(index: number, field: K, value: Paiement[K]) => {
+    setPaiements(prev => prev.map((p, i) =>
       i === index ? { ...p, [field]: value } : p
     ))
   }
@@ -558,10 +570,24 @@ export default function EditReservation() {
     // Ajouter un nouveau paiement avec la date actuelle
     const today = new Date().toISOString().split('T')[0]
     setPaiements([...paiements, { montant: '', type: '', date: today, recu: '' }])
+    setDocuments(prev => ({
+      ...prev,
+      payment: [...(prev.payment || []), null]
+    }))
   }
 
   const supprimerPaiement = (index: number) => {
-    setPaiements(paiements => paiements.filter((_, i) => i !== index))
+    setPaiements(prev => prev.filter((_, i) => i !== index))
+    setDocuments(prev => {
+      const newPayments = [...(prev.payment || [])]
+      newPayments.splice(index, 1)
+      return { ...prev, payment: newPayments }
+    })
+    setPreviews(prev => {
+      const newPreviews = { ...prev }
+      delete newPreviews[`payment_${index}`]
+      return newPreviews
+    })
   }
 
   // Helper function pour obtenir l'URL d'un document
@@ -650,8 +676,25 @@ export default function EditReservation() {
   // Calculs de progression
   const section1Complete = formData.nom && formData.prenom && formData.telephone && formData.typeChambre && formData.prix && formData.gender
   const section2Complete = formData.programId && formData.hotelMadina && formData.hotelMakkah
-  const section3Complete = paiements.length > 0 && paiements.every(p => p.montant && p.type && p.date)
+  const arePaymentsValid = useMemo(() => {
+    if (paiements.length === 0) {
+      return true;
+    }
+
+    return paiements.every((paiement, index) => {
+      const montantRempli = paiement.montant !== "" && !Number.isNaN(Number(paiement.montant));
+      const typeRempli = paiement.type !== "";
+      const dateRemplie = paiement.date !== "";
+      const recuExiste = (paiement.recu && paiement.recu.trim() !== "") || !!paymentDocuments?.[index];
+
+      return montantRempli && typeRempli && dateRemplie && recuExiste;
+    });
+  }, [paiements, paymentDocuments]);
+
+  const section3Complete = paiements.length > 0 && arePaymentsValid
   const section4Complete = true // Les toggles sont toujours complétés
+
+  const isFormValid = useMemo(() => arePaymentsValid, [arePaymentsValid])
 
   const totalProgress = [section1Complete, section2Complete, section3Complete, section4Complete]
     .filter(Boolean).length * 25
@@ -932,8 +975,9 @@ export default function EditReservation() {
                             <Input
                               type="date"
                               value={paiement.date}
-                              onChange={(e) => mettreAJourPaiement(index, "date", e.target.value)}
-                              className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                              readOnly
+                              disabled
+                              className="h-10 border-2 border-blue-200 bg-blue-50 text-gray-700 rounded-lg cursor-not-allowed"
                             />
                           )}
                         </div>
@@ -1182,9 +1226,9 @@ export default function EditReservation() {
                 </Link>
                 <Button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !isFormValid}
                   size="lg"
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <Edit className="h-4 w-4 mr-2" />
                       {isSubmitting ? "Modification..." : "Modifier la réservation"}

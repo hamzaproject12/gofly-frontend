@@ -667,6 +667,18 @@ router.patch('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const reservationId = parseInt(req.params.id);
+    if (isNaN(reservationId)) {
+      return res.status(400).json({ error: 'ID de réservation invalide' });
+    }
+
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+    });
+
+    if (!reservation) {
+      return res.status(404).json({ error: 'Réservation non trouvée' });
+    }
+
     // 1. Récupérer tous les fichiers liés à la réservation
     const fichiers = await prisma.fichier.findMany({
       where: { reservationId },
@@ -685,10 +697,41 @@ router.delete('/:id', async (req, res) => {
         }
       }
     }
-    // 3. Supprimer la réservation (CASCADE pour fichiers et paiements)
-    await prisma.reservation.delete({
-      where: { id: reservationId }
+
+    await prisma.$transaction(async (tx) => {
+      // 3. Supprimer/neutraliser les dépenses liées à la réservation
+      await tx.expense.deleteMany({
+        where: { reservationId },
+      });
+
+      // 4. Mettre à jour les rooms impactées
+      const roomsToUpdate = await tx.room.findMany({
+        where: {
+          listeIdsReservation: {
+            has: reservationId,
+          },
+        },
+      });
+
+      for (const room of roomsToUpdate) {
+        const updatedReservationIds = room.listeIdsReservation.filter((id) => id !== reservationId);
+        const recalculatedRemaining = Math.max(0, room.nbrPlaceTotal - updatedReservationIds.length);
+
+        await tx.room.update({
+          where: { id: room.id },
+          data: {
+            listeIdsReservation: updatedReservationIds,
+            nbrPlaceRestantes: recalculatedRemaining,
+          },
+        });
+      }
+
+      // 5. Supprimer la réservation (CASCADE pour fichiers et paiements)
+      await tx.reservation.delete({
+        where: { id: reservationId },
+      });
     });
+
     res.json({ message: 'Réservation supprimée avec succès' });
   } catch (error) {
     console.error('Erreur lors de la suppression de la réservation:', error);

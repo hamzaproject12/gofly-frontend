@@ -161,6 +161,39 @@ export default function ReservationsPage() {
   const { toast } = useToast()
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [reservationToDelete, setReservationToDelete] = useState<number | null>(null);
+  const handleDeleteReservation = async (id: number) => {
+    try {
+      setDeleteDialogOpen(false);
+      setLoading(true);
+
+      const response = await fetch(api.url(`/api/reservations/${id}`), {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Erreur lors de la suppression");
+      }
+
+      toast({
+        title: "Réservation supprimée",
+        description: "La réservation a été supprimée avec succès.",
+      });
+
+      await fetchData(currentPage);
+    } catch (error) {
+      console.error("Erreur suppression réservation:", error);
+      toast({
+        title: "Erreur",
+        description:
+          error instanceof Error ? error.message : "Impossible de supprimer la réservation",
+        variant: "destructive",
+      });
+    } finally {
+      setReservationToDelete(null);
+      setLoading(false);
+    }
+  };
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -204,6 +237,40 @@ export default function ReservationsPage() {
   const handleChambreChange = (value: string) => {
     setChambreFilter(value);
   };
+
+  const handleDeleteReservation = useCallback(async (id: number) => {
+    try {
+      setLoading(true);
+      setDeleteDialogOpen(false);
+
+      const response = await fetch(api.url(`/api/reservations/${id}`), {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Erreur lors de la suppression de la réservation");
+      }
+
+      toast({
+        title: "Réservation supprimée",
+        description: "La réservation a été supprimée avec succès.",
+      });
+
+      await fetchData(currentPage);
+    } catch (error) {
+      console.error("Erreur suppression réservation:", error);
+      toast({
+        title: "Erreur",
+        description:
+          error instanceof Error ? error.message : "Impossible de supprimer la réservation",
+        variant: "destructive",
+      });
+    } finally {
+      setReservationToDelete(null);
+      setLoading(false);
+    }
+  }, [currentPage, fetchData, toast]);
 
   // Fonctions de pagination
   const handlePageChange = (newPage: number) => {

@@ -152,6 +152,16 @@ export default function EditReservation() {
 
   const paymentDocuments = documents.payment;
 
+  const parseAmount = (value: string | number | null | undefined) => {
+    if (value === null || value === undefined) return 0;
+    const raw = typeof value === "number" ? value : value.trim();
+    if (typeof raw === "number") return raw;
+    if (raw === "") return 0;
+    const normalized = raw.replace(/\s/g, "").replace(",", ".");
+    const parsed = Number(normalized);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
   const fileInputs = useRef<FileInputs>({
     passeport: null,
     visa: null,
@@ -530,6 +540,7 @@ export default function EditReservation() {
       newPayments[index] = file;
       return { ...prev, payment: newPayments };
     });
+    mettreAJourPaiement(index, 'recu', file.name);
     
     // Créer l'aperçu local
     if (file.type.startsWith('image/')) {
@@ -561,9 +572,41 @@ export default function EditReservation() {
   }
 
   const mettreAJourPaiement = <K extends keyof Paiement>(index: number, field: K, value: Paiement[K]) => {
-    setPaiements(prev => prev.map((p, i) =>
-      i === index ? { ...p, [field]: value } : p
-    ))
+    setPaiements(prev => {
+      const totalPrice = parseAmount(formData.prix);
+
+      return prev.map((p, i) => {
+        if (i !== index) return p;
+
+        if (field === 'montant') {
+          const rawValue = typeof value === "string" ? value : value?.toString() ?? "";
+          if (rawValue === "") {
+            return { ...p, montant: "" };
+          }
+
+          let numericValue = parseAmount(rawValue);
+          if (numericValue < 0) numericValue = 0;
+
+          const sumOther = prev.reduce((sum, paiement, idx) => {
+            if (idx === index) return sum;
+            return sum + parseAmount(paiement.montant);
+          }, 0);
+
+          const allowedMax = Math.max(totalPrice - sumOther, 0);
+          const clamped = Math.min(numericValue, allowedMax);
+
+          const formatted = Number.isFinite(clamped) ? clamped : 0;
+          return { ...p, montant: formatted.toString() };
+        }
+
+        if (field === 'recu') {
+          const recuValue = typeof value === "string" ? value : value ?? null;
+          return { ...p, recu: recuValue };
+        }
+
+        return { ...p, [field]: value };
+      });
+    })
   }
 
   const ajouterPaiement = () => {
@@ -682,7 +725,7 @@ export default function EditReservation() {
     }
 
     return paiements.every((paiement, index) => {
-      const montantRempli = paiement.montant !== "" && !Number.isNaN(Number(paiement.montant));
+      const montantRempli = paiement.montant !== "" && !Number.isNaN(parseAmount(paiement.montant));
       const typeRempli = paiement.type !== "";
       const dateRemplie = paiement.date !== "";
       const recuExiste = (paiement.recu && paiement.recu.trim() !== "") || !!paymentDocuments?.[index];
@@ -690,6 +733,12 @@ export default function EditReservation() {
       return montantRempli && typeRempli && dateRemplie && recuExiste;
     });
   }, [paiements, paymentDocuments]);
+
+  const totalPrice = useMemo(() => parseAmount(formData.prix), [formData.prix]);
+  const totalPaid = useMemo(() => {
+    return paiements.reduce((total, paiement) => total + parseAmount(paiement.montant), 0);
+  }, [paiements]);
+  const remainingAmount = useMemo(() => Math.max(totalPrice - totalPaid, 0), [totalPrice, totalPaid]);
 
   const section3Complete = paiements.length > 0 && arePaymentsValid
   const section4Complete = true // Les toggles sont toujours complétés
@@ -731,20 +780,29 @@ export default function EditReservation() {
 
         {/* Structure identique à Nouvelle Réservation */}
         <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
-                <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-                  <CardTitle className="text-xl flex items-center gap-3">
-                    <Sparkles className="h-6 w-6" />
-                    Modifier la Réservation
-              {formData.prix && (
-                <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/30 ml-auto">
-                  <Wallet className="h-4 w-4 text-white" />
-                  <span className="text-sm text-white/80 font-medium">Prix:</span>
-                  <span className="text-lg font-bold text-white">
-                    {parseFloat(formData.prix).toLocaleString('fr-FR')} DH
-                  </span>
-                </div>
-              )}
-                  </CardTitle>
+                <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-0 z-40 shadow-lg">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <CardTitle className="text-xl flex items-center gap-3">
+                      <Sparkles className="h-6 w-6" />
+                      Modifier la Réservation
+                    </CardTitle>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/30">
+                        <Wallet className="h-4 w-4 text-white" />
+                        <span className="text-sm text-white/80 font-medium">Prix</span>
+                        <span className="text-lg font-bold text-white">
+                          {totalPrice.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/30">
+                        <CreditCard className="h-4 w-4 text-white" />
+                        <span className="text-sm text-white/80 font-medium">Reste à payer</span>
+                        <span className="text-lg font-bold text-white">
+                          {remainingAmount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-6 space-y-6">
             <form onSubmit={handleSubmit}>
@@ -961,6 +1019,10 @@ export default function EditReservation() {
                               value={paiement.montant}
                               onChange={(e) => mettreAJourPaiement(index, "montant", e.target.value)}
                               placeholder="Montant en dirhams"
+                              max={(() => {
+                                const sumOther = paiements.reduce((sum, p, idx) => idx === index ? sum : sum + parseAmount(p.montant), 0);
+                                return Math.max(totalPrice - sumOther, 0);
+                              })()}
                               className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
                             />
                           )}

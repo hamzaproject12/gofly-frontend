@@ -200,6 +200,8 @@ export default function NouvelleReservation() {
   // État pour la réduction du prix
   const [reduction, setReduction] = useState(0);
 
+  const paymentDocuments = documents.payment;
+
   // Références pour les inputs de fichiers
   const fileInputs = useRef<FileInputs>({
     passeport: null,
@@ -743,17 +745,32 @@ export default function NouvelleReservation() {
   }, [programInfo, formData.hotelMakkah, formData.typeChambre, formData.gender, selectedPlacesMakkah]);
 
   // Vérifier si les champs obligatoires sont remplis
+  const arePaymentsValid = useMemo(() => {
+    if (paiements.length === 0) {
+      return true;
+    }
+
+    return paiements.every((p) => {
+      const montantRempli = p.montant !== "" && !Number.isNaN(Number(p.montant));
+      const typeRempli = p.type !== "";
+      const recuRempli = typeof p.recu === "string" && p.recu.trim() !== "";
+
+      return montantRempli && typeRempli && recuRempli;
+    });
+  }, [paiements]);
+
   const isFormValid = useMemo(() => {
-    return (
+    const baseFieldsValid =
       formData.programme !== "" &&
       formData.typeChambre !== "" &&
       formData.gender !== "" &&
       formData.nom !== "" &&
       formData.prenom !== "" &&
       formData.telephone !== "" &&
-      formData.prix !== ""
-    )
-  }, [formData])
+      formData.prix !== "";
+
+    return baseFieldsValid && arePaymentsValid;
+  }, [formData, arePaymentsValid]);
 
   // Calculer la progression des sections
   const section1Complete = useMemo(() => {
@@ -769,8 +786,8 @@ export default function NouvelleReservation() {
   }, [formData])
 
   const section2Complete = useMemo(() => {
-    return paiements.length > 0 && paiements.every(p => p.montant && p.type)
-  }, [paiements])
+    return paiements.length > 0 && arePaymentsValid;
+  }, [paiements, arePaymentsValid]);
 
   const section3Complete = useMemo(() => {
     return Object.values(documents).some(doc => doc !== null)
@@ -787,13 +804,17 @@ export default function NouvelleReservation() {
 
   const ajouterPaiement = () => {
     setPaiements([...paiements, { montant: "", type: "", recu: null }])
+    setDocuments(prev => ({
+      ...prev,
+      payment: [...(prev.payment || []), null]
+    }))
   }
 
   const supprimerPaiement = (index: number) => {
     setPaiements(paiements.filter((_, i) => i !== index))
   }
 
-  const mettreAJourPaiement = (index: number, field: keyof Paiement, value: string) => {
+  const mettreAJourPaiement = <K extends keyof Paiement>(index: number, field: K, value: Paiement[K]) => {
     setPaiements(prev => {
       const newPaiements = [...prev]
       newPaiements[index] = {
@@ -936,6 +957,7 @@ export default function NouvelleReservation() {
       newPayments[index] = file;
       return { ...prev, payment: newPayments };
     });
+    mettreAJourPaiement(index, 'recu', file.name);
     
     // Créer l'aperçu local
     if (file.type.startsWith('image/')) {
@@ -978,6 +1000,24 @@ export default function NouvelleReservation() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const hasIncompletePayment = paiements.some((paiement, index) => {
+      const montantVide = paiement.montant === "" || Number.isNaN(Number(paiement.montant));
+      const typeVide = paiement.type === "";
+      const recuVide = !paymentDocuments?.[index] || !paiement.recu;
+
+      return montantVide || typeVide || recuVide;
+    });
+
+    if (hasIncompletePayment) {
+      toast({
+        title: "Paiement incomplet",
+        description: "Merci de renseigner le mode, le montant et le reçu pour chaque paiement ajouté.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     // Calculer la somme des montants des paiements juste avant l'insertion
@@ -2173,7 +2213,7 @@ export default function NouvelleReservation() {
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => {
-                                      mettreAJourPaiement(index, 'recu', '');
+                                      mettreAJourPaiement(index, 'recu', null);
                                       setPreviews(prev => {
                                         const newPreviews = { ...prev };
                                         delete newPreviews[`payment_${index}`];

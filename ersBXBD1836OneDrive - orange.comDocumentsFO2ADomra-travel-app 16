@@ -1,0 +1,123 @@
+warning: in the working copy of 'app/reservations/nouvelle/page.tsx', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/app/reservations/nouvelle/page.tsx b/app/reservations/nouvelle/page.tsx[m
+[1mindex 680f55f..dbbe34b 100644[m
+[1m--- a/app/reservations/nouvelle/page.tsx[m
+[1m+++ b/app/reservations/nouvelle/page.tsx[m
+[36m@@ -200,6 +200,8 @@[m [mexport default function NouvelleReservation() {[m
+   // État pour la réduction du prix[m
+   const [reduction, setReduction] = useState(0);[m
+ [m
+[32m+[m[32m  const paymentDocuments = documents.payment;[m
+[32m+[m
+   // Références pour les inputs de fichiers[m
+   const fileInputs = useRef<FileInputs>({[m
+     passeport: null,[m
+[36m@@ -743,17 +745,32 @@[m [mexport default function NouvelleReservation() {[m
+   }, [programInfo, formData.hotelMakkah, formData.typeChambre, formData.gender, selectedPlacesMakkah]);[m
+ [m
+   // Vérifier si les champs obligatoires sont remplis[m
+[32m+[m[32m  const arePaymentsValid = useMemo(() => {[m
+[32m+[m[32m    if (paiements.length === 0) {[m
+[32m+[m[32m      return true;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    return paiements.every((p) => {[m
+[32m+[m[32m      const montantRempli = p.montant !== "" && !Number.isNaN(Number(p.montant));[m
+[32m+[m[32m      const typeRempli = p.type !== "";[m
+[32m+[m[32m      const recuRempli = typeof p.recu === "string" && p.recu.trim() !== "";[m
+[32m+[m
+[32m+[m[32m      return montantRempli && typeRempli && recuRempli;[m
+[32m+[m[32m    });[m
+[32m+[m[32m  }, [paiements]);[m
+[32m+[m
+   const isFormValid = useMemo(() => {[m
+[31m-    return ([m
+[32m+[m[32m    const baseFieldsValid =[m
+       formData.programme !== "" &&[m
+       formData.typeChambre !== "" &&[m
+       formData.gender !== "" &&[m
+       formData.nom !== "" &&[m
+       formData.prenom !== "" &&[m
+       formData.telephone !== "" &&[m
+[31m-      formData.prix !== ""[m
+[31m-    )[m
+[31m-  }, [formData])[m
+[32m+[m[32m      formData.prix !== "";[m
+[32m+[m
+[32m+[m[32m    return baseFieldsValid && arePaymentsValid;[m
+[32m+[m[32m  }, [formData, arePaymentsValid]);[m
+ [m
+   // Calculer la progression des sections[m
+   const section1Complete = useMemo(() => {[m
+[36m@@ -769,8 +786,8 @@[m [mexport default function NouvelleReservation() {[m
+   }, [formData])[m
+ [m
+   const section2Complete = useMemo(() => {[m
+[31m-    return paiements.length > 0 && paiements.every(p => p.montant && p.type)[m
+[31m-  }, [paiements])[m
+[32m+[m[32m    return paiements.length > 0 && arePaymentsValid;[m
+[32m+[m[32m  }, [paiements, arePaymentsValid]);[m
+ [m
+   const section3Complete = useMemo(() => {[m
+     return Object.values(documents).some(doc => doc !== null)[m
+[36m@@ -787,13 +804,17 @@[m [mexport default function NouvelleReservation() {[m
+ [m
+   const ajouterPaiement = () => {[m
+     setPaiements([...paiements, { montant: "", type: "", recu: null }])[m
+[32m+[m[32m    setDocuments(prev => ({[m
+[32m+[m[32m      ...prev,[m
+[32m+[m[32m      payment: [...(prev.payment || []), null][m
+[32m+[m[32m    }))[m
+   }[m
+ [m
+   const supprimerPaiement = (index: number) => {[m
+     setPaiements(paiements.filter((_, i) => i !== index))[m
+   }[m
+ [m
+[31m-  const mettreAJourPaiement = (index: number, field: keyof Paiement, value: string) => {[m
+[32m+[m[32m  const mettreAJourPaiement = <K extends keyof Paiement>(index: number, field: K, value: Paiement[K]) => {[m
+     setPaiements(prev => {[m
+       const newPaiements = [...prev][m
+       newPaiements[index] = {[m
+[36m@@ -936,6 +957,7 @@[m [mexport default function NouvelleReservation() {[m
+       newPayments[index] = file;[m
+       return { ...prev, payment: newPayments };[m
+     });[m
+[32m+[m[32m    mettreAJourPaiement(index, 'recu', file.name);[m
+     [m
+     // Créer l'aperçu local[m
+     if (file.type.startsWith('image/')) {[m
+[36m@@ -978,6 +1000,24 @@[m [mexport default function NouvelleReservation() {[m
+ [m
+   const handleSubmit = async (e: React.FormEvent) => {[m
+     e.preventDefault();[m
+[32m+[m
+[32m+[m[32m    const hasIncompletePayment = paiements.some((paiement, index) => {[m
+[32m+[m[32m      const montantVide = paiement.montant === "" || Number.isNaN(Number(paiement.montant));[m
+[32m+[m[32m      const typeVide = paiement.type === "";[m
+[32m+[m[32m      const recuVide = !paymentDocuments?.[index] || !paiement.recu;[m
+[32m+[m
+[32m+[m[32m      return montantVide || typeVide || recuVide;[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    if (hasIncompletePayment) {[m
+[32m+[m[32m      toast({[m
+[32m+[m[32m        title: "Paiement incomplet",[m
+[32m+[m[32m        description: "Merci de renseigner le mode, le montant et le reçu pour chaque paiement ajouté.",[m
+[32m+[m[32m        variant: "destructive",[m
+[32m+[m[32m      });[m
+[32m+[m[32m      return;[m
+[32m+[m[32m    }[m
+[32m+[m
+     setIsSubmitting(true);[m
+ [m
+     // Calculer la somme des montants des paiements juste avant l'insertion[m
+[36m@@ -2173,7 +2213,7 @@[m [mexport default function NouvelleReservation() {[m
+                                     variant="ghost"[m
+                                     size="icon"[m
+                                     onClick={() => {[m
+[31m-                                      mettreAJourPaiement(index, 'recu', '');[m
+[32m+[m[32m                                      mettreAJourPaiement(index, 'recu', null);[m
+                                       setPreviews(prev => {[m
+                                         const newPreviews = { ...prev };[m
+                                         delete newPreviews[`payment_${index}`];[m

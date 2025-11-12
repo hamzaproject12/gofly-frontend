@@ -384,7 +384,7 @@ router.put('/:id', async (req, res) => {
 
           const freeRooms = existingRooms.filter(r => r.nbrPlaceRestantes === r.nbrPlaceTotal);
           const occupiedRooms = existingRooms.filter(r => r.nbrPlaceRestantes < r.nbrPlaceTotal);
-          const currentTotal = existingRooms.length;
+          let currentTotal = existingRooms.length;
           
           console.log(`[Room Update] Breakdown - Free: ${freeRooms.length}, Occupied: ${occupiedRooms.length}, Total: ${currentTotal}`);
 
@@ -615,7 +615,7 @@ router.put('/:id', async (req, res) => {
                   return !hasReservations && !hasOccupiedPlaces;
                 });
                 
-                const currentTotal = existingRooms.length;
+                let currentTotal = existingRooms.length;
                 
                 // Log détaillé pour debugging
                 console.log(`[Room Update] [TX] Breakdown - Free: ${freeRooms.length}, Occupied: ${occupiedRooms.length}, Total: ${currentTotal}`);

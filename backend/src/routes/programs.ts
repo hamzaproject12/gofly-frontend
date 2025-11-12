@@ -654,27 +654,40 @@ router.put('/:id', async (req, res) => {
 
                 // Gérer la création/suppression de rooms
                 if (desiredCount > currentTotal) {
-                  const toCreate = desiredCount - currentTotal;
-                  console.log(`[Room Update] [TX] Need to create ${toCreate} new rooms (desiredCount=${desiredCount}, currentTotal=${currentTotal})`);
+                const toCreate = desiredCount - currentTotal;
+                console.log(`[Room Update] [TX] Need to create ${toCreate} new rooms (desiredCount=${desiredCount}, currentTotal=${currentTotal})`);
                   
-                  if (toCreate > 0) {
-                    const basePrice = desiredPrice > 0 ? desiredPrice : (existingRooms.length > 0 ? existingRooms[0].prixRoom : 0);
-                    for (let i = 0; i < toCreate; i++) {
-                      const newRoom = await tx.room.create({
-                        data: {
-                          programId: program.id,
-                          hotelId: hotel.id,
-                          roomType,
-                          gender: 'Mixte',
-                          nbrPlaceTotal: type,
-                          nbrPlaceRestantes: type,
-                          prixRoom: basePrice,
-                          listeIdsReservation: [],
-                        }
-                      });
-                      console.log(`[Room Update] [TX] Created room ID: ${newRoom.id}`);
-                    }
-                    console.log(`[Room Update] [TX] Created ${toCreate} new rooms`);
+                if (toCreate > 0) {
+                  const basePrice = desiredPrice > 0 ? desiredPrice : (existingRooms.length > 0 ? existingRooms[0].prixRoom : 0);
+                  for (let i = 0; i < toCreate; i++) {
+                    const newRoom = await tx.room.create({
+                      data: {
+                        programId: program.id,
+                        hotelId: hotel.id,
+                        roomType,
+                        gender: 'Mixte',
+                        nbrPlaceTotal: type,
+                        nbrPlaceRestantes: type,
+                        prixRoom: basePrice,
+                        listeIdsReservation: [],
+                      }
+                    });
+                    console.log(`[Room Update] [TX] Created room ID: ${newRoom.id}`);
+
+                    // Mettre à jour les compteurs localement pour éviter la recréation dans la même transaction
+                    currentTotal += 1;
+                    const freeRoomEntry = {
+                      id: newRoom.id,
+                      nbrPlaceTotal: newRoom.nbrPlaceTotal,
+                      nbrPlaceRestantes: newRoom.nbrPlaceRestantes,
+                      prixRoom: newRoom.prixRoom,
+                      gender: newRoom.gender,
+                      listeIdsReservation: newRoom.listeIdsReservation,
+                    };
+                    freeRooms.push(freeRoomEntry as typeof existingRooms[number]);
+                    existingRooms.push(freeRoomEntry as typeof existingRooms[number]);
+                  }
+                  console.log(`[Room Update] [TX] Created ${toCreate} new rooms`);
                   }
                 } else if (desiredCount < currentTotal) {
                   const toRemove = currentTotal - desiredCount;

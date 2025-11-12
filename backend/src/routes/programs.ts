@@ -365,7 +365,6 @@ router.put('/:id', async (req, res) => {
               programId: program.id,
               hotelId: hotel.id,
               roomType,
-              gender: 'Mixte',
             },
             // Pas d'options de cache, lecture directe
           });
@@ -392,27 +391,28 @@ router.put('/:id', async (req, res) => {
 
           // Ajuster le prix de TOUTES les chambres (libres ET occupées) si un prix valide est fourni
           if (desiredPrice > 0) {
-            if (freeRooms.length > 0) {
-              await prisma.room.updateMany({
-                where: { id: { in: freeRooms.map(r => r.id) } },
-                data: { prixRoom: desiredPrice }
-              });
-              console.log(`[Room Update] Updated price for ${freeRooms.length} free rooms to ${desiredPrice}`);
-            }
-            // Mettre à jour aussi le prix des rooms occupées
-            if (occupiedRooms.length > 0) {
-              await prisma.room.updateMany({
-                where: { id: { in: occupiedRooms.map(r => r.id) } },
-                data: { prixRoom: desiredPrice }
-              });
-              console.log(`[Room Update] Updated price for ${occupiedRooms.length} occupied rooms to ${desiredPrice}`);
-            }
+            await prisma.room.updateMany({
+              where: {
+                programId: program.id,
+                hotelId: hotel.id,
+                roomType,
+              },
+              data: { prixRoom: desiredPrice }
+            });
+            console.log(`[Room Update] Updated price for ${existingRooms.length} rooms to ${desiredPrice}`);
           }
 
           // Si desiredCount est 0, supprimer toutes les chambres libres de ce type
           if (desiredCount <= 0) {
             if (freeRooms.length > 0) {
-              await prisma.room.deleteMany({ where: { id: { in: freeRooms.map(r => r.id) } } });
+              await prisma.room.deleteMany({
+                where: {
+                  programId: program.id,
+                  hotelId: hotel.id,
+                  roomType,
+                  id: { in: freeRooms.map(r => r.id) }
+                }
+              });
               console.log(`[Room Update] Deleted ${freeRooms.length} free rooms (desiredCount = 0)`);
             }
             continue;
@@ -592,7 +592,6 @@ router.put('/:id', async (req, res) => {
                     programId: program.id,
                     hotelId: hotel.id,
                     roomType: roomType,
-                    gender: 'Mixte',
                   },
                   // Ne pas utiliser de cache, forcer une lecture fraîche
                   orderBy: { id: 'asc' }
@@ -628,7 +627,6 @@ router.put('/:id', async (req, res) => {
                       programId: program.id,
                       hotelId: hotel.id,
                       roomType: roomType,
-                      gender: 'Mixte',
                     },
                     data: { prixRoom: desiredPrice }
                   });
@@ -637,7 +635,14 @@ router.put('/:id', async (req, res) => {
 
                 if (desiredCount <= 0) {
                   if (freeRooms.length > 0) {
-                    await tx.room.deleteMany({ where: { id: { in: freeRooms.map(r => r.id) } } });
+                    await tx.room.deleteMany({
+                      where: {
+                        programId: program.id,
+                        hotelId: hotel.id,
+                        roomType: roomType,
+                        id: { in: freeRooms.map(r => r.id) },
+                      },
+                    });
                     console.log(`[Room Update] [TX] Deleted ${freeRooms.length} free rooms (desiredCount = 0)`);
                   }
                   continue;
@@ -699,6 +704,9 @@ router.put('/:id', async (req, res) => {
                       const deletable = freeRooms.slice(0, Math.min(toRemove, freeRooms.length));
                       await tx.room.deleteMany({ 
                         where: { 
+                          programId: program.id,
+                          hotelId: hotel.id,
+                          roomType: roomType,
                           id: { in: deletable.map(r => r.id) } 
                         } 
                       });

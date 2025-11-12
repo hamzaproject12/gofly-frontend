@@ -383,7 +383,7 @@ router.put('/:id', async (req, res) => {
           }
 
           const freeRooms = existingRooms.filter(r => r.nbrPlaceRestantes === r.nbrPlaceTotal);
-          const occupiedRooms = existingRooms.filter(r => r.nbrPlaceRestantes < r.nbrPlaceTotal);
+          const occupiedRooms = existingRooms.filter(r => r.nbrPlaceRestantes < r.nbrPlaceTotal || (r.listeIdsReservation && r.listeIdsReservation.length > 0));
           let currentTotal = existingRooms.length;
           
           console.log(`[Room Update] Breakdown - Free: ${freeRooms.length}, Occupied: ${occupiedRooms.length}, Total: ${currentTotal}`);
@@ -603,17 +603,8 @@ router.put('/:id', async (req, res) => {
                 // Détecter les rooms occupées de manière plus robuste :
                 // 1. Par listeIdsReservation (plus fiable car mis à jour lors de la réservation)
                 // 2. Par nbrPlaceRestantes < nbrPlaceTotal (fallback)
-                const occupiedRooms = existingRooms.filter(r => {
-                  const hasReservations = r.listeIdsReservation && r.listeIdsReservation.length > 0;
-                  const hasOccupiedPlaces = r.nbrPlaceRestantes < r.nbrPlaceTotal;
-                  return hasReservations || hasOccupiedPlaces;
-                });
-                
-                const freeRooms = existingRooms.filter(r => {
-                  const hasReservations = r.listeIdsReservation && r.listeIdsReservation.length > 0;
-                  const hasOccupiedPlaces = r.nbrPlaceRestantes < r.nbrPlaceTotal;
-                  return !hasReservations && !hasOccupiedPlaces;
-                });
+                const freeRooms = existingRooms.filter(r => r.nbrPlaceRestantes === r.nbrPlaceTotal);
+                const occupiedRooms = existingRooms.filter(r => r.nbrPlaceRestantes < r.nbrPlaceTotal || (r.listeIdsReservation && r.listeIdsReservation.length > 0));
                 
                 let currentTotal = existingRooms.length;
                 
@@ -712,6 +703,19 @@ router.put('/:id', async (req, res) => {
                         } 
                       });
                       console.log(`[Room Update] [TX] Deleted ${deletable.length} free rooms (requested: ${toRemove})`);
+
+                      // Mettre à jour les compteurs locaux
+                      currentTotal -= deletable.length;
+                      for (const deleted of deletable) {
+                        const indexInFree = freeRooms.findIndex(fr => fr.id === deleted.id);
+                        if (indexInFree !== -1) {
+                          freeRooms.splice(indexInFree, 1);
+                        }
+                        const indexInExisting = existingRooms.findIndex(er => er.id === deleted.id);
+                        if (indexInExisting !== -1) {
+                          existingRooms.splice(indexInExisting, 1);
+                        }
+                      }
                     } else {
                       console.warn(`[Room Update] [TX] WARNING: Cannot remove ${toRemove} rooms - all ${currentTotal} rooms are occupied!`);
                     }

@@ -659,6 +659,10 @@ router.put('/:id', async (req, res) => {
                   
                 if (toCreate > 0) {
                   const basePrice = desiredPrice > 0 ? desiredPrice : (existingRooms.length > 0 ? existingRooms[0].prixRoom : 0);
+                  let updatedCurrentTotal = currentTotal;
+                  const updatedFreeRooms = [...freeRooms];
+                  const updatedExistingRooms = [...existingRooms];
+
                   for (let i = 0; i < toCreate; i++) {
                     const newRoom = await tx.room.create({
                       data: {
@@ -675,7 +679,7 @@ router.put('/:id', async (req, res) => {
                     console.log(`[Room Update] [TX] Created room ID: ${newRoom.id}`);
 
                     // Mettre à jour les compteurs localement pour éviter la recréation dans la même transaction
-                    currentTotal += 1;
+                    updatedCurrentTotal += 1;
                     const freeRoomEntry = {
                       id: newRoom.id,
                       nbrPlaceTotal: newRoom.nbrPlaceTotal,
@@ -684,10 +688,15 @@ router.put('/:id', async (req, res) => {
                       gender: newRoom.gender,
                       listeIdsReservation: newRoom.listeIdsReservation,
                     };
-                    freeRooms.push(freeRoomEntry as typeof existingRooms[number]);
-                    existingRooms.push(freeRoomEntry as typeof existingRooms[number]);
+                    updatedFreeRooms.push(freeRoomEntry as typeof existingRooms[number]);
+                    updatedExistingRooms.push(freeRoomEntry as typeof existingRooms[number]);
                   }
                   console.log(`[Room Update] [TX] Created ${toCreate} new rooms`);
+
+                  // Réassigner aux références utilisées plus bas
+                  currentTotal = updatedCurrentTotal;
+                  freeRooms.splice(0, freeRooms.length, ...updatedFreeRooms);
+                  existingRooms.splice(0, existingRooms.length, ...updatedExistingRooms);
                   }
                 } else if (desiredCount < currentTotal) {
                   const toRemove = currentTotal - desiredCount;

@@ -1132,7 +1132,7 @@ export default function EditReservation() {
                       )}
 
                       {/* Reçu existant */}
-                      {paiement.recu && (
+                      {paiement.id && paiement.recu && (
                         <div className="mt-3 p-2 border border-blue-200 rounded-lg bg-white">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-blue-700">Reçu de paiement</span>

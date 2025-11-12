@@ -1448,7 +1448,9 @@ export default function NouvelleReservation() {
                       <Wallet className="h-4 w-4 text-white" />
                       <span className="text-sm text-white/80 font-medium">Prix:</span>
                       <span className="text-lg font-bold text-white">
-                        {formData.prix ? parseFloat(formData.prix).toLocaleString('fr-FR') : calculatePrice.toLocaleString('fr-FR')} DH
+                        {formData.prix
+                          ? Math.round(parseFloat(formData.prix)).toLocaleString('fr-FR')
+                          : Math.round(calculatePrice).toLocaleString('fr-FR')} DH
                       </span>
                     </div>
                   )}

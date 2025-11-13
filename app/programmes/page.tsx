@@ -31,7 +31,7 @@ import {
 import Link from "next/link"
 import { useAuth } from "@/hooks/useAuth"
 import { DeleteConfirmation } from "@/components/ui/delete-confirmation"
-import RoleProtectedRoute from "@/components/RoleProtectedRoute"
+import RoleProtectedRoute from "../components/RoleProtectedRoute"
 
 // Types pour les données de l'API
 interface ProgramOverview {

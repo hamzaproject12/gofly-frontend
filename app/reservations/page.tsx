@@ -161,39 +161,6 @@ export default function ReservationsPage() {
   const { toast } = useToast()
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [reservationToDelete, setReservationToDelete] = useState<number | null>(null);
-  const handleDeleteReservation = async (id: number) => {
-    try {
-      setDeleteDialogOpen(false);
-      setLoading(true);
-
-      const response = await fetch(api.url(`/api/reservations/${id}`), {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Erreur lors de la suppression");
-      }
-
-      toast({
-        title: "Réservation supprimée",
-        description: "La réservation a été supprimée avec succès.",
-      });
-
-      await fetchData(currentPage);
-    } catch (error) {
-      console.error("Erreur suppression réservation:", error);
-      toast({
-        title: "Erreur",
-        description:
-          error instanceof Error ? error.message : "Impossible de supprimer la réservation",
-        variant: "destructive",
-      });
-    } finally {
-      setReservationToDelete(null);
-      setLoading(false);
-    }
-  };
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -562,30 +529,6 @@ export default function ReservationsPage() {
       urgent: filtered.filter(r => r.statut === 'Urgent').length
     };
   }, [reservations, searchQuery]);
-
-  const handleDeleteReservation = async (id: number) => {
-    setDeleteDialogOpen(false);
-    try {
-      const res = await fetch(api.url(`/api/reservations/${id}`), {
-        method: 'DELETE',
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Erreur lors de la suppression');
-      }
-      toast({
-        title: "Suppression réussie",
-        description: "La réservation a bien été supprimée.",
-      });
-      fetchData();
-    } catch (error: any) {
-      toast({
-        title: "Erreur",
-        description: error.message || 'Erreur lors de la suppression',
-        variant: "destructive",
-      });
-    }
-  };
 
   if (!mounted) {
     return null

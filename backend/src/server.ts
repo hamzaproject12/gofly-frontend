@@ -27,6 +27,8 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://127.0.0.1:3000',
   'https://gofly-beta.vercel.app',
+  'https://www.gofly-agence.net',
+  'https://gofly-agence.net',
   // Vercel domains will be added dynamically
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : [])
 ];

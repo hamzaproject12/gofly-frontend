@@ -31,6 +31,7 @@ import {
 import Link from "next/link"
 import { useAuth } from "@/hooks/useAuth"
 import { DeleteConfirmation } from "@/components/ui/delete-confirmation"
+import RoleProtectedRoute from "@/components/RoleProtectedRoute"
 
 // Types pour les données de l'API
 interface ProgramOverview {
@@ -357,8 +358,9 @@ export default function ProgrammesPage() {
   }
 
   return (
-    <>
-      <style jsx>{`
+    <RoleProtectedRoute allowedRoles={['ADMIN']} fallbackPath="/reservations">
+      <>
+        <style jsx>{`
         @keyframes fadeInUp {
           from {
             opacity: 0;
@@ -926,6 +928,8 @@ export default function ProgrammesPage() {
           isHardDelete={deleteConfirmation.isHardDelete}
         />
     </div>
+      )}
     </>
+    </RoleProtectedRoute>
   )
 }

@@ -42,6 +42,11 @@ router.get('/', async (req, res) => {
       const totalPlacesRestantes = program.rooms.reduce((sum, room) => sum + room.nbrPlaceRestantes, 0)
       const placesOccupees = totalPlaces - totalPlacesRestantes
 
+      // Calculer le montant restant à payer pour le programme
+      const totalPrice = program.reservations.reduce((sum, res) => sum + (res.price || 0), 0)
+      const totalPaid = program.reservations.reduce((sum, res) => sum + (res.paidAmount || 0), 0)
+      const remainingAmount = totalPrice - totalPaid
+
       // Grouper les chambres par hôtel
       const roomsByHotel = program.rooms.reduce((acc, room) => {
         const hotelKey = `${room.hotel.name} (${room.hotel.city})`
@@ -82,7 +87,8 @@ router.get('/', async (req, res) => {
           totalPlaces,
           placesOccupees,
           placesRestantes: totalPlacesRestantes,
-          occupancyRate: totalPlaces > 0 ? ((placesOccupees / totalPlaces) * 100).toFixed(1) : '0'
+          occupancyRate: totalPlaces > 0 ? ((placesOccupees / totalPlaces) * 100).toFixed(1) : '0',
+          remainingAmount: remainingAmount
         },
         hotels: hotelsWithRooms
       }

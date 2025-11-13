@@ -57,6 +57,7 @@ interface Program {
     placesOccupees: number;
     placesRestantes: number;
     occupancyRate: string;
+    remainingAmount?: number;
   };
   hotels: HotelData[];
   isDeleted: boolean;
@@ -428,6 +429,17 @@ export default function HomePage() {
                         </p>
                       </div>
                     </div>
+                    {/* Montant restant à payer au milieu */}
+                    <div className="flex-1 flex justify-center">
+                      {program.statistics.remainingAmount !== undefined && (
+                        <div className="bg-yellow-100 border-2 border-yellow-400 rounded-lg px-4 py-2 shadow-sm">
+                          <p className="text-xs font-medium text-yellow-800 mb-1">Montant restant à payer</p>
+                          <p className="text-lg font-bold text-yellow-900">
+                            {program.statistics.remainingAmount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                          </p>
+                        </div>
+                      )}
+                    </div>
                     <div className="text-right">
                       <Badge variant="outline" className="text-lg px-3 py-1">
                         {program.statistics.placesRestantes} / {program.statistics.totalPlaces}
@@ -520,6 +532,17 @@ export default function HomePage() {
                           )}
                         </p>
                       </div>
+                    </div>
+                    {/* Montant restant à payer au milieu */}
+                    <div className="flex-1 flex justify-center">
+                      {program.statistics.remainingAmount !== undefined && (
+                        <div className="bg-yellow-100 border-2 border-yellow-400 rounded-lg px-4 py-2 shadow-sm">
+                          <p className="text-xs font-medium text-yellow-800 mb-1">Montant restant à payer</p>
+                          <p className="text-lg font-bold text-yellow-900">
+                            {program.statistics.remainingAmount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                          </p>
+                        </div>
+                      )}
                     </div>
                     <div className="text-right">
                       <Badge variant="outline" className="text-lg px-3 py-1">

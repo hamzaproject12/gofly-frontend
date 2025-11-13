@@ -16,7 +16,10 @@ import {
   UserCheck,
   UserX,
   LayoutDashboard,
-  List
+  List,
+  Wallet,
+  Percent,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 
 interface Agent {
@@ -412,43 +415,105 @@ export default function HomePage() {
           <div className="space-y-6">
             {roomData?.data.map((program) => (
               <Card key={program.id} className={`border-0 shadow-lg ${program.isDeleted ? 'border-2 border-yellow-300 bg-yellow-50' : ''}`}>
-                <CardHeader className={`${program.isDeleted ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' : 'bg-gradient-to-r from-indigo-50 to-blue-50'}`}>
-                  <CardTitle className="flex items-center justify-between">
+                <CardHeader className={`${program.isDeleted ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' : 'bg-gradient-to-r from-indigo-50 to-blue-50'} pb-4`}>
+                  {/* Nom du programme et date */}
+                  <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">🎯</span>
+                      <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg">
+                        <span className="text-2xl">🎯</span>
+                      </div>
                       <div>
                         {program.isDeleted && (
-                          <Badge className="bg-yellow-500 text-white mb-1 mr-2">Supprimé</Badge>
+                          <Badge className="bg-yellow-500 text-white mb-2">Supprimé</Badge>
                         )}
-                        <h2 className={`text-xl font-bold ${program.isDeleted ? 'text-yellow-900' : 'text-gray-900'}`}>{program.name}</h2>
-                        <p className={`text-sm ${program.isDeleted ? 'text-yellow-700' : 'text-gray-600'}`}>
-                          Créé le {new Date(program.created_at).toLocaleDateString('fr-FR')}
+                        <h2 className={`text-2xl font-bold ${program.isDeleted ? 'text-yellow-900' : 'text-gray-900'} mb-1`}>
+                          {program.name}
+                        </h2>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <CalendarIcon className="h-4 w-4" />
+                          <span>
+                            Créé le {new Date(program.created_at).toLocaleDateString('fr-FR', { 
+                              day: 'numeric', 
+                              month: 'long', 
+                              year: 'numeric' 
+                            })}
+                          </span>
                           {program.deletedAt && (
-                            <span className="ml-2 text-orange-700">- Supprimé le {new Date(program.deletedAt).toLocaleDateString('fr-FR')}</span>
+                            <>
+                              <span className="mx-1">•</span>
+                              <span className="text-orange-700">
+                                Supprimé le {new Date(program.deletedAt).toLocaleDateString('fr-FR')}
+                              </span>
+                            </>
                           )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Statistiques en grille */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Montant restant à payer */}
+                    {program.statistics.remainingAmount !== undefined && (
+                      <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-300 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-yellow-400 shadow-sm">
+                            <Wallet className="h-5 w-5 text-yellow-900" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-yellow-800 uppercase tracking-wide">
+                              Montant restant à payer
+                            </p>
+                          </div>
+                        </div>
+                        <p className="text-2xl font-bold text-yellow-900 mt-2">
+                          {program.statistics.remainingAmount.toLocaleString('fr-FR', { 
+                            minimumFractionDigits: 2, 
+                            maximumFractionDigits: 2 
+                          })} <span className="text-lg">DH</span>
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Places disponibles */}
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-100 border-2 border-blue-300 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-400 shadow-sm">
+                          <Users className="h-5 w-5 text-blue-900" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide">
+                            Places disponibles
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-baseline gap-2 mt-2">
+                        <p className="text-2xl font-bold text-blue-900">
+                          {program.statistics.placesRestantes}
+                        </p>
+                        <p className="text-lg text-blue-700 font-medium">
+                          / {program.statistics.totalPlaces}
                         </p>
                       </div>
                     </div>
-                    {/* Montant restant à payer au milieu */}
-                    <div className="flex-1 flex justify-center">
-                      {program.statistics.remainingAmount !== undefined && (
-                        <div className="bg-yellow-100 border-2 border-yellow-400 rounded-lg px-4 py-2 shadow-sm">
-                          <p className="text-xs font-medium text-yellow-800 mb-1">Montant restant à payer</p>
-                          <p className="text-lg font-bold text-yellow-900">
-                            {program.statistics.remainingAmount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+
+                    {/* Taux d'occupation */}
+                    <div className="bg-gradient-to-br from-green-50 to-emerald-100 border-2 border-green-300 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-400 shadow-sm">
+                          <Percent className="h-5 w-5 text-green-900" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-green-800 uppercase tracking-wide">
+                            Taux d'occupation
                           </p>
                         </div>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <Badge variant="outline" className="text-lg px-3 py-1">
-                        {program.statistics.placesRestantes} / {program.statistics.totalPlaces}
-                      </Badge>
-                      <p className={`text-sm mt-1 ${program.isDeleted ? 'text-yellow-700' : 'text-gray-600'}`}>
-                        Taux d'occupation: {program.statistics.occupancyRate}%
+                      </div>
+                      <p className="text-2xl font-bold text-green-900 mt-2">
+                        {program.statistics.occupancyRate}%
                       </p>
                     </div>
-                  </CardTitle>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-6">
                   <div className="space-y-4">
@@ -516,43 +581,105 @@ export default function HomePage() {
           <div className="space-y-6">
             {roomData?.data.map((program) => (
               <Card key={program.id} className={`border-0 shadow-lg ${program.isDeleted ? 'border-2 border-yellow-300 bg-yellow-50' : ''}`}>
-                <CardHeader className={`${program.isDeleted ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' : 'bg-gradient-to-r from-indigo-50 to-blue-50'}`}>
-                  <CardTitle className="flex items-center justify-between">
+                <CardHeader className={`${program.isDeleted ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' : 'bg-gradient-to-r from-indigo-50 to-blue-50'} pb-4`}>
+                  {/* Nom du programme et date */}
+                  <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">🎯</span>
+                      <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg">
+                        <span className="text-2xl">🎯</span>
+                      </div>
                       <div>
                         {program.isDeleted && (
-                          <Badge className="bg-yellow-500 text-white mb-1 mr-2">Supprimé</Badge>
+                          <Badge className="bg-yellow-500 text-white mb-2">Supprimé</Badge>
                         )}
-                        <h2 className={`text-xl font-bold ${program.isDeleted ? 'text-yellow-900' : 'text-gray-900'}`}>{program.name}</h2>
-                        <p className={`text-sm ${program.isDeleted ? 'text-yellow-700' : 'text-gray-600'}`}>
-                          Créé le {new Date(program.created_at).toLocaleDateString('fr-FR')}
+                        <h2 className={`text-2xl font-bold ${program.isDeleted ? 'text-yellow-900' : 'text-gray-900'} mb-1`}>
+                          {program.name}
+                        </h2>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <CalendarIcon className="h-4 w-4" />
+                          <span>
+                            Créé le {new Date(program.created_at).toLocaleDateString('fr-FR', { 
+                              day: 'numeric', 
+                              month: 'long', 
+                              year: 'numeric' 
+                            })}
+                          </span>
                           {program.deletedAt && (
-                            <span className="ml-2 text-orange-700">- Supprimé le {new Date(program.deletedAt).toLocaleDateString('fr-FR')}</span>
+                            <>
+                              <span className="mx-1">•</span>
+                              <span className="text-orange-700">
+                                Supprimé le {new Date(program.deletedAt).toLocaleDateString('fr-FR')}
+                              </span>
+                            </>
                           )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Statistiques en grille */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Montant restant à payer */}
+                    {program.statistics.remainingAmount !== undefined && (
+                      <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-300 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-yellow-400 shadow-sm">
+                            <Wallet className="h-5 w-5 text-yellow-900" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-yellow-800 uppercase tracking-wide">
+                              Montant restant à payer
+                            </p>
+                          </div>
+                        </div>
+                        <p className="text-2xl font-bold text-yellow-900 mt-2">
+                          {program.statistics.remainingAmount.toLocaleString('fr-FR', { 
+                            minimumFractionDigits: 2, 
+                            maximumFractionDigits: 2 
+                          })} <span className="text-lg">DH</span>
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Places disponibles */}
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-100 border-2 border-blue-300 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-400 shadow-sm">
+                          <Users className="h-5 w-5 text-blue-900" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide">
+                            Places disponibles
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-baseline gap-2 mt-2">
+                        <p className="text-2xl font-bold text-blue-900">
+                          {program.statistics.placesRestantes}
+                        </p>
+                        <p className="text-lg text-blue-700 font-medium">
+                          / {program.statistics.totalPlaces}
                         </p>
                       </div>
                     </div>
-                    {/* Montant restant à payer au milieu */}
-                    <div className="flex-1 flex justify-center">
-                      {program.statistics.remainingAmount !== undefined && (
-                        <div className="bg-yellow-100 border-2 border-yellow-400 rounded-lg px-4 py-2 shadow-sm">
-                          <p className="text-xs font-medium text-yellow-800 mb-1">Montant restant à payer</p>
-                          <p className="text-lg font-bold text-yellow-900">
-                            {program.statistics.remainingAmount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+
+                    {/* Taux d'occupation */}
+                    <div className="bg-gradient-to-br from-green-50 to-emerald-100 border-2 border-green-300 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-400 shadow-sm">
+                          <Percent className="h-5 w-5 text-green-900" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-green-800 uppercase tracking-wide">
+                            Taux d'occupation
                           </p>
                         </div>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <Badge variant="outline" className="text-lg px-3 py-1">
-                        {program.statistics.placesRestantes} / {program.statistics.totalPlaces}
-                      </Badge>
-                      <p className={`text-sm mt-1 ${program.isDeleted ? 'text-yellow-700' : 'text-gray-600'}`}>
-                        Taux d'occupation: {program.statistics.occupancyRate}%
+                      </div>
+                      <p className="text-2xl font-bold text-green-900 mt-2">
+                        {program.statistics.occupancyRate}%
                       </p>
                     </div>
-                  </CardTitle>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-6">
                   <div className="space-y-6">

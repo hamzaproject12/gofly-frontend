@@ -415,103 +415,64 @@ export default function HomePage() {
           <div className="space-y-6">
             {roomData?.data.map((program) => (
               <Card key={program.id} className={`border-0 shadow-lg ${program.isDeleted ? 'border-2 border-yellow-300 bg-yellow-50' : ''}`}>
-                <CardHeader className={`${program.isDeleted ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' : 'bg-gradient-to-r from-indigo-50 to-blue-50'} pb-4`}>
-                  {/* Nom du programme et date */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg">
-                        <span className="text-2xl">🎯</span>
-                      </div>
+                <CardHeader className={`${program.isDeleted ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' : 'bg-gradient-to-r from-indigo-50 to-blue-50'} py-3`}>
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    {/* Nom du programme et date */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">🎯</span>
                       <div>
                         {program.isDeleted && (
-                          <Badge className="bg-yellow-500 text-white mb-2">Supprimé</Badge>
+                          <Badge className="bg-yellow-500 text-white text-xs mb-1">Supprimé</Badge>
                         )}
-                        <h2 className={`text-2xl font-bold ${program.isDeleted ? 'text-yellow-900' : 'text-gray-900'} mb-1`}>
+                        <h2 className={`text-lg font-bold ${program.isDeleted ? 'text-yellow-900' : 'text-gray-900'}`}>
                           {program.name}
                         </h2>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <CalendarIcon className="h-4 w-4" />
-                          <span>
-                            Créé le {new Date(program.created_at).toLocaleDateString('fr-FR', { 
-                              day: 'numeric', 
-                              month: 'long', 
-                              year: 'numeric' 
-                            })}
-                          </span>
-                          {program.deletedAt && (
-                            <>
-                              <span className="mx-1">•</span>
-                              <span className="text-orange-700">
-                                Supprimé le {new Date(program.deletedAt).toLocaleDateString('fr-FR')}
-                              </span>
-                            </>
-                          )}
-                        </div>
+                        <p className="text-xs text-gray-600 flex items-center gap-1">
+                          <CalendarIcon className="h-3 w-3" />
+                          {new Date(program.created_at).toLocaleDateString('fr-FR')}
+                        </p>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Statistiques en grille */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Montant restant à payer */}
-                    {program.statistics.remainingAmount !== undefined && (
-                      <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-300 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-yellow-400 shadow-sm">
-                            <Wallet className="h-5 w-5 text-yellow-900" />
-                          </div>
+                    {/* Statistiques compactes en ligne */}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {/* Montant restant à payer */}
+                      {program.statistics.remainingAmount !== undefined && (
+                        <div className="flex items-center gap-2 bg-yellow-100 border border-yellow-300 rounded-lg px-3 py-1.5">
+                          <Wallet className="h-4 w-4 text-yellow-700" />
                           <div>
-                            <p className="text-xs font-semibold text-yellow-800 uppercase tracking-wide">
-                              Montant restant à payer
+                            <p className="text-xs text-yellow-800 font-medium">Restant</p>
+                            <p className="text-sm font-bold text-yellow-900">
+                              {program.statistics.remainingAmount.toLocaleString('fr-FR', { 
+                                minimumFractionDigits: 0, 
+                                maximumFractionDigits: 0 
+                              })} DH
                             </p>
                           </div>
                         </div>
-                        <p className="text-2xl font-bold text-yellow-900 mt-2">
-                          {program.statistics.remainingAmount.toLocaleString('fr-FR', { 
-                            minimumFractionDigits: 2, 
-                            maximumFractionDigits: 2 
-                          })} <span className="text-lg">DH</span>
-                        </p>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Places disponibles */}
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-100 border-2 border-blue-300 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-400 shadow-sm">
-                          <Users className="h-5 w-5 text-blue-900" />
-                        </div>
+                      {/* Places disponibles */}
+                      <div className="flex items-center gap-2 bg-blue-100 border border-blue-300 rounded-lg px-3 py-1.5">
+                        <Users className="h-4 w-4 text-blue-700" />
                         <div>
-                          <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide">
-                            Places disponibles
+                          <p className="text-xs text-blue-800 font-medium">Places</p>
+                          <p className="text-sm font-bold text-blue-900">
+                            {program.statistics.placesRestantes} / {program.statistics.totalPlaces}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-baseline gap-2 mt-2">
-                        <p className="text-2xl font-bold text-blue-900">
-                          {program.statistics.placesRestantes}
-                        </p>
-                        <p className="text-lg text-blue-700 font-medium">
-                          / {program.statistics.totalPlaces}
-                        </p>
-                      </div>
-                    </div>
 
-                    {/* Taux d'occupation */}
-                    <div className="bg-gradient-to-br from-green-50 to-emerald-100 border-2 border-green-300 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-400 shadow-sm">
-                          <Percent className="h-5 w-5 text-green-900" />
-                        </div>
+                      {/* Taux d'occupation */}
+                      <div className="flex items-center gap-2 bg-green-100 border border-green-300 rounded-lg px-3 py-1.5">
+                        <Percent className="h-4 w-4 text-green-700" />
                         <div>
-                          <p className="text-xs font-semibold text-green-800 uppercase tracking-wide">
-                            Taux d'occupation
+                          <p className="text-xs text-green-800 font-medium">Occupation</p>
+                          <p className="text-sm font-bold text-green-900">
+                            {program.statistics.occupancyRate}%
                           </p>
                         </div>
                       </div>
-                      <p className="text-2xl font-bold text-green-900 mt-2">
-                        {program.statistics.occupancyRate}%
-                      </p>
                     </div>
                   </div>
                 </CardHeader>
@@ -581,103 +542,64 @@ export default function HomePage() {
           <div className="space-y-6">
             {roomData?.data.map((program) => (
               <Card key={program.id} className={`border-0 shadow-lg ${program.isDeleted ? 'border-2 border-yellow-300 bg-yellow-50' : ''}`}>
-                <CardHeader className={`${program.isDeleted ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' : 'bg-gradient-to-r from-indigo-50 to-blue-50'} pb-4`}>
-                  {/* Nom du programme et date */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg">
-                        <span className="text-2xl">🎯</span>
-                      </div>
+                <CardHeader className={`${program.isDeleted ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' : 'bg-gradient-to-r from-indigo-50 to-blue-50'} py-3`}>
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    {/* Nom du programme et date */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">🎯</span>
                       <div>
                         {program.isDeleted && (
-                          <Badge className="bg-yellow-500 text-white mb-2">Supprimé</Badge>
+                          <Badge className="bg-yellow-500 text-white text-xs mb-1">Supprimé</Badge>
                         )}
-                        <h2 className={`text-2xl font-bold ${program.isDeleted ? 'text-yellow-900' : 'text-gray-900'} mb-1`}>
+                        <h2 className={`text-lg font-bold ${program.isDeleted ? 'text-yellow-900' : 'text-gray-900'}`}>
                           {program.name}
                         </h2>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <CalendarIcon className="h-4 w-4" />
-                          <span>
-                            Créé le {new Date(program.created_at).toLocaleDateString('fr-FR', { 
-                              day: 'numeric', 
-                              month: 'long', 
-                              year: 'numeric' 
-                            })}
-                          </span>
-                          {program.deletedAt && (
-                            <>
-                              <span className="mx-1">•</span>
-                              <span className="text-orange-700">
-                                Supprimé le {new Date(program.deletedAt).toLocaleDateString('fr-FR')}
-                              </span>
-                            </>
-                          )}
-                        </div>
+                        <p className="text-xs text-gray-600 flex items-center gap-1">
+                          <CalendarIcon className="h-3 w-3" />
+                          {new Date(program.created_at).toLocaleDateString('fr-FR')}
+                        </p>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Statistiques en grille */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Montant restant à payer */}
-                    {program.statistics.remainingAmount !== undefined && (
-                      <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-300 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-yellow-400 shadow-sm">
-                            <Wallet className="h-5 w-5 text-yellow-900" />
-                          </div>
+                    {/* Statistiques compactes en ligne */}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {/* Montant restant à payer */}
+                      {program.statistics.remainingAmount !== undefined && (
+                        <div className="flex items-center gap-2 bg-yellow-100 border border-yellow-300 rounded-lg px-3 py-1.5">
+                          <Wallet className="h-4 w-4 text-yellow-700" />
                           <div>
-                            <p className="text-xs font-semibold text-yellow-800 uppercase tracking-wide">
-                              Montant restant à payer
+                            <p className="text-xs text-yellow-800 font-medium">Restant</p>
+                            <p className="text-sm font-bold text-yellow-900">
+                              {program.statistics.remainingAmount.toLocaleString('fr-FR', { 
+                                minimumFractionDigits: 0, 
+                                maximumFractionDigits: 0 
+                              })} DH
                             </p>
                           </div>
                         </div>
-                        <p className="text-2xl font-bold text-yellow-900 mt-2">
-                          {program.statistics.remainingAmount.toLocaleString('fr-FR', { 
-                            minimumFractionDigits: 2, 
-                            maximumFractionDigits: 2 
-                          })} <span className="text-lg">DH</span>
-                        </p>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Places disponibles */}
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-100 border-2 border-blue-300 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-400 shadow-sm">
-                          <Users className="h-5 w-5 text-blue-900" />
-                        </div>
+                      {/* Places disponibles */}
+                      <div className="flex items-center gap-2 bg-blue-100 border border-blue-300 rounded-lg px-3 py-1.5">
+                        <Users className="h-4 w-4 text-blue-700" />
                         <div>
-                          <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide">
-                            Places disponibles
+                          <p className="text-xs text-blue-800 font-medium">Places</p>
+                          <p className="text-sm font-bold text-blue-900">
+                            {program.statistics.placesRestantes} / {program.statistics.totalPlaces}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-baseline gap-2 mt-2">
-                        <p className="text-2xl font-bold text-blue-900">
-                          {program.statistics.placesRestantes}
-                        </p>
-                        <p className="text-lg text-blue-700 font-medium">
-                          / {program.statistics.totalPlaces}
-                        </p>
-                      </div>
-                    </div>
 
-                    {/* Taux d'occupation */}
-                    <div className="bg-gradient-to-br from-green-50 to-emerald-100 border-2 border-green-300 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-400 shadow-sm">
-                          <Percent className="h-5 w-5 text-green-900" />
-                        </div>
+                      {/* Taux d'occupation */}
+                      <div className="flex items-center gap-2 bg-green-100 border border-green-300 rounded-lg px-3 py-1.5">
+                        <Percent className="h-4 w-4 text-green-700" />
                         <div>
-                          <p className="text-xs font-semibold text-green-800 uppercase tracking-wide">
-                            Taux d'occupation
+                          <p className="text-xs text-green-800 font-medium">Occupation</p>
+                          <p className="text-sm font-bold text-green-900">
+                            {program.statistics.occupancyRate}%
                           </p>
                         </div>
                       </div>
-                      <p className="text-2xl font-bold text-green-900 mt-2">
-                        {program.statistics.occupancyRate}%
-                      </p>
                     </div>
                   </div>
                 </CardHeader>

@@ -205,70 +205,7 @@ export default function ReservationsPage() {
     setChambreFilter(value);
   };
 
-  const handleDeleteReservation = useCallback(async (id: number) => {
-    try {
-      setLoading(true);
-      setDeleteDialogOpen(false);
-
-      const response = await fetch(api.url(`/api/reservations/${id}`), {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Erreur lors de la suppression de la réservation");
-      }
-
-      toast({
-        title: "Réservation supprimée",
-        description: "La réservation a été supprimée avec succès.",
-      });
-
-      await fetchData(currentPage);
-    } catch (error) {
-      console.error("Erreur suppression réservation:", error);
-      toast({
-        title: "Erreur",
-        description:
-          error instanceof Error ? error.message : "Impossible de supprimer la réservation",
-        variant: "destructive",
-      });
-    } finally {
-      setReservationToDelete(null);
-      setLoading(false);
-    }
-  }, [currentPage, fetchData, toast]);
-
-  // Fonctions de pagination
-  const handlePageChange = (newPage: number) => {
-    setCurrentPage(newPage);
-    fetchData(newPage);
-  };
-
-  const handleNextPage = () => {
-    if (hasNextPage) {
-      handlePageChange(currentPage + 1);
-    }
-  };
-
-  const handlePrevPage = () => {
-    if (hasPrevPage) {
-      handlePageChange(currentPage - 1);
-    }
-  };
-
-  // Fonction de recherche et filtrage
-  const handleSearch = (query: string) => {
-    setFilters(prev => ({ ...prev, search: query }));
-    // Ne pas appeler fetchData immédiatement, attendre que l'utilisateur arrête de taper
-  };
-
-  const handleDateFilter = (from: string, to: string) => {
-    setFilters(prev => ({ ...prev, dateFrom: from, dateTo: to }));
-    setCurrentPage(1);
-    fetchData(1);
-  };
-
+  // Déclarer fetchData en premier pour éviter les problèmes d'ordre
   const fetchData = useCallback(async (page = 1) => {
     try {
       setLoading(true)
@@ -421,7 +358,72 @@ export default function ReservationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [programmeFilter, statutFilter, chambreFilter]);
+  }, [programmeFilter, statutFilter, chambreFilter, filters]);
+
+  // Fonction de suppression de réservation (après fetchData)
+  const handleDeleteReservation = useCallback(async (id: number) => {
+    try {
+      setLoading(true);
+      setDeleteDialogOpen(false);
+
+      const response = await fetch(api.url(`/api/reservations/${id}`), {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Erreur lors de la suppression de la réservation");
+      }
+
+      toast({
+        title: "Réservation supprimée",
+        description: "La réservation a été supprimée avec succès.",
+      });
+
+      await fetchData(currentPage);
+    } catch (error) {
+      console.error("Erreur suppression réservation:", error);
+      toast({
+        title: "Erreur",
+        description:
+          error instanceof Error ? error.message : "Impossible de supprimer la réservation",
+        variant: "destructive",
+      });
+    } finally {
+      setReservationToDelete(null);
+      setLoading(false);
+    }
+  }, [currentPage, fetchData, toast]);
+
+  // Fonctions de pagination
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    fetchData(newPage);
+  };
+
+  const handleNextPage = () => {
+    if (hasNextPage) {
+      handlePageChange(currentPage + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (hasPrevPage) {
+      handlePageChange(currentPage - 1);
+    }
+  };
+
+  // Fonction de recherche et filtrage
+  const handleSearch = (query: string) => {
+    setFilters(prev => ({ ...prev, search: query }));
+    // Ne pas appeler fetchData immédiatement, attendre que l'utilisateur arrête de taper
+  };
+
+  const handleDateFilter = (from: string, to: string) => {
+    setFilters(prev => ({ ...prev, dateFrom: from, dateTo: to }));
+    setCurrentPage(1);
+    fetchData(1);
+  };
 
   useEffect(() => {
     setMounted(true)

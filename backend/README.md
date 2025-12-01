@@ -14,7 +14,7 @@ DATABASE_URL="postgresql://..."
 PORT=5000
 
 # Frontend URL (set this to your Vercel domain after deployment)
-FRONTEND_URL="https://your-app.vercel.app" 
+FRONTEND_URL="https://your-app.vercel.app"
 ```
 
 ### Deployment Steps:

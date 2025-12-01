@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, ArrowRight, Plane, Sparkles, MapPin } from 'lucide-react';
+import { api } from "@/lib/api";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -26,7 +27,7 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(api.url('/api/auth/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

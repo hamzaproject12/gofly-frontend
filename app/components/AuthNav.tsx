@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { api } from "@/lib/api";
 
 interface Agent {
   id: number;
@@ -47,7 +48,7 @@ export default function AuthNav() {
 
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch('/api/auth/profile', {
+      const response = await fetch(api.url('/api/auth/profile'), {
         credentials: 'include',
       });
 
@@ -65,7 +66,7 @@ export default function AuthNav() {
   const handleLogout = async () => {
     try {
       console.log('Déconnexion en cours...');
-      const response = await fetch('/api/auth/logout', {
+      const response = await fetch(api.url('/api/auth/logout'), {
         method: 'POST',
         credentials: 'include',
       });

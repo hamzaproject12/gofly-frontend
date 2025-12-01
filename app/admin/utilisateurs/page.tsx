@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import RoleProtectedRoute from '../../components/RoleProtectedRoute';
+import { api } from "@/lib/api";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,7 +53,7 @@ export default function GestionUtilisateursPage() {
 
   const fetchAgents = async () => {
     try {
-      const response = await fetch('/api/admin/agents', {
+      const response = await fetch(api.url('/api/admin/agents'), {
         credentials: 'include',
       });
 
@@ -75,7 +76,7 @@ export default function GestionUtilisateursPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/admin/agents', {
+      const response = await fetch(api.url('/api/admin/agents'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -109,7 +110,7 @@ export default function GestionUtilisateursPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(`/api/admin/agents/${editingAgent.id}`, {
+      const response = await fetch(api.url(`/api/admin/agents/${editingAgent.id}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -147,7 +148,7 @@ export default function GestionUtilisateursPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(`/api/admin/agents/${agent.id}`, {
+      const response = await fetch(api.url(`/api/admin/agents/${agent.id}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -183,7 +184,7 @@ export default function GestionUtilisateursPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(`/api/admin/agents/${agent.id}`, {
+      const response = await fetch(api.url(`/api/admin/agents/${agent.id}`), {
         method: 'DELETE',
         credentials: 'include',
       });

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import RoleProtectedRoute from '../components/RoleProtectedRoute';
+import { api } from "@/lib/api";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,7 +46,7 @@ export default function GestionHotelsPage() {
 
   const fetchHotels = async () => {
     try {
-      const response = await fetch('/api/hotels', {
+      const response = await fetch(api.url('/api/hotels'), {
         credentials: 'include',
       });
 
@@ -68,7 +69,7 @@ export default function GestionHotelsPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/hotels', {
+      const response = await fetch(api.url('/api/hotels'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -102,7 +103,7 @@ export default function GestionHotelsPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(`/api/hotels/${editingHotel.id}`, {
+      const response = await fetch(api.url(`/api/hotels/${editingHotel.id}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -142,7 +143,7 @@ export default function GestionHotelsPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(`/api/hotels/${hotel.id}`, {
+      const response = await fetch(api.url(`/api/hotels/${hotel.id}`), {
         method: 'DELETE',
         credentials: 'include',
       });

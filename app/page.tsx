@@ -97,7 +97,7 @@ export default function HomePage() {
 
       // Récupérer les données du profil et la disponibilité des chambres en parallèle
       const [profileResponse, roomResponse] = await Promise.all([
-        fetch('/api/auth/profile', { credentials: 'include' }),
+        fetch(api.url('/api/auth/profile'), { credentials: 'include' }),
         fetch(api.url(api.endpoints.roomAvailability))
       ]);
 

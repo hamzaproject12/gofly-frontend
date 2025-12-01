@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { api } from "@/lib/api";
 
 interface Agent {
   id: number;
@@ -33,7 +34,7 @@ export default function RoleProtectedRoute({
 
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch('/api/auth/profile', {
+      const response = await fetch(api.url('/api/auth/profile'), {
         credentials: 'include',
       });
 

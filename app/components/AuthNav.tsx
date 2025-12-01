@@ -48,9 +48,7 @@ export default function AuthNav() {
 
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch(api.url('/api/auth/profile'), {
-        credentials: 'include',
-      });
+      const response = await api.request('/api/auth/profile');
 
       if (response.ok) {
         const data = await response.json();
@@ -66,15 +64,15 @@ export default function AuthNav() {
   const handleLogout = async () => {
     try {
       console.log('Déconnexion en cours...');
-      const response = await fetch(api.url('/api/auth/logout'), {
-        method: 'POST',
-        credentials: 'include',
+      const response = await api.request('/api/auth/logout', {
+        method: 'POST'
       });
 
       console.log('Réponse de déconnexion:', response.status, response.ok);
 
       if (response.ok) {
         console.log('Déconnexion réussie, redirection...');
+        localStorage.removeItem('authToken'); // Clear token on logout
         setAgent(null);
         setShowProfile(false);
         // Forcer la redirection
@@ -87,6 +85,7 @@ export default function AuthNav() {
     } catch (error) {
       console.error('Erreur de déconnexion:', error);
       // Même en cas d'erreur, on force la déconnexion côté client
+      localStorage.removeItem('authToken');
       setAgent(null);
       setShowProfile(false);
       window.location.href = '/login';

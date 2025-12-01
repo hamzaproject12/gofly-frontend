@@ -34,9 +34,7 @@ export default function RoleProtectedRoute({
 
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch(api.url('/api/auth/profile'), {
-        credentials: 'include',
-      });
+      const response = await api.request('/api/auth/profile');
 
       if (response.ok) {
         const data = await response.json();

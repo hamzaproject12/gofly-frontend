@@ -34,6 +34,12 @@ const allowedOrigins = [
   // .map(url => url.trim()) nettoie les espaces vides accidentels
   ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',').map(url => url.trim()) : [])
 ];
+// AJOUTEZ CECI :
+console.log('🚨 --- DEBUG CORS --- 🚨');
+console.log('Variable Railway FRONTEND_URL :', process.env.FRONTEND_URL);
+console.log('Type de FRONTEND_URL :', typeof process.env.FRONTEND_URL);
+console.log('✅ Liste finale des origines autorisées :', allowedOrigins);
+console.log('🚨 --------------------- 🚨');
 
 app.use(cors({
   origin: allowedOrigins,

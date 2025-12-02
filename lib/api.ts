@@ -25,6 +25,10 @@ export const api = {
   request: async (url: string, options: RequestInit = {}) => {
     const token = getAuthToken();
     
+    console.log(`🌐 API Config Base URL: ${API_BASE_URL}`);
+    console.log(`🚀 API Request to: ${url}`);
+    console.log(`🔑 Token available: ${!!token}`);
+    
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...options.headers,

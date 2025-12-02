@@ -29,8 +29,10 @@ const allowedOrigins = [
   'https://gofly-beta.vercel.app',
   'https://www.gofly-agence.net',
   'https://gofly-agence.net',
-  // Vercel domains will be added dynamically
-  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : [])
+  // Vercel domains will be added dynamically via Railway variable
+  // .split(',') permet de gérer plusieurs URLs (ex: "https://site1.com,https://site2.com")
+  // .map(url => url.trim()) nettoie les espaces vides accidentels
+  ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',').map(url => url.trim()) : [])
 ];
 
 app.use(cors({

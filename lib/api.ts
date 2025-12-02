@@ -22,7 +22,9 @@ export const api = {
     return `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
   },
   // Fonction pour faire des requêtes avec l'authentification
-  request: async (url: string, options: RequestInit = {}) => {
+  request: async (endpoint: string, options: RequestInit = {}) => {
+    // Construit l'URL complète si ce n'est pas déjà une URL absolue
+    const url = endpoint.startsWith('http') ? endpoint : api.url(endpoint);
     const token = getAuthToken();
     
     console.log(`🌐 API Config Base URL: ${API_BASE_URL}`);

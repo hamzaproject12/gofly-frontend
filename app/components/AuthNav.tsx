@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from "@/lib/api";
+import { siteConfig } from "@/lib/config";
 
 interface Agent {
   id: number;
@@ -98,7 +99,7 @@ export default function AuthNav() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-20">
             <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-gray-900">GoodFly</h1>
+              <h1 className="text-xl font-semibold text-gray-900">{siteConfig.name}</h1>
             </div>
             <div className="flex items-center">
               <div className="animate-pulse bg-gray-200 h-8 w-24 rounded"></div>
@@ -115,7 +116,7 @@ export default function AuthNav() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-20">
             <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-gray-900">GoodFly</h1>
+              <h1 className="text-xl font-semibold text-gray-900">{siteConfig.name}</h1>
             </div>
             <div className="flex items-center space-x-4">
               <Link
@@ -144,11 +145,11 @@ export default function AuthNav() {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 flex items-center justify-center">
-                <img src="/logo-gofly.png" alt="Logo GoFly" className="h-10 w-10 object-contain rounded-xl" />
+                <img src={siteConfig.logo} alt={`Logo ${siteConfig.name}`} className="h-10 w-10 object-contain rounded-xl" />
               </div>
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-700 to-blue-900 bg-clip-text text-transparent">
-                  GoFly
+                  {siteConfig.name}
                 </h1>
                 <p className="text-xs text-gray-500">Gestion Omra</p>
               </div>

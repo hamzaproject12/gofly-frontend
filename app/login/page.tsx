@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, ArrowRight, Plane, Sparkles, MapPin } from 'lucide-react';
 import { api } from "@/lib/api";
+import { siteConfig } from "@/lib/config";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -93,8 +94,8 @@ export default function LoginPage() {
           <div className="absolute -inset-4 bg-[hsl(44.38deg_86.67%_61.76%)]/30 rounded-full blur-2xl animate-pulse group-hover:bg-[hsl(44.38deg_86.67%_61.76%)]/50 transition-all duration-500"></div>
           <div className="relative bg-white/10 backdrop-blur-md rounded-2xl p-2 border border-white/20">
             <img
-              src="/logo-gofly.png"
-              alt="GoFly Logo"
+              src={siteConfig.logo}
+              alt={`${siteConfig.name} Logo`}
               className="relative w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-[0_0_25px_rgba(255,204,102,0.6)] animate-logo-glow"
               loading="eager"
             />
@@ -107,7 +108,7 @@ export default function LoginPage() {
         {/* Titre principal */}
         <div className="text-center mb-8 animate-slide-up">
           <h1 className="text-4xl md:text-5xl font-bold mb-3 bg-gradient-to-r from-white via-[hsl(44.38deg_86.67%_61.76%)] to-white bg-clip-text text-transparent animate-gradient leading-tight">
-            GoFly Travel
+            {siteConfig.name}
           </h1>
           <p className="text-gray-300 text-lg">
             Votre voyage spirituel commence ici
@@ -206,7 +207,7 @@ export default function LoginPage() {
         {/* Footer */}
         <div className="text-center mt-8 space-y-2 animate-fade-in">
           <p className="text-gray-400 text-sm">
-            © 2025 GoFly Travel Agency
+            © {new Date().getFullYear()} {siteConfig.name}
           </p>
           <p className="text-gray-500 text-xs">
             Agence spécialisée Omra & Hajj

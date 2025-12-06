@@ -928,7 +928,6 @@ export default function ProgrammesPage() {
           isHardDelete={deleteConfirmation.isHardDelete}
         />
     </div>
-      )}
     </>
     </RoleProtectedRoute>
   )

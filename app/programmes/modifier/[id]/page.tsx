@@ -543,7 +543,7 @@ export default function ModifierProgrammePage() {
                                           <div className="mt-1 text-center text-[11px] text-gray-500">Occupées: {occupied} • Total actuel: {total}</div>
                                         </div>
                                         <div>
-                                          <div className="text-sm text-yellow-700 mb-2 text-center font-semibold">Prix (DH)</div>
+                                          <div className="text-sm text-yellow-700 mb-2 text-center font-semibold">Prix (Riyal)</div>
                                           <Input
                                             type="number"
                                             value={formData.hotelsMadina.find((h) => h.name === hotel.name)?.chambres[type]?.prix || ""}
@@ -653,7 +653,7 @@ export default function ModifierProgrammePage() {
                                             <div className="mt-1 text-center text-[11px] text-gray-500">Occupées: {occupied} • Total actuel: {total}</div>
                                           </div>
                                           <div>
-                                            <div className="text-sm text-blue-700 mb-2 text-center font-semibold">Prix (DH)</div>
+                                            <div className="text-sm text-blue-700 mb-2 text-center font-semibold">Prix (Riyal)</div>
                                             <Input
                                               type="number"
                                               value={formData.hotelsMakkah.find((h) => h.name === hotel.name)?.chambres[type]?.prix || ""}

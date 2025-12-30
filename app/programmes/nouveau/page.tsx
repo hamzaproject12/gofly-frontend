@@ -552,7 +552,7 @@ export default function NouveauProgramme() {
                                         
                                         {/* Prix */}
                                         <div>
-                                          <div className="text-sm text-yellow-700 mb-2 text-center font-semibold">Prix (DH)</div>
+                                          <div className="text-sm text-yellow-700 mb-2 text-center font-semibold">Prix (Riyal)</div>
                                           <Input
                                             type="number"
                                             min="0"
@@ -730,7 +730,7 @@ export default function NouveauProgramme() {
                                           
                                           {/* Prix */}
                                           <div>
-                                            <div className="text-sm text-blue-700 mb-2 text-center font-semibold">Prix (DH)</div>
+                                            <div className="text-sm text-blue-700 mb-2 text-center font-semibold">Prix (Riyal)</div>
                                             <Input
                                               type="number"
                                               min="0"

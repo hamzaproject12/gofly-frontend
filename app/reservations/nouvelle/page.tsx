@@ -172,6 +172,9 @@ export default function NouvelleReservation() {
     prixAvionDH: number;
     prixVisaRiyal: number;
     profit: number;
+    profitEconomique: number;
+    profitNormal: number;
+    profitVIP: number;
     rooms: Array<{
       id: number;
       hotelId: number;
@@ -194,7 +197,8 @@ export default function NouvelleReservation() {
     includeAvion: true,
     includeVisa: true,
     joursMadina: 0, // Sera initialisé avec les valeurs du programme
-    joursMakkah: 0  // Sera initialisé avec les valeurs du programme
+    joursMakkah: 0, // Sera initialisé avec les valeurs du programme
+    plan: "Normal" // Plan par défaut: Économique, Normal, VIP
   });
 
   // État pour la réduction du prix
@@ -281,7 +285,10 @@ export default function NouvelleReservation() {
         exchange: data.exchange,
         prixAvionDH: data.prixAvionDH,
         prixVisaRiyal: data.prixVisaRiyal,
-        profit: data.profit,
+        profit: data.profit || 0,
+        profitEconomique: data.profitEconomique || 0,
+        profitNormal: data.profitNormal || 0,
+        profitVIP: data.profitVIP || 0,
         rooms: data.rooms || []
       };
       
@@ -332,11 +339,26 @@ export default function NouvelleReservation() {
       const prixAvion = customization.includeAvion ? programInfo.prixAvionDH : 0;
       const prixVisa = customization.includeVisa ? programInfo.prixVisaRiyal : 0;
       
+      // Récupérer le profit selon le plan sélectionné
+      const getProfitByPlan = () => {
+        switch (customization.plan) {
+          case "Économique":
+            return programInfo.profitEconomique || programInfo.profit || 0;
+          case "VIP":
+            return programInfo.profitVIP || programInfo.profit || 0;
+          case "Normal":
+          default:
+            return programInfo.profitNormal || programInfo.profit || 0;
+        }
+      };
+      
+      const profit = getProfitByPlan();
+      
       // LOGS DÉTAILLÉS DU CALCUL SANS HÔTEL
       console.log('🔍 === DÉTAIL DU CALCUL DU PRIX (SANS HÔTEL) ===');
       console.log('📊 Données de base:');
       console.log('   - Taux de change:', programInfo.exchange, 'DH/Riyal');
-      console.log('   - Profit fixe:', programInfo.profit, 'DH');
+      console.log('   - Plan sélectionné:', customization.plan);
       
       console.log('✈️ Prix Avion:');
       console.log('   - Inclus:', customization.includeAvion ? 'OUI' : 'NON');
@@ -349,14 +371,16 @@ export default function NouvelleReservation() {
       
       console.log('🧮 Calcul détaillé:');
       console.log('   - Prix Avion:', prixAvion, 'DH');
-      console.log('   - Profit:', programInfo.profit, 'DH');
+      console.log('   - Plan:', customization.plan);
+      console.log('   - Profit:', profit, 'DH');
       console.log('   - Visa converti:', prixVisa * programInfo.exchange, 'DH');
       
-      const prixFinal = prixAvion + programInfo.profit + (prixVisa * programInfo.exchange);
+      const prixFinal = prixAvion + profit + (prixVisa * programInfo.exchange);
 
       console.log('💰 === RÉSULTAT FINAL (SANS HÔTEL) ===');
       console.log('   - Prix Avion:', prixAvion, 'DH');
-      console.log('   - Profit:', programInfo.profit, 'DH');
+      console.log('   - Plan:', customization.plan);
+      console.log('   - Profit:', profit, 'DH');
       console.log('   - Visa converti:', prixVisa * programInfo.exchange, 'DH');
       console.log('   - PRIX FINAL:', prixFinal, 'DH');
       console.log('✅ Prix calculé (sans hôtel):', prixFinal);
@@ -461,6 +485,21 @@ export default function NouvelleReservation() {
     const joursUtilisesMadina = customization.joursMadina;
     const joursUtilisesMakkah = customization.joursMakkah;
 
+    // Récupérer le profit selon le plan sélectionné
+    const getProfitByPlan = () => {
+      switch (customization.plan) {
+        case "Économique":
+          return programInfo.profitEconomique || programInfo.profit || 0;
+        case "VIP":
+          return programInfo.profitVIP || programInfo.profit || 0;
+        case "Normal":
+        default:
+          return programInfo.profitNormal || programInfo.profit || 0;
+      }
+    };
+    
+    const profit = getProfitByPlan();
+
     // Calculer le prix des hôtels selon la sélection
     const prixHotelMadina = (formData.hotelMadina !== "none" && roomMadina) ? (prixRoomMadina / nbPersonnes) * joursUtilisesMadina : 0;
     const prixHotelMakkah = (formData.hotelMakkah !== "none" && roomMakkah) ? (prixRoomMakkah / nbPersonnes) * joursUtilisesMakkah : 0;
@@ -471,7 +510,7 @@ export default function NouvelleReservation() {
     console.log('   - Type de chambre:', roomType, `(${nbPersonnes} personne${nbPersonnes > 1 ? 's' : ''})`);
     console.log('   - Genre:', gender);
     console.log('   - Taux de change:', programInfo.exchange, 'DH/Riyal');
-    console.log('   - Profit fixe:', programInfo.profit, 'DH');
+    console.log('   - Plan sélectionné:', customization.plan);
     
     console.log('✈️ Prix Avion:');
     console.log('   - Inclus:', customization.includeAvion ? 'OUI' : 'NON');
@@ -503,17 +542,19 @@ export default function NouvelleReservation() {
     
     console.log('🧮 Calcul détaillé:');
     console.log('   - Prix Avion:', prixAvion, 'DH');
-    console.log('   - Profit:', programInfo.profit, 'DH');
+    console.log('   - Plan sélectionné:', customization.plan);
+    console.log('   - Profit:', profit, 'DH');
     console.log('   - Total Riyals (Visa + Hôtels):', (prixVisa + prixHotelMakkah + prixHotelMadina), 'Riyals');
     console.log('   - Conversion en DH:', (prixVisa + prixHotelMakkah + prixHotelMadina) * programInfo.exchange, 'DH');
     
     const prixFinal = prixAvion 
-      + programInfo.profit 
+      + profit 
       + (prixVisa + prixHotelMakkah + prixHotelMadina) * programInfo.exchange;
 
     console.log('💰 === RÉSULTAT FINAL ===');
     console.log('   - Prix Avion:', prixAvion, 'DH');
-    console.log('   - Profit:', programInfo.profit, 'DH');
+    console.log('   - Plan:', customization.plan);
+    console.log('   - Profit:', profit, 'DH');
     console.log('   - Services (Visa + Hôtels) convertis:', (prixVisa + prixHotelMakkah + prixHotelMadina) * programInfo.exchange, 'DH');
     console.log('   - PRIX FINAL:', prixFinal, 'DH');
     console.log('✅ Prix calculé:', prixFinal);
@@ -662,7 +703,8 @@ export default function NouvelleReservation() {
       setCustomization(prev => ({
         ...prev,
         joursMadina: programInfo.nbJoursMadina,
-        joursMakkah: programInfo.nbJoursMakkah
+        joursMakkah: programInfo.nbJoursMakkah,
+        plan: prev.plan || "Normal" // Garder le plan existant ou utiliser "Normal" par défaut
       }));
     }
   }, [programInfo]);
@@ -1072,6 +1114,7 @@ export default function NouvelleReservation() {
           statutHotel: (formData.hotelMadina !== "none" || formData.hotelMakkah !== "none") ? formData.statutHotel : false,
           statutVol: customization.includeAvion ? formData.statutVol : false,
           paidAmount: paidAmount,
+          plan: customization.plan,
           // Ajouter les IDs des chambres sélectionnées
           roomMadinaId: Object.keys(selectedPlacesMadina)[0] ? parseInt(Object.keys(selectedPlacesMadina)[0]) : null,
           roomMakkahId: Object.keys(selectedPlacesMakkah)[0] ? parseInt(Object.keys(selectedPlacesMakkah)[0]) : null
@@ -1629,6 +1672,36 @@ export default function NouvelleReservation() {
                         {/* Séparateur */}
                         <div className="w-px h-8 bg-blue-300"></div>
                         
+                        {/* Plan de voyage */}
+                        <div className="flex items-center gap-6">
+                          <span className="text-sm font-semibold text-blue-700">Plan:</span>
+                          <Select
+                            value={customization.plan}
+                            onValueChange={(value) => 
+                              setCustomization(prev => ({ ...prev, plan: value }))
+                            }
+                          >
+                            <SelectTrigger className="w-32 h-8 text-xs border border-blue-200 focus:border-blue-500">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Économique">Économique</SelectItem>
+                              <SelectItem value="Normal">Normal</SelectItem>
+                              <SelectItem value="VIP">VIP</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <span className="text-xs text-blue-500">
+                            Profit: {
+                              customization.plan === "Économique" ? (programInfo.profitEconomique || 0) :
+                              customization.plan === "VIP" ? (programInfo.profitVIP || 0) :
+                              (programInfo.profitNormal || 0)
+                            } DH
+                          </span>
+                        </div>
+                        
+                        {/* Séparateur */}
+                        <div className="w-px h-8 bg-blue-300"></div>
+                        
                         {/* Bouton réinitialiser */}
                         <Button
                           type="button"
@@ -1637,7 +1710,8 @@ export default function NouvelleReservation() {
                               includeAvion: true,
                               includeVisa: true,
                               joursMadina: programInfo.nbJoursMadina,
-                              joursMakkah: programInfo.nbJoursMakkah
+                              joursMakkah: programInfo.nbJoursMakkah,
+                              plan: "Normal"
                             });
                           }}
                           variant="outline"

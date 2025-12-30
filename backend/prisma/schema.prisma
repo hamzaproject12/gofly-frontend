@@ -39,6 +39,9 @@ model Program {
   prixAvionDH      Float                @default(0)
   prixVisaRiyal    Float                @default(0)
   profit           Float                @default(0)
+  profitEconomique Float                @default(0)
+  profitNormal     Float                @default(0)
+  profitVIP        Float                @default(0)
   isDeleted        Boolean              @default(false)
   deletedAt        DateTime?
   expenses         Expense[]
@@ -117,6 +120,7 @@ model Reservation {
   gender          String    @default("Homme")
   agentId         Int?
   reduction       Float     @default(0)
+  plan            String    @default("Normal") @db.VarChar(20)
   expenses        Expense[]
   documents       Fichier[]
   payments        Payment[]

@@ -62,6 +62,9 @@ export default function NouveauProgramme() {
     prixAvion: "",
     prixVisaRiyal: "",
     profit: "",
+    profitEconomique: "",
+    profitNormal: "",
+    profitVIP: "",
     dateCreation: new Date(),
     hotelsMadina: [] as Array<{
       name: string,
@@ -246,6 +249,9 @@ export default function NouveauProgramme() {
         prixAvionDH: formData.prixAvion ? parseFloat(formData.prixAvion) : 0,
         prixVisaRiyal: formData.prixVisaRiyal ? parseFloat(formData.prixVisaRiyal) : 0,
         profit: formData.profit ? parseFloat(formData.profit) : 0,
+        profitEconomique: formData.profitEconomique ? parseFloat(formData.profitEconomique) : 0,
+        profitNormal: formData.profitNormal ? parseFloat(formData.profitNormal) : 0,
+        profitVIP: formData.profitVIP ? parseFloat(formData.profitVIP) : 0,
         visaDeadline: formData.datesLimites.visa,
         hotelDeadline: formData.datesLimites.hotels,
         flightDeadline: formData.datesLimites.billets,
@@ -442,19 +448,49 @@ export default function NouveauProgramme() {
                           className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="profit" className="text-green-700 font-medium flex items-center gap-2">
-                          <PiggyBank className="h-4 w-4" />
-                          Profit (DH)
-                        </Label>
-                        <Input
-                          id="profit"
-                          type="number"
-                          value={formData.profit}
-                          onChange={(e) => setFormData({ ...formData, profit: e.target.value })}
-                          placeholder="Ex: 1500"
-                          className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
-                        />
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+                        <div className="space-y-2">
+                          <Label htmlFor="profitEconomique" className="text-green-700 font-medium flex items-center gap-2">
+                            <PiggyBank className="h-4 w-4" />
+                            Profit Économique (DH)
+                          </Label>
+                          <Input
+                            id="profitEconomique"
+                            type="number"
+                            value={formData.profitEconomique}
+                            onChange={(e) => setFormData({ ...formData, profitEconomique: e.target.value })}
+                            placeholder="Ex: 1000"
+                            className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="profitNormal" className="text-green-700 font-medium flex items-center gap-2">
+                            <PiggyBank className="h-4 w-4" />
+                            Profit Normal (DH)
+                          </Label>
+                          <Input
+                            id="profitNormal"
+                            type="number"
+                            value={formData.profitNormal}
+                            onChange={(e) => setFormData({ ...formData, profitNormal: e.target.value })}
+                            placeholder="Ex: 1500"
+                            className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="profitVIP" className="text-green-700 font-medium flex items-center gap-2">
+                            <PiggyBank className="h-4 w-4" />
+                            Profit VIP (DH)
+                          </Label>
+                          <Input
+                            id="profitVIP"
+                            type="number"
+                            value={formData.profitVIP}
+                            onChange={(e) => setFormData({ ...formData, profitVIP: e.target.value })}
+                            placeholder="Ex: 2000"
+                            className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>

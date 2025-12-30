@@ -52,6 +52,9 @@ interface ProgramApi {
   prixAvionDH: number
   prixVisaRiyal: number
   profit: number
+  profitEconomique: number
+  profitNormal: number
+  profitVIP: number
   hotelsMadina: Array<{ hotel: { id: number; name: string; city: "Madina" } }>
   hotelsMakkah: Array<{ hotel: { id: number; name: string; city: "Makkah" } }>
   rooms: Array<{
@@ -96,6 +99,9 @@ export default function ModifierProgrammePage() {
     prixAvion: "",
     prixVisaRiyal: "",
     profit: "",
+    profitEconomique: "",
+    profitNormal: "",
+    profitVIP: "",
     dateCreation: new Date(),
     hotelsMadina: [] as Array<{
       name: string
@@ -230,6 +236,9 @@ export default function ModifierProgrammePage() {
           prixAvion: String(program.prixAvionDH ?? ""),
           prixVisaRiyal: String(program.prixVisaRiyal ?? ""),
           profit: String(program.profit ?? ""),
+          profitEconomique: String((program as any).profitEconomique ?? ""),
+          profitNormal: String((program as any).profitNormal ?? ""),
+          profitVIP: String((program as any).profitVIP ?? ""),
           dateCreation: program.created_at ? new Date(program.created_at) : new Date(),
           hotelsMadina: selectedMadina,
           hotelsMakkah: selectedMakkah,
@@ -325,6 +334,9 @@ export default function ModifierProgrammePage() {
         prixAvionDH: formData.prixAvion ? parseFloat(formData.prixAvion) : undefined,
         prixVisaRiyal: formData.prixVisaRiyal ? parseFloat(formData.prixVisaRiyal) : undefined,
         profit: formData.profit ? parseFloat(formData.profit) : undefined,
+        profitEconomique: formData.profitEconomique ? parseFloat(formData.profitEconomique) : undefined,
+        profitNormal: formData.profitNormal ? parseFloat(formData.profitNormal) : undefined,
+        profitVIP: formData.profitVIP ? parseFloat(formData.profitVIP) : undefined,
         visaDeadline: formData.datesLimites.visa ?? undefined,
         hotelDeadline: formData.datesLimites.hotels ?? undefined,
         flightDeadline: formData.datesLimites.billets ?? undefined,
@@ -444,9 +456,19 @@ export default function ModifierProgrammePage() {
                           <Label className="text-green-700 font-medium flex items-center gap-2"><Plane className="h-4 w-4" />Prix Avion (DH)</Label>
                           <Input type="number" value={formData.prixAvion} onChange={(e) => setFormData({ ...formData, prixAvion: e.target.value })} className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" />
                         </div>
-                        <div className="space-y-2">
-                          <Label className="text-green-700 font-medium flex items-center gap-2"><PiggyBank className="h-4 w-4" />Profit (DH)</Label>
-                          <Input type="number" value={formData.profit} onChange={(e) => setFormData({ ...formData, profit: e.target.value })} className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" />
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+                          <div className="space-y-2">
+                            <Label className="text-green-700 font-medium flex items-center gap-2"><PiggyBank className="h-4 w-4" />Profit Économique (DH)</Label>
+                            <Input type="number" value={formData.profitEconomique} onChange={(e) => setFormData({ ...formData, profitEconomique: e.target.value })} placeholder="Ex: 1000" className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-green-700 font-medium flex items-center gap-2"><PiggyBank className="h-4 w-4" />Profit Normal (DH)</Label>
+                            <Input type="number" value={formData.profitNormal} onChange={(e) => setFormData({ ...formData, profitNormal: e.target.value })} placeholder="Ex: 1500" className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-green-700 font-medium flex items-center gap-2"><PiggyBank className="h-4 w-4" />Profit VIP (DH)</Label>
+                            <Input type="number" value={formData.profitVIP} onChange={(e) => setFormData({ ...formData, profitVIP: e.target.value })} placeholder="Ex: 2000" className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" />
+                          </div>
                         </div>
                         <div className="space-y-2">
                           <Label className="text-green-700 font-medium flex items-center gap-2"><FileText className="h-4 w-4" />Prix Visa (Riyal)</Label>

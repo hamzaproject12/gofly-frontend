@@ -274,7 +274,7 @@ router.get('/:id', async (req, res) => {
 // Create new reservation
 router.post('/', async (req, res) => {
   try {
-    const { firstName, lastName, phone, programId, roomType, gender, hotelMadina, hotelMakkah, price, reservationDate, status, statutPasseport, statutVisa, statutHotel, statutVol, paidAmount, reduction, roomMadinaId, roomMakkahId } = req.body;
+    const { firstName, lastName, phone, programId, roomType, gender, hotelMadina, hotelMakkah, price, reservationDate, status, statutPasseport, statutVisa, statutHotel, statutVol, paidAmount, reduction, roomMadinaId, roomMakkahId, plan } = req.body;
     
     // Extraire l'agentId du token JWT
     const agentId = extractAgentIdFromToken(req);
@@ -286,6 +286,7 @@ router.post('/', async (req, res) => {
     console.log('- statutHotel:', statutHotel, 'Type:', typeof statutHotel);
     console.log('- statutVol:', statutVol, 'Type:', typeof statutVol);
     console.log('- reduction:', reduction, 'Type:', typeof reduction);
+    console.log('- plan:', plan, 'Type:', typeof plan);
     
     // Créer la réservation sans les deadlines (elles seront récupérées via la relation program)
     const reservation = await prisma.reservation.create({
@@ -307,6 +308,7 @@ router.post('/', async (req, res) => {
         statutHotel,
         statutVol,
         paidAmount: paidAmount ? parseFloat(paidAmount) : 0,
+        plan: plan || "Normal",
         agentId: agentId // Ajouter l'agentId extrait du token
       },
       include: {

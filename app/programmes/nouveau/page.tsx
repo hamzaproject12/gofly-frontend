@@ -376,7 +376,9 @@ export default function NouveauProgramme() {
                       <Wallet className="h-5 w-5" />
                       Détails financiers et durée
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    
+                    {/* Grille principale pour les champs standards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                       <div className="space-y-2">
                         <Label htmlFor="nbJoursMadina" className="text-green-700 font-medium flex items-center gap-2">
                           <MapPin className="h-4 w-4" />
@@ -448,10 +450,17 @@ export default function NouveauProgramme() {
                           className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
                         />
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+                    </div>
+
+                    {/* Section séparée pour les profits */}
+                    <div className="border-t border-green-200 pt-6">
+                      <h4 className="text-md font-semibold text-green-700 mb-4 flex items-center gap-2">
+                        <PiggyBank className="h-5 w-5" />
+                        Profits par plan
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="profitEconomique" className="text-green-700 font-medium flex items-center gap-2">
-                            <PiggyBank className="h-4 w-4" />
                             Profit Économique (DH)
                           </Label>
                           <Input
@@ -465,7 +474,6 @@ export default function NouveauProgramme() {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="profitNormal" className="text-green-700 font-medium flex items-center gap-2">
-                            <PiggyBank className="h-4 w-4" />
                             Profit Normal (DH)
                           </Label>
                           <Input
@@ -479,7 +487,6 @@ export default function NouveauProgramme() {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="profitVIP" className="text-green-700 font-medium flex items-center gap-2">
-                            <PiggyBank className="h-4 w-4" />
                             Profit VIP (DH)
                           </Label>
                           <Input

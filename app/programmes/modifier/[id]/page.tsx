@@ -25,6 +25,7 @@ import {
   ArrowLeft,
   User,
   Bed,
+  BadgeCheck,
 } from "lucide-react"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
@@ -439,40 +440,120 @@ export default function ModifierProgrammePage() {
                         <Wallet className="h-5 w-5" />
                         Détails financiers et durée
                       </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      
+                      {/* Grille principale pour les champs standards */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                         <div className="space-y-2">
-                          <Label className="text-green-700 font-medium flex items-center gap-2"><MapPin className="h-4 w-4" />NB Jours Madina</Label>
-                          <Input type="number" value={formData.nbJoursMadina} onChange={(e) => setFormData({ ...formData, nbJoursMadina: e.target.value })} className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" />
+                          <Label className="text-green-700 font-medium flex items-center gap-2">
+                            <MapPin className="h-4 w-4" />
+                            NB Jours Madina
+                          </Label>
+                          <Input 
+                            type="number" 
+                            value={formData.nbJoursMadina} 
+                            onChange={(e) => setFormData({ ...formData, nbJoursMadina: e.target.value })} 
+                            placeholder="Ex: 4"
+                            className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" 
+                          />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-green-700 font-medium flex items-center gap-2"><MapPin className="h-4 w-4" />NB Jours Makkah</Label>
-                          <Input type="number" value={formData.nbJoursMakkah} onChange={(e) => setFormData({ ...formData, nbJoursMakkah: e.target.value })} className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" />
+                          <Label className="text-green-700 font-medium flex items-center gap-2">
+                            <MapPin className="h-4 w-4" />
+                            NB Jours Makkah
+                          </Label>
+                          <Input 
+                            type="number" 
+                            value={formData.nbJoursMakkah} 
+                            onChange={(e) => setFormData({ ...formData, nbJoursMakkah: e.target.value })} 
+                            placeholder="Ex: 15"
+                            className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" 
+                          />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-green-700 font-medium flex items-center gap-2"><DollarSign className="h-4 w-4" />Exchange</Label>
-                          <Input type="number" step="0.01" value={formData.exchange} onChange={(e) => setFormData({ ...formData, exchange: e.target.value })} className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" />
+                          <Label className="text-green-700 font-medium flex items-center gap-2">
+                            <DollarSign className="h-4 w-4" />
+                            Exchange
+                          </Label>
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            value={formData.exchange} 
+                            onChange={(e) => setFormData({ ...formData, exchange: e.target.value })} 
+                            placeholder="Ex: 2.80"
+                            className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" 
+                          />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-green-700 font-medium flex items-center gap-2"><Plane className="h-4 w-4" />Prix Avion (DH)</Label>
-                          <Input type="number" value={formData.prixAvion} onChange={(e) => setFormData({ ...formData, prixAvion: e.target.value })} className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" />
+                          <Label className="text-green-700 font-medium flex items-center gap-2">
+                            <Plane className="h-4 w-4" />
+                            Prix Avion (DH)
+                          </Label>
+                          <Input 
+                            type="number" 
+                            value={formData.prixAvion} 
+                            onChange={(e) => setFormData({ ...formData, prixAvion: e.target.value })} 
+                            placeholder="Ex: 7750"
+                            className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" 
+                          />
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+                        <div className="space-y-2">
+                          <Label className="text-green-700 font-medium flex items-center gap-2">
+                            <BadgeCheck className="h-4 w-4" />
+                            Prix Visa (Riyal)
+                          </Label>
+                          <Input 
+                            type="number" 
+                            value={formData.prixVisaRiyal} 
+                            onChange={(e) => setFormData({ ...formData, prixVisaRiyal: e.target.value })} 
+                            placeholder="Ex: 550"
+                            className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" 
+                          />
+                        </div>
+                      </div>
+
+                      {/* Section séparée pour les profits */}
+                      <div className="border-t border-green-200 pt-6">
+                        <h4 className="text-md font-semibold text-green-700 mb-4 flex items-center gap-2">
+                          <PiggyBank className="h-5 w-5" />
+                          Profits par plan
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div className="space-y-2">
-                            <Label className="text-green-700 font-medium flex items-center gap-2"><PiggyBank className="h-4 w-4" />Profit Économique (DH)</Label>
-                            <Input type="number" value={formData.profitEconomique} onChange={(e) => setFormData({ ...formData, profitEconomique: e.target.value })} placeholder="Ex: 1000" className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" />
+                            <Label className="text-green-700 font-medium flex items-center gap-2">
+                              Profit Économique (DH)
+                            </Label>
+                            <Input 
+                              type="number" 
+                              value={formData.profitEconomique} 
+                              onChange={(e) => setFormData({ ...formData, profitEconomique: e.target.value })} 
+                              placeholder="Ex: 1000" 
+                              className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" 
+                            />
                           </div>
                           <div className="space-y-2">
-                            <Label className="text-green-700 font-medium flex items-center gap-2"><PiggyBank className="h-4 w-4" />Profit Normal (DH)</Label>
-                            <Input type="number" value={formData.profitNormal} onChange={(e) => setFormData({ ...formData, profitNormal: e.target.value })} placeholder="Ex: 1500" className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" />
+                            <Label className="text-green-700 font-medium flex items-center gap-2">
+                              Profit Normal (DH)
+                            </Label>
+                            <Input 
+                              type="number" 
+                              value={formData.profitNormal} 
+                              onChange={(e) => setFormData({ ...formData, profitNormal: e.target.value })} 
+                              placeholder="Ex: 1500" 
+                              className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" 
+                            />
                           </div>
                           <div className="space-y-2">
-                            <Label className="text-green-700 font-medium flex items-center gap-2"><PiggyBank className="h-4 w-4" />Profit VIP (DH)</Label>
-                            <Input type="number" value={formData.profitVIP} onChange={(e) => setFormData({ ...formData, profitVIP: e.target.value })} placeholder="Ex: 2000" className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" />
+                            <Label className="text-green-700 font-medium flex items-center gap-2">
+                              Profit VIP (DH)
+                            </Label>
+                            <Input 
+                              type="number" 
+                              value={formData.profitVIP} 
+                              onChange={(e) => setFormData({ ...formData, profitVIP: e.target.value })} 
+                              placeholder="Ex: 2000" 
+                              className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" 
+                            />
                           </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-green-700 font-medium flex items-center gap-2"><FileText className="h-4 w-4" />Prix Visa (Riyal)</Label>
-                          <Input type="number" value={formData.prixVisaRiyal} onChange={(e) => setFormData({ ...formData, prixVisaRiyal: e.target.value })} className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" />
                         </div>
                       </div>
                     </div>

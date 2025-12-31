@@ -31,6 +31,9 @@ import {
   Info,
   ChevronDown,
   ChevronUp,
+  Leaf,
+  ShieldCheck,
+  Crown,
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/components/ui/use-toast"
@@ -200,6 +203,63 @@ export default function NouvelleReservation() {
     joursMakkah: 0, // Sera initialisé avec les valeurs du programme
     plan: "Normal" // Plan par défaut: Économique, Normal, VIP
   });
+
+  // Dynamic Theme Engine - Configuration des thèmes pour chaque plan
+  const planThemes = useMemo(() => ({
+    "Économique": {
+      name: "Économique",
+      icon: Leaf,
+      colors: {
+        primary: "slate",
+        secondary: "blue",
+        bg: "bg-slate-50",
+        border: "border-slate-300",
+        borderActive: "border-slate-500",
+        ring: "ring-slate-400",
+        text: "text-slate-700",
+        textActive: "text-slate-900",
+        badge: "bg-slate-100 text-slate-700 border-slate-300",
+        glow: "shadow-slate-400/50",
+      }
+    },
+    "Normal": {
+      name: "Normal",
+      icon: ShieldCheck,
+      colors: {
+        primary: "emerald",
+        secondary: "green",
+        bg: "bg-emerald-50",
+        border: "border-emerald-300",
+        borderActive: "border-emerald-500",
+        ring: "ring-emerald-400",
+        text: "text-emerald-700",
+        textActive: "text-emerald-900",
+        badge: "bg-emerald-100 text-emerald-700 border-emerald-300",
+        glow: "shadow-emerald-400/50",
+      }
+    },
+    "VIP": {
+      name: "VIP",
+      icon: Crown,
+      colors: {
+        primary: "amber",
+        secondary: "yellow",
+        bg: "bg-amber-50",
+        border: "border-amber-300",
+        borderActive: "border-amber-500",
+        ring: "ring-amber-400",
+        text: "text-amber-700",
+        textActive: "text-amber-900",
+        badge: "bg-amber-100 text-amber-700 border-amber-300",
+        glow: "shadow-amber-400/50",
+      }
+    }
+  }), []);
+
+  // Get active theme based on selected plan
+  const activeTheme = useMemo(() => {
+    return planThemes[customization.plan as keyof typeof planThemes] || planThemes["Normal"];
+  }, [customization.plan, planThemes]);
 
   // État pour la réduction du prix
   const [reduction, setReduction] = useState(0);
@@ -1487,10 +1547,13 @@ export default function NouvelleReservation() {
                   Nouvelle Réservation
                   </div>
                   {calculatePrice > 0 && (
-                    <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/30">
-                      <Wallet className="h-4 w-4 text-white" />
-                      <span className="text-sm text-white/80 font-medium">Prix:</span>
-                      <span className="text-lg font-bold text-white">
+                    <div className={`
+                      flex items-center gap-2 backdrop-blur-sm px-3 py-1.5 rounded-lg border-2 transition-all duration-300
+                      ${activeTheme.colors.bg} ${activeTheme.colors.border} ${activeTheme.colors.glow} shadow-lg
+                    `}>
+                      <Wallet className={`h-4 w-4 ${activeTheme.colors.textActive}`} />
+                      <span className={`text-sm font-medium ${activeTheme.colors.text}`}>Prix:</span>
+                      <span className={`text-lg font-bold ${activeTheme.colors.textActive}`}>
                         {formData.prix
                           ? parseInt(formData.prix, 10).toLocaleString('fr-FR')
                           : Math.round(calculatePrice).toLocaleString('fr-FR')} DH
@@ -1593,21 +1656,102 @@ export default function NouvelleReservation() {
 
                       <div className="space-y-2">
                         <Label className="text-blue-700 font-medium text-sm">Plan *</Label>
-                        <Select
-                          value={customization.plan}
-                          onValueChange={(value) => 
-                            setCustomization(prev => ({ ...prev, plan: value }))
-                          }
+                        {/* Enhanced Plan Selection - Segmented Control */}
+                        <div 
+                          className={`
+                            relative p-1 rounded-xl border-2 transition-all duration-300 ease-in-out
+                            ${activeTheme.colors.border} ${activeTheme.colors.bg}
+                            ${activeTheme.colors.glow} shadow-lg
+                            hover:shadow-xl animate-pulse-subtle
+                          `}
                         >
-                          <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
-                            <SelectValue placeholder="Sélectionner le plan" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Économique">Économique</SelectItem>
-                            <SelectItem value="Normal">Normal</SelectItem>
-                            <SelectItem value="VIP">VIP</SelectItem>
-                          </SelectContent>
-                        </Select>
+                          <div className="grid grid-cols-3 gap-2">
+                            {Object.entries(planThemes).map(([planKey, theme]) => {
+                              const Icon = theme.icon;
+                              const isSelected = customization.plan === planKey;
+                              
+                              return (
+                                <button
+                                  key={planKey}
+                                  type="button"
+                                  onClick={() => {
+                                    setCustomization(prev => ({ ...prev, plan: planKey }));
+                                  }}
+                                  className={`
+                                    relative flex flex-col items-center justify-center gap-2 p-3 rounded-lg
+                                    transition-all duration-300 ease-in-out
+                                    ${isSelected 
+                                      ? `${activeTheme.colors.bg} ${activeTheme.colors.borderActive} border-2 shadow-md scale-105 animate-pulse-selected` 
+                                      : 'bg-white border-2 border-transparent hover:border-gray-300 hover:bg-gray-50'
+                                    }
+                                    transform hover:scale-102 active:scale-98
+                                    focus:outline-none focus:ring-2 ${activeTheme.colors.ring} focus:ring-offset-2
+                                  `}
+                                >
+                                  {/* Icon */}
+                                  <Icon 
+                                    className={`
+                                      h-5 w-5 transition-all duration-300
+                                      ${isSelected 
+                                        ? `${activeTheme.colors.textActive} scale-110` 
+                                        : 'text-gray-400'
+                                      }
+                                    `}
+                                  />
+                                  
+                                  {/* Plan Name */}
+                                  <span className={`
+                                    text-xs font-semibold transition-colors duration-300
+                                    ${isSelected 
+                                      ? activeTheme.colors.textActive 
+                                      : 'text-gray-500'
+                                    }
+                                  `}>
+                                    {theme.name}
+                                  </span>
+                                  
+                                  {/* Active Indicator */}
+                                  {isSelected && (
+                                    <div 
+                                      className={`
+                                        absolute -top-1 -right-1 h-3 w-3 rounded-full
+                                        ${activeTheme.colors.badge} border-2 ${activeTheme.colors.borderActive}
+                                        animate-ping
+                                      `}
+                                    />
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          
+                          {/* Glow effect on selection */}
+                          {customization.plan && (
+                            <div 
+                              className={`
+                                absolute inset-0 rounded-xl pointer-events-none
+                                ${activeTheme.colors.glow} shadow-2xl
+                                opacity-30 animate-glow-pulse
+                              `}
+                            />
+                          )}
+                        </div>
+                        
+                        {/* Plan Badge */}
+                        {(() => {
+                          const ThemeIcon = activeTheme.icon;
+                          return (
+                            <div className={`
+                              inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border
+                              ${activeTheme.colors.badge} transition-all duration-300
+                            `}>
+                              <ThemeIcon className={`h-4 w-4 ${activeTheme.colors.textActive}`} />
+                              <span className={`text-sm font-medium ${activeTheme.colors.textActive}`}>
+                                Plan {activeTheme.name} sélectionné
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -2534,10 +2678,13 @@ export default function NouvelleReservation() {
                 </div>
                 
                 {/* Prix final */}
-                <div className="flex items-center gap-2 bg-gradient-to-r from-emerald-100 to-teal-100 px-3 py-2 rounded-lg border border-emerald-300">
-                  <Wallet className="h-4 w-4 text-emerald-600" />
-                  <span className="text-sm font-medium text-emerald-700">Total:</span>
-                  <span className="font-bold text-emerald-700 text-lg">
+                <div className={`
+                  flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all duration-300
+                  ${activeTheme.colors.bg} ${activeTheme.colors.border} ${activeTheme.colors.glow} shadow-lg
+                `}>
+                  <Wallet className={`h-4 w-4 ${activeTheme.colors.textActive}`} />
+                  <span className={`text-sm font-medium ${activeTheme.colors.text}`}>Total:</span>
+                  <span className={`font-bold ${activeTheme.colors.textActive} text-lg`}>
                     {Math.max(0, Math.round(calculatePrice - reduction)).toLocaleString('fr-FR')} DH
                   </span>
                 </div>

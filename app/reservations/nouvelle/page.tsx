@@ -1656,16 +1656,16 @@ export default function NouvelleReservation() {
 
                       <div className="space-y-2">
                         <Label className="text-blue-700 font-medium text-sm">Plan *</Label>
-                        {/* Enhanced Plan Selection - Segmented Control */}
+                        {/* Enhanced Plan Selection - Compact Segmented Control */}
                         <div 
                           className={`
-                            relative p-1 rounded-xl border-2 transition-all duration-300 ease-in-out
+                            relative h-10 rounded-lg border-2 transition-all duration-300 ease-in-out
                             ${activeTheme.colors.border} ${activeTheme.colors.bg}
-                            ${activeTheme.colors.glow} shadow-lg
-                            hover:shadow-xl animate-pulse-subtle
+                            ${activeTheme.colors.glow} shadow-md
+                            hover:shadow-lg
                           `}
                         >
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-3 h-full gap-1 p-1">
                             {Object.entries(planThemes).map(([planKey, theme]) => {
                               const Icon = theme.icon;
                               const isSelected = customization.plan === planKey;
@@ -1678,22 +1678,21 @@ export default function NouvelleReservation() {
                                     setCustomization(prev => ({ ...prev, plan: planKey }));
                                   }}
                                   className={`
-                                    relative flex flex-col items-center justify-center gap-2 p-3 rounded-lg
+                                    relative flex items-center justify-center gap-1.5 rounded-md
                                     transition-all duration-300 ease-in-out
                                     ${isSelected 
-                                      ? `${activeTheme.colors.bg} ${activeTheme.colors.borderActive} border-2 shadow-md scale-105 animate-pulse-selected` 
-                                      : 'bg-white border-2 border-transparent hover:border-gray-300 hover:bg-gray-50'
+                                      ? `${activeTheme.colors.bg} ${activeTheme.colors.borderActive} border shadow-sm` 
+                                      : 'bg-white border border-transparent hover:border-gray-300 hover:bg-gray-50'
                                     }
-                                    transform hover:scale-102 active:scale-98
-                                    focus:outline-none focus:ring-2 ${activeTheme.colors.ring} focus:ring-offset-2
+                                    focus:outline-none focus:ring-2 ${activeTheme.colors.ring} focus:ring-offset-1
                                   `}
                                 >
                                   {/* Icon */}
                                   <Icon 
                                     className={`
-                                      h-5 w-5 transition-all duration-300
+                                      h-4 w-4 transition-all duration-300
                                       ${isSelected 
-                                        ? `${activeTheme.colors.textActive} scale-110` 
+                                        ? `${activeTheme.colors.textActive}` 
                                         : 'text-gray-400'
                                       }
                                     `}
@@ -1701,7 +1700,7 @@ export default function NouvelleReservation() {
                                   
                                   {/* Plan Name */}
                                   <span className={`
-                                    text-xs font-semibold transition-colors duration-300
+                                    text-xs font-medium transition-colors duration-300
                                     ${isSelected 
                                       ? activeTheme.colors.textActive 
                                       : 'text-gray-500'
@@ -1714,9 +1713,8 @@ export default function NouvelleReservation() {
                                   {isSelected && (
                                     <div 
                                       className={`
-                                        absolute -top-1 -right-1 h-3 w-3 rounded-full
-                                        ${activeTheme.colors.badge} border-2 ${activeTheme.colors.borderActive}
-                                        animate-ping
+                                        absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full
+                                        ${activeTheme.colors.badge} border ${activeTheme.colors.borderActive}
                                       `}
                                     />
                                   )}
@@ -1724,34 +1722,7 @@ export default function NouvelleReservation() {
                               );
                             })}
                           </div>
-                          
-                          {/* Glow effect on selection */}
-                          {customization.plan && (
-                            <div 
-                              className={`
-                                absolute inset-0 rounded-xl pointer-events-none
-                                ${activeTheme.colors.glow} shadow-2xl
-                                opacity-30 animate-glow-pulse
-                              `}
-                            />
-                          )}
                         </div>
-                        
-                        {/* Plan Badge */}
-                        {(() => {
-                          const ThemeIcon = activeTheme.icon;
-                          return (
-                            <div className={`
-                              inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border
-                              ${activeTheme.colors.badge} transition-all duration-300
-                            `}>
-                              <ThemeIcon className={`h-4 w-4 ${activeTheme.colors.textActive}`} />
-                              <span className={`text-sm font-medium ${activeTheme.colors.textActive}`}>
-                                Plan {activeTheme.name} sélectionné
-                              </span>
-                            </div>
-                          );
-                        })()}
                       </div>
                     </div>
 

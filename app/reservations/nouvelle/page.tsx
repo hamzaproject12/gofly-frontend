@@ -1522,7 +1522,7 @@ export default function NouvelleReservation() {
                       )}
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                       <div className="space-y-2">
                         <Label className="text-blue-700 font-medium text-sm">Programme *</Label>
                         <Select
@@ -1589,7 +1589,26 @@ export default function NouvelleReservation() {
                             <SelectItem value="Femme">Femme</SelectItem>
                           </SelectContent>
                         </Select>
-                                            </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-blue-700 font-medium text-sm">Plan *</Label>
+                        <Select
+                          value={customization.plan}
+                          onValueChange={(value) => 
+                            setCustomization(prev => ({ ...prev, plan: value }))
+                          }
+                        >
+                          <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
+                            <SelectValue placeholder="Sélectionner le plan" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Économique">Économique</SelectItem>
+                            <SelectItem value="Normal">Normal</SelectItem>
+                            <SelectItem value="VIP">VIP</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
 
                   {/* Section de personnalisation compacte */}
@@ -1672,46 +1691,16 @@ export default function NouvelleReservation() {
                         {/* Séparateur */}
                         <div className="w-px h-8 bg-blue-300"></div>
                         
-                        {/* Plan de voyage */}
-                        <div className="flex items-center gap-6">
-                          <span className="text-sm font-semibold text-blue-700">Plan:</span>
-                          <Select
-                            value={customization.plan}
-                            onValueChange={(value) => 
-                              setCustomization(prev => ({ ...prev, plan: value }))
-                            }
-                          >
-                            <SelectTrigger className="w-32 h-8 text-xs border border-blue-200 focus:border-blue-500">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Économique">Économique</SelectItem>
-                              <SelectItem value="Normal">Normal</SelectItem>
-                              <SelectItem value="VIP">VIP</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <span className="text-xs text-blue-500">
-                            Profit: {
-                              customization.plan === "Économique" ? (programInfo.profitEconomique || 0) :
-                              customization.plan === "VIP" ? (programInfo.profitVIP || 0) :
-                              (programInfo.profitNormal || 0)
-                            } DH
-                          </span>
-                        </div>
-                        
-                        {/* Séparateur */}
-                        <div className="w-px h-8 bg-blue-300"></div>
-                        
                         {/* Bouton réinitialiser */}
                         <Button
                           type="button"
                           onClick={() => {
                             setCustomization({
+                              ...customization,
                               includeAvion: true,
                               includeVisa: true,
                               joursMadina: programInfo.nbJoursMadina,
-                              joursMakkah: programInfo.nbJoursMakkah,
-                              plan: "Normal"
+                              joursMakkah: programInfo.nbJoursMakkah
                             });
                           }}
                           variant="outline"

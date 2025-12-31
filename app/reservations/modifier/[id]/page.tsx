@@ -813,7 +813,7 @@ export default function EditReservation() {
                   Configuration du Voyage
                     </h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                       <div className="space-y-2">
                     <Label className="text-blue-700 font-medium text-sm">Programme *</Label>
                         <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
@@ -839,6 +839,13 @@ export default function EditReservation() {
                     <Label className="text-blue-700 font-medium text-sm">Genre *</Label>
                         <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
                           <span className="text-gray-900 font-medium">{formData.gender || 'N/A'}</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                    <Label className="text-blue-700 font-medium text-sm">Plan *</Label>
+                        <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                          <span className="text-gray-900 font-medium">{reservationData?.plan || 'Normal'}</span>
                         </div>
                       </div>
                       </div>

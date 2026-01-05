@@ -264,6 +264,9 @@ export default function NouvelleReservation() {
   // État pour la réduction du prix
   const [reduction, setReduction] = useState(0);
   
+  // État pour le mode d'ajustement du prix ('reduction' | 'proposition' | null)
+  const [prixMode, setPrixMode] = useState<'reduction' | 'proposition' | null>(null);
+  
   // État pour le prix proposé (prix plus élevé que le prix calculé)
   const [prixPropose, setPrixPropose] = useState<number | null>(null);
 
@@ -740,16 +743,19 @@ export default function NouvelleReservation() {
   useEffect(() => {
     if (calculatePrice > 0) {
       let prixFinal: number;
-      if (prixPropose !== null && prixPropose > calculatePrice) {
-        // Utiliser le prix proposé s'il est défini et supérieur au prix calculé
-        prixFinal = Math.max(0, Math.round(prixPropose - reduction));
+      if (prixMode === 'proposition' && prixPropose !== null && prixPropose > calculatePrice) {
+        // Utiliser le prix proposé si le mode est activé et supérieur au prix calculé
+        prixFinal = Math.max(0, Math.round(prixPropose));
+      } else if (prixMode === 'reduction') {
+        // Utiliser le prix calculé moins la réduction
+        prixFinal = Math.max(0, Math.round(calculatePrice - reduction));
       } else {
         // Sinon utiliser le prix calculé normal
-        prixFinal = Math.max(0, Math.round(calculatePrice - reduction));
+        prixFinal = Math.max(0, Math.round(calculatePrice));
       }
       setFormData(prev => ({ ...prev, prix: prixFinal.toString() }));
     }
-  }, [calculatePrice, reduction, prixPropose]);
+  }, [calculatePrice, reduction, prixPropose, prixMode]);
 
   // Réinitialiser la sélection des places quand les critères de base changent
   useEffect(() => {
@@ -2627,69 +2633,9 @@ export default function NouvelleReservation() {
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-emerald-200 shadow-2xl z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
-              {/* Section calcul du prix - Réduction et Total seulement */}
+              {/* Section calcul du prix - Toggle entre Réduction et Proposition */}
               <div className="flex items-center gap-4">
-                {/* Champ de réduction */}
-                <div className="flex items-center gap-2 bg-red-50 px-3 py-2 rounded-lg border border-red-200">
-                  <X className="h-4 w-4 text-red-600" />
-                  <span className="text-sm font-medium text-red-700">Réduction:</span>
-                  <Input
-                    type="number"
-                    min="0"
-                    max={calculatePrice}
-                    value={reduction === 0 ? '' : reduction}
-                    onChange={(e) => {
-                      const value = e.target.value === '' ? 0 : parseInt(e.target.value) || 0;
-                      setReduction(Math.min(value, calculatePrice));
-                    }}
-                    onFocus={(e) => {
-                      if (e.target.value === '0') {
-                        e.target.value = '';
-                      }
-                    }}
-                    onBlur={(e) => {
-                      if (e.target.value === '') {
-                        setReduction(0);
-                      }
-                    }}
-                    className="w-24 h-7 text-sm border border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-200 rounded text-center bg-white font-medium"
-                    placeholder="0"
-                  />
-                  <span className="text-sm text-red-600 font-medium">DH</span>
-                </div>
-                
-                {/* Prix proposé */}
-                <div className="flex items-center gap-1.5 bg-green-50 px-2 py-1.5 rounded-lg border border-green-200">
-                  <ChevronUp className="h-3.5 w-3.5 text-green-600" />
-                  <span className="text-xs font-medium text-green-700">Proposé:</span>
-                  <Input
-                    type="number"
-                    min={calculatePrice}
-                    value={prixPropose === null ? '' : prixPropose}
-                    onChange={(e) => {
-                      const value = e.target.value === '' ? null : parseInt(e.target.value) || null;
-                      if (value !== null && value >= calculatePrice) {
-                        setPrixPropose(value);
-                      } else if (value === null || value === 0) {
-                        setPrixPropose(null);
-                      }
-                    }}
-                    onFocus={(e) => {
-                      if (e.target.value === '0' || e.target.value === '') {
-                        e.target.value = '';
-                      }
-                    }}
-                    onBlur={(e) => {
-                      if (e.target.value === '' || parseInt(e.target.value) < calculatePrice) {
-                        setPrixPropose(null);
-                      }
-                    }}
-                    className="w-20 h-6 text-xs border border-green-300 focus:border-green-500 focus:ring-1 focus:ring-green-200 rounded text-center bg-white font-medium"
-                    placeholder="Auto"
-                  />
-                </div>
-                
-                {/* Prix final */}
+                {/* Prix final avec toggle */}
                 <div className={`
                   flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all duration-300
                   ${activeTheme.colors.bg} ${activeTheme.colors.border} ${activeTheme.colors.glow} shadow-lg
@@ -2698,18 +2644,119 @@ export default function NouvelleReservation() {
                   <span className={`text-sm font-medium ${activeTheme.colors.text}`}>Total:</span>
                   <span className={`font-bold ${activeTheme.colors.textActive} text-lg`}>
                     {(() => {
-                      const basePrice = (prixPropose !== null && prixPropose > calculatePrice) 
-                        ? prixPropose 
-                        : calculatePrice;
-                      return Math.max(0, Math.round(basePrice - reduction)).toLocaleString('fr-FR');
+                      if (prixMode === 'proposition' && prixPropose !== null && prixPropose > calculatePrice) {
+                        return Math.max(0, Math.round(prixPropose)).toLocaleString('fr-FR');
+                      } else if (prixMode === 'reduction') {
+                        return Math.max(0, Math.round(calculatePrice - reduction)).toLocaleString('fr-FR');
+                      } else {
+                        return Math.max(0, Math.round(calculatePrice)).toLocaleString('fr-FR');
+                      }
                     })()} DH
                   </span>
+                  
+                  {/* Toggle pour Réduction/Proposition */}
+                  <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-gray-300">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-medium text-gray-600">Réduc.</span>
+                      <Switch
+                        checked={prixMode === 'reduction'}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setPrixMode('reduction');
+                            setPrixPropose(null);
+                          } else {
+                            setPrixMode(null);
+                            setReduction(0);
+                          }
+                        }}
+                        className="data-[state=checked]:bg-red-500 scale-75"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-medium text-gray-600">Propos.</span>
+                      <Switch
+                        checked={prixMode === 'proposition'}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setPrixMode('proposition');
+                            setReduction(0);
+                            if (prixPropose === null || prixPropose < calculatePrice) {
+                              setPrixPropose(calculatePrice);
+                            }
+                          } else {
+                            setPrixMode(null);
+                            setPrixPropose(null);
+                          }
+                        }}
+                        className="data-[state=checked]:bg-green-500 scale-75"
+                      />
+                    </div>
+                  </div>
                 </div>
-
-                {/* Indicateur d'économie si réduction */}
-                {reduction > 0 && (
-                  <div className="px-2 py-1 bg-red-100 border border-red-200 rounded text-xs text-red-600 font-medium">
-                    -{reduction.toLocaleString('fr-FR')} DH
+                
+                {/* Box de réduction - affiché seulement si mode réduction est activé */}
+                {prixMode === 'reduction' && (
+                  <div className="flex items-center gap-2 bg-red-50 px-3 py-2 rounded-lg border border-red-200">
+                    <X className="h-4 w-4 text-red-600" />
+                    <span className="text-sm font-medium text-red-700">Réduction:</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      max={calculatePrice}
+                      value={reduction === 0 ? '' : reduction}
+                      onChange={(e) => {
+                        const value = e.target.value === '' ? 0 : parseInt(e.target.value) || 0;
+                        setReduction(Math.min(value, calculatePrice));
+                      }}
+                      onFocus={(e) => {
+                        if (e.target.value === '0') {
+                          e.target.value = '';
+                        }
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value === '') {
+                          setReduction(0);
+                        }
+                      }}
+                      className="w-24 h-7 text-sm border border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-200 rounded text-center bg-white font-medium"
+                      placeholder="0"
+                    />
+                    <span className="text-sm text-red-600 font-medium">DH</span>
+                  </div>
+                )}
+                
+                {/* Box de proposition - affiché seulement si mode proposition est activé */}
+                {prixMode === 'proposition' && (
+                  <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-lg border border-green-200">
+                    <ChevronUp className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-700">Proposition:</span>
+                    <Input
+                      type="number"
+                      min={calculatePrice}
+                      value={prixPropose === null ? '' : prixPropose}
+                      onChange={(e) => {
+                        const value = e.target.value === '' ? null : parseInt(e.target.value) || null;
+                        if (value !== null && value >= calculatePrice) {
+                          setPrixPropose(value);
+                        } else if (value === null || value === 0) {
+                          setPrixPropose(calculatePrice);
+                        }
+                      }}
+                      onFocus={(e) => {
+                        if (e.target.value === '0' || e.target.value === '') {
+                          e.target.value = '';
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const value = parseInt(e.target.value);
+                        if (e.target.value === '' || (value && value < calculatePrice)) {
+                          setPrixPropose(calculatePrice);
+                        }
+                      }}
+                      className="w-24 h-7 text-sm border border-green-300 focus:border-green-500 focus:ring-1 focus:ring-green-200 rounded text-center bg-white font-medium"
+                      placeholder={calculatePrice.toString()}
+                    />
+                    <span className="text-sm text-green-600 font-medium">DH</span>
                   </div>
                 )}
               </div>

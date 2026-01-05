@@ -743,8 +743,8 @@ export default function NouvelleReservation() {
   useEffect(() => {
     if (calculatePrice > 0) {
       let prixFinal: number;
-      if (prixMode === 'proposition' && prixPropose !== null && prixPropose > calculatePrice) {
-        // Utiliser le prix proposé si le mode est activé et supérieur au prix calculé
+      if (prixMode === 'proposition' && prixPropose !== null && prixPropose >= calculatePrice) {
+        // Utiliser le prix proposé si le mode est activé et supérieur ou égal au prix calculé
         prixFinal = Math.max(0, Math.round(prixPropose));
       } else if (prixMode === 'reduction') {
         // Utiliser le prix calculé moins la réduction
@@ -2644,7 +2644,7 @@ export default function NouvelleReservation() {
                   <span className={`text-sm font-medium ${activeTheme.colors.text}`}>Total:</span>
                   <span className={`font-bold ${activeTheme.colors.textActive} text-lg`}>
                     {(() => {
-                      if (prixMode === 'proposition' && prixPropose !== null && prixPropose > calculatePrice) {
+                      if (prixMode === 'proposition' && prixPropose !== null && prixPropose >= calculatePrice) {
                         return Math.max(0, Math.round(prixPropose)).toLocaleString('fr-FR');
                       } else if (prixMode === 'reduction') {
                         return Math.max(0, Math.round(calculatePrice - reduction)).toLocaleString('fr-FR');
@@ -2680,9 +2680,8 @@ export default function NouvelleReservation() {
                           if (checked) {
                             setPrixMode('proposition');
                             setReduction(0);
-                            if (prixPropose === null || prixPropose < calculatePrice) {
-                              setPrixPropose(calculatePrice);
-                            }
+                            // Laisser null pour que l'utilisateur puisse saisir librement
+                            // Le placeholder affichera le prix calculé comme suggestion
                           } else {
                             setPrixMode(null);
                             setPrixPropose(null);
@@ -2732,25 +2731,15 @@ export default function NouvelleReservation() {
                     <span className="text-sm font-medium text-green-700">Proposition:</span>
                     <Input
                       type="number"
-                      min={calculatePrice}
+                      min="0"
                       value={prixPropose === null ? '' : prixPropose}
                       onChange={(e) => {
                         const value = e.target.value === '' ? null : parseInt(e.target.value) || null;
-                        if (value !== null && value >= calculatePrice) {
-                          setPrixPropose(value);
-                        } else if (value === null || value === 0) {
-                          setPrixPropose(calculatePrice);
-                        }
+                        setPrixPropose(value);
                       }}
                       onFocus={(e) => {
                         if (e.target.value === '0' || e.target.value === '') {
                           e.target.value = '';
-                        }
-                      }}
-                      onBlur={(e) => {
-                        const value = parseInt(e.target.value);
-                        if (e.target.value === '' || (value && value < calculatePrice)) {
-                          setPrixPropose(calculatePrice);
                         }
                       }}
                       className="w-24 h-7 text-sm border border-green-300 focus:border-green-500 focus:ring-1 focus:ring-green-200 rounded text-center bg-white font-medium"
@@ -2761,18 +2750,20 @@ export default function NouvelleReservation() {
                 )}
               </div>
               
-              {/* Bouton de confirmation */}
-              <Button
-                type="submit"
-                disabled={!isFormValid || isSubmitting}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 text-lg"
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.querySelector('form')?.requestSubmit();
-                }}
-              >
-                {isSubmitting ? 'Enregistrement...' : 'Confirmer la Réservation'}
-              </Button>
+              {/* Bouton de confirmation - caché si proposition avec prix inférieur au total */}
+              {!(prixMode === 'proposition' && prixPropose !== null && prixPropose < calculatePrice) && (
+                <Button
+                  type="submit"
+                  disabled={!isFormValid || isSubmitting}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 text-lg"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.querySelector('form')?.requestSubmit();
+                  }}
+                >
+                  {isSubmitting ? 'Enregistrement...' : 'Confirmer la Réservation'}
+                </Button>
+              )}
             </div>
           </div>
         </div>

@@ -2612,7 +2612,7 @@ export default function NouvelleReservation() {
                     </Link>
                     <Button
                       type="submit"
-                      disabled={!isFormValid || isSubmitting}
+                      disabled={!isFormValid || isSubmitting || (prixMode === 'proposition' && prixPropose !== null && prixPropose < calculatePrice)}
                       className="bg-blue-600 hover:bg-blue-700"
                     >
                       {isSubmitting ? 'Enregistrement...' : 'Enregistrer'}
@@ -2750,20 +2750,18 @@ export default function NouvelleReservation() {
                 )}
               </div>
               
-              {/* Bouton de confirmation - caché si proposition avec prix inférieur au total */}
-              {!(prixMode === 'proposition' && prixPropose !== null && prixPropose < calculatePrice) && (
-                <Button
-                  type="submit"
-                  disabled={!isFormValid || isSubmitting}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 text-lg"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    document.querySelector('form')?.requestSubmit();
-                  }}
-                >
-                  {isSubmitting ? 'Enregistrement...' : 'Confirmer la Réservation'}
-                </Button>
-              )}
+              {/* Bouton de confirmation - désactivé si proposition avec prix inférieur au total */}
+              <Button
+                type="submit"
+                disabled={!isFormValid || isSubmitting || (prixMode === 'proposition' && prixPropose !== null && prixPropose < calculatePrice)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 text-lg"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.querySelector('form')?.requestSubmit();
+                }}
+              >
+                {isSubmitting ? 'Enregistrement...' : 'Confirmer la Réservation'}
+              </Button>
             </div>
           </div>
         </div>

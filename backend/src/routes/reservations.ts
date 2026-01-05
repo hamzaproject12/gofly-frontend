@@ -274,7 +274,7 @@ router.get('/:id', async (req, res) => {
 // Create new reservation
 router.post('/', async (req, res) => {
   try {
-    const { firstName, lastName, phone, programId, roomType, gender, hotelMadina, hotelMakkah, price, reservationDate, status, statutPasseport, statutVisa, statutHotel, statutVol, paidAmount, reduction, roomMadinaId, roomMakkahId, plan } = req.body;
+    const { firstName, lastName, phone, passportNumber, programId, roomType, gender, hotelMadina, hotelMakkah, price, reservationDate, status, statutPasseport, statutVisa, statutHotel, statutVol, paidAmount, reduction, roomMadinaId, roomMakkahId, plan } = req.body;
     
     // Extraire l'agentId du token JWT
     const agentId = extractAgentIdFromToken(req);
@@ -294,6 +294,7 @@ router.post('/', async (req, res) => {
         firstName,
         lastName,
         phone,
+        passportNumber: passportNumber || null,
         programId: Number(programId),
         roomType,
         gender: gender || "Homme",
@@ -448,6 +449,7 @@ router.put('/:id', async (req, res) => {
       firstName,
       lastName,
       phone,
+      passportNumber,
       programId,
       roomType,
       hotelMadina,
@@ -491,6 +493,7 @@ router.put('/:id', async (req, res) => {
     if (firstName !== undefined) updateData.firstName = firstName;
     if (lastName !== undefined) updateData.lastName = lastName;
     if (phone !== undefined) updateData.phone = phone;
+    if (passportNumber !== undefined) updateData.passportNumber = passportNumber || null;
     if (programId !== undefined) updateData.programId = programId;
     if (roomType !== undefined) updateData.roomType = roomType;
     if (hotelMadina !== undefined) updateData.hotelMadina = hotelMadina;

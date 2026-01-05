@@ -84,6 +84,7 @@ type FormData = {
   nom: string;
   prenom: string;
   telephone: string;
+  passportNumber: string;
   prix: string;
   hotelMadina: string;
   hotelMakkah: string;
@@ -118,6 +119,7 @@ export default function EditReservation() {
     nom: "",
     prenom: "",
     telephone: "",
+    passportNumber: "",
     prix: "",
     hotelMadina: "",
     hotelMakkah: "",
@@ -189,6 +191,7 @@ export default function EditReservation() {
             nom: reservationData.lastName || "",
             prenom: reservationData.firstName || "",
             telephone: reservationData.phone || "",
+            passportNumber: reservationData.passportNumber || "",
             prix: reservationData.price?.toString() || "",
             hotelMadina: reservationData.hotelMadinaId?.toString() || reservationData.hotelMadina || "",
             hotelMakkah: reservationData.hotelMakkahId?.toString() || reservationData.hotelMakkah || "",
@@ -411,6 +414,7 @@ export default function EditReservation() {
         statutHotel: formData.statutHotel,
         statutVol: formData.statutVol,
         statutPasseport: shouldUpdateStatutPasseport,
+        passportNumber: formData.passportNumber || null,
         // Mettre à jour le statut global si toutes les conditions sont remplies
         ...(isReservationComplete && { status: 'Complet' })
       }
@@ -907,6 +911,16 @@ export default function EditReservation() {
                     <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
                       <span className="text-gray-900 font-medium">{formData.telephone || 'N/A'}</span>
                       </div>
+                      </div>
+
+                      <div className="space-y-2">
+                    <Label className="text-blue-700 font-medium text-sm">N° passport</Label>
+                    <Input
+                      value={formData.passportNumber}
+                      onChange={(e) => setFormData({ ...formData, passportNumber: e.target.value })}
+                      placeholder="Numéro de passeport"
+                      className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                    />
                       </div>
 
                   {/* Passeport - Ajouté dans Informations Client */}

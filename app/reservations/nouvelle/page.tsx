@@ -136,6 +136,7 @@ export default function NouvelleReservation() {
     nom: string;
     prenom: string;
     telephone: string;
+    passportNumber: string;
     prix: string;
     hotelMadina: string;
     hotelMakkah: string;
@@ -152,6 +153,7 @@ export default function NouvelleReservation() {
     nom: "",
     prenom: "",
     telephone: "",
+    passportNumber: "",
     prix: "",
     hotelMadina: "",
     hotelMakkah: "",
@@ -871,9 +873,8 @@ export default function NouvelleReservation() {
     return paiements.every((p) => {
       const montantRempli = p.montant !== "" && !Number.isNaN(Number(p.montant));
       const typeRempli = p.type !== "";
-      const recuRempli = typeof p.recu === "string" && p.recu.trim() !== "";
 
-      return montantRempli && typeRempli && recuRempli;
+      return montantRempli && typeRempli;
     });
   }, [paiements]);
 
@@ -1122,15 +1123,14 @@ export default function NouvelleReservation() {
     const hasIncompletePayment = paiements.some((paiement, index) => {
       const montantVide = paiement.montant === "" || Number.isNaN(Number(paiement.montant));
       const typeVide = paiement.type === "";
-      const recuVide = !paymentDocuments?.[index] || !paiement.recu;
 
-      return montantVide || typeVide || recuVide;
+      return montantVide || typeVide;
     });
 
     if (hasIncompletePayment) {
       toast({
         title: "Paiement incomplet",
-        description: "Merci de renseigner le mode, le montant et le reçu pour chaque paiement ajouté.",
+        description: "Merci de renseigner le mode et le montant pour chaque paiement ajouté.",
         variant: "destructive",
       });
       return;
@@ -1176,6 +1176,7 @@ export default function NouvelleReservation() {
           firstName: formData.prenom,
           lastName: formData.nom,
           phone: formData.telephone,
+          passportNumber: formData.passportNumber || null,
           programId: parseInt(formData.programId),
           roomType: formData.typeChambre,
           gender: formData.gender,
@@ -2279,7 +2280,15 @@ export default function NouvelleReservation() {
                       />
                     </div>
 
-
+                    <div className="space-y-2">
+                      <Label className="text-blue-700 font-medium text-sm">N° passport</Label>
+                      <Input
+                        value={formData.passportNumber}
+                        onChange={(e) => setFormData({ ...formData, passportNumber: e.target.value })}
+                        placeholder="Numéro de passeport"
+                        className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                      />
+                    </div>
 
                     {/* Passeport - Ajouté dans Informations Client */}
                     <div className="space-y-2 md:col-span-3">

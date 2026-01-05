@@ -263,6 +263,9 @@ export default function NouvelleReservation() {
 
   // État pour la réduction du prix
   const [reduction, setReduction] = useState(0);
+  
+  // État pour le prix proposé (prix plus élevé que le prix calculé)
+  const [prixPropose, setPrixPropose] = useState<number | null>(null);
 
   const paymentDocuments = documents.payment;
 
@@ -733,13 +736,20 @@ export default function NouvelleReservation() {
     }
   };
 
-  // Mettre à jour le prix automatiquement quand le calcul ou la réduction change
+  // Mettre à jour le prix automatiquement quand le calcul, la réduction ou le prix proposé change
   useEffect(() => {
     if (calculatePrice > 0) {
-      const prixFinal = Math.max(0, Math.round(calculatePrice - reduction));
+      let prixFinal: number;
+      if (prixPropose !== null && prixPropose > calculatePrice) {
+        // Utiliser le prix proposé s'il est défini et supérieur au prix calculé
+        prixFinal = Math.max(0, Math.round(prixPropose - reduction));
+      } else {
+        // Sinon utiliser le prix calculé normal
+        prixFinal = Math.max(0, Math.round(calculatePrice - reduction));
+      }
       setFormData(prev => ({ ...prev, prix: prixFinal.toString() }));
     }
-  }, [calculatePrice, reduction]);
+  }, [calculatePrice, reduction, prixPropose]);
 
   // Réinitialiser la sélection des places quand les critères de base changent
   useEffect(() => {
@@ -2648,6 +2658,37 @@ export default function NouvelleReservation() {
                   <span className="text-sm text-red-600 font-medium">DH</span>
                 </div>
                 
+                {/* Prix proposé */}
+                <div className="flex items-center gap-1.5 bg-green-50 px-2 py-1.5 rounded-lg border border-green-200">
+                  <ChevronUp className="h-3.5 w-3.5 text-green-600" />
+                  <span className="text-xs font-medium text-green-700">Proposé:</span>
+                  <Input
+                    type="number"
+                    min={calculatePrice}
+                    value={prixPropose === null ? '' : prixPropose}
+                    onChange={(e) => {
+                      const value = e.target.value === '' ? null : parseInt(e.target.value) || null;
+                      if (value !== null && value >= calculatePrice) {
+                        setPrixPropose(value);
+                      } else if (value === null || value === 0) {
+                        setPrixPropose(null);
+                      }
+                    }}
+                    onFocus={(e) => {
+                      if (e.target.value === '0' || e.target.value === '') {
+                        e.target.value = '';
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value === '' || parseInt(e.target.value) < calculatePrice) {
+                        setPrixPropose(null);
+                      }
+                    }}
+                    className="w-20 h-6 text-xs border border-green-300 focus:border-green-500 focus:ring-1 focus:ring-green-200 rounded text-center bg-white font-medium"
+                    placeholder="Auto"
+                  />
+                </div>
+                
                 {/* Prix final */}
                 <div className={`
                   flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all duration-300
@@ -2656,7 +2697,12 @@ export default function NouvelleReservation() {
                   <Wallet className={`h-4 w-4 ${activeTheme.colors.textActive}`} />
                   <span className={`text-sm font-medium ${activeTheme.colors.text}`}>Total:</span>
                   <span className={`font-bold ${activeTheme.colors.textActive} text-lg`}>
-                    {Math.max(0, Math.round(calculatePrice - reduction)).toLocaleString('fr-FR')} DH
+                    {(() => {
+                      const basePrice = (prixPropose !== null && prixPropose > calculatePrice) 
+                        ? prixPropose 
+                        : calculatePrice;
+                      return Math.max(0, Math.round(basePrice - reduction)).toLocaleString('fr-FR');
+                    })()} DH
                   </span>
                 </div>
 

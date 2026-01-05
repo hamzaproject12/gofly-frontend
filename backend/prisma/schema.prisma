@@ -121,6 +121,10 @@ model Reservation {
   agentId         Int?
   reduction       Float     @default(0)
   plan            String    @default("Normal") @db.VarChar(20)
+  passportNumber  String?   @db.VarChar(50)
+  transport       String?   @db.VarChar(100)
+  remarque        String?   @db.Text
+  groupe          String?   @db.VarChar(100)
   expenses        Expense[]
   documents       Fichier[]
   payments        Payment[]

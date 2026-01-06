@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useMemo, useEffect } from "react"
+import { Loader2 } from "lucide-react"
 import { api } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -44,6 +45,66 @@ import {
 
 // Types
 type DocumentType = 'passport' | 'visa' | 'flightBooked' | 'hotelBooked' | 'payment';
+
+// Custom Hook: Blob Proxy for PDF Display
+// Fetches PDF from Cloudinary and creates a blob with correct MIME type to force display
+const usePdfBlob = (url: string | null | undefined) => {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Reset state when URL changes
+    setBlobUrl(null);
+    setError(null);
+    
+    // Skip if no URL or if it's already a blob/data URL
+    if (!url || url.startsWith('blob:') || url.startsWith('data:')) {
+      setBlobUrl(url || null);
+      return;
+    }
+
+    // Skip if not a Cloudinary URL (for local files, use as-is)
+    if (!url.includes('cloudinary.com')) {
+      setBlobUrl(url);
+      return;
+    }
+
+    // Fetch and create blob
+    let objectUrl: string | null = null;
+    setLoading(true);
+    setError(null);
+
+    fetch(url)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
+        }
+        const blob = await response.blob();
+        // Force the MIME type to application/pdf
+        const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+        objectUrl = URL.createObjectURL(pdfBlob);
+        setBlobUrl(objectUrl);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('❌ Error fetching PDF blob:', err);
+        setError(err.message || 'Failed to load PDF');
+        setLoading(false);
+        // Fallback to original URL
+        setBlobUrl(url);
+      });
+
+    // Cleanup function
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [url]);
+
+  return { blobUrl, loading, error };
+};
 
 interface Program {
   id: number;
@@ -99,6 +160,110 @@ type FormData = {
     type: string;
     date: string;
   }>;
+};
+
+// PDF Preview Box Component with Blob Proxy (for inline preview)
+const PdfPreviewBox = ({ url, title, onZoom }: { url: string | null; title: string; onZoom: () => void }) => {
+  const { blobUrl, loading, error } = usePdfBlob(url);
+
+  if (loading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
+          <span className="text-sm text-gray-600">Chargement du PDF...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-2 text-red-600">
+          <FileText className="h-8 w-8" />
+          <span className="text-sm">Erreur de chargement</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!blobUrl) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
+        Aucun fichier
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-full relative">
+      <iframe
+        src={blobUrl}
+        type="application/pdf"
+        className="w-full h-full border-0"
+        title={title}
+      />
+      {/* Overlay cliquable pour ouvrir dans le modal */}
+      <div 
+        className="absolute inset-0 bg-transparent hover:bg-black/5 cursor-pointer transition-colors flex items-center justify-center opacity-0 hover:opacity-100"
+        onClick={onZoom}
+      >
+        <div className="bg-white/90 rounded-lg p-2 shadow-lg">
+          <ZoomIn className="h-5 w-5 text-blue-600" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// PDF Preview Modal Component with Blob Proxy (for full-screen modal)
+const PdfPreviewModal = ({ url, title }: { url: string; title: string }) => {
+  const { blobUrl, loading, error } = usePdfBlob(url);
+
+  if (loading) {
+    return (
+      <div className="w-full h-[calc(80vh-100px)] flex items-center justify-center bg-gray-50 border rounded-lg">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 text-blue-600 animate-spin" />
+          <span className="text-base text-gray-600">Chargement du PDF...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full h-[calc(80vh-100px)] flex items-center justify-center bg-gray-50 border rounded-lg">
+        <div className="flex flex-col items-center gap-4 text-red-600">
+          <FileText className="h-16 w-16" />
+          <div className="text-center">
+            <p className="text-base font-medium">Erreur de chargement</p>
+            <p className="text-sm text-gray-500 mt-1">{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!blobUrl) {
+    return (
+      <div className="w-full h-[calc(80vh-100px)] flex items-center justify-center bg-gray-100 text-gray-400 border rounded-lg">
+        Aucun fichier disponible
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-[calc(80vh-100px)] border rounded-lg overflow-hidden">
+      <iframe
+        src={blobUrl}
+        type="application/pdf"
+        className="w-full h-full border-0"
+        title={title}
+      />
+    </div>
+  );
 };
 
 export default function EditReservation() {
@@ -1206,13 +1371,13 @@ export default function EditReservation() {
                                     />
                                   );
                                 } else {
+                                  // Use Blob Proxy for Cloudinary URLs
                                   return (
-                                    <div className="w-full h-full flex items-center justify-center bg-gray-50 cursor-pointer" onClick={() => setPreviewImage({ url: previews.passport?.url || '', title: 'Nouveau passeport', type: 'application/pdf' })}>
-                                      <div className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors">
-                                        <FileText className="h-16 w-16 text-red-600" />
-                                        <span className="text-sm font-medium text-blue-700">Cliquer pour voir le PDF</span>
-                                      </div>
-                                    </div>
+                                    <PdfPreviewBox 
+                                      url={previews.passport?.url || null} 
+                                      title="Nouveau passeport" 
+                                      onZoom={() => setPreviewImage({ url: previews.passport?.url || '', title: 'Nouveau passeport', type: 'application/pdf' })} 
+                                    />
                                   );
                                 }
                               } else {
@@ -1236,27 +1401,15 @@ export default function EditReservation() {
                               }
                               
                               if (isPdf) {
-                                // Utiliser un iframe pour afficher le PDF directement dans la boîte
+                                // Use Blob Proxy for existing Cloudinary PDFs
                                 return (
-                                  <div className="w-full h-full relative">
-                                    <iframe
-                                      src={passportUrl || ''}
-                                      type="application/pdf"
-                                      className="w-full h-full border-0"
-                                      title="Aperçu du passeport"
-                                    />
-                                    {/* Overlay cliquable pour ouvrir dans le modal */}
-                                    <div 
-                                      className="absolute inset-0 bg-transparent hover:bg-black/5 cursor-pointer transition-colors flex items-center justify-center opacity-0 hover:opacity-100"
-                                      onClick={() => {
-                                        setPreviewImage({ url: passportUrl || '', title: 'Passeport', type: 'application/pdf' });
-                                      }}
-                                    >
-                                      <div className="bg-white/90 rounded-lg p-2 shadow-lg">
-                                        <ZoomIn className="h-5 w-5 text-blue-600" />
-                                      </div>
-                                    </div>
-                                  </div>
+                                  <PdfPreviewBox 
+                                    url={passportUrl} 
+                                    title="Passeport" 
+                                    onZoom={() => {
+                                      setPreviewImage({ url: passportUrl || '', title: 'Passeport', type: 'application/pdf' });
+                                    }} 
+                                  />
                                 );
                               } else {
                                 return (
@@ -1630,15 +1783,8 @@ export default function EditReservation() {
                     className="w-full h-full min-h-[600px]"
                   />
                 ) : (
-                  // Pour les PDFs Cloudinary, utiliser iframe avec URL corrigée
-                  <div className="w-full h-[calc(80vh-100px)] border rounded-lg overflow-hidden">
-                    <iframe
-                      src={fixCloudinaryUrlForPdf(previewImage.url) || previewImage.url}
-                      type="application/pdf"
-                      className="w-full h-full border-0"
-                      title={previewImage.title}
-                    />
-                  </div>
+                  // Pour les PDFs Cloudinary, utiliser Blob Proxy
+                  <PdfPreviewModal url={previewImage.url} title={previewImage.title} />
                 )
               ) : (
                 <img

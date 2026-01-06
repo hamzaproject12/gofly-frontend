@@ -949,6 +949,16 @@ export default function NouvelleReservation() {
     return url.match(/\.(jpeg|jpg|gif|png)$/) != null;
   };
 
+  // Fonction pour corriger l'URL Cloudinary pour les PDFs
+  const fixCloudinaryUrlForPdf = (url: string): string => {
+    if (!url || typeof url !== 'string') return url;
+    // Si c'est une URL Cloudinary avec /image/upload/ et que c'est un PDF, corriger vers /raw/upload/
+    if (url.includes('cloudinary.com') && url.includes('/image/upload/') && (url.includes('.pdf') || url.match(/\.pdf(\?|$)/))) {
+      return url.replace('/image/upload/', '/raw/upload/');
+    }
+    return url;
+  };
+
   // Fonction pour uploader vers Cloudinary
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: DocumentType) => {
@@ -2344,17 +2354,29 @@ export default function NouvelleReservation() {
                               </Button>
                             </div>
                           </div>
-                          <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200 flex items-center justify-center bg-gray-50">
+                          <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
                             {previews.passport?.type === 'application/pdf' ? (
-                              <a
-                                href={previews.passport.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors"
-                              >
-                                <FileText className="h-16 w-16 text-red-600" />
-                                <span className="text-sm font-medium text-blue-700">Voir le PDF</span>
-                              </a>
+                              // Pour les PDFs locaux, utiliser embed pour l'aperçu
+                              previews.passport.url.startsWith('blob:') || previews.passport.url.startsWith('data:') ? (
+                                <embed
+                                  src={previews.passport.url}
+                                  type="application/pdf"
+                                  className="w-full h-full"
+                                />
+                              ) : (
+                                // Pour les URLs Cloudinary, utiliser un lien
+                                <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                                  <a
+                                    href={previews.passport.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors"
+                                  >
+                                    <FileText className="h-16 w-16 text-red-600" />
+                                    <span className="text-sm font-medium text-blue-700">Voir le PDF</span>
+                                  </a>
+                                </div>
+                              )
                             ) : (
                               <img
                                 src={previews.passport.url}
@@ -2459,17 +2481,29 @@ export default function NouvelleReservation() {
                                       </button>
                                     </div>
                                   </div>
-                                  <div className="w-full h-[200px] overflow-hidden rounded-lg border border-orange-200 flex items-center justify-center bg-orange-50">
+                                  <div className="w-full h-[200px] overflow-hidden rounded-lg border border-orange-200">
                                     {previews[`payment_${index}`]?.type === 'application/pdf' ? (
-                                      <a
-                                        href={previews[`payment_${index}`]?.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-orange-100 rounded-lg transition-colors"
-                                      >
-                                        <FileText className="h-16 w-16 text-red-600" />
-                                        <span className="text-sm font-medium text-orange-700">Voir le PDF</span>
-                                      </a>
+                                      // Pour les PDFs locaux, utiliser embed pour l'aperçu
+                                      previews[`payment_${index}`]?.url.startsWith('blob:') || previews[`payment_${index}`]?.url.startsWith('data:') ? (
+                                        <embed
+                                          src={previews[`payment_${index}`]?.url}
+                                          type="application/pdf"
+                                          className="w-full h-full"
+                                        />
+                                      ) : (
+                                        // Pour les URLs Cloudinary, utiliser un lien
+                                        <div className="w-full h-full flex items-center justify-center bg-orange-50">
+                                          <a
+                                            href={previews[`payment_${index}`]?.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-orange-100 rounded-lg transition-colors"
+                                          >
+                                            <FileText className="h-16 w-16 text-red-600" />
+                                            <span className="text-sm font-medium text-orange-700">Voir le PDF</span>
+                                          </a>
+                                        </div>
+                                      )
                                     ) : (
                                       <img
                                         src={previews[`payment_${index}`]?.url}
@@ -2807,17 +2841,26 @@ export default function NouvelleReservation() {
             {previewImage && (
               <div className="w-full h-full flex items-center justify-center p-4">
                 {previewImage.type === 'application/pdf' ? (
-                  <div className="flex flex-col items-center justify-center gap-4 p-8">
-                    <FileText className="h-24 w-24 text-red-600" />
-                    <a
-                      href={previewImage.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                    >
-                      Ouvrir le PDF dans un nouvel onglet
-                    </a>
-                  </div>
+                  // Pour les PDFs locaux, utiliser embed, sinon lien vers Cloudinary
+                  previewImage.url.startsWith('blob:') || previewImage.url.startsWith('data:') ? (
+                    <embed
+                      src={previewImage.url}
+                      type="application/pdf"
+                      className="w-full h-full"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center gap-4 p-8">
+                      <FileText className="h-24 w-24 text-red-600" />
+                      <a
+                        href={fixCloudinaryUrlForPdf(previewImage.url)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                      >
+                        Ouvrir le PDF dans un nouvel onglet
+                      </a>
+                    </div>
+                  )
                 ) : (
                   <img
                     src={previewImage.url}

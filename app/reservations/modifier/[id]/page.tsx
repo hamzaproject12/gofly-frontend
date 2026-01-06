@@ -138,6 +138,7 @@ export default function EditReservation() {
   const [paiements, setPaiements] = useState<Paiement[]>([])
   const [previews, setPreviews] = useState<{ [key: string]: { url: string, type: string } }>({})
   const [reservationData, setReservationData] = useState<any>(null)
+  const [passportToDelete, setPassportToDelete] = useState<number | null>(null) // ID du fichier passeport à supprimer
   const [documents, setDocuments] = useState<{
     passport: File | null;
     visa: File | null;
@@ -375,9 +376,9 @@ export default function EditReservation() {
       }
 
       // 2. Maintenant mettre à jour les informations de la réservation (avec le paidAmount recalculé)
-      // Vérifier si un nouveau passeport est uploadé OU si un passeport existe déjà
+      // Vérifier si un nouveau passeport est uploadé OU si un passeport existe déjà (et n'est pas marqué pour suppression)
       const hasNewPassport = documents.passport !== null;
-      const hasExistingPassport = getDocumentUrl('passport') !== null;
+      const hasExistingPassport = getDocumentUrl('passport') !== null && passportToDelete === null;
       const shouldUpdateStatutPasseport = hasNewPassport || hasExistingPassport;
       
       // Vérifier si la réservation est complète pour mettre le statut à "Complet"
@@ -448,9 +449,31 @@ export default function EditReservation() {
       const responseData = await response.json()
       console.log('✅ Réponse PUT succès:', responseData)
 
-      // 3. Upload nouveau passeport si présent
+      // 3. Supprimer l'ancien passeport si on a un nouveau ou si on a marqué pour suppression
+      const fileIdToDelete = passportToDelete || (documents.passport ? getPassportFileId() : null);
+      if (fileIdToDelete !== null) {
+        console.log('🗑️ Suppression de l\'ancien passeport...')
+        try {
+          const deleteResponse = await fetch(api.url(`${api.endpoints.uploadCloudinary}/${fileIdToDelete}`), {
+            method: "DELETE",
+          });
+          
+          if (!deleteResponse.ok) {
+            const error = await deleteResponse.json().catch(() => ({ error: 'Erreur inconnue' }));
+            console.error('⚠️ Erreur suppression ancien passeport:', error);
+            fileUploadErrors.push(`Erreur lors de la suppression de l'ancien passeport: ${error.error || 'Erreur inconnue'}`);
+          } else {
+            console.log('✅ Ancien passeport supprimé avec succès');
+          }
+        } catch (error) {
+          console.error('❌ Erreur lors de la suppression de l\'ancien passeport:', error);
+          fileUploadErrors.push('Erreur lors de la suppression de l\'ancien passeport');
+        }
+      }
+
+      // 4. Upload nouveau passeport si présent
       if (documents.passport && reservationId) {
-        console.log('📤 Upload passeport vers Cloudinary...')
+        console.log('📤 Upload nouveau passeport vers Cloudinary...')
         const formDataPassport = new FormData();
         formDataPassport.append("file", documents.passport);
         formDataPassport.append("reservationId", reservationId.toString());
@@ -463,9 +486,9 @@ export default function EditReservation() {
         
         if (!passportResponse.ok) {
           const error = await passportResponse.json();
-          fileUploadErrors.push(`Erreur lors de l'upload du passeport: ${error.error || 'Erreur inconnue'}`);
+          fileUploadErrors.push(`Erreur lors de l'upload du nouveau passeport: ${error.error || 'Erreur inconnue'}`);
         } else {
-          console.log('✅ Passeport uploadé avec succès')
+          console.log('✅ Nouveau passeport uploadé avec succès')
         }
       }
 
@@ -637,11 +660,26 @@ export default function EditReservation() {
     })
   }
 
+  // Fonction pour corriger l'URL Cloudinary pour les PDFs
+  const fixCloudinaryUrlForPdf = (url: string | null): string | null => {
+    if (!url || typeof url !== 'string') return url;
+    // Si c'est une URL Cloudinary avec /image/upload/ et que c'est un PDF, corriger vers /raw/upload/
+    if (url.includes('cloudinary.com') && url.includes('/image/upload/') && (url.includes('.pdf') || url.match(/\.pdf(\?|$)/))) {
+      return url.replace('/image/upload/', '/raw/upload/');
+    }
+    return url;
+  };
+
   // Helper function pour obtenir l'URL d'un document
   const getDocumentUrl = (type: string) => {
-    // D'abord vérifier dans previews (pour les nouveaux fichiers)
+    // Si on a un nouveau fichier dans previews, l'utiliser
     if (previews[type]) {
       return previews[type].url;
+    }
+    
+    // Si on a marqué le passeport pour suppression, ne pas afficher l'ancien
+    if (type === 'passport' && passportToDelete !== null) {
+      return null;
     }
     
     // Ensuite vérifier dans les documents existants de la réservation
@@ -654,15 +692,23 @@ export default function EditReservation() {
     );
     
     if (existingDoc) {
-      console.log('🔍 Debug - Found document for type:', {
-        requestedType: type,
-        foundType: existingDoc.fileType,
-        url: existingDoc.cloudinaryUrl || existingDoc.filePath
-      });
-      return existingDoc.cloudinaryUrl || existingDoc.filePath;
+      const url = existingDoc.cloudinaryUrl || existingDoc.filePath;
+      // Corriger l'URL si c'est un PDF
+      return fixCloudinaryUrlForPdf(url);
     }
     
     return null;
+  }
+
+  // Helper function pour obtenir l'ID du fichier passeport existant
+  const getPassportFileId = (): number | null => {
+    if (passportToDelete !== null) return passportToDelete;
+    
+    const existingDoc = (reservationData.documents || reservationData.fichiers || []).find((d: any) => 
+      ['passport', 'passeport'].includes(d.fileType)
+    );
+    
+    return existingDoc?.id || null;
   }
 
   // Helper function pour obtenir le type d'un document
@@ -926,66 +972,145 @@ export default function EditReservation() {
                   {/* Passeport - Ajouté dans Informations Client */}
                   <div className="space-y-2 md:col-span-3">
                     <Label className="text-blue-700 font-medium text-sm">Passeport *</Label>
-                    {!getDocumentUrl('passport') ? (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="file"
-                          ref={(el) => {
-                            if (el) fileInputs.current.passeport = el;
-                          }}
-                          onChange={(e) => handleFileChange(e, 'passport')}
-                          accept="image/*,.pdf"
-                          className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                        />
-                        {documents.passport && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveDocument('passport')}
-                            className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                    {(!getDocumentUrl('passport') && !documents.passport) || passportToDelete !== null ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="file"
+                            ref={(el) => {
+                              if (el) fileInputs.current.passeport = el;
+                            }}
+                            onChange={(e) => {
+                              handleFileChange(e, 'passport');
+                              // Réinitialiser passportToDelete si on upload un nouveau fichier
+                              if (e.target.files && e.target.files.length > 0) {
+                                setPassportToDelete(null);
+                              }
+                            }}
+                            accept="image/*,.pdf"
+                            className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                          />
+                          {passportToDelete !== null && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              type="button"
+                              onClick={() => setPassportToDelete(null)}
+                              className="text-gray-600 hover:text-gray-800"
+                            >
+                              <X className="h-4 w-4 mr-1" />
+                              Annuler
+                            </Button>
+                          )}
+                        </div>
+                        {passportToDelete !== null && (
+                          <p className="text-xs text-orange-600">L'ancien passeport sera remplacé par le nouveau fichier</p>
                         )}
                       </div>
                     ) : (
                       <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-blue-700">Aperçu du passeport</span>
+                          <span className="text-sm font-medium text-blue-700">
+                            {documents.passport ? 'Nouveau passeport' : 'Aperçu du passeport'}
+                          </span>
                           <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded"
-                              onClick={e => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setPreviewImage({ url: getDocumentUrl('passport') || '', title: 'Passeport', type: getDocumentType('passport') });
-                              }}
-                            >
-                              <ZoomIn className="h-3 w-3 mr-1" />
-                              Zoom
-                            </button>
-                      </div>
-                    </div>
-                        <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200 flex items-center justify-center bg-gray-50">
-                          {getDocumentType('passport') === 'application/pdf' ? (
-                            <a
-                              href={getDocumentUrl('passport') || '#'}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors"
-                            >
-                              <FileText className="h-16 w-16 text-red-600" />
-                              <span className="text-sm font-medium text-blue-700">Voir le PDF</span>
-                            </a>
+                            {getDocumentUrl('passport') && !documents.passport && (
+                              <button
+                                type="button"
+                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded"
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setPreviewImage({ url: getDocumentUrl('passport') || '', title: 'Passeport', type: getDocumentType('passport') });
+                                }}
+                              >
+                                <ZoomIn className="h-3 w-3 mr-1" />
+                                Zoom
+                              </button>
+                            )}
+                            {getDocumentUrl('passport') && !documents.passport && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                type="button"
+                                onClick={() => {
+                                  const fileId = getPassportFileId();
+                                  if (fileId) {
+                                    setPassportToDelete(fileId);
+                                  }
+                                }}
+                                className="text-orange-600 hover:text-orange-800 hover:bg-orange-50"
+                              >
+                                <Edit className="h-3 w-3 mr-1" />
+                                Remplacer
+                              </Button>
+                            )}
+                            {documents.passport && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                type="button"
+                                onClick={() => {
+                                  handleRemoveDocument('passport');
+                                  if (passportToDelete) {
+                                    setPassportToDelete(null);
+                                  }
+                                }}
+                                className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" />
+                                Supprimer
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
+                          {documents.passport ? (
+                            // Afficher le nouveau fichier
+                            previews.passport?.type === 'application/pdf' ? (
+                              previews.passport.url.startsWith('blob:') || previews.passport.url.startsWith('data:') ? (
+                                <embed
+                                  src={previews.passport.url}
+                                  type="application/pdf"
+                                  className="w-full h-full"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                                  <a
+                                    href={previews.passport.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors"
+                                  >
+                                    <FileText className="h-16 w-16 text-red-600" />
+                                    <span className="text-sm font-medium text-blue-700">Voir le PDF</span>
+                                  </a>
+                                </div>
+                              )
+                            ) : (
+                              <img
+                                src={previews.passport.url}
+                                alt="Nouveau passeport"
+                                className="w-full h-full object-contain"
+                              />
+                            )
                           ) : (
-                            <img
-                              src={getDocumentUrl('passport')}
-                              alt="Passeport"
-                              className="w-full h-full object-contain"
-                            />
+                            // Afficher l'ancien fichier
+                            getDocumentType('passport') === 'application/pdf' ? (
+                              <embed
+                                src={getDocumentUrl('passport') || '#'}
+                                type="application/pdf"
+                                className="w-full h-full"
+                              />
+                            ) : (
+                              <img
+                                src={getDocumentUrl('passport')}
+                                alt="Passeport"
+                                className="w-full h-full object-contain"
+                              />
+                            )
                           )}
-                  </div>
+                        </div>
                       </div>
                     )}
                       </div>
@@ -1171,17 +1296,13 @@ export default function EditReservation() {
                               </button>
                             </div>
                             </div>
-                          <div className="w-full h-[150px] overflow-hidden rounded-lg border border-blue-200 flex items-center justify-center bg-gray-50">
+                          <div className="w-full h-[150px] overflow-hidden rounded-lg border border-blue-200">
                             {paiement.recu.includes('.pdf') ? (
-                              <a
-                                href={paiement.recu}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors"
-                              >
-                                <FileText className="h-12 w-12 text-red-600" />
-                                <span className="text-xs font-medium text-blue-700">Voir le PDF</span>
-                              </a>
+                              <embed
+                                src={paiement.recu}
+                                type="application/pdf"
+                                className="w-full h-full"
+                              />
                             ) : (
                               <img
                                 src={paiement.recu}
@@ -1339,17 +1460,26 @@ export default function EditReservation() {
           {previewImage && (
             <div className="mt-4">
               {previewImage.url.includes('.pdf') || previewImage.type === 'application/pdf' ? (
-                <div className="flex flex-col items-center justify-center gap-4 p-8">
-                  <FileText className="h-24 w-24 text-red-600" />
-                  <a
-                    href={previewImage.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                  >
-                    Ouvrir le PDF dans un nouvel onglet
-                  </a>
-                </div>
+                // Pour les PDFs locaux, utiliser embed, sinon lien vers Cloudinary corrigé
+                previewImage.url.startsWith('blob:') || previewImage.url.startsWith('data:') ? (
+                  <embed
+                    src={previewImage.url}
+                    type="application/pdf"
+                    className="w-full h-full min-h-[600px]"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-4 p-8">
+                    <FileText className="h-24 w-24 text-red-600" />
+                    <a
+                      href={fixCloudinaryUrlForPdf(previewImage.url) || previewImage.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                    >
+                      Ouvrir le PDF dans un nouvel onglet
+                    </a>
+                  </div>
+                )
               ) : (
                 <img
                   src={previewImage.url}

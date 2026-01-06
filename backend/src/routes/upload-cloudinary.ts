@@ -131,6 +131,16 @@ router.post('/', upload.any(), async (req, res) => {
         // Obtenir l'extension du fichier
         const extension = (file.originalname.split('.').pop() || '').toLowerCase();
 
+        // Corriger l'URL Cloudinary pour les PDFs (remplacer /image/upload/ par /raw/upload/)
+        let correctedUrl = cloudinaryResult.secure_url;
+        if (extension === 'pdf' && correctedUrl.includes('/image/upload/')) {
+          correctedUrl = correctedUrl.replace('/image/upload/', '/raw/upload/');
+          console.log('🔧 Corrected Cloudinary URL for PDF:', {
+            original: cloudinaryResult.secure_url,
+            corrected: correctedUrl
+          });
+        }
+
         // Sauvegarder en base de données seulement si reservationId est fourni
         let dbFile = null;
         if (reservationId) {
@@ -142,7 +152,7 @@ router.post('/', upload.any(), async (req, res) => {
               fileType: fileTypeForDb,
               filePath: `cloudinary://${cloudinaryResult.public_id}`, // Pour compatibilité
               cloudinaryId: cloudinaryResult.public_id,
-              cloudinaryUrl: cloudinaryResult.secure_url,
+              cloudinaryUrl: correctedUrl,
               fileCategory: extension
             }
           });
@@ -164,10 +174,10 @@ router.post('/', upload.any(), async (req, res) => {
           fileType: fileTypeForDb,
           filePath: `cloudinary://${cloudinaryResult.public_id}`,
           cloudinaryId: cloudinaryResult.public_id,
-          cloudinaryUrl: cloudinaryResult.secure_url,
+          cloudinaryUrl: correctedUrl,
           cloudinaryInfo: {
             public_id: cloudinaryResult.public_id,
-            secure_url: cloudinaryResult.secure_url,
+            secure_url: correctedUrl,
             format: cloudinaryResult.format,
             bytes: cloudinaryResult.bytes,
             created_at: cloudinaryResult.created_at

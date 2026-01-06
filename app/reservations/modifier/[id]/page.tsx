@@ -250,21 +250,29 @@ export default function EditReservation() {
         Object.entries(docObj).forEach(([type, doc]: any) => {
             if (doc.url) {
               const isPdf = isPdfFile(doc.fileName || doc.url);
-              console.log('🔍 Debug - Setting preview for:', {
-                type,
-                url: doc.url,
-                fileName: doc.fileName,
-                isPdf: isPdf
-              });
               
               // Normaliser les types pour la cohérence 
               const normalizedType = type === 'passeport' ? 'passport' : 
                                    type === 'paiement' ? 'payment' : type;
               
+              // Pour les PDFs Cloudinary, corriger l'URL pour ajouter .pdf si nécessaire
+              let correctedUrl = doc.url;
+              if (isPdf && doc.url.includes('cloudinary.com')) {
+                correctedUrl = fixCloudinaryUrlForPdf(doc.url, doc.fileName) || doc.url;
+              }
+              
+              console.log('🔍 Debug - Setting preview for:', {
+                type,
+                originalUrl: doc.url,
+                correctedUrl: correctedUrl,
+                fileName: doc.fileName,
+                isPdf: isPdf
+              });
+              
               setPreviews(prev => ({ 
                 ...prev, 
                 [normalizedType]: { 
-                  url: doc.url, 
+                  url: correctedUrl, 
                   type: isPdf ? 'application/pdf' : 'image/*' 
                 }
               }))
@@ -673,17 +681,35 @@ export default function EditReservation() {
   };
 
   // Fonction pour corriger l'URL Cloudinary pour les PDFs
-  const fixCloudinaryUrlForPdf = (url: string | null): string | null => {
+  // Ajoute l'extension .pdf si manquante pour forcer le bon Content-Type
+  const fixCloudinaryUrlForPdf = (url: string | null, fileName?: string | null): string | null => {
     if (!url || typeof url !== 'string') return url;
     
-    // Si c'est une URL Cloudinary avec /image/upload/ et que c'est un PDF
-    // Ne pas corriger car le fichier est vraiment stocké dans /image/upload/
-    // Cloudinary peut servir les PDFs depuis /image/upload/ aussi
-    // On garde l'URL originale
-    if (url.includes('cloudinary.com') && url.includes('/image/upload/') && isPdfFile(url)) {
-      // L'URL est correcte, Cloudinary peut servir les PDFs depuis /image/upload/
+    // Si ce n'est pas une URL Cloudinary, retourner telle quelle
+    if (!url.includes('cloudinary.com')) return url;
+    
+    // Vérifier si c'est un PDF (par l'URL ou le nom de fichier)
+    const isPdf = isPdfFile(fileName || url);
+    
+    if (!isPdf) return url;
+    
+    // Si l'URL se termine déjà par .pdf, retourner telle quelle
+    if (url.toLowerCase().endsWith('.pdf') || url.match(/\.pdf(\?|$|#)/i)) {
       return url;
     }
+    
+    // Pour les URLs Cloudinary raw/upload, ajouter .pdf à la fin pour forcer le Content-Type
+    if (url.includes('/raw/upload/')) {
+      // Extraire la partie avant les paramètres de requête/ancre
+      const urlParts = url.split(/[?#]/);
+      const baseUrl = urlParts[0];
+      const queryAndHash = urlParts.slice(1).join('');
+      
+      // Ajouter .pdf avant les paramètres de requête/ancre
+      return baseUrl + '.pdf' + (queryAndHash ? (url.includes('?') ? '?' : '#') + queryAndHash : '');
+    }
+    
+    // Pour les autres types d'URLs Cloudinary, retourner telle quelle
     return url;
   };
 
@@ -1210,13 +1236,25 @@ export default function EditReservation() {
                               }
                               
                               if (isPdf) {
+                                // Utiliser un iframe pour afficher le PDF directement dans la boîte
                                 return (
-                                  <div className="w-full h-full flex items-center justify-center bg-gray-50 cursor-pointer" onClick={() => {
-                                    setPreviewImage({ url: passportUrl, title: 'Passeport', type: 'application/pdf' });
-                                  }}>
-                                    <div className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors">
-                                      <FileText className="h-16 w-16 text-red-600" />
-                                      <span className="text-sm font-medium text-blue-700">Cliquer pour voir le PDF</span>
+                                  <div className="w-full h-full relative">
+                                    <iframe
+                                      src={passportUrl || ''}
+                                      type="application/pdf"
+                                      className="w-full h-full border-0"
+                                      title="Aperçu du passeport"
+                                    />
+                                    {/* Overlay cliquable pour ouvrir dans le modal */}
+                                    <div 
+                                      className="absolute inset-0 bg-transparent hover:bg-black/5 cursor-pointer transition-colors flex items-center justify-center opacity-0 hover:opacity-100"
+                                      onClick={() => {
+                                        setPreviewImage({ url: passportUrl || '', title: 'Passeport', type: 'application/pdf' });
+                                      }}
+                                    >
+                                      <div className="bg-white/90 rounded-lg p-2 shadow-lg">
+                                        <ZoomIn className="h-5 w-5 text-blue-600" />
+                                      </div>
                                     </div>
                                   </div>
                                 );
@@ -1584,7 +1622,7 @@ export default function EditReservation() {
           {previewImage && (
             <div className="mt-4">
               {isPdfFile(previewImage.url) || previewImage.type === 'application/pdf' ? (
-                // Pour les PDFs locaux, utiliser embed, sinon lien vers Cloudinary corrigé
+                // Pour les PDFs locaux (blob/data), utiliser embed
                 previewImage.url.startsWith('blob:') || previewImage.url.startsWith('data:') ? (
                   <embed
                     src={previewImage.url}
@@ -1592,16 +1630,14 @@ export default function EditReservation() {
                     className="w-full h-full min-h-[600px]"
                   />
                 ) : (
-                  <div className="flex flex-col items-center justify-center gap-4 p-8">
-                    <FileText className="h-24 w-24 text-red-600" />
-                    <a
-                      href={fixCloudinaryUrlForPdf(previewImage.url) || previewImage.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                    >
-                      Ouvrir le PDF dans un nouvel onglet
-                    </a>
+                  // Pour les PDFs Cloudinary, utiliser iframe avec URL corrigée
+                  <div className="w-full h-[calc(80vh-100px)] border rounded-lg overflow-hidden">
+                    <iframe
+                      src={fixCloudinaryUrlForPdf(previewImage.url) || previewImage.url}
+                      type="application/pdf"
+                      className="w-full h-full border-0"
+                      title={previewImage.title}
+                    />
                   </div>
                 )
               ) : (

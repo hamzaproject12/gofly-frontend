@@ -48,6 +48,7 @@ type DocumentType = 'passport' | 'visa' | 'flightBooked' | 'hotelBooked' | 'paym
 
 // Custom Hook: Blob Proxy for PDF Display
 // Fetches PDF from Cloudinary and creates a blob with correct MIME type to force display
+// Implements smart retry: tries exact URL first, then with .pdf extension if 404
 const usePdfBlob = (url: string | null | undefined) => {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -70,33 +71,61 @@ const usePdfBlob = (url: string | null | undefined) => {
       return;
     }
 
-    // Fetch and create blob
+    // Smart fetch with retry mechanism
     let objectUrl: string | null = null;
-    setLoading(true);
-    setError(null);
+    let isCancelled = false;
+    
+    const fetchPdf = async () => {
+      setLoading(true);
+      setError(null);
 
-    fetch(url)
-      .then(async (response) => {
+      try {
+        // Attempt 1: Try exact URL first (most likely for files without extension)
+        let response = await fetch(url);
+        
+        // Attempt 2: If 404 and URL doesn't already end with .pdf, try with .pdf extension
+        if (!response.ok && response.status === 404 && !url.toLowerCase().endsWith('.pdf')) {
+          console.log('🔄 Retrying PDF fetch with .pdf extension...');
+          const urlWithExtension = `${url}.pdf`;
+          response = await fetch(urlWithExtension);
+        }
+
+        // If still not ok, throw error
         if (!response.ok) {
           throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
         }
+
+        // Check if cancelled before processing
+        if (isCancelled) return;
+
         const blob = await response.blob();
         // Force the MIME type to application/pdf
         const pdfBlob = new Blob([blob], { type: 'application/pdf' });
         objectUrl = URL.createObjectURL(pdfBlob);
-        setBlobUrl(objectUrl);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error('❌ Error fetching PDF blob:', err);
-        setError(err.message || 'Failed to load PDF');
-        setLoading(false);
-        // Fallback to original URL
-        setBlobUrl(url);
-      });
+        
+        if (!isCancelled) {
+          setBlobUrl(objectUrl);
+          setLoading(false);
+        } else {
+          // Cleanup if cancelled
+          URL.revokeObjectURL(objectUrl);
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          console.error('❌ Error fetching PDF blob:', err);
+          setError(err instanceof Error ? err.message : 'Failed to load PDF');
+          setLoading(false);
+          // Fallback to original URL (let browser handle it)
+          setBlobUrl(url);
+        }
+      }
+    };
+
+    fetchPdf();
 
     // Cleanup function
     return () => {
+      isCancelled = true;
       if (objectUrl) {
         URL.revokeObjectURL(objectUrl);
       }
@@ -420,16 +449,11 @@ export default function EditReservation() {
               const normalizedType = type === 'passeport' ? 'passport' : 
                                    type === 'paiement' ? 'payment' : type;
               
-              // Pour les PDFs Cloudinary, corriger l'URL pour ajouter .pdf si nécessaire
-              let correctedUrl = doc.url;
-              if (isPdf && doc.url.includes('cloudinary.com')) {
-                correctedUrl = fixCloudinaryUrlForPdf(doc.url, doc.fileName) || doc.url;
-              }
-              
+              // DO NOT modify the URL - use it exactly as it comes from the database
+              // The usePdfBlob hook will handle the smart retry logic (try exact URL, then with .pdf if 404)
               console.log('🔍 Debug - Setting preview for:', {
                 type,
-                originalUrl: doc.url,
-                correctedUrl: correctedUrl,
+                url: doc.url,
                 fileName: doc.fileName,
                 isPdf: isPdf
               });
@@ -437,7 +461,7 @@ export default function EditReservation() {
               setPreviews(prev => ({ 
                 ...prev, 
                 [normalizedType]: { 
-                  url: correctedUrl, 
+                  url: doc.url, // Use original URL exactly as stored
                   type: isPdf ? 'application/pdf' : 'image/*' 
                 }
               }))

@@ -667,9 +667,14 @@ export default function EditReservation() {
   // Fonction pour corriger l'URL Cloudinary pour les PDFs
   const fixCloudinaryUrlForPdf = (url: string | null): string | null => {
     if (!url || typeof url !== 'string') return url;
-    // Si c'est une URL Cloudinary avec /image/upload/ et que c'est un PDF, corriger vers /raw/upload/
+    
+    // Si c'est une URL Cloudinary avec /image/upload/ et que c'est un PDF
+    // Ne pas corriger car le fichier est vraiment stocké dans /image/upload/
+    // Cloudinary peut servir les PDFs depuis /image/upload/ aussi
+    // On garde l'URL originale
     if (url.includes('cloudinary.com') && url.includes('/image/upload/') && (url.includes('.pdf') || url.match(/\.pdf(\?|$)/))) {
-      return url.replace('/image/upload/', '/raw/upload/');
+      // L'URL est correcte, Cloudinary peut servir les PDFs depuis /image/upload/
+      return url;
     }
     return url;
   };
@@ -696,9 +701,12 @@ export default function EditReservation() {
     );
     
     if (existingDoc) {
-      const url = existingDoc.cloudinaryUrl || existingDoc.filePath;
-      // Corriger l'URL si c'est un PDF
-      return fixCloudinaryUrlForPdf(url);
+      let url = existingDoc.cloudinaryUrl || existingDoc.filePath;
+      
+      // Pour les PDFs, garder l'URL telle quelle car Cloudinary peut servir les PDFs
+      // depuis /image/upload/ si c'est là qu'ils ont été stockés
+      // Ne pas essayer de corriger car cela peut causer des 404
+      return url;
     }
     
     return null;

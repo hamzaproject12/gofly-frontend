@@ -67,7 +67,9 @@ class CloudinaryService {
             console.log('✅ Cloudinary upload successful:', {
               public_id: result.public_id,
               format: result.format,
-              bytes: result.bytes
+              bytes: result.bytes,
+              resource_type: result.resource_type,
+              secure_url: result.secure_url
             });
             resolve(result);
           }
@@ -102,6 +104,10 @@ class CloudinaryService {
     const folder = `omra-travel/${fileType}s`;
     const public_id = `${fileType}_${reservationId}_${Date.now()}`;
 
+    // Déterminer le resource_type selon le type de fichier
+    // Pour les PDFs, utiliser 'raw' explicitement pour éviter qu'ils soient stockés comme images
+    const resourceType = file.mimetype === 'application/pdf' ? 'raw' : 'auto';
+
     // Optimisations spécifiques pour les reçus de paiement
     const transformation = [];
     
@@ -123,7 +129,7 @@ class CloudinaryService {
     return this.uploadFile(file, {
       folder,
       public_id,
-      resource_type: 'auto',
+      resource_type: resourceType,
       transformation
     });
   }

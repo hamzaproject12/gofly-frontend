@@ -131,14 +131,24 @@ router.post('/', upload.any(), async (req, res) => {
         // Obtenir l'extension du fichier
         const extension = (file.originalname.split('.').pop() || '').toLowerCase();
 
-        // Corriger l'URL Cloudinary pour les PDFs (remplacer /image/upload/ par /raw/upload/)
+        // Utiliser l'URL retournée par Cloudinary telle quelle
+        // Cloudinary retourne toujours la bonne URL selon le resource_type utilisé
         let correctedUrl = cloudinaryResult.secure_url;
-        if (extension === 'pdf' && correctedUrl.includes('/image/upload/')) {
-          correctedUrl = correctedUrl.replace('/image/upload/', '/raw/upload/');
-          console.log('🔧 Corrected Cloudinary URL for PDF:', {
-            original: cloudinaryResult.secure_url,
-            corrected: correctedUrl
+        
+        // Log pour débogage
+        if (extension === 'pdf') {
+          console.log('📄 PDF upload result:', {
+            originalUrl: cloudinaryResult.secure_url,
+            resourceType: cloudinaryResult.resource_type || 'auto',
+            format: cloudinaryResult.format,
+            publicId: cloudinaryResult.public_id
           });
+          
+          // Si l'URL contient /image/upload/ mais qu'on a utilisé resource_type: 'raw',
+          // il y a un problème - mais normalement Cloudinary devrait retourner /raw/upload/
+          if (correctedUrl.includes('/image/upload/') && file.mimetype === 'application/pdf') {
+            console.warn('⚠️ PDF uploaded but URL contains /image/upload/ - this might cause issues');
+          }
         }
 
         // Sauvegarder en base de données seulement si reservationId est fourni

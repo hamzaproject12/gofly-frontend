@@ -24,6 +24,7 @@ interface UploadResult {
   secure_url: string;
   url: string;
   format: string;
+  resource_type?: string;
   width?: number;
   height?: number;
   bytes: number;

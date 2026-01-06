@@ -44,6 +44,13 @@ export default function ReservationDetails() {
   const [loading, setLoading] = useState(true);
   const [preview, setPreview] = useState<{ url: string; title: string } | null>(null);
 
+  // Helper function pour vérifier si un fichier/URL est un PDF (case-insensitive)
+  const isPdfFile = (fileNameOrUrl: string | null | undefined): boolean => {
+    if (!fileNameOrUrl || typeof fileNameOrUrl !== 'string') return false;
+    const lower = fileNameOrUrl.toLowerCase();
+    return lower.includes('.pdf') || lower.endsWith('.pdf') || /\.pdf(\?|$|#)/i.test(fileNameOrUrl);
+  };
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const parts = window.location.pathname.split('/');
@@ -188,7 +195,7 @@ export default function ReservationDetails() {
                           <div className="md:col-span-3 space-y-2">
                             <span className="text-orange-700 font-medium text-sm">Reçu</span>
                             {recuUrl ? (
-                              recuUrl.endsWith('.pdf') ? (
+                              isPdfFile(recuUrl) ? (
                                 <div className="w-24 h-28 rounded-lg overflow-hidden border-2 border-orange-100 bg-gradient-to-br from-orange-50 to-white flex items-center justify-center cursor-pointer" onClick={() => setPreview({ url: recuUrl, title: paiement.recuName || 'Reçu paiement' })}>
                                   <embed src={`${recuUrl}#toolbar=0&navpanes=0&scrollbar=0`} type="application/pdf" className="w-full h-full" />
                                 </div>
@@ -230,7 +237,7 @@ export default function ReservationDetails() {
                         onClick={() => url && setPreview({ url, title: doc.type })}
                       >
                         <span className="text-xs font-semibold text-purple-700 mb-1 uppercase tracking-wide group-hover:text-purple-900 transition-colors">{doc.type}</span>
-                        {url ? (url.endsWith('.pdf') ? (
+                        {url ? (isPdfFile(url) ? (
                           <div className="w-28 h-36 rounded-lg overflow-hidden border-2 border-purple-100 bg-gradient-to-br from-purple-50 to-white flex items-center justify-center group-hover:border-purple-400">
                             <embed src={`${url}#toolbar=0&navpanes=0&scrollbar=0`} type="application/pdf" className="w-full h-full" />
                           </div>
@@ -261,7 +268,7 @@ export default function ReservationDetails() {
               <span className="font-semibold text-blue-800">{preview.title}</span>
               <Button variant="ghost" size="icon" onClick={() => setPreview(null)}><span className="text-xl">×</span></Button>
             </div>
-            {preview.url.endsWith('.pdf') ? (
+            {isPdfFile(preview.url) ? (
               <embed src={`${preview.url}#toolbar=0&navpanes=0&scrollbar=0`} type="application/pdf" className="max-w-full max-h-[70vh] object-contain" />
             ) : (
               <img src={preview.url} alt={preview.title} className="max-w-full max-h-[70vh] object-contain" />

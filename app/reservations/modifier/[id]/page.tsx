@@ -249,11 +249,12 @@ export default function EditReservation() {
           // Set previews pour les documents existants
         Object.entries(docObj).forEach(([type, doc]: any) => {
             if (doc.url) {
+              const isPdf = isPdfFile(doc.fileName || doc.url);
               console.log('🔍 Debug - Setting preview for:', {
                 type,
                 url: doc.url,
                 fileName: doc.fileName,
-                isPdf: doc.fileName?.includes('.pdf')
+                isPdf: isPdf
               });
               
               // Normaliser les types pour la cohérence 
@@ -264,7 +265,7 @@ export default function EditReservation() {
                 ...prev, 
                 [normalizedType]: { 
                   url: doc.url, 
-                  type: doc.fileName?.includes('.pdf') ? 'application/pdf' : 'image/*' 
+                  type: isPdf ? 'application/pdf' : 'image/*' 
                 }
               }))
             }
@@ -664,6 +665,13 @@ export default function EditReservation() {
     })
   }
 
+  // Helper function pour vérifier si un fichier/URL est un PDF (case-insensitive)
+  const isPdfFile = (fileNameOrUrl: string | null | undefined): boolean => {
+    if (!fileNameOrUrl || typeof fileNameOrUrl !== 'string') return false;
+    const lower = fileNameOrUrl.toLowerCase();
+    return lower.includes('.pdf') || lower.endsWith('.pdf') || /\.pdf(\?|$|#)/i.test(fileNameOrUrl);
+  };
+
   // Fonction pour corriger l'URL Cloudinary pour les PDFs
   const fixCloudinaryUrlForPdf = (url: string | null): string | null => {
     if (!url || typeof url !== 'string') return url;
@@ -672,7 +680,7 @@ export default function EditReservation() {
     // Ne pas corriger car le fichier est vraiment stocké dans /image/upload/
     // Cloudinary peut servir les PDFs depuis /image/upload/ aussi
     // On garde l'URL originale
-    if (url.includes('cloudinary.com') && url.includes('/image/upload/') && (url.includes('.pdf') || url.match(/\.pdf(\?|$)/))) {
+    if (url.includes('cloudinary.com') && url.includes('/image/upload/') && isPdfFile(url)) {
       // L'URL est correcte, Cloudinary peut servir les PDFs depuis /image/upload/
       return url;
     }
@@ -740,7 +748,7 @@ export default function EditReservation() {
     );
     
     if (existingDoc) {
-      return existingDoc.fileName?.includes('.pdf') ? 'application/pdf' : 'image/*';
+      return isPdfFile(existingDoc.fileName || existingDoc.cloudinaryUrl || existingDoc.filePath) ? 'application/pdf' : 'image/*';
     }
     
     return 'image/*';
@@ -1367,14 +1375,14 @@ export default function EditReservation() {
                               <button
                                 type="button"
                                 className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 rounded"
-                                onClick={() => setPreviewImage({ url: paiement.recu || '', title: 'Reçu paiement', type: 'image/*' })}
+                                onClick={() => setPreviewImage({ url: paiement.recu || '', title: 'Reçu paiement', type: isPdfFile(paiement.recu) ? 'application/pdf' : 'image/*' })}
                               >
                                 <ZoomIn className="h-4 w-4" />
                               </button>
                             </div>
                             </div>
                           <div className="w-full h-[150px] overflow-hidden rounded-lg border border-blue-200">
-                            {paiement.recu.includes('.pdf') ? (
+                            {isPdfFile(paiement.recu) ? (
                               <embed
                                 src={paiement.recu}
                                 type="application/pdf"
@@ -1536,7 +1544,7 @@ export default function EditReservation() {
           </DialogHeader>
           {previewImage && (
             <div className="mt-4">
-              {previewImage.url.includes('.pdf') || previewImage.type === 'application/pdf' ? (
+              {isPdfFile(previewImage.url) || previewImage.type === 'application/pdf' ? (
                 // Pour les PDFs locaux, utiliser embed, sinon lien vers Cloudinary corrigé
                 previewImage.url.startsWith('blob:') || previewImage.url.startsWith('data:') ? (
                   <embed

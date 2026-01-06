@@ -944,9 +944,16 @@ export default function NouvelleReservation() {
     })
   }
 
+  // Helper function pour vérifier si un fichier/URL est un PDF (case-insensitive)
+  const isPdfFile = (fileNameOrUrl: string | null | undefined): boolean => {
+    if (!fileNameOrUrl || typeof fileNameOrUrl !== 'string') return false;
+    const lower = fileNameOrUrl.toLowerCase();
+    return lower.includes('.pdf') || lower.endsWith('.pdf') || /\.pdf(\?|$|#)/i.test(fileNameOrUrl);
+  };
+
   // Fonction pour vérifier si le fichier est une image
   const isImageFile = (url: string) => {
-    return url.match(/\.(jpeg|jpg|gif|png)$/) != null;
+    return url.match(/\.(jpeg|jpg|gif|png)$/i) != null;
   };
 
   // Fonction pour corriger l'URL Cloudinary pour les PDFs
@@ -957,7 +964,7 @@ export default function NouvelleReservation() {
     // Ne pas corriger car le fichier est vraiment stocké dans /image/upload/
     // Cloudinary peut servir les PDFs depuis /image/upload/ aussi
     // On garde l'URL originale
-    if (url.includes('cloudinary.com') && url.includes('/image/upload/') && (url.includes('.pdf') || url.match(/\.pdf(\?|$)/))) {
+    if (url.includes('cloudinary.com') && url.includes('/image/upload/') && isPdfFile(url)) {
       // L'URL est correcte, Cloudinary peut servir les PDFs depuis /image/upload/
       return url;
     }

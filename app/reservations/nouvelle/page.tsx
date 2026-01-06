@@ -2366,7 +2366,7 @@ export default function NouvelleReservation() {
                               </Button>
                             </div>
                           </div>
-                          <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
+                          <div className="w-full h-[350px] overflow-hidden rounded-lg border border-blue-200">
                             {previews.passport?.type === 'application/pdf' ? (
                               // Pour les PDFs locaux, utiliser embed pour l'aperçu
                               previews.passport.url.startsWith('blob:') || previews.passport.url.startsWith('data:') ? (

@@ -229,7 +229,6 @@ const PdfPreviewBox = ({ url, title, onZoom }: { url: string | null; title: stri
     <div className="w-full h-full relative">
       <iframe
         src={blobUrl}
-        type="application/pdf"
         className="w-full h-full border-0"
         title={title}
       />
@@ -287,7 +286,6 @@ const PdfPreviewModal = ({ url, title }: { url: string; title: string }) => {
     <div className="w-full h-[calc(80vh-100px)] border rounded-lg overflow-hidden">
       <iframe
         src={blobUrl}
-        type="application/pdf"
         className="w-full h-full border-0"
         title={title}
       />
@@ -1366,7 +1364,7 @@ export default function EditReservation() {
                             )}
                           </div>
                         </div>
-                        <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
+                        <div className="w-full h-[350px] overflow-hidden rounded-lg border border-blue-200">
                           {(() => {
                             // Debug logging
                             const passportUrl = documents.passport ? previews.passport?.url : (previews.passport?.url || getDocumentUrl('passport'));

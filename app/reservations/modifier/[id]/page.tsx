@@ -967,13 +967,17 @@ export default function EditReservation() {
                             </button>
                       </div>
                     </div>
-                        <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
+                        <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200 flex items-center justify-center bg-gray-50">
                           {getDocumentType('passport') === 'application/pdf' ? (
-                            <embed
-                              src={`${getDocumentUrl('passport')}#toolbar=0&navpanes=0&scrollbar=0`}
-                              type="application/pdf"
-                              className="w-full h-full"
-                            />
+                            <a
+                              href={getDocumentUrl('passport') || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors"
+                            >
+                              <FileText className="h-16 w-16 text-red-600" />
+                              <span className="text-sm font-medium text-blue-700">Voir le PDF</span>
+                            </a>
                           ) : (
                             <img
                               src={getDocumentUrl('passport')}
@@ -1167,13 +1171,17 @@ export default function EditReservation() {
                               </button>
                             </div>
                             </div>
-                          <div className="w-full h-[150px] overflow-hidden rounded-lg border border-blue-200">
+                          <div className="w-full h-[150px] overflow-hidden rounded-lg border border-blue-200 flex items-center justify-center bg-gray-50">
                             {paiement.recu.includes('.pdf') ? (
-                              <embed
-                                src={`${paiement.recu}#toolbar=0&navpanes=0&scrollbar=0`}
-                                type="application/pdf"
-                                className="w-full h-full"
-                              />
+                              <a
+                                href={paiement.recu}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors"
+                              >
+                                <FileText className="h-12 w-12 text-red-600" />
+                                <span className="text-xs font-medium text-blue-700">Voir le PDF</span>
+                              </a>
                             ) : (
                               <img
                                 src={paiement.recu}
@@ -1330,12 +1338,18 @@ export default function EditReservation() {
           </DialogHeader>
           {previewImage && (
             <div className="mt-4">
-              {previewImage.url.includes('.pdf') ? (
-                <iframe
-                  src={previewImage.url}
-                  className="w-full h-96 border rounded"
-                  title={previewImage.title}
-                />
+              {previewImage.url.includes('.pdf') || previewImage.type === 'application/pdf' ? (
+                <div className="flex flex-col items-center justify-center gap-4 p-8">
+                  <FileText className="h-24 w-24 text-red-600" />
+                  <a
+                    href={previewImage.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    Ouvrir le PDF dans un nouvel onglet
+                  </a>
+                </div>
               ) : (
                 <img
                   src={previewImage.url}

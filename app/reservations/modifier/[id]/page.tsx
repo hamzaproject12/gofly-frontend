@@ -213,7 +213,11 @@ export default function EditReservation() {
           })
           
           setFormData(initialFormData)
-          setInitialData(initialFormData) // Stocker les données initiales
+          // Stocker les données initiales complètes (formulaire + réservation)
+          setInitialData({
+            ...reservationData,
+            formData: initialFormData
+          })
 
           // Charger les paiements existants
           const initialPaiements = (reservationData.payments || []).map((p: any) => ({
@@ -775,12 +779,19 @@ export default function EditReservation() {
     }
 
     return paiements.every((paiement, index) => {
+      // Si c'est un paiement existant (avec ID), il est déjà valide
+      if (paiement.id) {
+        return true;
+      }
+      
+      // Pour les nouveaux paiements, vérifier que tous les champs sont remplis
       const montantRempli = paiement.montant !== "" && !Number.isNaN(parseAmount(paiement.montant));
       const typeRempli = paiement.type !== "";
       const dateRemplie = paiement.date !== "";
+      // Le reçu n'est plus obligatoire
       const recuExiste = (paiement.recu && paiement.recu.trim() !== "") || !!paymentDocuments?.[index];
 
-      return montantRempli && typeRempli && dateRemplie && recuExiste;
+      return montantRempli && typeRempli && dateRemplie;
     });
   }, [paiements, paymentDocuments]);
 
@@ -793,7 +804,65 @@ export default function EditReservation() {
   const section3Complete = paiements.length > 0 && arePaymentsValid
   const section4Complete = true // Les toggles sont toujours complétés
 
-  const isFormValid = useMemo(() => arePaymentsValid, [arePaymentsValid])
+  // Détecter les changements dans le formulaire
+  const hasChanges = useMemo(() => {
+    // Vérifier les changements dans les documents (toujours disponible)
+    const hasNewDocuments = 
+      documents.passport !== null ||
+      documents.visa !== null ||
+      documents.hotelBooked !== null ||
+      documents.flightBooked !== null ||
+      documents.payment.some(f => f !== null);
+    
+    // Vérifier si un passeport est marqué pour suppression
+    const passportToBeDeleted = passportToDelete !== null;
+    
+    // Si initialData n'est pas encore chargé, vérifier seulement les documents
+    if (!initialData || !initialData.formData) {
+      return hasNewDocuments || passportToBeDeleted;
+    }
+    
+    const initialFormData = initialData.formData;
+    const initialReservationData = initialData;
+    
+    // Vérifier les changements dans les champs du formulaire
+    const formDataChanged = 
+      formData.prix !== (initialFormData.prix || '') ||
+      formData.dateReservation !== (initialFormData.dateReservation || '') ||
+      formData.statutVisa !== (initialFormData.statutVisa || false) ||
+      formData.statutHotel !== (initialFormData.statutHotel || false) ||
+      formData.statutVol !== (initialFormData.statutVol || false) ||
+      formData.passportNumber !== (initialFormData.passportNumber || '') ||
+      formData.hotelMadina !== (initialFormData.hotelMadina || '') ||
+      formData.hotelMakkah !== (initialFormData.hotelMakkah || '');
+    
+    // Vérifier les changements dans les paiements (nouveaux paiements ajoutés ou modifications)
+    const hasNewPayments = paiements.some(p => !p.id);
+    const paymentsChanged = paiements.length !== (initialReservationData.payments?.length || 0) ||
+      paiements.some((p, index) => {
+        const initialP = initialReservationData.payments?.[index];
+        if (!initialP) return true; // Nouveau paiement
+        return p.montant !== (initialP.amount?.toString() || '') ||
+               p.type !== (initialP.paymentMethod || '') ||
+               p.date !== (initialP.paymentDate?.split('T')[0] || '');
+      });
+    
+    return formDataChanged || hasNewDocuments || passportToBeDeleted || hasNewPayments || paymentsChanged;
+  }, [formData, initialData, documents, passportToDelete, paiements]);
+
+  const isFormValid = useMemo(() => {
+    // Le formulaire est valide si :
+    // 1. Les paiements sont valides (ou il n'y a pas de paiements)
+    // 2. ET (il y a des changements OU le formulaire de base est valide)
+    const baseFormValid = formData.prix && formData.programId && formData.typeChambre && formData.gender;
+    // Si des changements sont détectés, activer le bouton même si certains champs ne sont pas remplis
+    // (car on peut modifier juste une partie)
+    if (hasChanges) {
+      return arePaymentsValid; // Juste vérifier que les paiements sont valides
+    }
+    // Sinon, vérifier que le formulaire de base est valide
+    return arePaymentsValid && baseFormValid;
+  }, [arePaymentsValid, hasChanges, formData])
 
   const totalProgress = [section1Complete, section2Complete, section3Complete, section4Complete]
     .filter(Boolean).length * 25
@@ -1438,7 +1507,7 @@ export default function EditReservation() {
                 </Link>
                 <Button
                   type="submit"
-                  disabled={isSubmitting || !isFormValid}
+                  disabled={isSubmitting || (!isFormValid && !hasChanges)}
                   size="lg"
                   className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
                 >

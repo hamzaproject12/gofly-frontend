@@ -1151,7 +1151,7 @@ export default function EditReservation() {
                         </div>
                         <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
                           {documents.passport ? (
-                            // Afficher le nouveau fichier
+                            // Afficher le nouveau fichier uploadé
                             previews.passport?.type === 'application/pdf' ? (
                               previews.passport.url.startsWith('blob:') || previews.passport.url.startsWith('data:') ? (
                                 <embed
@@ -1160,39 +1160,51 @@ export default function EditReservation() {
                                   className="w-full h-full"
                                 />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                                  <a
-                                    href={previews.passport.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors"
-                                  >
+                                <div className="w-full h-full flex items-center justify-center bg-gray-50 cursor-pointer" onClick={() => setPreviewImage({ url: previews.passport.url, title: 'Nouveau passeport', type: 'application/pdf' })}>
+                                  <div className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors">
                                     <FileText className="h-16 w-16 text-red-600" />
-                                    <span className="text-sm font-medium text-blue-700">Voir le PDF</span>
-                                  </a>
+                                    <span className="text-sm font-medium text-blue-700">Cliquer pour voir le PDF</span>
+                                  </div>
                                 </div>
                               )
                             ) : (
                               <img
-                                src={previews.passport.url}
+                                src={previews.passport?.url}
                                 alt="Nouveau passeport"
-                                className="w-full h-full object-contain"
+                                className="w-full h-full object-contain cursor-pointer"
+                                onClick={() => setPreviewImage({ url: previews.passport?.url || '', title: 'Nouveau passeport', type: previews.passport?.type || 'image/*' })}
                               />
                             )
                           ) : (
-                            // Afficher l'ancien fichier
-                            getDocumentType('passport') === 'application/pdf' ? (
-                              <embed
-                                src={getDocumentUrl('passport') || '#'}
-                                type="application/pdf"
-                                className="w-full h-full"
-                              />
+                            // Afficher l'ancien fichier existant (depuis previews ou getDocumentUrl)
+                            (previews.passport || getDocumentUrl('passport')) ? (
+                              (previews.passport?.type === 'application/pdf' || getDocumentType('passport') === 'application/pdf') ? (
+                                <div className="w-full h-full flex items-center justify-center bg-gray-50 cursor-pointer" onClick={() => {
+                                  const url = previews.passport?.url || getDocumentUrl('passport') || '';
+                                  const type = previews.passport?.type || getDocumentType('passport');
+                                  setPreviewImage({ url, title: 'Passeport', type });
+                                }}>
+                                  <div className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors">
+                                    <FileText className="h-16 w-16 text-red-600" />
+                                    <span className="text-sm font-medium text-blue-700">Cliquer pour voir le PDF</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <img
+                                  src={previews.passport?.url || getDocumentUrl('passport') || ''}
+                                  alt="Passeport"
+                                  className="w-full h-full object-contain cursor-pointer"
+                                  onClick={() => {
+                                    const url = previews.passport?.url || getDocumentUrl('passport') || '';
+                                    const type = previews.passport?.type || getDocumentType('passport');
+                                    setPreviewImage({ url, title: 'Passeport', type });
+                                  }}
+                                />
+                              )
                             ) : (
-                              <img
-                                src={getDocumentUrl('passport')}
-                                alt="Passeport"
-                                className="w-full h-full object-contain"
-                              />
+                              <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
+                                Aucun passeport attaché
+                              </div>
                             )
                           )}
                         </div>

@@ -1099,21 +1099,23 @@ export default function EditReservation() {
                             {documents.passport ? 'Nouveau passeport' : 'Aperçu du passeport'}
                           </span>
                           <div className="flex items-center gap-2">
-                            {getDocumentUrl('passport') && !documents.passport && (
+                            {(previews.passport || getDocumentUrl('passport')) && !documents.passport && (
                               <button
                                 type="button"
                                 className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded"
                                 onClick={e => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  setPreviewImage({ url: getDocumentUrl('passport') || '', title: 'Passeport', type: getDocumentType('passport') });
+                                  const url = previews.passport?.url || getDocumentUrl('passport') || '';
+                                  const type = previews.passport?.type || getDocumentType('passport');
+                                  setPreviewImage({ url, title: 'Passeport', type });
                                 }}
                               >
                                 <ZoomIn className="h-3 w-3 mr-1" />
                                 Zoom
                               </button>
                             )}
-                            {getDocumentUrl('passport') && !documents.passport && (
+                            {(previews.passport || getDocumentUrl('passport')) && !documents.passport && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1150,63 +1152,88 @@ export default function EditReservation() {
                           </div>
                         </div>
                         <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
-                          {documents.passport ? (
-                            // Afficher le nouveau fichier uploadé
-                            previews.passport?.type === 'application/pdf' ? (
-                              previews.passport.url.startsWith('blob:') || previews.passport.url.startsWith('data:') ? (
-                                <embed
-                                  src={previews.passport.url}
-                                  type="application/pdf"
-                                  className="w-full h-full"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-gray-50 cursor-pointer" onClick={() => setPreviewImage({ url: previews.passport.url, title: 'Nouveau passeport', type: 'application/pdf' })}>
-                                  <div className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors">
-                                    <FileText className="h-16 w-16 text-red-600" />
-                                    <span className="text-sm font-medium text-blue-700">Cliquer pour voir le PDF</span>
+                          {(() => {
+                            // Debug logging
+                            const passportUrl = documents.passport ? previews.passport?.url : (previews.passport?.url || getDocumentUrl('passport'));
+                            const passportType = documents.passport ? previews.passport?.type : (previews.passport?.type || getDocumentType('passport'));
+                            const isPdf = passportType === 'application/pdf';
+                            
+                            console.log('🔍 Debug - Rendering passport preview:', {
+                              hasNewDocument: !!documents.passport,
+                              hasPreview: !!previews.passport,
+                              previewType: previews.passport?.type,
+                              documentUrl: getDocumentUrl('passport'),
+                              finalUrl: passportUrl,
+                              finalType: passportType,
+                              isPdf: isPdf
+                            });
+                            
+                            if (documents.passport) {
+                              // Afficher le nouveau fichier uploadé
+                              if (isPdf) {
+                                if (previews.passport?.url?.startsWith('blob:') || previews.passport?.url?.startsWith('data:')) {
+                                  return (
+                                    <embed
+                                      src={previews.passport.url}
+                                      type="application/pdf"
+                                      className="w-full h-full"
+                                    />
+                                  );
+                                } else {
+                                  return (
+                                    <div className="w-full h-full flex items-center justify-center bg-gray-50 cursor-pointer" onClick={() => setPreviewImage({ url: previews.passport?.url || '', title: 'Nouveau passeport', type: 'application/pdf' })}>
+                                      <div className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors">
+                                        <FileText className="h-16 w-16 text-red-600" />
+                                        <span className="text-sm font-medium text-blue-700">Cliquer pour voir le PDF</span>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                              } else {
+                                return (
+                                  <img
+                                    src={previews.passport?.url || ''}
+                                    alt="Nouveau passeport"
+                                    className="w-full h-full object-contain cursor-pointer"
+                                    onClick={() => setPreviewImage({ url: previews.passport?.url || '', title: 'Nouveau passeport', type: previews.passport?.type || 'image/*' })}
+                                  />
+                                );
+                              }
+                            } else {
+                              // Afficher l'ancien fichier existant
+                              if (!passportUrl) {
+                                return (
+                                  <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
+                                    Aucun passeport attaché
                                   </div>
-                                </div>
-                              )
-                            ) : (
-                              <img
-                                src={previews.passport?.url}
-                                alt="Nouveau passeport"
-                                className="w-full h-full object-contain cursor-pointer"
-                                onClick={() => setPreviewImage({ url: previews.passport?.url || '', title: 'Nouveau passeport', type: previews.passport?.type || 'image/*' })}
-                              />
-                            )
-                          ) : (
-                            // Afficher l'ancien fichier existant (depuis previews ou getDocumentUrl)
-                            (previews.passport || getDocumentUrl('passport')) ? (
-                              (previews.passport?.type === 'application/pdf' || getDocumentType('passport') === 'application/pdf') ? (
-                                <div className="w-full h-full flex items-center justify-center bg-gray-50 cursor-pointer" onClick={() => {
-                                  const url = previews.passport?.url || getDocumentUrl('passport') || '';
-                                  const type = previews.passport?.type || getDocumentType('passport');
-                                  setPreviewImage({ url, title: 'Passeport', type });
-                                }}>
-                                  <div className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors">
-                                    <FileText className="h-16 w-16 text-red-600" />
-                                    <span className="text-sm font-medium text-blue-700">Cliquer pour voir le PDF</span>
+                                );
+                              }
+                              
+                              if (isPdf) {
+                                return (
+                                  <div className="w-full h-full flex items-center justify-center bg-gray-50 cursor-pointer" onClick={() => {
+                                    setPreviewImage({ url: passportUrl, title: 'Passeport', type: 'application/pdf' });
+                                  }}>
+                                    <div className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors">
+                                      <FileText className="h-16 w-16 text-red-600" />
+                                      <span className="text-sm font-medium text-blue-700">Cliquer pour voir le PDF</span>
+                                    </div>
                                   </div>
-                                </div>
-                              ) : (
-                                <img
-                                  src={previews.passport?.url || getDocumentUrl('passport') || ''}
-                                  alt="Passeport"
-                                  className="w-full h-full object-contain cursor-pointer"
-                                  onClick={() => {
-                                    const url = previews.passport?.url || getDocumentUrl('passport') || '';
-                                    const type = previews.passport?.type || getDocumentType('passport');
-                                    setPreviewImage({ url, title: 'Passeport', type });
-                                  }}
-                                />
-                              )
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
-                                Aucun passeport attaché
-                              </div>
-                            )
-                          )}
+                                );
+                              } else {
+                                return (
+                                  <img
+                                    src={passportUrl}
+                                    alt="Passeport"
+                                    className="w-full h-full object-contain cursor-pointer"
+                                    onClick={() => {
+                                      setPreviewImage({ url: passportUrl, title: 'Passeport', type: passportType });
+                                    }}
+                                  />
+                                );
+                              }
+                            }
+                          })()}
                         </div>
                       </div>
                     )}

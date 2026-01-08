@@ -692,6 +692,64 @@ export default function EditReservation() {
         }
       }
 
+      // 5. Gérer les remplacements de reçus pour les paiements existants
+      if (reservationId) {
+        for (let i = 0; i < paiements.length; i++) {
+          const paiement = paiements[i];
+          // Si le paiement a un ID (existant) ET qu'un nouveau fichier a été uploadé
+          if (paiement.id && documents.payment[i]) {
+            console.log(`📤 Remplacement du reçu pour paiement existant ID ${paiement.id}...`)
+            
+            // Récupérer l'ancien fichier pour le supprimer
+            const existingPayment = reservationData?.payments?.find((p: any) => p.id === paiement.id);
+            if (existingPayment?.fichier?.id) {
+              console.log(`🗑️ Suppression de l'ancien reçu (fichier ID: ${existingPayment.fichier.id})...`)
+              try {
+                const deleteResponse = await fetch(api.url(`${api.endpoints.uploadCloudinary}/${existingPayment.fichier.id}`), {
+                  method: "DELETE",
+                });
+                
+                if (!deleteResponse.ok) {
+                  const error = await deleteResponse.json().catch(() => ({ error: 'Erreur inconnue' }));
+                  console.error('⚠️ Erreur suppression ancien reçu:', error);
+                  fileUploadErrors.push(`Erreur lors de la suppression de l'ancien reçu: ${error.error || 'Erreur inconnue'}`);
+                } else {
+                  console.log('✅ Ancien reçu supprimé avec succès');
+                }
+              } catch (error) {
+                console.error('❌ Erreur lors de la suppression de l\'ancien reçu:', error);
+                fileUploadErrors.push('Erreur lors de la suppression de l\'ancien reçu');
+              }
+            }
+            
+            // Upload le nouveau reçu et le lier au paiement existant
+            const formDataPayment = new FormData();
+            formDataPayment.append("file", documents.payment[i] as File);
+            formDataPayment.append("reservationId", reservationId.toString());
+            formDataPayment.append("paymentId", paiement.id.toString());
+            formDataPayment.append("fileType", "payment");
+
+            try {
+              const receiptResponse = await fetch(api.url(api.endpoints.uploadCloudinary), {
+                method: "POST",
+                body: formDataPayment,
+              });
+              
+              if (!receiptResponse.ok) {
+                const error = await receiptResponse.json();
+                console.error('❌ Erreur upload nouveau reçu:', error)
+                fileUploadErrors.push(`Erreur lors de l'upload du nouveau reçu pour le paiement ${i + 1}: ${error.error || 'Erreur inconnue'}`);
+              } else {
+                console.log('✅ Nouveau reçu uploadé et lié au paiement existant')
+              }
+            } catch (error) {
+              console.error('❌ Erreur lors de l\'upload du nouveau reçu:', error);
+              fileUploadErrors.push(`Erreur lors de l'upload du nouveau reçu pour le paiement ${i + 1}`);
+            }
+          }
+        }
+      }
+
 
       if (fileUploadErrors.length > 0) {
         toast({

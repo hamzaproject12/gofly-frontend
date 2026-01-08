@@ -331,3 +331,4 @@ npx prisma migrate dev
 Avoir une fonctionnalité d'import Excel qui permet d'importer des réservations en masse depuis un fichier Excel contenant des données en français/arabe, avec gestion automatique des hôtels, chambres, paiements, expenses et upload des fichiers depuis Google Drive.
 
 
+

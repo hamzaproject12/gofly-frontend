@@ -1545,47 +1545,41 @@ export default function EditReservation() {
                         </div>
                             </div>
 
-                      {/* Upload de reçu de paiement */}
-                      {!paiement.recu && (
+                      {/* Upload de reçu de paiement - Afficher seulement si pas de nouveau fichier uploadé et pas de reçu existant */}
+                      {!previews[`payment_${index}`] && !paiement.recu && (
                         <div className="mt-3 space-y-2">
                           <Label className="text-blue-700 font-medium text-sm">Reçu de paiement</Label>
                           <div className="flex items-center gap-2">
                             <Input
                               type="file"
+                              data-payment-index={index}
                               onChange={(e) => handlePaymentFileChange(e, index)}
                               accept="image/*,.pdf"
                               className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
                             />
-                            {documents.payment?.[index] && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  setPreviews(prev => {
-                                    const newPreviews = { ...prev };
-                                    delete newPreviews[`payment_${index}`];
-                                    return newPreviews;
-                                  });
-                                  setDocuments(prev => {
-                                    const newPayments = [...(prev.payment || [])];
-                                    newPayments[index] = null;
-                                    return { ...prev, payment: newPayments };
-                                  });
-                                }}
-                                className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
                           </div>
                         </div>
+                      )}
+                      
+                      {/* Champ d'upload caché pour remplacer un reçu existant */}
+                      {paiement.id && paiement.recu && !previews[`payment_${index}`] && (
+                        <Input
+                          type="file"
+                          data-payment-index={index}
+                          onChange={(e) => handlePaymentFileChange(e, index)}
+                          accept="image/*,.pdf"
+                          className="hidden"
+                          id={`payment-file-${index}`}
+                        />
                       )}
 
                       {/* Aperçu du nouveau reçu uploadé */}
                       {previews[`payment_${index}`] && (
                         <div className="mt-3 p-2 border border-blue-200 rounded-lg bg-white">
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-blue-700">Aperçu du nouveau reçu</span>
+                            <span className="text-sm font-medium text-blue-700">
+                              {paiement.id && paiement.recu ? 'Nouveau reçu (remplacera l\'ancien)' : 'Aperçu du nouveau reçu'}
+                            </span>
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
@@ -1598,15 +1592,51 @@ export default function EditReservation() {
                               >
                                 <ZoomIn className="h-4 w-4" />
                               </button>
+                              {documents.payment?.[index] && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  type="button"
+                                  onClick={() => {
+                                    setPreviews(prev => {
+                                      const newPreviews = { ...prev };
+                                      delete newPreviews[`payment_${index}`];
+                                      return newPreviews;
+                                    });
+                                    setDocuments(prev => {
+                                      const newPayments = [...(prev.payment || [])];
+                                      newPayments[index] = null;
+                                      return { ...prev, payment: newPayments };
+                                    });
+                                  }}
+                                  className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </div>
-                          <div className="w-full h-[150px] overflow-hidden rounded-lg border border-blue-200">
+                          <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
                             {previews[`payment_${index}`].type === 'application/pdf' ? (
-                              <embed
-                                src={`${previews[`payment_${index}`].url}#toolbar=0&navpanes=0&scrollbar=0`}
-                                type="application/pdf"
-                                className="w-full h-full"
-                              />
+                              // Pour les PDFs locaux (blob/data), utiliser embed directement
+                              previews[`payment_${index}`].url.startsWith('blob:') || previews[`payment_${index}`].url.startsWith('data:') ? (
+                                <embed
+                                  src={previews[`payment_${index}`].url}
+                                  type="application/pdf"
+                                  className="w-full h-full"
+                                />
+                              ) : (
+                                // Pour les URLs Cloudinary, utiliser Blob Proxy
+                                <PdfPreviewBox 
+                                  url={previews[`payment_${index}`].url} 
+                                  title="Nouveau reçu de paiement" 
+                                  onZoom={() => setPreviewImage({ 
+                                    url: previews[`payment_${index}`].url, 
+                                    title: 'Nouveau reçu paiement', 
+                                    type: previews[`payment_${index}`].type 
+                                  })} 
+                                />
+                              )
                             ) : (
                               <img
                                 src={previews[`payment_${index}`].url}
@@ -1618,8 +1648,8 @@ export default function EditReservation() {
                         </div>
                       )}
 
-                      {/* Reçu existant */}
-                      {paiement.id && paiement.recu && (
+                      {/* Reçu existant - Afficher seulement si pas de nouveau fichier uploadé */}
+                      {paiement.id && paiement.recu && !previews[`payment_${index}`] && (
                         <div className="mt-3 p-2 border border-blue-200 rounded-lg bg-white">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-blue-700">Reçu de paiement</span>
@@ -1631,14 +1661,32 @@ export default function EditReservation() {
                               >
                                 <ZoomIn className="h-4 w-4" />
                               </button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  // Ouvrir le champ d'upload pour remplacer
+                                  const fileInput = document.getElementById(`payment-file-${index}`) as HTMLInputElement;
+                                  if (fileInput) {
+                                    fileInput.click();
+                                  }
+                                }}
+                                className="text-orange-600 hover:text-orange-800 hover:bg-orange-50"
+                              >
+                                <Edit className="h-4 w-4" />
+                                Remplacer
+                              </Button>
                             </div>
-                            </div>
-                          <div className="w-full h-[150px] overflow-hidden rounded-lg border border-blue-200">
+                          </div>
+                          <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
                             {isPdfFile(paiement.recu) ? (
-                              <embed
-                                src={paiement.recu}
-                                type="application/pdf"
-                                className="w-full h-full"
+                              // Utiliser Blob Proxy pour les PDFs Cloudinary
+                              <PdfPreviewBox 
+                                url={paiement.recu} 
+                                title="Reçu de paiement" 
+                                onZoom={() => setPreviewImage({ url: paiement.recu || '', title: 'Reçu paiement', type: isPdfFile(paiement.recu) ? 'application/pdf' : 'image/*' })} 
                               />
                             ) : (
                               <img
@@ -1647,8 +1695,8 @@ export default function EditReservation() {
                                 className="w-full h-full object-contain"
                               />
                             )}
-                            </div>
                           </div>
+                        </div>
                       )}
                         </div>
                       ))}

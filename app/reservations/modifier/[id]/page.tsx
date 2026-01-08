@@ -153,6 +153,7 @@ interface Paiement {
   montant: string;
   date: string;
   recu: string | null;
+  recuFileName?: string; // Nom du fichier pour détecter les PDFs
   id?: number; // ID optionnel pour identifier les paiements existants
 }
 
@@ -412,13 +413,31 @@ export default function EditReservation() {
           })
 
           // Charger les paiements existants
-          const initialPaiements = (reservationData.payments || []).map((p: any) => ({
-            montant: p.amount?.toString() || '',
-            type: p.paymentMethod || '',
-            date: p.paymentDate?.split('T')[0] || '',
-            recu: p.fichier?.cloudinaryUrl || p.fichier?.filePath || '',
-            id: p.id // Garder l'ID pour identifier les paiements existants
-          }))
+          const initialPaiements = (reservationData.payments || []).map((p: any) => {
+            const recuUrl = p.fichier?.cloudinaryUrl || p.fichier?.filePath || '';
+            const recuFileName = p.fichier?.fileName || '';
+            
+            // Si on a un reçu, charger aussi dans previews pour la détection PDF correcte
+            if (recuUrl && p.id) {
+              const isPdf = isPdfFile(recuFileName || recuUrl);
+              setPreviews(prev => ({
+                ...prev,
+                [`payment_existing_${p.id}`]: {
+                  url: recuUrl,
+                  type: isPdf ? 'application/pdf' : 'image/*'
+                }
+              }));
+            }
+            
+            return {
+              montant: p.amount?.toString() || '',
+              type: p.paymentMethod || '',
+              date: p.paymentDate?.split('T')[0] || '',
+              recu: recuUrl,
+              recuFileName: recuFileName, // Garder le fileName pour la détection PDF
+              id: p.id // Garder l'ID pour identifier les paiements existants
+            };
+          })
           setPaiements(initialPaiements)
 
           // Charger les documents existants
@@ -1715,7 +1734,10 @@ export default function EditReservation() {
                               <button
                                 type="button"
                                 className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 rounded"
-                                onClick={() => setPreviewImage({ url: paiement.recu || '', title: 'Reçu paiement', type: isPdfFile(paiement.recu) ? 'application/pdf' : 'image/*' })}
+                                onClick={() => {
+                                  const isPdf = isPdfFile(paiement.recuFileName || paiement.recu);
+                                  setPreviewImage({ url: paiement.recu || '', title: 'Reçu paiement', type: isPdf ? 'application/pdf' : 'image/*' });
+                                }}
                               >
                                 <ZoomIn className="h-4 w-4" />
                               </button>
@@ -1739,12 +1761,15 @@ export default function EditReservation() {
                             </div>
                           </div>
                           <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
-                            {isPdfFile(paiement.recu) ? (
+                            {isPdfFile(paiement.recuFileName || paiement.recu) ? (
                               // Utiliser Blob Proxy pour les PDFs Cloudinary
                               <PdfPreviewBox 
                                 url={paiement.recu} 
                                 title="Reçu de paiement" 
-                                onZoom={() => setPreviewImage({ url: paiement.recu || '', title: 'Reçu paiement', type: isPdfFile(paiement.recu) ? 'application/pdf' : 'image/*' })} 
+                                onZoom={() => {
+                                  const isPdf = isPdfFile(paiement.recuFileName || paiement.recu);
+                                  setPreviewImage({ url: paiement.recu || '', title: 'Reçu paiement', type: isPdf ? 'application/pdf' : 'image/*' });
+                                }} 
                               />
                             ) : (
                               <img

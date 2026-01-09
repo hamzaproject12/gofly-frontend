@@ -434,21 +434,32 @@ export default function SoldeCaissePage() {
               </div>
               <div className="text-right">
                 <div className={`text-4xl font-bold ${soldeFinal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {soldeFinal.toLocaleString()} DH
+                  {Math.round(soldeFinal).toString()} DH
                 </div>
                 <p className="text-slate-300 text-sm">Solde Final</p>
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               {/* Total Paiements */}
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Total Paiements</p>
-                    <p className="text-2xl font-bold text-green-400">{totalPaiements.toLocaleString()} DH</p>
+                    <p className="text-2xl font-bold text-green-400">{Math.round(totalPaiements).toString()} DH</p>
                 </div>
                   <CreditCard className="h-8 w-8 text-green-400" />
+                </div>
+              </div>
+
+              {/* Total Paiement Prévu */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                    <p className="text-slate-300 text-sm">Total Paiement Prévu</p>
+                    <p className="text-2xl font-bold text-yellow-400">{Math.round(gainPrevu).toString()} DH</p>
+                </div>
+                  <DollarSign className="h-8 w-8 text-yellow-400" />
                 </div>
               </div>
 
@@ -457,7 +468,7 @@ export default function SoldeCaissePage() {
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Total Dépenses</p>
-                    <p className="text-2xl font-bold text-red-400">{Math.abs(totalDepenses).toLocaleString()} DH</p>
+                    <p className="text-2xl font-bold text-red-400">{Math.round(Math.abs(totalDepenses)).toString()} DH</p>
                 </div>
                   <FileText className="h-8 w-8 text-red-400" />
                 </div>
@@ -468,7 +479,7 @@ export default function SoldeCaissePage() {
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Solde Final Prévu</p>
-                    <p className="text-2xl font-bold text-blue-400">{soldeFinalPrevu.toLocaleString()} DH</p>
+                    <p className="text-2xl font-bold text-blue-400">{Math.round(soldeFinalPrevu).toString()} DH</p>
                 </div>
                   <TrendingUp className="h-8 w-8 text-blue-400" />
                 </div>

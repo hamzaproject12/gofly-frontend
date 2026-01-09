@@ -274,7 +274,7 @@ router.get('/:id', async (req, res) => {
 // Create new reservation
 router.post('/', async (req, res) => {
   try {
-    const { firstName, lastName, phone, passportNumber, programId, roomType, gender, hotelMadina, hotelMakkah, price, reservationDate, status, statutPasseport, statutVisa, statutHotel, statutVol, paidAmount, reduction, roomMadinaId, roomMakkahId, plan } = req.body;
+    const { firstName, lastName, phone, passportNumber, groupe, remarque, transport, programId, roomType, gender, hotelMadina, hotelMakkah, price, reservationDate, status, statutPasseport, statutVisa, statutHotel, statutVol, paidAmount, reduction, roomMadinaId, roomMakkahId, plan } = req.body;
     
     // Extraire l'agentId du token JWT
     const agentId = extractAgentIdFromToken(req);
@@ -295,6 +295,9 @@ router.post('/', async (req, res) => {
         lastName,
         phone,
         passportNumber: passportNumber || null,
+        groupe: groupe || null,
+        remarque: remarque || null,
+        transport: transport || null,
         programId: Number(programId),
         roomType,
         gender: gender || "Homme",
@@ -450,6 +453,9 @@ router.put('/:id', async (req, res) => {
       lastName,
       phone,
       passportNumber,
+      groupe,
+      remarque,
+      transport,
       programId,
       roomType,
       hotelMadina,
@@ -494,6 +500,9 @@ router.put('/:id', async (req, res) => {
     if (lastName !== undefined) updateData.lastName = lastName;
     if (phone !== undefined) updateData.phone = phone;
     if (passportNumber !== undefined) updateData.passportNumber = passportNumber || null;
+    if (groupe !== undefined) updateData.groupe = groupe || null;
+    if (remarque !== undefined) updateData.remarque = remarque || null;
+    if (transport !== undefined) updateData.transport = transport || null;
     if (programId !== undefined) updateData.programId = programId;
     if (roomType !== undefined) updateData.roomType = roomType;
     if (hotelMadina !== undefined) updateData.hotelMadina = hotelMadina;

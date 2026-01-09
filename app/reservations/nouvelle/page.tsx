@@ -137,6 +137,9 @@ export default function NouvelleReservation() {
     prenom: string;
     telephone: string;
     passportNumber: string;
+    groupe: string;
+    remarque: string;
+    transport: boolean;
     prix: string;
     hotelMadina: string;
     hotelMakkah: string;
@@ -154,6 +157,9 @@ export default function NouvelleReservation() {
     prenom: "",
     telephone: "",
     passportNumber: "",
+    groupe: "",
+    remarque: "",
+    transport: false,
     prix: "",
     hotelMadina: "",
     hotelMakkah: "",
@@ -1199,6 +1205,9 @@ export default function NouvelleReservation() {
           lastName: formData.nom,
           phone: formData.telephone,
           passportNumber: formData.passportNumber || null,
+          groupe: formData.groupe || null,
+          remarque: formData.remarque || null,
+          transport: formData.transport ? 'Oui' : null,
           programId: parseInt(formData.programId),
           roomType: formData.typeChambre,
           gender: formData.gender,
@@ -2264,14 +2273,26 @@ export default function NouvelleReservation() {
                 </div>
                 */}
 
-                {/* Section 2: Informations Client restantes */}
+                {/* Section 2: Informations Client */}
                 <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
                   <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
                     <User className="h-5 w-5" />
                     Informations Client
                     {section1Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  
+                  {/* Première ligne : groupe, nom, prénom, transport */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                    <div className="space-y-2">
+                      <Label className="text-blue-700 font-medium text-sm">Groupe</Label>
+                      <Input
+                        value={formData.groupe}
+                        onChange={(e) => setFormData({ ...formData, groupe: e.target.value })}
+                        placeholder="Nom du groupe"
+                        className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                      />
+                    </div>
+
                     <div className="space-y-2">
                       <Label className="text-blue-700 font-medium text-sm">Nom *</Label>
                       <Input
@@ -2293,15 +2314,22 @@ export default function NouvelleReservation() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-blue-700 font-medium text-sm">Téléphone *</Label>
-                      <Input
-                        value={formData.telephone}
-                        onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
-                        placeholder="Numéro de téléphone"
-                        className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                      />
+                      <Label className="text-blue-700 font-medium text-sm">Transport</Label>
+                      <div className="flex items-center gap-2 h-10 px-3 border-2 border-blue-200 rounded-lg bg-white">
+                        <Switch
+                          checked={formData.transport || false}
+                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, transport: checked }))}
+                          className="data-[state=checked]:bg-blue-600"
+                        />
+                        <span className="text-sm text-gray-700">
+                          {formData.transport ? 'Oui' : 'Non'}
+                        </span>
+                      </div>
                     </div>
+                  </div>
 
+                  {/* Deuxième ligne : passport (input text), remarque */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div className="space-y-2">
                       <Label className="text-blue-700 font-medium text-sm">N° passport</Label>
                       <Input
@@ -2312,94 +2340,117 @@ export default function NouvelleReservation() {
                       />
                     </div>
 
-                    {/* Passeport - Ajouté dans Informations Client */}
-                    <div className="space-y-2 md:col-span-3">
-                      <Label className="text-blue-700 font-medium text-sm">Passeport *</Label>
-                      <div className="flex items-center gap-2">
+                    <div className="space-y-2">
+                      <Label className="text-blue-700 font-medium text-sm">Remarque</Label>
                       <Input
-                          type="file"
-                          ref={(el) => {
-                            if (el) fileInputs.current.passeport = el;
-                          }}
-                          onChange={(e) => handleFileChange(e, 'passport')}
-                          accept="image/*,.pdf"
-                          className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                        value={formData.remarque}
+                        onChange={(e) => setFormData({ ...formData, remarque: e.target.value })}
+                        placeholder="Remarques additionnelles"
+                        className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Téléphone - toujours nécessaire */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div className="space-y-2">
+                      <Label className="text-blue-700 font-medium text-sm">Téléphone *</Label>
+                      <Input
+                        value={formData.telephone}
+                        onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
+                        placeholder="Numéro de téléphone"
+                        className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Passeport - Fichier */}
+                  <div className="space-y-2">
+                    <Label className="text-blue-700 font-medium text-sm">Passeport *</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="file"
+                        ref={(el) => {
+                          if (el) fileInputs.current.passeport = el;
+                        }}
+                        onChange={(e) => handleFileChange(e, 'passport')}
+                        accept="image/*,.pdf"
+                        className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                        disabled={isSubmitting}
+                      />
+                      {documents.passport && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveDocument('passport')}
+                          className="text-red-600 hover:text-red-800 hover:bg-red-50"
                           disabled={isSubmitting}
-                        />
-                        {documents.passport && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveDocument('passport')}
-                            className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                            disabled={isSubmitting}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                      {previews.passport && (
-                        <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-blue-700">Aperçu du passeport</span>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded"
-                                onClick={e => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setPreviewImage({ url: previews.passport.url, title: 'Passeport', type: previews.passport.type });
-                                }}
-                              >
-                                <ZoomIn className="h-3 w-3 mr-1" />
-                                Zoom
-                              </button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveDocument('passport')}
-                                className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                Supprimer
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="w-full h-[350px] overflow-hidden rounded-lg border border-blue-200">
-                            {previews.passport?.type === 'application/pdf' ? (
-                              // Pour les PDFs locaux, utiliser embed pour l'aperçu
-                              previews.passport.url.startsWith('blob:') || previews.passport.url.startsWith('data:') ? (
-                                <embed
-                                  src={previews.passport.url}
-                                  type="application/pdf"
-                                  className="w-full h-full"
-                                />
-                              ) : (
-                                // Pour les URLs Cloudinary, utiliser un lien
-                                <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                                  <a
-                                    href={previews.passport.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors"
-                                  >
-                                    <FileText className="h-16 w-16 text-red-600" />
-                                    <span className="text-sm font-medium text-blue-700">Voir le PDF</span>
-                                  </a>
-                                </div>
-                              )
-                            ) : (
-                              <img
-                                src={previews.passport.url}
-                                alt="Passeport"
-                                className="w-full h-full object-contain"
-                              />
-                            )}
-                          </div>
-                        </div>
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       )}
                     </div>
+                    {previews.passport && (
+                      <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-blue-700">Aperçu du passeport</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded"
+                              onClick={e => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setPreviewImage({ url: previews.passport.url, title: 'Passeport', type: previews.passport.type });
+                              }}
+                            >
+                              <ZoomIn className="h-3 w-3 mr-1" />
+                              Zoom
+                            </button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveDocument('passport')}
+                              className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Supprimer
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="w-full h-[350px] overflow-hidden rounded-lg border border-blue-200">
+                          {previews.passport?.type === 'application/pdf' ? (
+                            // Pour les PDFs locaux, utiliser embed pour l'aperçu
+                            previews.passport.url.startsWith('blob:') || previews.passport.url.startsWith('data:') ? (
+                              <embed
+                                src={previews.passport.url}
+                                type="application/pdf"
+                                className="w-full h-full"
+                              />
+                            ) : (
+                              // Pour les URLs Cloudinary, utiliser un lien
+                              <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                                <a
+                                  href={previews.passport.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors"
+                                >
+                                  <FileText className="h-16 w-16 text-red-600" />
+                                  <span className="text-sm font-medium text-blue-700">Voir le PDF</span>
+                                </a>
+                              </div>
+                            )
+                          ) : (
+                            <img
+                              src={previews.passport.url}
+                              alt="Passeport"
+                              className="w-full h-full object-contain"
+                            />
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -2434,11 +2485,11 @@ export default function NouvelleReservation() {
                             <div className="md:col-span-3 space-y-2">
                               <Label className="text-orange-700 font-medium text-sm">Montant (DH)</Label>
                               <Input
-                                type="number"
+                                type="text"
                                 value={paiement.montant}
                                 onChange={(e) => mettreAJourPaiement(index, "montant", e.target.value)}
                                 placeholder="Montant en dirhams"
-                                className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
+                                className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
                             </div>
                             <div className="md:col-span-6 space-y-2">
@@ -2762,9 +2813,7 @@ export default function NouvelleReservation() {
                     <X className="h-4 w-4 text-red-600" />
                     <span className="text-sm font-medium text-red-700">Réduction:</span>
                     <Input
-                      type="number"
-                      min="0"
-                      max={calculatePrice}
+                      type="text"
                       value={reduction === 0 ? '' : reduction}
                       onChange={(e) => {
                         const value = e.target.value === '' ? 0 : parseInt(e.target.value) || 0;
@@ -2780,7 +2829,7 @@ export default function NouvelleReservation() {
                           setReduction(0);
                         }
                       }}
-                      className="w-24 h-7 text-sm border border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-200 rounded text-center bg-white font-medium"
+                      className="w-24 h-7 text-sm border border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-200 rounded text-center bg-white font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       placeholder="0"
                     />
                     <span className="text-sm text-red-600 font-medium">DH</span>
@@ -2793,8 +2842,7 @@ export default function NouvelleReservation() {
                     <ChevronUp className="h-4 w-4 text-green-600" />
                     <span className="text-sm font-medium text-green-700">Proposition:</span>
                     <Input
-                      type="number"
-                      min="0"
+                      type="text"
                       value={prixPropose === null ? '' : prixPropose}
                       onChange={(e) => {
                         const value = e.target.value === '' ? null : parseInt(e.target.value) || null;
@@ -2805,7 +2853,7 @@ export default function NouvelleReservation() {
                           e.target.value = '';
                         }
                       }}
-                      className="w-24 h-7 text-sm border border-green-300 focus:border-green-500 focus:ring-1 focus:ring-green-200 rounded text-center bg-white font-medium"
+                      className="w-24 h-7 text-sm border border-green-300 focus:border-green-500 focus:ring-1 focus:ring-green-200 rounded text-center bg-white font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       placeholder={calculatePrice.toString()}
                     />
                     <span className="text-sm text-green-600 font-medium">DH</span>

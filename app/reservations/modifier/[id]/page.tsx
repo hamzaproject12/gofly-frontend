@@ -306,13 +306,16 @@ export default function EditReservation() {
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string; type: string } | null>(null)
   const [showRoomGuide, setShowRoomGuide] = useState(false)
   
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<FormData & { groupe: string; remarque: string; transport: boolean }>({
     programme: "",
     typeChambre: "",
     nom: "",
     prenom: "",
     telephone: "",
     passportNumber: "",
+    groupe: "",
+    remarque: "",
+    transport: false,
     prix: "",
     hotelMadina: "",
     hotelMakkah: "",
@@ -386,6 +389,9 @@ export default function EditReservation() {
             prenom: reservationData.firstName || "",
             telephone: reservationData.phone || "",
             passportNumber: reservationData.passportNumber || "",
+            groupe: reservationData.groupe || "",
+            remarque: reservationData.remarque || "",
+            transport: reservationData.transport === 'Oui' || reservationData.transport === true,
             prix: reservationData.price?.toString() || "",
             hotelMadina: reservationData.hotelMadinaId?.toString() || reservationData.hotelMadina || "",
             hotelMakkah: reservationData.hotelMakkahId?.toString() || reservationData.hotelMakkah || "",
@@ -635,6 +641,9 @@ export default function EditReservation() {
         statutVol: formData.statutVol,
         statutPasseport: shouldUpdateStatutPasseport,
         passportNumber: formData.passportNumber || null,
+        groupe: formData.groupe || null,
+        remarque: formData.remarque || null,
+        transport: formData.transport ? 'Oui' : null,
         // Mettre à jour le statut global si toutes les conditions sont remplies
         ...(isReservationComplete && { status: 'Complet' })
       }
@@ -904,11 +913,11 @@ export default function EditReservation() {
         }
 
         if (field === 'recu') {
-          const recuValue = typeof value === "string" ? value : value ?? null;
-          return { ...p, recu: recuValue };
+          const recuValue = typeof value === "string" ? value : (value ?? null);
+          return { ...p, recu: recuValue as string | null };
         }
 
-        return { ...p, [field]: value };
+        return { ...p, [field]: value } as Paiement;
       });
     })
   }
@@ -1312,7 +1321,19 @@ export default function EditReservation() {
                       Informations Client
                       {section1Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
                     </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                
+                {/* Première ligne : groupe, nom, prénom, transport */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                      <div className="space-y-2">
+                    <Label className="text-blue-700 font-medium text-sm">Groupe</Label>
+                    <Input
+                      value={formData.groupe}
+                      onChange={(e) => setFormData({ ...formData, groupe: e.target.value })}
+                      placeholder="Nom du groupe"
+                      className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                    />
+                      </div>
+
                       <div className="space-y-2">
                     <Label className="text-blue-700 font-medium text-sm">Nom *</Label>
                     <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
@@ -1328,12 +1349,22 @@ export default function EditReservation() {
                       </div>
 
                       <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Téléphone *</Label>
-                    <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
-                      <span className="text-gray-900 font-medium">{formData.telephone || 'N/A'}</span>
+                    <Label className="text-blue-700 font-medium text-sm">Transport</Label>
+                    <div className="flex items-center gap-2 h-10 px-3 border-2 border-blue-200 rounded-lg bg-white">
+                      <Switch
+                        checked={formData.transport || false}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, transport: checked }))}
+                        className="data-[state=checked]:bg-blue-600"
+                      />
+                      <span className="text-sm text-gray-700">
+                        {formData.transport ? 'Oui' : 'Non'}
+                      </span>
+                    </div>
                       </div>
-                      </div>
+                </div>
 
+                {/* Deuxième ligne : passport, remarque */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div className="space-y-2">
                     <Label className="text-blue-700 font-medium text-sm">N° passport</Label>
                     <Input
@@ -1343,6 +1374,27 @@ export default function EditReservation() {
                       className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
                     />
                       </div>
+
+                      <div className="space-y-2">
+                    <Label className="text-blue-700 font-medium text-sm">Remarque</Label>
+                    <Input
+                      value={formData.remarque}
+                      onChange={(e) => setFormData({ ...formData, remarque: e.target.value })}
+                      placeholder="Remarques additionnelles"
+                      className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                    />
+                      </div>
+                </div>
+
+                {/* Téléphone - toujours nécessaire */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <div className="space-y-2">
+                    <Label className="text-blue-700 font-medium text-sm">Téléphone *</Label>
+                    <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                      <span className="text-gray-900 font-medium">{formData.telephone || 'N/A'}</span>
+                      </div>
+                      </div>
+                </div>
 
                   {/* Passeport - Ajouté dans Informations Client */}
                   <div className="space-y-2 md:col-span-3">
@@ -1527,9 +1579,8 @@ export default function EditReservation() {
                         </div>
                       </div>
                     )}
-                      </div>
-                    </div>
                   </div>
+                </div>
 
               {/* Section 3: Paiements */}
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
@@ -1579,15 +1630,11 @@ export default function EditReservation() {
                             </div>
                           ) : (
                             <Input
-                              type="number"
+                              type="text"
                               value={paiement.montant}
                               onChange={(e) => mettreAJourPaiement(index, "montant", e.target.value)}
                               placeholder="Montant en dirhams"
-                              max={(() => {
-                                const sumOther = paiements.reduce((sum, p, idx) => idx === index ? sum : sum + parseAmount(p.montant), 0);
-                                return Math.max(totalPrice - sumOther, 0);
-                              })()}
-                              className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                              className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           )}
                             </div>

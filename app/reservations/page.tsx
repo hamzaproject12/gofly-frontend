@@ -184,7 +184,8 @@ export default function ReservationsPage() {
       'SINGLE': '1 personne',
       'DOUBLE': '2 personnes', 
       'TRIPLE': '3 personnes',
-      'QUAD': '4 personnes'
+      'QUAD': '4 personnes',
+      'QUINT': '5 personnes'
     };
     return mapping[roomType] || roomType;
   };
@@ -713,10 +714,11 @@ export default function ReservationsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="toutes">Toutes les chambres</SelectItem>
-                  <SelectItem value="SINGLE">2 personnes</SelectItem>
-                  <SelectItem value="DOUBLE">3 personnes</SelectItem>
-                  <SelectItem value="TRIPLE">4 personnes</SelectItem>
-                  <SelectItem value="QUAD">5 personnes</SelectItem>
+                  <SelectItem value="SINGLE">1 personne</SelectItem>
+                  <SelectItem value="DOUBLE">2 personnes</SelectItem>
+                  <SelectItem value="TRIPLE">3 personnes</SelectItem>
+                  <SelectItem value="QUAD">4 personnes</SelectItem>
+                  <SelectItem value="QUINT">5 personnes</SelectItem>
                 </SelectContent>
               </Select>
             </form>

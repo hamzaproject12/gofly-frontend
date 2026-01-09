@@ -234,6 +234,10 @@ type Program = {
 
 // 🎯 API Balance optimisée - toutes les données viennent du backend
 
+// Fonction helper pour formater les nombres avec des points comme séparateurs de milliers
+const formatNumberWithDots = (num: number): string => {
+  return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+};
 
 export default function SoldeCaissePage() {
   // États pour les filtres
@@ -434,7 +438,7 @@ export default function SoldeCaissePage() {
               </div>
               <div className="text-right">
                 <div className={`text-4xl font-bold ${soldeFinal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {Math.round(soldeFinal).toString()} DH
+                  {formatNumberWithDots(soldeFinal)} DH
                 </div>
                 <p className="text-slate-300 text-sm">Solde Final</p>
               </div>
@@ -446,7 +450,7 @@ export default function SoldeCaissePage() {
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Total Paiements</p>
-                    <p className="text-2xl font-bold text-green-400">{Math.round(totalPaiements).toString()} DH</p>
+                    <p className="text-2xl font-bold text-green-400">{formatNumberWithDots(totalPaiements)} DH</p>
                 </div>
                   <CreditCard className="h-8 w-8 text-green-400" />
                 </div>
@@ -457,7 +461,7 @@ export default function SoldeCaissePage() {
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Total Paiement Prévu</p>
-                    <p className="text-2xl font-bold text-yellow-400">{Math.round(gainPrevu).toString()} DH</p>
+                    <p className="text-2xl font-bold text-yellow-400">{formatNumberWithDots(gainPrevu)} DH</p>
                 </div>
                   <DollarSign className="h-8 w-8 text-yellow-400" />
                 </div>
@@ -468,7 +472,7 @@ export default function SoldeCaissePage() {
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Total Dépenses</p>
-                    <p className="text-2xl font-bold text-red-400">{Math.round(Math.abs(totalDepenses)).toString()} DH</p>
+                    <p className="text-2xl font-bold text-red-400">{formatNumberWithDots(Math.abs(totalDepenses))} DH</p>
                 </div>
                   <FileText className="h-8 w-8 text-red-400" />
                 </div>
@@ -479,7 +483,7 @@ export default function SoldeCaissePage() {
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Solde Final Prévu</p>
-                    <p className="text-2xl font-bold text-blue-400">{Math.round(soldeFinalPrevu).toString()} DH</p>
+                    <p className="text-2xl font-bold text-blue-400">{formatNumberWithDots(soldeFinalPrevu)} DH</p>
                 </div>
                   <TrendingUp className="h-8 w-8 text-blue-400" />
                 </div>

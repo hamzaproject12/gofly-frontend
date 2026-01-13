@@ -20,7 +20,9 @@ import {
   List,
   Wallet,
   Percent,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 
 interface Agent {
@@ -86,6 +88,19 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'dashboard' | 'hotel-detail'>('dashboard');
+  const [collapsedPrograms, setCollapsedPrograms] = useState<Set<number>>(new Set());
+
+  const toggleProgram = (programId: number) => {
+    setCollapsedPrograms((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(programId)) {
+        newSet.delete(programId);
+      } else {
+        newSet.add(programId);
+      }
+      return newSet;
+    });
+  };
 
   useEffect(() => {
     fetchData();
@@ -418,21 +433,38 @@ export default function HomePage() {
               <Card key={program.id} className={`border-0 shadow-lg ${program.isDeleted ? 'border-2 border-yellow-300 bg-yellow-50' : ''}`}>
                 <CardHeader className={`${program.isDeleted ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' : 'bg-gradient-to-r from-indigo-50 to-blue-50'} py-3`}>
                   <div className="flex items-center justify-between flex-wrap gap-3">
-                    {/* Nom du programme et date */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">🎯</span>
-                      <div>
-                        {program.isDeleted && (
-                          <Badge className="bg-yellow-500 text-white text-xs mb-1">Supprimé</Badge>
-                        )}
-                        <h2 className={`text-lg font-bold ${program.isDeleted ? 'text-yellow-900' : 'text-gray-900'}`}>
-                          {program.name}
-                        </h2>
-                        <p className="text-xs text-gray-600 flex items-center gap-1">
-                          <CalendarIcon className="h-3 w-3" />
-                          {new Date(program.created_at).toLocaleDateString('fr-FR')}
-                        </p>
+                    <div className="flex items-center justify-between w-full gap-3">
+                      {/* Nom du programme et date */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">🎯</span>
+                        <div>
+                          {program.isDeleted && (
+                            <Badge className="bg-yellow-500 text-white text-xs mb-1">Supprimé</Badge>
+                          )}
+                          <h2 className={`text-lg font-bold ${program.isDeleted ? 'text-yellow-900' : 'text-gray-900'}`}>
+                            {program.name}
+                          </h2>
+                          <p className="text-xs text-gray-600 flex items-center gap-1">
+                            <CalendarIcon className="h-3 w-3" />
+                            {new Date(program.created_at).toLocaleDateString('fr-FR')}
+                          </p>
+                        </div>
                       </div>
+
+                      {/* Bouton de réduction/développement */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleProgram(program.id)}
+                        className="h-8 w-8 p-0 hover:bg-gray-200"
+                        aria-label={collapsedPrograms.has(program.id) ? "Développer le programme" : "Réduire le programme"}
+                      >
+                        {collapsedPrograms.has(program.id) ? (
+                          <ChevronDown className="h-5 w-5" />
+                        ) : (
+                          <ChevronUp className="h-5 w-5" />
+                        )}
+                      </Button>
                     </div>
 
                     {/* Statistiques compactes en ligne */}
@@ -477,6 +509,7 @@ export default function HomePage() {
                     </div>
                   </div>
                 </CardHeader>
+                {!collapsedPrograms.has(program.id) && (
                 <CardContent className="p-6">
                   <div className="space-y-4">
                     {program.hotels.map((hotel, hotelIndex) => (
@@ -535,6 +568,7 @@ export default function HomePage() {
                     ))}
                   </div>
                 </CardContent>
+                )}
               </Card>
             ))}
           </div>
@@ -545,21 +579,38 @@ export default function HomePage() {
               <Card key={program.id} className={`border-0 shadow-lg ${program.isDeleted ? 'border-2 border-yellow-300 bg-yellow-50' : ''}`}>
                 <CardHeader className={`${program.isDeleted ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' : 'bg-gradient-to-r from-indigo-50 to-blue-50'} py-3`}>
                   <div className="flex items-center justify-between flex-wrap gap-3">
-                    {/* Nom du programme et date */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">🎯</span>
-                      <div>
-                        {program.isDeleted && (
-                          <Badge className="bg-yellow-500 text-white text-xs mb-1">Supprimé</Badge>
-                        )}
-                        <h2 className={`text-lg font-bold ${program.isDeleted ? 'text-yellow-900' : 'text-gray-900'}`}>
-                          {program.name}
-                        </h2>
-                        <p className="text-xs text-gray-600 flex items-center gap-1">
-                          <CalendarIcon className="h-3 w-3" />
-                          {new Date(program.created_at).toLocaleDateString('fr-FR')}
-                        </p>
+                    <div className="flex items-center justify-between w-full gap-3">
+                      {/* Nom du programme et date */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">🎯</span>
+                        <div>
+                          {program.isDeleted && (
+                            <Badge className="bg-yellow-500 text-white text-xs mb-1">Supprimé</Badge>
+                          )}
+                          <h2 className={`text-lg font-bold ${program.isDeleted ? 'text-yellow-900' : 'text-gray-900'}`}>
+                            {program.name}
+                          </h2>
+                          <p className="text-xs text-gray-600 flex items-center gap-1">
+                            <CalendarIcon className="h-3 w-3" />
+                            {new Date(program.created_at).toLocaleDateString('fr-FR')}
+                          </p>
+                        </div>
                       </div>
+
+                      {/* Bouton de réduction/développement */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleProgram(program.id)}
+                        className="h-8 w-8 p-0 hover:bg-gray-200"
+                        aria-label={collapsedPrograms.has(program.id) ? "Développer le programme" : "Réduire le programme"}
+                      >
+                        {collapsedPrograms.has(program.id) ? (
+                          <ChevronDown className="h-5 w-5" />
+                        ) : (
+                          <ChevronUp className="h-5 w-5" />
+                        )}
+                      </Button>
                     </div>
 
                     {/* Statistiques compactes en ligne */}
@@ -604,6 +655,7 @@ export default function HomePage() {
                     </div>
                   </div>
                 </CardHeader>
+                {!collapsedPrograms.has(program.id) && (
                 <CardContent className="p-6">
                   <div className="space-y-6">
                     {program.hotels.map((hotel, hotelIndex) => {
@@ -739,6 +791,7 @@ export default function HomePage() {
                     })}
                   </div>
                 </CardContent>
+                )}
               </Card>
             ))}
           </div>

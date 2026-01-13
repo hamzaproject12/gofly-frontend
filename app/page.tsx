@@ -236,6 +236,17 @@ export default function HomePage() {
     return gender === 'Homme' ? '👨' : gender === 'Femme' ? '👩' : '👥';
   };
 
+  const getRoomTypeLabel = (roomType: string) => {
+    switch (roomType) {
+      case 'SINGLE': return '1 Personne';
+      case 'DOUBLE': return '2 Personnes';
+      case 'TRIPLE': return '3 Personnes';
+      case 'QUAD': return '4 Personnes';
+      case 'QUINT': return '5 Personnes';
+      default: return roomType;
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
@@ -530,7 +541,7 @@ export default function HomePage() {
                                   <div className="flex items-center gap-2">
                                     <span className="text-lg">{getRoomTypeIcon(room.roomType)}</span>
                                     <span className={`font-medium ${roomStyle.textColor}`}>
-                                      {room.roomType} {getGenderIcon(room.gender)}
+                                      {getRoomTypeLabel(room.roomType)} {getGenderIcon(room.gender)}
                                     </span>
                                   </div>
                                   <Badge className={`text-xs ${roomStyle.badgeColor}`}>
@@ -695,7 +706,7 @@ export default function HomePage() {
                                   <div className="text-center mb-3">
                                     <span className="text-2xl">{getRoomTypeIcon(roomType.roomType)}</span>
                                     <h4 className={`font-semibold ${roomStyle.textColor} mt-1`}>
-                                      {roomType.roomType}
+                                      {getRoomTypeLabel(roomType.roomType)}
                                     </h4>
                                   </div>
                                   

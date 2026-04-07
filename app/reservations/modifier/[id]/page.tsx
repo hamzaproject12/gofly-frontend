@@ -334,6 +334,7 @@ export default function EditReservation() {
   const [paiements, setPaiements] = useState<Paiement[]>([])
   const [previews, setPreviews] = useState<{ [key: string]: { url: string, type: string } }>({})
   const [reservationData, setReservationData] = useState<any>(null)
+  const [accompagnants, setAccompagnants] = useState<Array<{ id: number; firstName: string; lastName: string; phone: string; passportNumber: string | null }>>([])
   const [passportToDelete, setPassportToDelete] = useState<number | null>(null) // ID du fichier passeport à supprimer
   const [documents, setDocuments] = useState<{
     passport: File | null;
@@ -381,6 +382,13 @@ export default function EditReservation() {
           const reservationResponse = await fetch(api.url(`/api/reservations/${reservationId}`))
           const reservationData = await reservationResponse.json()
           setReservationData(reservationData)
+          setAccompagnants((reservationData.accompagnants || []).map((a: any) => ({
+            id: a.id,
+            firstName: a.firstName || '',
+            lastName: a.lastName || '',
+            phone: a.phone || '',
+            passportNumber: a.passportNumber || ''
+          })))
           
           const initialFormData = {
             programme: reservationData.program?.name || "",
@@ -790,6 +798,26 @@ export default function EditReservation() {
           title: "Succès",
           description: "Réservation modifiée avec succès",
         })
+      }
+
+      // Si c'est un dossier leader, appliquer les mises à jour des accompagnants
+      if (reservationData?.isLeader && accompagnants.length > 0) {
+        for (const a of accompagnants) {
+          const memberRes = await fetch(api.url(`/api/reservations/${a.id}`), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              firstName: a.firstName,
+              lastName: a.lastName,
+              phone: a.phone,
+              passportNumber: a.passportNumber || null,
+              reservationDate: formData.dateReservation
+            })
+          });
+          if (!memberRes.ok) {
+            console.warn(`Echec mise à jour accompagnant ${a.id}`);
+          }
+        }
       }
       
       router.push('/reservations')
@@ -1395,6 +1423,47 @@ export default function EditReservation() {
                       </div>
                       </div>
                 </div>
+
+                {reservationData?.isLeader && accompagnants.length > 0 && (
+                  <div className="mt-4 p-4 border border-blue-200 rounded-lg bg-white">
+                    <div className="text-sm font-semibold text-blue-800 mb-3">
+                      Accompagnants ({accompagnants.length}) - Informations personnelles
+                    </div>
+                    <div className="space-y-3">
+                      {accompagnants.map((a, idx) => (
+                        <div key={a.id} className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                          <Input
+                            value={a.lastName}
+                            onChange={(e) => setAccompagnants(prev => prev.map(item => item.id === a.id ? { ...item, lastName: e.target.value } : item))}
+                            placeholder={`Nom accompagnant ${idx + 1}`}
+                            className="h-10 border-2 border-blue-200"
+                          />
+                          <Input
+                            value={a.firstName}
+                            onChange={(e) => setAccompagnants(prev => prev.map(item => item.id === a.id ? { ...item, firstName: e.target.value } : item))}
+                            placeholder="Prénom"
+                            className="h-10 border-2 border-blue-200"
+                          />
+                          <Input
+                            value={a.phone}
+                            onChange={(e) => setAccompagnants(prev => prev.map(item => item.id === a.id ? { ...item, phone: e.target.value } : item))}
+                            placeholder="Téléphone"
+                            className="h-10 border-2 border-blue-200"
+                          />
+                          <Input
+                            value={a.passportNumber || ''}
+                            onChange={(e) => setAccompagnants(prev => prev.map(item => item.id === a.id ? { ...item, passportNumber: e.target.value } : item))}
+                            placeholder="N° passeport"
+                            className="h-10 border-2 border-blue-200"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-xs text-gray-600">
+                      Les champs structurels (programme, chambre, hôtels) restent verrouillés et gérés au niveau du dossier.
+                    </p>
+                  </div>
+                )}
 
                   {/* Passeport - Ajouté dans Informations Client */}
                   <div className="space-y-2 md:col-span-3">

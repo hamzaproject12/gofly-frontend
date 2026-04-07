@@ -12,6 +12,11 @@ enum Role {
   AGENT
 }
 
+enum ReservationType {
+  LIT
+  CHAMBRE_PRIVEE
+}
+
 model Agent {
   id           Int           @id @default(autoincrement())
   nom          String        @db.VarChar(100)
@@ -125,11 +130,22 @@ model Reservation {
   transport       String?   @db.VarChar(100)
   remarque        String?   @db.Text
   groupe          String?   @db.VarChar(100)
+  typeReservation ReservationType @default(LIT)
+  isLeader        Boolean         @default(true)
+  parentId        Int?
+  groupId         String?         @db.VarChar(64)
+  familyMixed     Boolean         @default(false)
+  roomSlot        Int?
   expenses        Expense[]
   documents       Fichier[]
   payments        Payment[]
   agent           Agent?    @relation(fields: [agentId], references: [id])
   program         Program   @relation(fields: [programId], references: [id])
+  parent          Reservation?  @relation("ReservationHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  accompagnants   Reservation[] @relation("ReservationHierarchy")
+
+  @@index([parentId])
+  @@index([groupId])
 }
 
 model Fichier {

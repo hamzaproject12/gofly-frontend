@@ -199,6 +199,17 @@ export default function AuthNav() {
                     </svg>
                     Nouvelle Réservation
                   </Link>
+                  <Link
+                    href="/reservations/nouvelle-chambre"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                    onClick={() => setShowCommercialMenu(false)}
+                  >
+                    <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12h10" />
+                    </svg>
+                    Nouvelle Chambre
+                  </Link>
                   {agent.role === 'ADMIN' && (
                     <Link
                       href="/programmes/nouveau"
@@ -433,6 +444,13 @@ export default function AuthNav() {
                 onClick={() => setShowMobileMenu(false)}
               >
                 Nouvelle Réservation
+              </Link>
+              <Link
+                href="/reservations/nouvelle-chambre"
+                className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
+                onClick={() => setShowMobileMenu(false)}
+              >
+                Nouvelle Chambre
               </Link>
               {agent.role === 'ADMIN' && (
                 <Link

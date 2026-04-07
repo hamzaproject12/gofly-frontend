@@ -65,7 +65,9 @@ router.get('/', async (req, res) => {
     const skip = (pageNumber - 1) * limitNumber;
 
     // Construire les filtres
-    const where: any = {};
+    const where: any = {
+      isLeader: true
+    };
     
     if (program && program !== 'tous') {
       where.program = {
@@ -130,8 +132,9 @@ router.get('/', async (req, res) => {
           include: {
             fichier: true
           }
-        }
-      },
+        },
+        accompagnants: true
+      } as any,
       orderBy: {
         created_at: 'desc'
       },
@@ -167,7 +170,9 @@ router.get('/stats', async (req, res) => {
     const { program, roomType, dateFrom, dateTo } = req.query;
     
     // Construire les filtres pour les stats
-    const where: any = {};
+    const where: any = {
+      isLeader: true
+    };
     
     if (program && program !== 'tous') {
       where.program = {
@@ -246,12 +251,131 @@ router.get('/rooms/:id', async (req, res) => {
   }
 });
 
+// Create reservation group (leader + accompagnants) in one transaction
+router.post('/group', async (req, res) => {
+  try {
+    const {
+      groupId,
+      typeReservation = 'CHAMBRE_PRIVEE',
+      familyMixed = true,
+      roomType,
+      roomMadinaId,
+      roomMakkahId,
+      occupants,
+      leaderPrice,
+      leaderPaidAmount = 0,
+      reservationDate,
+      common
+    } = req.body;
+
+    if (!Array.isArray(occupants) || occupants.length < 2) {
+      return res.status(400).json({ error: 'Le groupe doit contenir au moins 2 personnes.' });
+    }
+    if (!roomType || !common?.programId) {
+      return res.status(400).json({ error: 'Paramètres obligatoires manquants (programId/roomType).' });
+    }
+    if (!roomMadinaId || !roomMakkahId) {
+      return res.status(400).json({ error: 'Les rooms Madina et Makkah sont obligatoires pour chambre privée.' });
+    }
+
+    const agentId = extractAgentIdFromToken(req);
+    const groupSize = occupants.length;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const [madinaRoom, makkahRoom] = await Promise.all([
+        tx.room.findUnique({ where: { id: Number(roomMadinaId) } }),
+        tx.room.findUnique({ where: { id: Number(roomMakkahId) } }),
+      ]);
+
+      if (!madinaRoom || !makkahRoom) {
+        throw new Error('Une ou plusieurs rooms sont introuvables.');
+      }
+      if (madinaRoom.nbrPlaceRestantes < groupSize || makkahRoom.nbrPlaceRestantes < groupSize) {
+        throw new Error('Pas assez de places disponibles pour cette chambre privée.');
+      }
+
+      const createdReservations = [];
+      let leaderId: number | null = null;
+      const normalizedGroupId = groupId || `GRP-${Date.now()}`;
+
+      for (let i = 0; i < occupants.length; i += 1) {
+        const person = occupants[i];
+        const created: any = await tx.reservation.create({
+          data: {
+            firstName: person.firstName,
+            lastName: person.lastName,
+            phone: person.phone,
+            passportNumber: person.passportNumber || null,
+            groupId: normalizedGroupId,
+            typeReservation,
+            isLeader: i === 0,
+            parentId: i === 0 ? null : leaderId,
+            familyMixed: Boolean(familyMixed),
+            roomSlot: i + 1,
+            programId: Number(common.programId),
+            roomType,
+            gender: person.gender || "Homme",
+            hotelMadina: common.hotelMadina,
+            hotelMakkah: common.hotelMakkah,
+            reservationDate: new Date(reservationDate),
+            status: common.status || 'Incomplet',
+            statutPasseport: Boolean(common.statutPasseport),
+            statutVisa: Boolean(common.statutVisa),
+            statutHotel: Boolean(common.statutHotel),
+            statutVol: Boolean(common.statutVol),
+            price: i === 0 ? Number(leaderPrice) : 0,
+            paidAmount: i === 0 ? Number(leaderPaidAmount) : 0,
+            reduction: i === 0 ? Number(common.reduction || 0) : 0,
+            plan: common.plan || 'Normal',
+            groupe: common.groupe || null,
+            remarque: common.remarque || null,
+            transport: common.transport || null,
+            agentId
+          } as any
+        });
+
+        if (i === 0) {
+          leaderId = created.id;
+        }
+        createdReservations.push(created);
+      }
+
+      const createdIds = createdReservations.map(r => r.id);
+      await Promise.all([
+        tx.room.update({
+          where: { id: madinaRoom.id },
+          data: {
+            nbrPlaceRestantes: madinaRoom.nbrPlaceRestantes - groupSize,
+            listeIdsReservation: { push: createdIds }
+          }
+        }),
+        tx.room.update({
+          where: { id: makkahRoom.id },
+          data: {
+            nbrPlaceRestantes: makkahRoom.nbrPlaceRestantes - groupSize,
+            listeIdsReservation: { push: createdIds }
+          }
+        })
+      ]);
+
+      return { leaderId, reservations: createdReservations, groupId: normalizedGroupId };
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    console.error('Erreur création groupe réservation:', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Erreur création groupe réservation' });
+  }
+});
+
 // Get single reservation
 router.get('/:id', async (req, res) => {
   try {
     const reservation = await prisma.reservation.findUnique({
       where: { id: parseInt(req.params.id) },
       include: {
+        parent: true,
+        accompagnants: true,
         program: true,
         documents: true,
         payments: {
@@ -259,7 +383,7 @@ router.get('/:id', async (req, res) => {
             fichier: true
           }
         }
-      },
+      } as any,
     });
     if (!reservation) {
       return res.status(404).json({ error: 'Reservation not found' });
@@ -274,7 +398,7 @@ router.get('/:id', async (req, res) => {
 // Create new reservation
 router.post('/', async (req, res) => {
   try {
-    const { firstName, lastName, phone, passportNumber, groupe, remarque, transport, programId, roomType, gender, hotelMadina, hotelMakkah, price, reservationDate, status, statutPasseport, statutVisa, statutHotel, statutVol, paidAmount, reduction, roomMadinaId, roomMakkahId, plan } = req.body;
+    const { firstName, lastName, phone, passportNumber, groupe, remarque, transport, programId, roomType, gender, hotelMadina, hotelMakkah, price, reservationDate, status, statutPasseport, statutVisa, statutHotel, statutVol, paidAmount, reduction, roomMadinaId, roomMakkahId, plan, typeReservation, isLeader, parentId, groupId, familyMixed, roomSlot } = req.body;
     
     // Extraire l'agentId du token JWT
     const agentId = extractAgentIdFromToken(req);
@@ -289,8 +413,7 @@ router.post('/', async (req, res) => {
     console.log('- plan:', plan, 'Type:', typeof plan);
     
     // Créer la réservation sans les deadlines (elles seront récupérées via la relation program)
-    const reservation = await prisma.reservation.create({
-      data: {
+    const reservationCreateData: any = {
         firstName,
         lastName,
         phone,
@@ -313,8 +436,17 @@ router.post('/', async (req, res) => {
         statutVol,
         paidAmount: paidAmount ? parseFloat(paidAmount) : 0,
         plan: plan || "Normal",
-        agentId: agentId // Ajouter l'agentId extrait du token
-      },
+        agentId: agentId, // Ajouter l'agentId extrait du token
+        typeReservation: typeReservation || "LIT",
+        isLeader: isLeader !== undefined ? Boolean(isLeader) : true,
+        parentId: parentId ? Number(parentId) : null,
+        groupId: groupId || null,
+        familyMixed: familyMixed !== undefined ? Boolean(familyMixed) : false,
+        roomSlot: roomSlot ? Number(roomSlot) : null
+    };
+
+    const reservation = await prisma.reservation.create({
+      data: reservationCreateData,
       include: {
         program: true // Inclure le programme pour récupérer les deadlines
       }
@@ -482,9 +614,16 @@ router.put('/:id', async (req, res) => {
       status
     });
 
+    const reservationId = parseInt(req.params.id);
+    const currentReservation: any = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      select: { parentId: true, paidAmount: true } as any
+    } as any);
+    const isAccompagnant = Boolean(currentReservation?.parentId);
+
     // Calculer le paidAmount à partir de tous les paiements de cette réservation
     const existingPayments = await prisma.payment.findMany({
-      where: { reservationId: parseInt(req.params.id) }
+      where: { reservationId }
     });
     
     const totalPaid = existingPayments.reduce((sum, payment) => sum + payment.amount, 0);
@@ -503,11 +642,13 @@ router.put('/:id', async (req, res) => {
     if (groupe !== undefined) updateData.groupe = groupe || null;
     if (remarque !== undefined) updateData.remarque = remarque || null;
     if (transport !== undefined) updateData.transport = transport || null;
-    if (programId !== undefined) updateData.programId = programId;
-    if (roomType !== undefined) updateData.roomType = roomType;
-    if (hotelMadina !== undefined) updateData.hotelMadina = hotelMadina;
-    if (hotelMakkah !== undefined) updateData.hotelMakkah = hotelMakkah;
-    if (price !== undefined) updateData.price = price;
+    if (!isAccompagnant) {
+      if (programId !== undefined) updateData.programId = programId;
+      if (roomType !== undefined) updateData.roomType = roomType;
+      if (hotelMadina !== undefined) updateData.hotelMadina = hotelMadina;
+      if (hotelMakkah !== undefined) updateData.hotelMakkah = hotelMakkah;
+      if (price !== undefined) updateData.price = price;
+    }
     if (reservationDate !== undefined) updateData.reservationDate = new Date(reservationDate);
     
     // Ajouter les statuts (accepter false comme valeur valide)
@@ -520,13 +661,13 @@ router.put('/:id', async (req, res) => {
     if (status !== undefined) updateData.status = status;
     
     // Mettre à jour paidAmount avec le total calculé
-    updateData.paidAmount = totalPaid;
+    updateData.paidAmount = isAccompagnant ? (currentReservation as any)?.paidAmount ?? 0 : totalPaid;
 
     console.log('🔄 Données à mettre à jour:', updateData);
 
     // Mettre à jour la réservation
     const reservation = await prisma.reservation.update({
-      where: { id: parseInt(req.params.id) },
+      where: { id: reservationId },
       data: updateData
     });
 

@@ -116,6 +116,8 @@ type TransformedReservation = {
   passportDeadline?: string
   urgentReason?: string
   urgentDate?: Date
+  groupSize: number
+  typeReservation?: "LIT" | "CHAMBRE_PRIVEE"
 }
 
 type Stats = {
@@ -252,6 +254,13 @@ export default function ReservationsPage() {
 
       // Transform reservations data
       const transformedReservations = reservationsData.map((reservation: any) => {
+        const members = [reservation, ...(reservation.accompagnants || [])];
+        const groupSize = members.length;
+        const passportGroupOk = members.every((m: any) => Boolean(m.statutPasseport));
+        const visaGroupOk = members.every((m: any) => Boolean(m.statutVisa));
+        const hotelGroupOk = members.every((m: any) => Boolean(m.statutHotel));
+        const flightGroupOk = members.every((m: any) => Boolean(m.statutVol));
+
         // Si la réservation est déjà complète, ne jamais la mettre en urgent
         if (reservation.status === "Complet") {
           return {
@@ -266,10 +275,10 @@ export default function ReservationsPage() {
             prixEngage: reservation.price,
             paiementRecu: reservation.paidAmount,
             dateReservation: reservation.dateReservation,
-            passeport: reservation.statutPasseport,
-            visa: reservation.statutVisa,
-            reservationHotel: reservation.statutHotel,
-            billetAvion: reservation.statutVol,
+            passeport: passportGroupOk,
+            visa: visaGroupOk,
+            reservationHotel: hotelGroupOk,
+            billetAvion: flightGroupOk,
             statut: "Complet",
             echeanceProche: false,
             visaDeadline: reservation.program?.visaDeadline,
@@ -278,6 +287,8 @@ export default function ReservationsPage() {
             passportDeadline: reservation.program?.passportDeadline,
             urgentReason: undefined,
             urgentDate: undefined,
+            groupSize,
+            typeReservation: reservation.typeReservation,
           };
         }
         // Nouvelle logique d'urgence : on teste dans l'ordre Passeport, Visa, Hôtel, Vol
@@ -286,7 +297,7 @@ export default function ReservationsPage() {
         let urgentReason = undefined;
         let urgentDate = undefined;
         // Passeport
-        if (!reservation.statutPasseport && reservation.program?.passportDeadline) {
+        if (!passportGroupOk && reservation.program?.passportDeadline) {
           const date = new Date(reservation.program.passportDeadline);
           const diff = (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
           if (diff >= 0 && diff <= DAYS_URGENCY_WINDOW) {
@@ -296,7 +307,7 @@ export default function ReservationsPage() {
           }
         }
         // Visa
-        if (!isUrgent && !reservation.statutVisa && reservation.program?.visaDeadline) {
+        if (!isUrgent && !visaGroupOk && reservation.program?.visaDeadline) {
           const date = new Date(reservation.program.visaDeadline);
           const diff = (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
           if (diff >= 0 && diff <= DAYS_URGENCY_WINDOW) {
@@ -306,7 +317,7 @@ export default function ReservationsPage() {
           }
         }
         // Hôtel
-        if (!isUrgent && !reservation.statutHotel && reservation.program?.hotelDeadline) {
+        if (!isUrgent && !hotelGroupOk && reservation.program?.hotelDeadline) {
           const date = new Date(reservation.program.hotelDeadline);
           const diff = (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
           if (diff >= 0 && diff <= DAYS_URGENCY_WINDOW) {
@@ -316,7 +327,7 @@ export default function ReservationsPage() {
           }
         }
         // Vol
-        if (!isUrgent && !reservation.statutVol && reservation.program?.flightDeadline) {
+        if (!isUrgent && !flightGroupOk && reservation.program?.flightDeadline) {
           const date = new Date(reservation.program.flightDeadline);
           const diff = (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
           if (diff >= 0 && diff <= DAYS_URGENCY_WINDOW) {
@@ -337,10 +348,10 @@ export default function ReservationsPage() {
           prixEngage: reservation.price,
           paiementRecu: reservation.paidAmount,
           dateReservation: reservation.dateReservation,
-          passeport: reservation.statutPasseport,
-          visa: reservation.statutVisa,
-          reservationHotel: reservation.statutHotel,
-          billetAvion: reservation.statutVol,
+          passeport: passportGroupOk,
+          visa: visaGroupOk,
+          reservationHotel: hotelGroupOk,
+          billetAvion: flightGroupOk,
           statut: isUrgent ? "Urgent" : reservation.status,
           echeanceProche: isUrgent,
           visaDeadline: reservation.program?.visaDeadline,
@@ -349,6 +360,8 @@ export default function ReservationsPage() {
           passportDeadline: reservation.program?.passportDeadline,
           urgentReason,
           urgentDate,
+          groupSize,
+          typeReservation: reservation.typeReservation,
         };
       });
 
@@ -578,12 +591,19 @@ export default function ReservationsPage() {
             <h1 className="text-2xl font-bold text-gray-900">Gestion des Réservations</h1>
             <p className="text-gray-500 mt-1">Gérez et suivez toutes vos réservations Omra</p>
           </div>
-          <Link href="/reservations/nouvelle">
-            <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transition-all">
-              <Plus className="mr-2 h-4 w-4" />
-              Nouvelle Réservation
-            </Button>
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/reservations/nouvelle">
+              <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transition-all">
+                <Plus className="mr-2 h-4 w-4" />
+                Nouvelle Réservation
+              </Button>
+            </Link>
+            <Link href="/reservations/nouvelle-chambre">
+              <Button variant="outline" className="shadow-sm">
+                Chambre Privée
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Statistiques */}
@@ -756,6 +776,11 @@ export default function ReservationsPage() {
                       <div className="flex flex-col md:flex-row md:items-center gap-2 p-3 border-b border-blue-100">
                         <div className="flex-1 flex flex-col md:flex-row md:items-center gap-3 min-w-[180px]">
                           <span className="font-bold text-xl text-blue-900 tracking-tight uppercase">{reservation.nom} {reservation.prenom}</span>
+                          {reservation.groupSize > 1 && (
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1">
+                              Groupe: {reservation.groupSize} pers.
+                            </span>
+                          )}
                           <span className="inline-flex items-center gap-1 text-base font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-1">
                             <Calendar className="h-5 w-5 text-blue-400" /> {reservation.programme}
                           </span>

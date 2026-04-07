@@ -51,6 +51,8 @@ export const api = {
   endpoints: {
     programs: '/api/programs',
     reservations: '/api/reservations',
+    /** Création transactionnelle leader + accompagnants (chambre privée) */
+    reservationGroup: '/api/reservations/group',
     expenses: '/api/expenses',
     upload: '/api/upload',
     uploadCloudinary: '/api/upload-cloudinary',

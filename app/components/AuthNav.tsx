@@ -188,7 +188,7 @@ export default function AuthNav() {
                 </svg>
               </button>
               {showCommercialMenu && (
-                <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 dropdown-menu">
+                <div className="absolute left-0 mt-2 min-w-[13rem] w-56 bg-white rounded-md shadow-lg py-1 z-50 dropdown-menu">
                   <Link
                     href="/reservations/nouvelle"
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"

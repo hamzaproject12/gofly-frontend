@@ -96,6 +96,8 @@ export default function NouvelleChambrePage() {
 
   const [paidAmount, setPaidAmount] = useState("");
   const [familyMixed, setFamilyMixed] = useState(true);
+  /** Si l'utilisateur modifie le prix à la main, ne plus l'écraser par le calcul auto */
+  const [userEditedPrix, setUserEditedPrix] = useState(false);
 
   const [programInfo, setProgramInfo] = useState<{
     nbJoursMadina: number;
@@ -312,13 +314,14 @@ export default function NouvelleChambrePage() {
 
     const prixRoomMadina = roomMadina.prixRoom || 0;
     const prixRoomMakkah = roomMakkah.prixRoom || 0;
+    // prixRoom en base = tarif par lit ; chambre complète = lit × capacité (nbPersonnes)
     const prixHotelMadina =
       formData.hotelMadina !== "none"
-        ? (prixRoomMadina / nbPersonnes) * customization.joursMadina
+        ? prixRoomMadina * nbPersonnes * customization.joursMadina
         : 0;
     const prixHotelMakkah =
       formData.hotelMakkah !== "none"
-        ? (prixRoomMakkah / nbPersonnes) * customization.joursMakkah
+        ? prixRoomMakkah * nbPersonnes * customization.joursMakkah
         : 0;
 
     const prixFinal =
@@ -338,10 +341,10 @@ export default function NouvelleChambrePage() {
   ]);
 
   useEffect(() => {
-    if (calculatePrice > 0) {
+    if (calculatePrice > 0 && !userEditedPrix) {
       setFormData((prev) => ({ ...prev, prix: String(calculatePrice) }));
     }
-  }, [calculatePrice]);
+  }, [calculatePrice, userEditedPrix]);
 
   const hotelNameMadina = useMemo(() => {
     if (!formData.hotelMadina || formData.hotelMadina === "none") {
@@ -673,11 +676,12 @@ export default function NouvelleChambrePage() {
                       </Label>
                       <Input
                         value={formData.prix}
-                        onChange={(e) =>
-                          setFormData((p) => ({ ...p, prix: e.target.value }))
-                        }
+                        onChange={(e) => {
+                          setUserEditedPrix(true);
+                          setFormData((p) => ({ ...p, prix: e.target.value }));
+                        }}
                         className="h-10 border-2 border-blue-200 rounded-lg"
-                        placeholder="Calculé automatiquement si config complète"
+                        placeholder="Calculé automatiquement si config complète (modifiable)"
                       />
                     </div>
                   </div>

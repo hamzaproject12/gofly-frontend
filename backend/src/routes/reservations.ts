@@ -375,7 +375,16 @@ router.get('/:id', async (req, res) => {
       where: { id: parseInt(req.params.id) },
       include: {
         parent: true,
-        accompagnants: true,
+        accompagnants: {
+          include: {
+            documents: true,
+            payments: {
+              include: {
+                fichier: true
+              }
+            }
+          }
+        },
         program: true,
         documents: true,
         payments: {

@@ -32,6 +32,9 @@ import {
   ChevronDown,
   ChevronUp,
   Edit,
+  Leaf,
+  ShieldCheck,
+  Crown,
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/components/ui/use-toast"
@@ -169,6 +172,20 @@ interface FileInputs {
   hotelBooked: HTMLInputElement | null;
 }
 
+const planThemesModifier = {
+  Économique: { name: "Économique", icon: Leaf },
+  Normal: { name: "Normal", icon: ShieldCheck },
+  VIP: { name: "VIP", icon: Crown },
+} as const;
+
+const ROOM_CAPACITY_EDIT: Record<string, number> = {
+  SINGLE: 1,
+  DOUBLE: 2,
+  TRIPLE: 3,
+  QUAD: 4,
+  QUINT: 5,
+};
+
 type FormData = {
   programme: string;
   typeChambre: string;
@@ -305,6 +322,15 @@ export default function EditReservation() {
   const [programs, setPrograms] = useState<Program[]>([])
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string; type: string } | null>(null)
   const [showRoomGuide, setShowRoomGuide] = useState(false)
+  const [isCustomizationOpen, setIsCustomizationOpen] = useState(false)
+  const [customization, setCustomization] = useState({
+    includeAvion: true,
+    includeVisa: true,
+    joursMadina: 0,
+    joursMakkah: 0,
+  })
+  const [memberPassportFiles, setMemberPassportFiles] = useState<Record<number, File | null>>({})
+  const [memberPassportDelete, setMemberPassportDelete] = useState<Record<number, number | null>>({})
   
   const [formData, setFormData] = useState<FormData & { groupe: string; remarque: string; transport: boolean }>({
     programme: "",
@@ -334,7 +360,17 @@ export default function EditReservation() {
   const [paiements, setPaiements] = useState<Paiement[]>([])
   const [previews, setPreviews] = useState<{ [key: string]: { url: string, type: string } }>({})
   const [reservationData, setReservationData] = useState<any>(null)
-  const [accompagnants, setAccompagnants] = useState<Array<{ id: number; firstName: string; lastName: string; phone: string; passportNumber: string | null }>>([])
+  const [accompagnants, setAccompagnants] = useState<
+    Array<{
+      id: number;
+      firstName: string;
+      lastName: string;
+      phone: string;
+      passportNumber: string | null;
+      documents?: any[];
+      payments?: any[];
+    }>
+  >([])
   const [passportToDelete, setPassportToDelete] = useState<number | null>(null) // ID du fichier passeport à supprimer
   const [documents, setDocuments] = useState<{
     passport: File | null;
@@ -387,7 +423,9 @@ export default function EditReservation() {
             firstName: a.firstName || '',
             lastName: a.lastName || '',
             phone: a.phone || '',
-            passportNumber: a.passportNumber || ''
+            passportNumber: a.passportNumber || '',
+            documents: a.documents || [],
+            payments: a.payments || [],
           })))
           
           const initialFormData = {
@@ -453,6 +491,10 @@ export default function EditReservation() {
             };
           })
           setPaiements(initialPaiements)
+          setDocuments((prev) => ({
+            ...prev,
+            payment: initialPaiements.map(() => null),
+          }))
 
           // Charger les documents existants
           const docObj: any = {}
@@ -510,7 +552,33 @@ export default function EditReservation() {
               hotelsMakkah: programData.hotelsMakkah?.length
             })
             setPrograms([programData]) // Un seul programme dans le tableau
+            setCustomization((c) => ({
+              ...c,
+              joursMadina: programData.nbJoursMadina ?? c.joursMadina,
+              joursMakkah: programData.nbJoursMakkah ?? c.joursMakkah,
+            }))
           }
+
+          ;(reservationData.accompagnants || []).forEach((a: any) => {
+            const passDoc = (a.documents || []).find((d: any) =>
+              ["passeport", "passport"].includes(d.fileType)
+            );
+            if (passDoc?.cloudinaryUrl || passDoc?.filePath) {
+              const url = passDoc.cloudinaryUrl || passDoc.filePath;
+              const fn = passDoc.fileName || url;
+              const lower = typeof fn === "string" ? fn.toLowerCase() : "";
+              const isPdf =
+                lower.includes(".pdf") ||
+                (typeof url === "string" && /\.pdf(\?|$|#)/i.test(url));
+              setPreviews((prev) => ({
+                ...prev,
+                [`member_passport_${a.id}`]: {
+                  url,
+                  type: isPdf ? "application/pdf" : "image/*",
+                },
+              }));
+            }
+          });
         }
       } catch (error) {
         console.error('Erreur lors du chargement:', error)
@@ -800,19 +868,58 @@ export default function EditReservation() {
         })
       }
 
-      // Si c'est un dossier leader, appliquer les mises à jour des accompagnants
+      // Si c'est un dossier leader, appliquer les mises à jour des accompagnants + fichiers passeport
       if (reservationData?.isLeader && accompagnants.length > 0) {
         for (const a of accompagnants) {
+          const delMemberPass = memberPassportDelete[a.id];
+          if (delMemberPass != null) {
+            try {
+              const delRes = await fetch(
+                api.url(`${api.endpoints.uploadCloudinary}/${delMemberPass}`),
+                { method: "DELETE" }
+              );
+              if (!delRes.ok) {
+                fileUploadErrors.push(`Suppression passeport accompagnant ${a.id} impossible`);
+              }
+            } catch {
+              fileUploadErrors.push(`Erreur suppression ancien passeport accompagnant`);
+            }
+          }
+
+          const newPassFile = memberPassportFiles[a.id];
+          if (newPassFile) {
+            const fd = new FormData();
+            fd.append("file", newPassFile);
+            fd.append("reservationId", String(a.id));
+            fd.append("fileType", "passport");
+            const up = await fetch(api.url(api.endpoints.uploadCloudinary), {
+              method: "POST",
+              body: fd,
+            });
+            if (!up.ok) {
+              const err = await up.json().catch(() => ({}));
+              fileUploadErrors.push(
+                `Upload passeport accompagnant: ${err.error || up.statusText}`
+              );
+            }
+          }
+
+          const existingPassDoc = (a.documents || []).find((d: any) =>
+            ["passport", "passeport"].includes(d.fileType)
+          );
+          const statutPasseportMember =
+            (!!existingPassDoc && delMemberPass == null) || !!newPassFile;
           const memberRes = await fetch(api.url(`/api/reservations/${a.id}`), {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               firstName: a.firstName,
               lastName: a.lastName,
               phone: a.phone,
               passportNumber: a.passportNumber || null,
-              reservationDate: formData.dateReservation
-            })
+              reservationDate: formData.dateReservation,
+              statutPasseport: statutPasseportMember,
+            }),
           });
           if (!memberRes.ok) {
             console.warn(`Echec mise à jour accompagnant ${a.id}`);
@@ -911,6 +1018,52 @@ export default function EditReservation() {
       })
     }
   }
+
+  const getMemberPassportFileId = (a: (typeof accompagnants)[0]) => {
+    const d = (a.documents || []).find((x: any) =>
+      ["passport", "passeport"].includes(x.fileType)
+    );
+    return d?.id ?? null;
+  };
+
+  const handleMemberPassportChange = (
+    memberId: number,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!(file.type === "application/pdf" || file.type.startsWith("image/"))) {
+      toast({
+        title: "Erreur",
+        description: "PDF ou image uniquement.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setMemberPassportFiles((prev) => ({ ...prev, [memberId]: file }));
+    setMemberPassportDelete((prev) => ({ ...prev, [memberId]: null }));
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviews((p) => ({
+          ...p,
+          [`member_passport_${memberId}`]: {
+            url: reader.result as string,
+            type: file.type,
+          },
+        }));
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setPreviews((p) => ({
+        ...p,
+        [`member_passport_${memberId}`]: {
+          url: URL.createObjectURL(file),
+          type: file.type,
+        },
+      }));
+    }
+  };
 
   const mettreAJourPaiement = <K extends keyof Paiement>(index: number, field: K, value: Paiement[K]) => {
     setPaiements(prev => {
@@ -1113,6 +1266,144 @@ export default function EditReservation() {
     return hotelRelation.hotel.name;
   }
 
+  const programDetail = programs[0] as
+    | {
+        rooms?: any[];
+        hotelsMadina?: Array<{ hotel: Hotel }>;
+        hotelsMakkah?: Array<{ hotel: Hotel }>;
+        nbJoursMadina?: number;
+        nbJoursMakkah?: number;
+        exchange?: number;
+        prixAvionDH?: number;
+        prixVisaRiyal?: number;
+        profit?: number;
+        profitEconomique?: number;
+        profitNormal?: number;
+        profitVIP?: number;
+      }
+    | undefined;
+
+  const resolveHotelId = (raw: string, city: "madina" | "makkah") => {
+    if (!raw || raw === "none") return null;
+    const n = parseInt(raw, 10);
+    if (!Number.isNaN(n) && String(n) === String(raw).trim()) return n;
+    const list =
+      city === "madina"
+        ? programDetail?.hotelsMadina
+        : programDetail?.hotelsMakkah;
+    const found = list?.find((ph: { hotel: Hotel }) => ph.hotel?.name === raw);
+    return found?.hotel?.id ?? null;
+  };
+
+  const sortRoomsByAlgorithm = (rooms: any[], selectedGender: string) => {
+    return [...rooms].sort((a, b) => {
+      const aIsSameGender = a.gender === selectedGender;
+      const bIsSameGender = b.gender === selectedGender;
+      if (aIsSameGender && !bIsSameGender) return -1;
+      if (!aIsSameGender && bIsSameGender) return 1;
+      const aOccupied = a.nbrPlaceTotal - a.nbrPlaceRestantes;
+      const bOccupied = b.nbrPlaceTotal - b.nbrPlaceRestantes;
+      if (aOccupied > 0 && bOccupied === 0) return -1;
+      if (aOccupied === 0 && bOccupied > 0) return 1;
+      if (aOccupied > 0 && bOccupied > 0) {
+        return bOccupied - aOccupied;
+      }
+      if (aOccupied === 0 && bOccupied === 0) {
+        return b.nbrPlaceRestantes - a.nbrPlaceRestantes;
+      }
+      return 0;
+    });
+  };
+
+  const groupReservationIds = useMemo(() => {
+    const ids: number[] = [Number(reservationId)];
+    accompagnants.forEach((a) => ids.push(a.id));
+    return ids;
+  }, [reservationId, accompagnants]);
+
+  const suggestedChambrePrix = useMemo(() => {
+    if (
+      !programDetail?.rooms ||
+      !reservationData?.isLeader ||
+      reservationData?.typeReservation !== "CHAMBRE_PRIVEE"
+    ) {
+      return 0;
+    }
+    const hidM = resolveHotelId(formData.hotelMadina, "madina");
+    const hidK = resolveHotelId(formData.hotelMakkah, "makkah");
+    if (!hidM || !hidK || !formData.typeChambre) return 0;
+    const nbPersonnes = ROOM_CAPACITY_EDIT[formData.typeChambre] || 1;
+    const inGroup = (r: any) =>
+      (r.listeIdsReservation || []).some((id: number) =>
+        groupReservationIds.includes(id)
+      );
+    const roomMadina = programDetail.rooms.find(
+      (r: any) =>
+        r.hotelId === hidM &&
+        r.roomType === formData.typeChambre &&
+        (inGroup(r) || formData.gender === r.gender || r.gender === "Mixte")
+    );
+    const roomMakkah = programDetail.rooms.find(
+      (r: any) =>
+        r.hotelId === hidK &&
+        r.roomType === formData.typeChambre &&
+        (inGroup(r) || formData.gender === r.gender || r.gender === "Mixte")
+    );
+    if (!roomMadina || !roomMakkah) return 0;
+    const plan = reservationData.plan || "Normal";
+    const getProfitByPlan = () => {
+      switch (plan) {
+        case "Économique":
+          return programDetail.profitEconomique || programDetail.profit || 0;
+        case "VIP":
+          return programDetail.profitVIP || programDetail.profit || 0;
+        default:
+          return programDetail.profitNormal || programDetail.profit || 0;
+      }
+    };
+    const ex = programDetail.exchange ?? 1;
+    const prixAvion = customization.includeAvion ? programDetail.prixAvionDH ?? 0 : 0;
+    const prixVisa = customization.includeVisa ? programDetail.prixVisaRiyal ?? 0 : 0;
+    const profit = getProfitByPlan();
+    const prixRoomMadina = roomMadina.prixRoom || 0;
+    const prixRoomMakkah = roomMakkah.prixRoom || 0;
+    const prixHotelMadina =
+      formData.hotelMadina && formData.hotelMadina !== "none"
+        ? prixRoomMadina * nbPersonnes * customization.joursMadina
+        : 0;
+    const prixHotelMakkah =
+      formData.hotelMakkah && formData.hotelMakkah !== "none"
+        ? prixRoomMakkah * nbPersonnes * customization.joursMakkah
+        : 0;
+    const prixFinal =
+      prixAvion +
+      profit +
+      (prixVisa + prixHotelMakkah + prixHotelMadina) * ex;
+    return Math.round(prixFinal);
+  }, [
+    programDetail,
+    reservationData,
+    formData.hotelMadina,
+    formData.hotelMakkah,
+    formData.typeChambre,
+    formData.gender,
+    customization,
+    groupReservationIds,
+  ]);
+
+  const getGenderIconRoom = (gender: string) => {
+    switch (gender) {
+      case "Homme":
+        return "👨";
+      case "Femme":
+        return "👩";
+      case "Mixte":
+        return "👥";
+      default:
+        return "👥";
+    }
+  };
+
   // Calculs de progression
   const section1Complete = formData.nom && formData.prenom && formData.telephone && formData.typeChambre && formData.prix && formData.gender
   const section2Complete = formData.programId && formData.hotelMadina && formData.hotelMakkah
@@ -1190,8 +1481,27 @@ export default function EditReservation() {
                p.date !== (initialP.paymentDate?.split('T')[0] || '');
       });
     
-    return formDataChanged || hasNewDocuments || passportToBeDeleted || hasNewPayments || paymentsChanged;
-  }, [formData, initialData, documents, passportToDelete, paiements]);
+    const hasMemberPassChanges =
+      Object.values(memberPassportFiles).some(Boolean) ||
+      Object.values(memberPassportDelete).some((v) => v != null);
+
+    return (
+      formDataChanged ||
+      hasNewDocuments ||
+      passportToBeDeleted ||
+      hasNewPayments ||
+      paymentsChanged ||
+      hasMemberPassChanges
+    );
+  }, [
+    formData,
+    initialData,
+    documents,
+    passportToDelete,
+    paiements,
+    memberPassportFiles,
+    memberPassportDelete,
+  ]);
 
   const isFormValid = useMemo(() => {
     // Le formulaire est valide si :
@@ -1268,79 +1578,472 @@ export default function EditReservation() {
                 </CardHeader>
                 <CardContent className="p-6 space-y-6">
             <form onSubmit={handleSubmit}>
-              {/* Section 1: Configuration du Voyage */}
+              {/* Section 1: Configuration du Voyage (alignée Nouvelle Réservation : Éditer + sous-bloc) */}
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
-                    <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
-                  <Sparkles className="h-5 w-5" />
-                  Configuration du Voyage
-                    </h3>
-                
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
+                    <Sparkles className="h-5 w-5" />
+                    Configuration du Voyage
+                  </h3>
+                  {formData.programId && programDetail && (
+                    <Button
+                      type="button"
+                      onClick={() => setIsCustomizationOpen(!isCustomizationOpen)}
+                      variant="ghost"
+                      size="sm"
+                      className="text-blue-700 hover:bg-blue-200 hover:text-blue-800 transition-all"
+                    >
+                      <Settings className="h-4 w-4 mr-2" />
+                      {isCustomizationOpen ? "Masquer" : "Éditer"}
+                    </Button>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                      <div className="space-y-2">
+                  <div className="space-y-2">
                     <Label className="text-blue-700 font-medium text-sm">Programme *</Label>
-                        <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
-                          <span className="text-gray-900 font-medium">{formData.programme || 'N/A'}</span>
+                    <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                      <span className="text-gray-900 font-medium">{formData.programme || "N/A"}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-blue-700 font-medium text-sm">Type de chambre *</Label>
+                    <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                      <span className="text-gray-900 font-medium">
+                        {formData.typeChambre === "SINGLE" && "1 personne"}
+                        {formData.typeChambre === "DOUBLE" && "2 personnes"}
+                        {formData.typeChambre === "TRIPLE" && "3 personnes"}
+                        {formData.typeChambre === "QUAD" && "4 personnes"}
+                        {formData.typeChambre === "QUINT" && "5 personnes"}
+                        {!formData.typeChambre && "N/A"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-blue-700 font-medium text-sm">Genre *</Label>
+                    <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                      <span className="text-gray-900 font-medium">{formData.gender || "N/A"}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-blue-700 font-medium text-sm">Plan *</Label>
+                    <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center gap-2">
+                      {(() => {
+                        const rawPlan = reservationData?.plan || "Normal";
+                        const th =
+                          rawPlan in planThemesModifier
+                            ? planThemesModifier[rawPlan as keyof typeof planThemesModifier]
+                            : planThemesModifier.Normal;
+                        const Icon = th.icon;
+                        return (
+                          <>
+                            <Icon className="h-4 w-4 text-emerald-700" />
+                            <span className="text-gray-900 font-medium">{th.name}</span>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                {isCustomizationOpen && formData.programId && programDetail && (
+                  <div className="mt-4 mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex flex-wrap items-center gap-6 lg:gap-8">
+                      <div className="flex items-center gap-6">
+                        <span className="text-sm font-semibold text-blue-700">Services:</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">✈️</span>
+                          <span className="text-sm font-medium text-blue-700">Avion</span>
+                          <Switch
+                            checked={customization.includeAvion}
+                            onCheckedChange={(checked) =>
+                              setCustomization((prev) => ({ ...prev, includeAvion: checked }))
+                            }
+                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">📄</span>
+                          <span className="text-sm font-medium text-blue-700">Visa</span>
+                          <Switch
+                            checked={customization.includeVisa}
+                            onCheckedChange={(checked) =>
+                              setCustomization((prev) => ({ ...prev, includeVisa: checked }))
+                            }
+                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                          />
                         </div>
                       </div>
-
-                      <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Type de chambre *</Label>
-                        <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
-                          <span className="text-gray-900 font-medium">
-                            {formData.typeChambre === 'SINGLE' && '1 personne'}
-                            {formData.typeChambre === 'DOUBLE' && '2 personnes'}
-                            {formData.typeChambre === 'TRIPLE' && '3 personnes'}
-                            {formData.typeChambre === 'QUAD' && '4 personnes'}
-                            {formData.typeChambre === 'QUINT' && '5 personnes'}
-                            {!formData.typeChambre && 'N/A'}
+                      <div className="w-px h-8 bg-blue-300 hidden sm:block" />
+                      <div className="flex flex-wrap items-center gap-6">
+                        <span className="text-sm font-semibold text-blue-700">Durée:</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🕌</span>
+                          <span className="text-sm font-medium text-blue-700">Madina</span>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={customization.joursMadina}
+                            onChange={(e) =>
+                              setCustomization((prev) => ({
+                                ...prev,
+                                joursMadina: parseInt(e.target.value, 10) || 0,
+                              }))
+                            }
+                            className="w-16 h-8 text-xs border border-blue-200 focus:border-blue-500 rounded text-center"
+                          />
+                          <span className="text-xs text-blue-500">
+                            (déf: {programDetail.nbJoursMadina ?? 0})
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🕋</span>
+                          <span className="text-sm font-medium text-blue-700">Makkah</span>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={customization.joursMakkah}
+                            onChange={(e) =>
+                              setCustomization((prev) => ({
+                                ...prev,
+                                joursMakkah: parseInt(e.target.value, 10) || 0,
+                              }))
+                            }
+                            className="w-16 h-8 text-xs border border-blue-200 focus:border-blue-500 rounded text-center"
+                          />
+                          <span className="text-xs text-blue-500">
+                            (déf: {programDetail.nbJoursMakkah ?? 0})
                           </span>
                         </div>
                       </div>
+                      <div className="w-px h-8 bg-blue-300 hidden sm:block" />
+                      <Button
+                        type="button"
+                        onClick={() =>
+                          setCustomization((c) => ({
+                            ...c,
+                            includeAvion: true,
+                            includeVisa: true,
+                            joursMadina: programDetail.nbJoursMadina ?? 0,
+                            joursMakkah: programDetail.nbJoursMakkah ?? 0,
+                          }))
+                        }
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+                      >
+                        Réinitialiser
+                      </Button>
+                    </div>
+                    {reservationData?.isLeader &&
+                      reservationData?.typeReservation === "CHAMBRE_PRIVEE" &&
+                      suggestedChambrePrix > 0 && (
+                        <p className="mt-3 text-xs text-emerald-800">
+                          Prix suggéré (lit × capacité, comme nouvelle chambre / nouvelle réservation) :{" "}
+                          <span className="font-semibold">
+                            {suggestedChambrePrix.toLocaleString("fr-FR")} DH
+                          </span>
+                          . Vous pouvez ajuster le montant ci-dessous.
+                        </p>
+                      )}
+                  </div>
+                )}
 
-                      <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Genre *</Label>
-                        <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
-                          <span className="text-gray-900 font-medium">{formData.gender || 'N/A'}</span>
-                        </div>
-                      </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div className="space-y-2">
+                    <Label className="text-blue-700 font-medium text-sm">Prix total dossier (DH) *</Label>
+                    <Input
+                      value={formData.prix}
+                      onChange={(e) => setFormData({ ...formData, prix: e.target.value })}
+                      className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                      placeholder="Montant"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-blue-700 font-medium text-sm">Date de réservation *</Label>
+                    <Input
+                      type="date"
+                      value={formData.dateReservation}
+                      onChange={(e) => setFormData({ ...formData, dateReservation: e.target.value })}
+                      className="h-10 border-2 border-blue-200 rounded-lg"
+                    />
+                  </div>
+                </div>
 
-                      <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Plan *</Label>
-                        <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
-                          <span className="text-gray-900 font-medium">{reservationData?.plan || 'Normal'}</span>
-                        </div>
-                      </div>
-                      </div>
-
-                {/* Choix des hôtels */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Hôtel à Madina */}
-                      <div className="space-y-2">
+                {/* Hôtels & chambres — même présentation « points » que Nouvelle Réservation */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                  <div className="space-y-2">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-lg">🕌</span>
                       <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina *</Label>
+                      <button
+                        type="button"
+                        onClick={() => setShowRoomGuide(true)}
+                        className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-colors"
+                        title="Guide des chambres"
+                      >
+                        <Info className="h-4 w-4" />
+                      </button>
                     </div>
-                        <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
-                          <span className="text-gray-900 font-medium">
-                            {getHotelName(formData.hotelMadina, 'madina')}
-                          </span>
+                    <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                      <span className="text-gray-900 font-medium">
+                        {getHotelName(formData.hotelMadina, "madina")}
+                      </span>
+                    </div>
+                    {programDetail?.rooms &&
+                      formData.hotelMadina &&
+                      formData.hotelMadina !== "none" &&
+                      formData.typeChambre &&
+                      formData.gender && (
+                        <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-medium text-green-700">
+                              🕌 Chambres (aperçu des places)
+                            </span>
+                          </div>
+                          <div className="grid gap-2">
+                            {(() => {
+                              const hid = resolveHotelId(formData.hotelMadina, "madina");
+                              if (!hid)
+                                return (
+                                  <div className="text-xs text-gray-500 py-2">—</div>
+                                );
+                              const filteredRooms = programDetail.rooms.filter(
+                                (room: any) =>
+                                  room.hotelId === hid &&
+                                  room.roomType === formData.typeChambre &&
+                                  (room.gender === formData.gender ||
+                                    room.gender === "Mixte" ||
+                                    !room.gender)
+                              );
+                              if (filteredRooms.length === 0) {
+                                return (
+                                  <div className="text-xs text-gray-500 text-center py-2">
+                                    Aucune chambre trouvée
+                                  </div>
+                                );
+                              }
+                              const sortedRooms = sortRoomsByAlgorithm(
+                                filteredRooms,
+                                formData.gender
+                              );
+                              return sortedRooms.map((room: any, index: number) => {
+                                const placesOccupees =
+                                  room.nbrPlaceTotal - room.nbrPlaceRestantes;
+                                const placesDisponibles = room.nbrPlaceRestantes;
+                                const isGroupRoom = (room.listeIdsReservation || []).some(
+                                  (rid: number) => groupReservationIds.includes(rid)
+                                );
+                                return (
+                                  <div
+                                    key={index}
+                                    className={`relative p-2 rounded border transition-all ${
+                                      isGroupRoom
+                                        ? "border-yellow-400 bg-yellow-50"
+                                        : "border-gray-300 bg-white"
+                                    }`}
+                                  >
+                                    <div className="flex items-center">
+                                      <div className="flex items-center gap-2 w-20">
+                                        <span className="text-sm">
+                                          {getGenderIconRoom(room.gender)}
+                                        </span>
+                                        <span className="text-xs font-medium text-gray-700">
+                                          ({placesDisponibles}/{room.nbrPlaceTotal})
+                                        </span>
+                                      </div>
+                                      <div className="flex-1 flex justify-center">
+                                        <div className="flex gap-1.5">
+                                          {Array.from(
+                                            { length: room.nbrPlaceTotal },
+                                            (_, placeIndex) => {
+                                              const gn = groupReservationIds.length;
+                                              const take = isGroupRoom
+                                                ? Math.min(gn, room.nbrPlaceRestantes)
+                                                : 0;
+                                              const y0 = placesOccupees;
+                                              const y1 = y0 + take - 1;
+                                              let placeColor = "bg-gray-300";
+                                              let placeTitle = `Place ${placeIndex + 1}`;
+                                              if (placeIndex < placesOccupees) {
+                                                placeColor = "bg-red-500";
+                                                placeTitle = `Place ${placeIndex + 1} occupée`;
+                                              } else if (
+                                                isGroupRoom &&
+                                                take > 0 &&
+                                                placeIndex >= y0 &&
+                                                placeIndex <= y1
+                                              ) {
+                                                placeColor = "bg-yellow-400";
+                                                placeTitle = `Place ${placeIndex + 1} — dossier groupe`;
+                                              } else {
+                                                placeColor = "bg-green-500";
+                                                placeTitle = `Place ${placeIndex + 1} libre`;
+                                              }
+                                              return (
+                                                <div
+                                                  key={placeIndex}
+                                                  className={`w-4 h-4 rounded-full ${placeColor} transition-all`}
+                                                  title={placeTitle}
+                                                />
+                                              );
+                                            }
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="w-8 flex justify-end">
+                                        {isGroupRoom && (
+                                          <div className="w-3 h-3 bg-yellow-400 rounded-full" title="Chambre du dossier" />
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              });
+                            })()}
+                          </div>
                         </div>
-                      </div>
+                      )}
+                  </div>
 
-                  {/* Hôtel à Makkah */}
-                      <div className="space-y-2">
+                  <div className="space-y-2">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-lg">🕋</span>
                       <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah *</Label>
+                      <button
+                        type="button"
+                        onClick={() => setShowRoomGuide(true)}
+                        className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-colors"
+                        title="Guide des chambres"
+                      >
+                        <Info className="h-4 w-4" />
+                      </button>
                     </div>
-                        <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
-                          <span className="text-gray-900 font-medium">
-                            {getHotelName(formData.hotelMakkah, 'makkah')}
-                          </span>
+                    <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                      <span className="text-gray-900 font-medium">
+                        {getHotelName(formData.hotelMakkah, "makkah")}
+                      </span>
+                    </div>
+                    {programDetail?.rooms &&
+                      formData.hotelMakkah &&
+                      formData.hotelMakkah !== "none" &&
+                      formData.typeChambre &&
+                      formData.gender && (
+                        <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-medium text-green-700">
+                              🕋 Chambres (aperçu des places)
+                            </span>
+                          </div>
+                          <div className="grid gap-2">
+                            {(() => {
+                              const hid = resolveHotelId(formData.hotelMakkah, "makkah");
+                              if (!hid)
+                                return (
+                                  <div className="text-xs text-gray-500 py-2">—</div>
+                                );
+                              const filteredRooms = programDetail.rooms.filter(
+                                (room: any) =>
+                                  room.hotelId === hid &&
+                                  room.roomType === formData.typeChambre &&
+                                  (room.gender === formData.gender ||
+                                    room.gender === "Mixte" ||
+                                    !room.gender)
+                              );
+                              if (filteredRooms.length === 0) {
+                                return (
+                                  <div className="text-xs text-gray-500 text-center py-2">
+                                    Aucune chambre trouvée
+                                  </div>
+                                );
+                              }
+                              const sortedRooms = sortRoomsByAlgorithm(
+                                filteredRooms,
+                                formData.gender
+                              );
+                              return sortedRooms.map((room: any, index: number) => {
+                                const placesOccupees =
+                                  room.nbrPlaceTotal - room.nbrPlaceRestantes;
+                                const placesDisponibles = room.nbrPlaceRestantes;
+                                const isGroupRoom = (room.listeIdsReservation || []).some(
+                                  (rid: number) => groupReservationIds.includes(rid)
+                                );
+                                return (
+                                  <div
+                                    key={index}
+                                    className={`relative p-2 rounded border transition-all ${
+                                      isGroupRoom
+                                        ? "border-yellow-400 bg-yellow-50"
+                                        : "border-gray-300 bg-white"
+                                    }`}
+                                  >
+                                    <div className="flex items-center">
+                                      <div className="flex items-center gap-2 w-20">
+                                        <span className="text-sm">
+                                          {getGenderIconRoom(room.gender)}
+                                        </span>
+                                        <span className="text-xs font-medium text-gray-700">
+                                          ({placesDisponibles}/{room.nbrPlaceTotal})
+                                        </span>
+                                      </div>
+                                      <div className="flex-1 flex justify-center">
+                                        <div className="flex gap-1.5">
+                                          {Array.from(
+                                            { length: room.nbrPlaceTotal },
+                                            (_, placeIndex) => {
+                                              const gn = groupReservationIds.length;
+                                              const take = isGroupRoom
+                                                ? Math.min(gn, room.nbrPlaceRestantes)
+                                                : 0;
+                                              const y0 = placesOccupees;
+                                              const y1 = y0 + take - 1;
+                                              let placeColor = "bg-gray-300";
+                                              let placeTitle = `Place ${placeIndex + 1}`;
+                                              if (placeIndex < placesOccupees) {
+                                                placeColor = "bg-red-500";
+                                                placeTitle = `Place ${placeIndex + 1} occupée`;
+                                              } else if (
+                                                isGroupRoom &&
+                                                take > 0 &&
+                                                placeIndex >= y0 &&
+                                                placeIndex <= y1
+                                              ) {
+                                                placeColor = "bg-yellow-400";
+                                                placeTitle = `Place ${placeIndex + 1} — dossier groupe`;
+                                              } else {
+                                                placeColor = "bg-green-500";
+                                                placeTitle = `Place ${placeIndex + 1} libre`;
+                                              }
+                                              return (
+                                                <div
+                                                  key={placeIndex}
+                                                  className={`w-4 h-4 rounded-full ${placeColor} transition-all`}
+                                                  title={placeTitle}
+                                                />
+                                              );
+                                            }
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="w-8 flex justify-end">
+                                        {isGroupRoom && (
+                                          <div className="w-3 h-3 bg-yellow-400 rounded-full" title="Chambre du dossier" />
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              });
+                            })()}
+                          </div>
                         </div>
-                      </div>
-                    </div>
+                      )}
                   </div>
+                </div>
+              </div>
 
               {/* Section 2: Informations Client */}
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
@@ -1429,35 +2132,175 @@ export default function EditReservation() {
                     <div className="text-sm font-semibold text-blue-800 mb-3">
                       Accompagnants ({accompagnants.length}) - Informations personnelles
                     </div>
-                    <div className="space-y-3">
-                      {accompagnants.map((a, idx) => (
-                        <div key={a.id} className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                          <Input
-                            value={a.lastName}
-                            onChange={(e) => setAccompagnants(prev => prev.map(item => item.id === a.id ? { ...item, lastName: e.target.value } : item))}
-                            placeholder={`Nom accompagnant ${idx + 1}`}
-                            className="h-10 border-2 border-blue-200"
-                          />
-                          <Input
-                            value={a.firstName}
-                            onChange={(e) => setAccompagnants(prev => prev.map(item => item.id === a.id ? { ...item, firstName: e.target.value } : item))}
-                            placeholder="Prénom"
-                            className="h-10 border-2 border-blue-200"
-                          />
-                          <Input
-                            value={a.phone}
-                            onChange={(e) => setAccompagnants(prev => prev.map(item => item.id === a.id ? { ...item, phone: e.target.value } : item))}
-                            placeholder="Téléphone"
-                            className="h-10 border-2 border-blue-200"
-                          />
-                          <Input
-                            value={a.passportNumber || ''}
-                            onChange={(e) => setAccompagnants(prev => prev.map(item => item.id === a.id ? { ...item, passportNumber: e.target.value } : item))}
-                            placeholder="N° passeport"
-                            className="h-10 border-2 border-blue-200"
-                          />
-                        </div>
-                      ))}
+                    <div className="space-y-4">
+                      {accompagnants.map((a, idx) => {
+                        const passKey = `member_passport_${a.id}`;
+                        const hasPreview = !!previews[passKey];
+                        const fid = getMemberPassportFileId(a);
+                        const markPassportReplace = memberPassportDelete[a.id] != null;
+                        return (
+                          <div
+                            key={a.id}
+                            className="rounded-lg border border-indigo-100 bg-indigo-50/30 p-3 space-y-3"
+                          >
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                              <Input
+                                value={a.lastName}
+                                onChange={(e) =>
+                                  setAccompagnants((prev) =>
+                                    prev.map((item) =>
+                                      item.id === a.id
+                                        ? { ...item, lastName: e.target.value }
+                                        : item
+                                    )
+                                  )
+                                }
+                                placeholder={`Nom accompagnant ${idx + 1}`}
+                                className="h-10 border-2 border-blue-200"
+                              />
+                              <Input
+                                value={a.firstName}
+                                onChange={(e) =>
+                                  setAccompagnants((prev) =>
+                                    prev.map((item) =>
+                                      item.id === a.id
+                                        ? { ...item, firstName: e.target.value }
+                                        : item
+                                    )
+                                  )
+                                }
+                                placeholder="Prénom"
+                                className="h-10 border-2 border-blue-200"
+                              />
+                              <Input
+                                value={a.phone}
+                                onChange={(e) =>
+                                  setAccompagnants((prev) =>
+                                    prev.map((item) =>
+                                      item.id === a.id
+                                        ? { ...item, phone: e.target.value }
+                                        : item
+                                    )
+                                  )
+                                }
+                                placeholder="Téléphone"
+                                className="h-10 border-2 border-blue-200"
+                              />
+                              <Input
+                                value={a.passportNumber || ""}
+                                onChange={(e) =>
+                                  setAccompagnants((prev) =>
+                                    prev.map((item) =>
+                                      item.id === a.id
+                                        ? { ...item, passportNumber: e.target.value }
+                                        : item
+                                    )
+                                  )
+                                }
+                                placeholder="N° passeport"
+                                className="h-10 border-2 border-blue-200"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-blue-700 font-medium text-sm">
+                                Passeport (fichier) — accompagnant {idx + 1}
+                              </Label>
+                              {(!hasPreview || markPassportReplace) && !memberPassportFiles[a.id] ? (
+                                <Input
+                                  type="file"
+                                  accept="image/*,.pdf"
+                                  onChange={(e) => handleMemberPassportChange(a.id, e)}
+                                  className="h-10 border-2 border-blue-200"
+                                />
+                              ) : (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Input
+                                    type="file"
+                                    accept="image/*,.pdf"
+                                    onChange={(e) => handleMemberPassportChange(a.id, e)}
+                                    className="h-10 border-2 border-blue-200 max-w-xs"
+                                  />
+                                  {hasPreview && !markPassportReplace && (
+                                    <>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          const u = previews[passKey]?.url;
+                                          const t = previews[passKey]?.type || "image/*";
+                                          if (u) setPreviewImage({ url: u, title: "Passeport accompagnant", type: t });
+                                        }}
+                                      >
+                                        <ZoomIn className="h-4 w-4 mr-1" />
+                                        Aperçu
+                                      </Button>
+                                      {fid && (
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          className="text-orange-600"
+                                          onClick={() => {
+                                            if (fid)
+                                              setMemberPassportDelete((prev) => ({
+                                                ...prev,
+                                                [a.id]: fid,
+                                              }));
+                                            setPreviews((prev) => {
+                                              const n = { ...prev };
+                                              delete n[passKey];
+                                              return n;
+                                            });
+                                          }}
+                                        >
+                                          <Edit className="h-4 w-4 mr-1" />
+                                          Remplacer
+                                        </Button>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                              {memberPassportFiles[a.id] && (
+                                <p className="text-xs text-emerald-700">
+                                  Nouveau fichier prêt à être enregistré avec la réservation.
+                                </p>
+                              )}
+                            </div>
+                            {(a.payments || []).length > 0 && (
+                              <div className="text-xs text-gray-700 space-y-1">
+                                <span className="font-semibold">Paiements liés à ce membre :</span>
+                                {(a.payments || []).map((p: any) => (
+                                  <div key={p.id} className="flex flex-wrap gap-2 items-center">
+                                    <span>
+                                      {p.amount} DH — {p.paymentMethod}
+                                    </span>
+                                    {(p.fichier?.cloudinaryUrl || p.fichier?.filePath) && (
+                                      <Button
+                                        type="button"
+                                        variant="link"
+                                        className="h-auto p-0 text-blue-600"
+                                        onClick={() => {
+                                          const u = p.fichier.cloudinaryUrl || p.fichier.filePath;
+                                          const pdf = isPdfFile(p.fichier?.fileName || u);
+                                          setPreviewImage({
+                                            url: u,
+                                            title: "Reçu paiement",
+                                            type: pdf ? "application/pdf" : "image/*",
+                                          });
+                                        }}
+                                      >
+                                        Voir le reçu
+                                      </Button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                     <p className="mt-2 text-xs text-gray-600">
                       Les champs structurels (programme, chambre, hôtels) restent verrouillés et gérés au niveau du dossier.
@@ -2034,6 +2877,19 @@ export default function EditReservation() {
                 </CardContent>
               </Card>
             </div>
+
+      <Dialog open={showRoomGuide} onOpenChange={setShowRoomGuide}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Guide des chambres</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600">
+            Les pastilles rouges indiquent les places déjà occupées, les vertes les places
+            libres, et les jaunes les places attribuées à ce dossier (groupe). Le cadre jaune
+            autour d&apos;une ligne correspond à la chambre où votre groupe est enregistré.
+          </p>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog de prévisualisation */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>

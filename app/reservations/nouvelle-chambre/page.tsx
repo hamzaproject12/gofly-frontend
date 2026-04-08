@@ -61,6 +61,12 @@ type Occupant = {
   gender: "Homme" | "Femme";
 };
 
+type PaymentRow = {
+  amount: string;
+  type: string;
+  receipt: File | null;
+};
+
 const ROOM_CAPACITY: Record<string, number> = {
   SINGLE: 1,
   DOUBLE: 2,
@@ -124,6 +130,26 @@ export default function NouvelleChambrePage() {
   const [roomMakkahId, setRoomMakkahId] = useState("");
 
   const [occupants, setOccupants] = useState<Occupant[]>([]);
+  const [occupantPassportFiles, setOccupantPassportFiles] = useState<
+    Array<File | null>
+  >([]);
+  const [leaderMeta, setLeaderMeta] = useState({
+    groupe: "",
+    remarque: "",
+    transport: false,
+  });
+  const [supplierDocuments, setSupplierDocuments] = useState<{
+    visa: File | null;
+    flightBooked: File | null;
+    hotelBooked: File | null;
+  }>({
+    visa: null,
+    flightBooked: null,
+    hotelBooked: null,
+  });
+  const [payments, setPayments] = useState<PaymentRow[]>([
+    { amount: "", type: "", receipt: null },
+  ]);
 
   const capacity = formData.typeChambre
     ? ROOM_CAPACITY[formData.typeChambre] || 0
@@ -205,6 +231,7 @@ export default function NouvelleChambrePage() {
   useEffect(() => {
     if (!capacity) {
       setOccupants([]);
+      setOccupantPassportFiles([]);
       return;
     }
     setOccupants((prev) =>
@@ -219,17 +246,19 @@ export default function NouvelleChambrePage() {
             : prev[i]?.gender || "Homme",
       }))
     );
+    setOccupantPassportFiles((prev) =>
+      Array.from({ length: capacity }, (_, i) => prev[i] || null)
+    );
   }, [capacity, formData.gender]);
 
   const roomCandidatesMadina = useMemo(() => {
     if (!programInfo || !formData.typeChambre || !formData.hotelMadina)
       return [];
     const hid = parseInt(formData.hotelMadina, 10);
-    const cap = ROOM_CAPACITY[formData.typeChambre] || 0;
     return programInfo.rooms.filter((room) => {
       if (room.hotelId !== hid || room.roomType !== formData.typeChambre)
         return false;
-      if (room.nbrPlaceRestantes < cap) return false;
+      if (room.nbrPlaceRestantes !== room.nbrPlaceTotal) return false;
       if (familyMixed) return true;
       return (
         room.gender === formData.gender || room.gender === "Mixte"
@@ -247,11 +276,10 @@ export default function NouvelleChambrePage() {
     if (!programInfo || !formData.typeChambre || !formData.hotelMakkah)
       return [];
     const hid = parseInt(formData.hotelMakkah, 10);
-    const cap = ROOM_CAPACITY[formData.typeChambre] || 0;
     return programInfo.rooms.filter((room) => {
       if (room.hotelId !== hid || room.roomType !== formData.typeChambre)
         return false;
-      if (room.nbrPlaceRestantes < cap) return false;
+      if (room.nbrPlaceRestantes !== room.nbrPlaceTotal) return false;
       if (familyMixed) {
         return true;
       }
@@ -378,6 +406,34 @@ export default function NouvelleChambrePage() {
     });
   };
 
+  const setOccupantPassportFile = (index: number, file: File | null) => {
+    setOccupantPassportFiles((prev) => {
+      const next = [...prev];
+      next[index] = file;
+      return next;
+    });
+  };
+
+  const setPaymentField = (
+    index: number,
+    field: keyof PaymentRow,
+    value: string | File | null
+  ) => {
+    setPayments((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value } as PaymentRow;
+      return next;
+    });
+  };
+
+  const addPaymentRow = () => {
+    setPayments((prev) => [...prev, { amount: "", type: "", receipt: null }]);
+  };
+
+  const removePaymentRow = (index: number) => {
+    setPayments((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const canSubmit =
     !!formData.programId &&
     !!formData.typeChambre &&
@@ -388,7 +444,11 @@ export default function NouvelleChambrePage() {
     !!roomMakkahId &&
     !!formData.prix &&
     occupants.length === capacity &&
-    occupants.every((o) => o.firstName && o.lastName && o.phone);
+    occupants.every((o, i) =>
+      i === 0 ? o.firstName && o.lastName && o.phone : o.firstName && o.lastName
+    ) &&
+    occupantPassportFiles.length === capacity &&
+    occupantPassportFiles.every(Boolean);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -396,6 +456,10 @@ export default function NouvelleChambrePage() {
 
     setIsSubmitting(true);
     try {
+      const totalPayments = payments.reduce(
+        (sum, p) => sum + (Number(p.amount) || 0),
+        0
+      );
       const leaderOccupants = occupants.map((o, i) =>
         i === 0 ? { ...o, gender: formData.gender } : o
       );
@@ -413,19 +477,22 @@ export default function NouvelleChambrePage() {
             roomMakkahId: Number(roomMakkahId),
             reservationDate: formData.dateReservation,
             leaderPrice: Number(formData.prix),
-            leaderPaidAmount: Number(paidAmount || 0),
+            leaderPaidAmount: Number(paidAmount || totalPayments || 0),
             occupants: leaderOccupants,
             common: {
               programId: Number(formData.programId),
               hotelMadina: hotelNameMadina,
               hotelMakkah: hotelNameMakkah,
               status: "Incomplet",
-              statutPasseport: false,
+              statutPasseport: true,
               statutVisa: false,
               statutHotel: false,
               statutVol: false,
               reduction: 0,
               plan: customization.plan,
+              groupe: leaderMeta.groupe || null,
+              remarque: leaderMeta.remarque || null,
+              transport: leaderMeta.transport ? "Oui" : null,
             },
           }),
         }
@@ -436,9 +503,204 @@ export default function NouvelleChambrePage() {
         throw new Error(err.error || "Erreur création dossier chambre");
       }
 
+      const groupData = await groupRes.json();
+      const leaderId = Number(groupData.leaderId);
+      const createdReservations = Array.isArray(groupData.reservations)
+        ? groupData.reservations
+        : [];
+      if (!leaderId || createdReservations.length !== occupants.length) {
+        throw new Error(
+          "Création partielle du groupe détectée, impossible de rattacher les documents."
+        );
+      }
+
+      // 1) Upload passeport pour chaque membre (lié à son ID de réservation)
+      await Promise.all(
+        createdReservations.map(async (reservation: { id: number }, index: number) => {
+          const passportFile = occupantPassportFiles[index];
+          if (!passportFile) return;
+          const fd = new FormData();
+          fd.append("file", passportFile);
+          fd.append("reservationId", String(reservation.id));
+          fd.append("fileType", "passport");
+          const uploadRes = await fetch(api.url(api.endpoints.uploadCloudinary), {
+            method: "POST",
+            body: fd,
+          });
+          if (!uploadRes.ok) {
+            const uploadErr = await uploadRes.json().catch(() => ({}));
+            throw new Error(
+              uploadErr.error ||
+                `Erreur upload passeport du membre ${index + 1}`
+            );
+          }
+        })
+      );
+
+      // 2) Upload des documents fournisseurs (leader uniquement)
+      const uploadedFileIds: Record<string, number | null> = {
+        visa: null,
+        flightBooked: null,
+        hotelBooked: null,
+      };
+      const uploadSupplierDoc = async (
+        field: "visa" | "flightBooked" | "hotelBooked"
+      ) => {
+        const file = supplierDocuments[field];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append(field, file);
+        fd.append("reservationId", String(leaderId));
+        const uploadRes = await fetch(api.url(api.endpoints.upload), {
+          method: "POST",
+          body: fd,
+        });
+        if (!uploadRes.ok) {
+          const uploadErr = await uploadRes.json().catch(() => ({}));
+          throw new Error(uploadErr.error || `Erreur upload ${field}`);
+        }
+        const uploadData = await uploadRes.json();
+        uploadedFileIds[field] = uploadData?.files?.[0]?.id ?? null;
+      };
+
+      await uploadSupplierDoc("visa");
+      await uploadSupplierDoc("flightBooked");
+      await uploadSupplierDoc("hotelBooked");
+
+      // 3) Paiements liés au leader
+      for (const payment of payments) {
+        if (!payment.amount || !payment.type) continue;
+        let fichierId: number | null = null;
+        if (payment.receipt) {
+          const fd = new FormData();
+          fd.append("file", payment.receipt);
+          fd.append("reservationId", String(leaderId));
+          fd.append("fileType", "payment");
+          const uploadRes = await fetch(api.url(api.endpoints.uploadCloudinary), {
+            method: "POST",
+            body: fd,
+          });
+          if (!uploadRes.ok) {
+            const uploadErr = await uploadRes.json().catch(() => ({}));
+            throw new Error(uploadErr.error || "Erreur upload reçu paiement");
+          }
+          const data = await uploadRes.json();
+          fichierId = data?.results?.[0]?.id ?? null;
+        }
+
+        const paymentRes = await api.request(api.url(api.endpoints.payments), {
+          method: "POST",
+          body: JSON.stringify({
+            amount: parseFloat(payment.amount),
+            type: payment.type,
+            reservationId: leaderId,
+            fichierId: fichierId || undefined,
+            programId: Number(formData.programId),
+          }),
+        });
+        if (!paymentRes.ok) {
+          const paymentErr = await paymentRes.json().catch(() => ({}));
+          throw new Error(paymentErr.error || "Erreur création paiement leader");
+        }
+      }
+
+      // 4) Expenses leader
+      if (programInfo) {
+        const expensePayloads: Array<{
+          description: string;
+          amount: number;
+          type: string;
+          fichierId?: number;
+        }> = [];
+
+        if (customization.includeAvion) {
+          expensePayloads.push({
+            description: `Service de vol (dossier chambre ${groupData.groupId})`,
+            amount: programInfo.prixAvionDH,
+            type: "Vol",
+            fichierId: uploadedFileIds.flightBooked || undefined,
+          });
+        }
+        if (customization.includeVisa) {
+          expensePayloads.push({
+            description: `Service de visa (dossier chambre ${groupData.groupId})`,
+            amount: programInfo.prixVisaRiyal * programInfo.exchange,
+            type: "Visa",
+            fichierId: uploadedFileIds.visa || undefined,
+          });
+        }
+
+        const roomMadina = programInfo.rooms.find((r) => r.id === Number(roomMadinaId));
+        const roomMakkah = programInfo.rooms.find((r) => r.id === Number(roomMakkahId));
+        if (roomMadina) {
+          expensePayloads.push({
+            description: `Service hôtel Madina (dossier chambre ${groupData.groupId})`,
+            amount:
+              roomMadina.prixRoom *
+              capacity *
+              customization.joursMadina *
+              programInfo.exchange,
+            type: "Hotel Madina",
+            fichierId: uploadedFileIds.hotelBooked || undefined,
+          });
+        }
+        if (roomMakkah) {
+          expensePayloads.push({
+            description: `Service hôtel Makkah (dossier chambre ${groupData.groupId})`,
+            amount:
+              roomMakkah.prixRoom *
+              capacity *
+              customization.joursMakkah *
+              programInfo.exchange,
+            type: "Hotel Makkah",
+            fichierId: uploadedFileIds.hotelBooked || undefined,
+          });
+        }
+
+        for (const expense of expensePayloads) {
+          const expenseRes = await api.request(api.url(api.endpoints.expenses), {
+            method: "POST",
+            body: JSON.stringify({
+              description: expense.description,
+              amount: expense.amount,
+              date: new Date().toISOString(),
+              type: expense.type,
+              fichierId: expense.fichierId,
+              programId: Number(formData.programId),
+              reservationId: leaderId,
+            }),
+          });
+          if (!expenseRes.ok) {
+            const expenseErr = await expenseRes.json().catch(() => ({}));
+            throw new Error(expenseErr.error || `Erreur création expense ${expense.type}`);
+          }
+        }
+      }
+
+      // 5) Patch statuts leader
+      const patchRes = await api.request(`/api/reservations/${leaderId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          statutPasseport: true,
+          statutVisa: customization.includeVisa ? Boolean(supplierDocuments.visa) : false,
+          statutHotel:
+            formData.hotelMadina !== "none" || formData.hotelMakkah !== "none"
+              ? Boolean(supplierDocuments.hotelBooked)
+              : false,
+          statutVol: customization.includeAvion
+            ? Boolean(supplierDocuments.flightBooked)
+            : false,
+        }),
+      });
+      if (!patchRes.ok) {
+        const patchErr = await patchRes.json().catch(() => ({}));
+        throw new Error(patchErr.error || "Erreur mise à jour statuts leader");
+      }
+
       toast({
         title: "Succès",
-        description: "Dossier chambre privée créé (leader + accompagnants).",
+        description:
+          "Dossier chambre privée créé avec passeports, paiements et dépenses leader.",
       });
       router.push("/reservations");
     } catch (error) {
@@ -694,9 +956,10 @@ export default function NouvelleChambrePage() {
                     Hôtels & chambres (bloc privé)
                   </h3>
                   <p className="text-sm text-emerald-800 mb-4">
-                    Choisissez les mêmes types de chambre à Madina et Makkah avec
-                    assez de places pour tout le groupe. Les noms d&apos;hôtels
-                    sont enregistrés comme sur la page Nouvelle Réservation.
+                    Choisissez une room totalement vide a Madina et une room
+                    totalement vide a Makkah pour bloquer la chambre privee
+                    complete. Les noms d&apos;hotels sont enregistres comme sur la
+                    page Nouvelle Reservation.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -731,7 +994,7 @@ export default function NouvelleChambrePage() {
                         onValueChange={setRoomMadinaId}
                       >
                         <SelectTrigger className="h-10 border-2 border-emerald-200 rounded-lg bg-white">
-                          <SelectValue placeholder="Room avec places suffisantes" />
+                          <SelectValue placeholder="Room totalement vide (obligatoire)" />
                         </SelectTrigger>
                         <SelectContent>
                           {roomCandidatesMadina.map((r) => (
@@ -775,7 +1038,7 @@ export default function NouvelleChambrePage() {
                         onValueChange={setRoomMakkahId}
                       >
                         <SelectTrigger className="h-10 border-2 border-emerald-200 rounded-lg bg-white">
-                          <SelectValue placeholder="Room avec places suffisantes" />
+                          <SelectValue placeholder="Room totalement vide (obligatoire)" />
                         </SelectTrigger>
                         <SelectContent>
                           {roomCandidatesMakkah.map((r) => (
@@ -821,44 +1084,138 @@ export default function NouvelleChambrePage() {
                         }
                         className="border-2 border-indigo-100"
                       />
-                      <Input
-                        placeholder="Téléphone"
-                        value={o.phone}
-                        onChange={(e) =>
-                          updateOccupant(i, "phone", e.target.value)
-                        }
-                        className="border-2 border-indigo-100"
-                      />
-                      <Input
-                        placeholder="N° passeport"
-                        value={o.passportNumber}
-                        onChange={(e) =>
-                          updateOccupant(i, "passportNumber", e.target.value)
-                        }
-                        className="border-2 border-indigo-100"
-                      />
-                      <Select
-                        value={i === 0 ? formData.gender : o.gender}
-                        onValueChange={(v) => {
-                          if (i === 0) {
-                            setFormData((p) => ({
-                              ...p,
-                              gender: v as "Homme" | "Femme",
-                            }));
+                      {i === 0 ? (
+                        <>
+                          <Input
+                            placeholder="Téléphone"
+                            value={o.phone}
+                            onChange={(e) =>
+                              updateOccupant(i, "phone", e.target.value)
+                            }
+                            className="border-2 border-indigo-100"
+                          />
+                          <Input
+                            placeholder="Groupe (optionnel)"
+                            value={leaderMeta.groupe}
+                            onChange={(e) =>
+                              setLeaderMeta((prev) => ({
+                                ...prev,
+                                groupe: e.target.value,
+                              }))
+                            }
+                            className="border-2 border-indigo-100"
+                          />
+                          <Select
+                            value={formData.gender}
+                            onValueChange={(v) =>
+                              setFormData((p) => ({
+                                ...p,
+                                gender: v as "Homme" | "Femme",
+                              }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Homme">Homme</SelectItem>
+                              <SelectItem value="Femme">Femme</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            placeholder="Remarque (optionnel)"
+                            value={leaderMeta.remarque}
+                            onChange={(e) =>
+                              setLeaderMeta((prev) => ({
+                                ...prev,
+                                remarque: e.target.value,
+                              }))
+                            }
+                            className="md:col-span-6 border-2 border-indigo-100"
+                          />
+                          <div className="md:col-span-6 flex items-center gap-2 text-sm text-indigo-700">
+                            <Switch
+                              checked={leaderMeta.transport}
+                              onCheckedChange={(checked) =>
+                                setLeaderMeta((prev) => ({
+                                  ...prev,
+                                  transport: checked,
+                                }))
+                              }
+                            />
+                            Transport demandé
+                          </div>
+                        </>
+                      ) : null}
+                      <div className={i === 0 ? "md:col-span-6" : "md:col-span-4"}>
+                        <Label className="text-xs text-indigo-700 mb-1 block">
+                          Passeport (obligatoire)
+                        </Label>
+                        <Input
+                          type="file"
+                          accept=".pdf,image/png,image/jpeg,image/webp"
+                          onChange={(e) =>
+                            setOccupantPassportFile(
+                              i,
+                              e.target.files?.[0] || null
+                            )
                           }
-                          updateOccupant(i, "gender", v);
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Homme">Homme</SelectItem>
-                          <SelectItem value="Femme">Femme</SelectItem>
-                        </SelectContent>
-                      </Select>
+                          className="border-2 border-indigo-100"
+                        />
+                      </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Documents fournisseur (leader) */}
+                <div className="bg-gradient-to-r from-cyan-50 to-sky-50 p-4 rounded-xl border border-cyan-200">
+                  <h3 className="text-lg font-semibold text-cyan-900 mb-4">
+                    Documents fournisseur (leader)
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label>Visa</Label>
+                      <Input
+                        type="file"
+                        accept=".pdf,image/png,image/jpeg,image/webp"
+                        onChange={(e) =>
+                          setSupplierDocuments((prev) => ({
+                            ...prev,
+                            visa: e.target.files?.[0] || null,
+                          }))
+                        }
+                        className="border-2 border-cyan-200"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Billet</Label>
+                      <Input
+                        type="file"
+                        accept=".pdf,image/png,image/jpeg,image/webp"
+                        onChange={(e) =>
+                          setSupplierDocuments((prev) => ({
+                            ...prev,
+                            flightBooked: e.target.files?.[0] || null,
+                          }))
+                        }
+                        className="border-2 border-cyan-200"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Réservation hôtel</Label>
+                      <Input
+                        type="file"
+                        accept=".pdf,image/png,image/jpeg,image/webp"
+                        onChange={(e) =>
+                          setSupplierDocuments((prev) => ({
+                            ...prev,
+                            hotelBooked: e.target.files?.[0] || null,
+                          }))
+                        }
+                        className="border-2 border-cyan-200"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Paiement leader */}
@@ -877,6 +1234,54 @@ export default function NouvelleChambrePage() {
                         className="h-10 border-2 border-amber-200"
                       />
                     </div>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {payments.map((payment, index) => (
+                      <div
+                        key={index}
+                        className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 rounded-lg border border-amber-200 bg-white/80"
+                      >
+                        <Input
+                          placeholder="Montant"
+                          value={payment.amount}
+                          onChange={(e) =>
+                            setPaymentField(index, "amount", e.target.value)
+                          }
+                          className="border-2 border-amber-100"
+                        />
+                        <Input
+                          placeholder="Type (Cash, Virement...)"
+                          value={payment.type}
+                          onChange={(e) =>
+                            setPaymentField(index, "type", e.target.value)
+                          }
+                          className="border-2 border-amber-100"
+                        />
+                        <Input
+                          type="file"
+                          accept=".pdf,image/png,image/jpeg,image/webp"
+                          onChange={(e) =>
+                            setPaymentField(
+                              index,
+                              "receipt",
+                              e.target.files?.[0] || null
+                            )
+                          }
+                          className="border-2 border-amber-100"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => removePaymentRow(index)}
+                          disabled={payments.length === 1}
+                        >
+                          Supprimer
+                        </Button>
+                      </div>
+                    ))}
+                    <Button type="button" variant="outline" onClick={addPaymentRow}>
+                      Ajouter un paiement
+                    </Button>
                   </div>
                 </div>
 

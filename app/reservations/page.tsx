@@ -776,11 +776,15 @@ export default function ReservationsPage() {
                       <div className="flex flex-col md:flex-row md:items-center gap-2 p-3 border-b border-blue-100">
                         <div className="flex-1 flex flex-col md:flex-row md:items-center gap-3 min-w-[180px]">
                           <span className="font-bold text-xl text-blue-900 tracking-tight uppercase">{reservation.nom} {reservation.prenom}</span>
-                          {reservation.groupSize > 1 && (
+                          {reservation.typeReservation === "CHAMBRE_PRIVEE" ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1">
+                              👨‍👩‍👧‍👦 {reservation.groupSize} personnes
+                            </span>
+                          ) : reservation.groupSize > 1 ? (
                             <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1">
                               Groupe: {reservation.groupSize} pers.
                             </span>
-                          )}
+                          ) : null}
                           <span className="inline-flex items-center gap-1 text-base font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-1">
                             <Calendar className="h-5 w-5 text-blue-400" /> {reservation.programme}
                           </span>

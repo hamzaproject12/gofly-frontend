@@ -2185,6 +2185,7 @@ export default function EditReservation() {
                                 }
                                 placeholder="Téléphone"
                                 className="h-10 border-2 border-blue-200"
+                                disabled
                               />
                               <Input
                                 value={a.passportNumber || ""}
@@ -2199,6 +2200,7 @@ export default function EditReservation() {
                                 }
                                 placeholder="N° passeport"
                                 className="h-10 border-2 border-blue-200"
+                                disabled
                               />
                             </div>
                             <div className="space-y-2">

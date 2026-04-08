@@ -290,6 +290,16 @@ router.post('/group', async (req, res) => {
       if (!madinaRoom || !makkahRoom) {
         throw new Error('Une ou plusieurs rooms sont introuvables.');
       }
+      if (madinaRoom.roomType !== roomType || makkahRoom.roomType !== roomType) {
+        throw new Error('Le type de room sélectionné ne correspond pas au type de chambre demandé.');
+      }
+      if (madinaRoom.programId !== Number(common.programId) || makkahRoom.programId !== Number(common.programId)) {
+        throw new Error('Les rooms sélectionnées ne sont pas liées au programme choisi.');
+      }
+      // Chambre privée = uniquement des rooms totalement vides au moment de la réservation
+      if (madinaRoom.nbrPlaceRestantes !== madinaRoom.nbrPlaceTotal || makkahRoom.nbrPlaceRestantes !== makkahRoom.nbrPlaceTotal) {
+        throw new Error('Chambre privée: seules les rooms totalement vides peuvent être réservées.');
+      }
       if (madinaRoom.nbrPlaceRestantes < groupSize || makkahRoom.nbrPlaceRestantes < groupSize) {
         throw new Error('Pas assez de places disponibles pour cette chambre privée.');
       }

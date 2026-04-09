@@ -24,6 +24,11 @@ import {
   Hotel,
   Wallet,
   CreditCard,
+  Settings,
+  Info,
+  CheckCircle,
+  FileText,
+  Bell,
   Leaf,
   ShieldCheck,
   Crown,
@@ -150,6 +155,13 @@ export default function NouvelleChambrePage() {
   const [payments, setPayments] = useState<PaymentRow[]>([
     { amount: "", type: "", receipt: null },
   ]);
+  const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
+  const [supplierStatus, setSupplierStatus] = useState({
+    statutVisa: false,
+    statutVol: false,
+    statutHotel: false,
+  });
+  const [reduction, setReduction] = useState("0");
 
   const capacity = formData.typeChambre
     ? ROOM_CAPACITY[formData.typeChambre] || 0
@@ -434,6 +446,15 @@ export default function NouvelleChambrePage() {
     setPayments((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const sortedRoomCandidatesMadina = useMemo(
+    () => [...roomCandidatesMadina].sort((a, b) => a.id - b.id),
+    [roomCandidatesMadina]
+  );
+  const sortedRoomCandidatesMakkah = useMemo(
+    () => [...roomCandidatesMakkah].sort((a, b) => a.id - b.id),
+    [roomCandidatesMakkah]
+  );
+
   const canSubmit =
     !!formData.programId &&
     !!formData.typeChambre &&
@@ -485,10 +506,10 @@ export default function NouvelleChambrePage() {
               hotelMakkah: hotelNameMakkah,
               status: "Incomplet",
               statutPasseport: true,
-              statutVisa: false,
-              statutHotel: false,
-              statutVol: false,
-              reduction: 0,
+              statutVisa: supplierStatus.statutVisa,
+              statutHotel: supplierStatus.statutHotel,
+              statutVol: supplierStatus.statutVol,
+              reduction: Number(reduction || 0),
               plan: customization.plan,
               groupe: leaderMeta.groupe || null,
               remarque: leaderMeta.remarque || null,
@@ -682,14 +703,9 @@ export default function NouvelleChambrePage() {
         method: "PATCH",
         body: JSON.stringify({
           statutPasseport: true,
-          statutVisa: customization.includeVisa ? Boolean(supplierDocuments.visa) : false,
-          statutHotel:
-            formData.hotelMadina !== "none" || formData.hotelMakkah !== "none"
-              ? Boolean(supplierDocuments.hotelBooked)
-              : false,
-          statutVol: customization.includeAvion
-            ? Boolean(supplierDocuments.flightBooked)
-            : false,
+          statutVisa: supplierStatus.statutVisa,
+          statutHotel: supplierStatus.statutHotel,
+          statutVol: supplierStatus.statutVol,
         }),
       });
       if (!patchRes.ok) {
@@ -758,14 +774,28 @@ export default function NouvelleChambrePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Section 1 — comme Nouvelle Réservation */}
+              <form onSubmit={handleSubmit} className="space-y-6 pb-24">
                 <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-2">
-                  <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
-                    <Sparkles className="h-5 w-5" />
-                    Configuration du voyage
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
+                      <Sparkles className="h-5 w-5" />
+                      Configuration du Voyage
+                    </h3>
+                    {formData.programId && programInfo && (
+                      <Button
+                        type="button"
+                        onClick={() => setIsCustomizationOpen(!isCustomizationOpen)}
+                        variant="ghost"
+                        size="sm"
+                        className="text-blue-700 hover:bg-blue-200 hover:text-blue-800"
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        {isCustomizationOpen ? "Masquer" : "Éditer"}
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
                     <div className="space-y-2">
                       <Label className="text-blue-700 font-medium text-sm">
                         Programme *
@@ -800,7 +830,7 @@ export default function NouvelleChambrePage() {
 
                     <div className="space-y-2">
                       <Label className="text-blue-700 font-medium text-sm">
-                        Type de chambre (privative) *
+                        Type de chambre *
                       </Label>
                       <Select
                         value={formData.typeChambre}
@@ -824,7 +854,7 @@ export default function NouvelleChambrePage() {
 
                     <div className="space-y-2">
                       <Label className="text-blue-700 font-medium text-sm">
-                        Genre (leader / réf. prix) *
+                        Genre *
                       </Label>
                       <Select
                         value={formData.gender}
@@ -883,39 +913,55 @@ export default function NouvelleChambrePage() {
                         })}
                       </div>
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mb-2">
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={customization.includeAvion}
-                        onCheckedChange={(c) =>
-                          setCustomization((p) => ({ ...p, includeAvion: c }))
-                        }
-                      />
-                      <span className="text-sm text-blue-800">Inclure vol</span>
+                    <div className="space-y-2">
+                      <Label className="text-blue-700 font-medium text-sm">
+                        Hôtel à Madina *
+                      </Label>
+                      <Select
+                        value={formData.hotelMadina}
+                        onValueChange={(v) => {
+                          setFormData((p) => ({ ...p, hotelMadina: v }));
+                          setRoomMadinaId("");
+                        }}
+                      >
+                        <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
+                          <SelectValue placeholder="Sélectionner un hôtel à Madina" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {hotelsMadina.map((h) => (
+                            <SelectItem key={h.id} value={h.id.toString()}>
+                              {h.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={customization.includeVisa}
-                        onCheckedChange={(c) =>
-                          setCustomization((p) => ({ ...p, includeVisa: c }))
-                        }
-                      />
-                      <span className="text-sm text-blue-800">Inclure visa</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={familyMixed}
-                        onCheckedChange={setFamilyMixed}
-                      />
-                      <span className="text-sm text-blue-800">
-                        Famille mixte (chambre)
-                      </span>
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-blue-700 font-medium text-sm">
+                        Hôtel à Makkah *
+                      </Label>
+                      <Select
+                        value={formData.hotelMakkah}
+                        onValueChange={(v) => {
+                          setFormData((p) => ({ ...p, hotelMakkah: v }));
+                          setRoomMakkahId("");
+                        }}
+                      >
+                        <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
+                          <SelectValue placeholder="Sélectionner un hôtel à Makkah" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {hotelsMakkah.map((h) => (
+                            <SelectItem key={h.id} value={h.id.toString()}>
+                              {h.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     <div className="space-y-2">
                       <Label className="text-blue-700 font-medium text-sm">
                         Date de réservation *
@@ -932,6 +978,7 @@ export default function NouvelleChambrePage() {
                         className="h-10 border-2 border-blue-200 rounded-lg"
                       />
                     </div>
+
                     <div className="space-y-2">
                       <Label className="text-blue-700 font-medium text-sm">
                         Prix total dossier (leader) *
@@ -943,130 +990,144 @@ export default function NouvelleChambrePage() {
                           setFormData((p) => ({ ...p, prix: e.target.value }));
                         }}
                         className="h-10 border-2 border-blue-200 rounded-lg"
-                        placeholder="Calculé automatiquement si config complète (modifiable)"
+                        placeholder="Calculé automatiquement (modifiable)"
                       />
                     </div>
                   </div>
-                </div>
 
-                {/* Hôtels — même esprit que Nouvelle Réservation */}
-                <div className="bg-gradient-to-r from-emerald-50 to-green-50 p-4 rounded-xl border border-emerald-200">
-                  <h3 className="text-lg font-semibold text-emerald-900 mb-4 flex items-center gap-2">
-                    <Hotel className="h-5 w-5" />
-                    Hôtels & chambres (bloc privé)
-                  </h3>
-                  <p className="text-sm text-emerald-800 mb-4">
-                    Choisissez une room totalement vide a Madina et une room
-                    totalement vide a Makkah pour bloquer la chambre privee
-                    complete. Les noms d&apos;hotels sont enregistres comme sur la
-                    page Nouvelle Reservation.
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-emerald-800 font-medium text-sm">
-                        Hôtel Madina *
-                      </Label>
-                      <Select
-                        value={formData.hotelMadina}
-                        onValueChange={(v) => {
-                          setFormData((p) => ({ ...p, hotelMadina: v }));
-                          setRoomMadinaId("");
-                        }}
-                      >
-                        <SelectTrigger className="h-10 border-2 border-emerald-200 rounded-lg bg-white">
-                          <SelectValue placeholder="Choisir" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {hotelsMadina.map((h) => (
-                            <SelectItem key={h.id} value={h.id.toString()}>
-                              {h.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  {isCustomizationOpen && (
+                    <div className="mt-4 mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={customization.includeAvion}
+                            onCheckedChange={(c) =>
+                              setCustomization((p) => ({ ...p, includeAvion: c }))
+                            }
+                          />
+                          <span className="text-sm text-blue-800">Inclure vol</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={customization.includeVisa}
+                            onCheckedChange={(c) =>
+                              setCustomization((p) => ({ ...p, includeVisa: c }))
+                            }
+                          />
+                          <span className="text-sm text-blue-800">Inclure visa</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={familyMixed}
+                            onCheckedChange={setFamilyMixed}
+                          />
+                          <span className="text-sm text-blue-800">Famille mixte</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-emerald-800 font-medium text-sm">
-                        Chambre Madina (room) *
-                      </Label>
-                      <Select
-                        value={roomMadinaId}
-                        onValueChange={setRoomMadinaId}
-                      >
-                        <SelectTrigger className="h-10 border-2 border-emerald-200 rounded-lg bg-white">
-                          <SelectValue placeholder="Room totalement vide (obligatoire)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {roomCandidatesMadina.map((r) => (
-                            <SelectItem key={r.id} value={r.id.toString()}>
-                              #{r.id} — {r.nbrPlaceRestantes} places —{" "}
-                              {r.gender}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Info className="h-4 w-4 text-green-700" />
+                        <span className="text-xs font-medium text-green-700">
+                          Chambres disponibles à Madina (libres uniquement)
+                        </span>
+                      </div>
+                      <div className="grid gap-2">
+                        {sortedRoomCandidatesMadina.map((room) => (
+                          <div
+                            key={room.id}
+                            className={`p-2 rounded border cursor-pointer transition-all ${
+                              roomMadinaId === String(room.id)
+                                ? "border-yellow-400 bg-yellow-50"
+                                : "border-gray-300 bg-white hover:border-blue-300"
+                            }`}
+                            onClick={() => setRoomMadinaId(String(room.id))}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-medium">
+                                Room #{room.id} - {room.gender}
+                              </span>
+                              <span className="text-xs text-gray-600">
+                                ({room.nbrPlaceRestantes}/{room.nbrPlaceTotal})
+                              </span>
+                            </div>
+                            <div className="flex gap-1.5">
+                              {Array.from({ length: room.nbrPlaceTotal }, (_, idx) => (
+                                <div
+                                  key={idx}
+                                  className={`w-4 h-4 rounded-full ${
+                                    roomMadinaId === String(room.id) && idx === 0
+                                      ? "bg-yellow-400"
+                                      : "bg-green-500"
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-emerald-800 font-medium text-sm">
-                        Hôtel Makkah *
-                      </Label>
-                      <Select
-                        value={formData.hotelMakkah}
-                        onValueChange={(v) => {
-                          setFormData((p) => ({ ...p, hotelMakkah: v }));
-                          setRoomMakkahId("");
-                        }}
-                      >
-                        <SelectTrigger className="h-10 border-2 border-emerald-200 rounded-lg bg-white">
-                          <SelectValue placeholder="Choisir" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {hotelsMakkah.map((h) => (
-                            <SelectItem key={h.id} value={h.id.toString()}>
-                              {h.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-emerald-800 font-medium text-sm">
-                        Chambre Makkah (room) *
-                      </Label>
-                      <Select
-                        value={roomMakkahId}
-                        onValueChange={setRoomMakkahId}
-                      >
-                        <SelectTrigger className="h-10 border-2 border-emerald-200 rounded-lg bg-white">
-                          <SelectValue placeholder="Room totalement vide (obligatoire)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {roomCandidatesMakkah.map((r) => (
-                            <SelectItem key={r.id} value={r.id.toString()}>
-                              #{r.id} — {r.nbrPlaceRestantes} places —{" "}
-                              {r.gender}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Info className="h-4 w-4 text-green-700" />
+                        <span className="text-xs font-medium text-green-700">
+                          Chambres disponibles à Makkah (libres uniquement)
+                        </span>
+                      </div>
+                      <div className="grid gap-2">
+                        {sortedRoomCandidatesMakkah.map((room) => (
+                          <div
+                            key={room.id}
+                            className={`p-2 rounded border cursor-pointer transition-all ${
+                              roomMakkahId === String(room.id)
+                                ? "border-yellow-400 bg-yellow-50"
+                                : "border-gray-300 bg-white hover:border-blue-300"
+                            }`}
+                            onClick={() => setRoomMakkahId(String(room.id))}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-medium">
+                                Room #{room.id} - {room.gender}
+                              </span>
+                              <span className="text-xs text-gray-600">
+                                ({room.nbrPlaceRestantes}/{room.nbrPlaceTotal})
+                              </span>
+                            </div>
+                            <div className="flex gap-1.5">
+                              {Array.from({ length: room.nbrPlaceTotal }, (_, idx) => (
+                                <div
+                                  key={idx}
+                                  className={`w-4 h-4 rounded-full ${
+                                    roomMakkahId === String(room.id) && idx === 0
+                                      ? "bg-yellow-400"
+                                      : "bg-green-500"
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Occupants */}
-                <div className="bg-gradient-to-r from-indigo-50 to-blue-50 p-4 rounded-xl border border-indigo-200">
-                  <h3 className="text-lg font-semibold text-indigo-900 mb-4 flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Occupants ({capacity || "—"}) — Leader en premier
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
+                  <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    Informations Client
                   </h3>
                   {occupants.map((o, i) => (
                     <div
                       key={i}
-                      className="mb-4 p-4 rounded-lg border border-indigo-100 bg-white/80 grid grid-cols-1 md:grid-cols-6 gap-3"
+                      className="mb-4 p-4 rounded-lg border border-blue-200 bg-white/80 grid grid-cols-1 md:grid-cols-6 gap-3"
                     >
-                      <div className="md:col-span-6 text-xs font-semibold text-indigo-700 flex items-center gap-2">
+                      <div className="md:col-span-6 text-xs font-semibold text-blue-700 flex items-center gap-2">
                         <User className="h-4 w-4" />
-                        {i === 0 ? "Leader (payeur du dossier)" : `Accompagnant ${i}`}
+                        {i === 0 ? "Leader" : `Accompagnant ${i}`}
                       </div>
                       <Input
                         placeholder="Nom"
@@ -1074,7 +1135,7 @@ export default function NouvelleChambrePage() {
                         onChange={(e) =>
                           updateOccupant(i, "lastName", e.target.value)
                         }
-                        className="border-2 border-indigo-100"
+                        className="border-2 border-blue-100"
                       />
                       <Input
                         placeholder="Prénom"
@@ -1082,7 +1143,7 @@ export default function NouvelleChambrePage() {
                         onChange={(e) =>
                           updateOccupant(i, "firstName", e.target.value)
                         }
-                        className="border-2 border-indigo-100"
+                        className="border-2 border-blue-100"
                       />
                       {i === 0 ? (
                         <>
@@ -1092,7 +1153,7 @@ export default function NouvelleChambrePage() {
                             onChange={(e) =>
                               updateOccupant(i, "phone", e.target.value)
                             }
-                            className="border-2 border-indigo-100"
+                            className="border-2 border-blue-100"
                           />
                           <Input
                             placeholder="Groupe (optionnel)"
@@ -1103,7 +1164,7 @@ export default function NouvelleChambrePage() {
                                 groupe: e.target.value,
                               }))
                             }
-                            className="border-2 border-indigo-100"
+                            className="border-2 border-blue-100"
                           />
                           <Select
                             value={formData.gender}
@@ -1131,9 +1192,9 @@ export default function NouvelleChambrePage() {
                                 remarque: e.target.value,
                               }))
                             }
-                            className="md:col-span-6 border-2 border-indigo-100"
+                            className="md:col-span-6 border-2 border-blue-100"
                           />
-                          <div className="md:col-span-6 flex items-center gap-2 text-sm text-indigo-700">
+                          <div className="md:col-span-6 flex items-center gap-2 text-sm text-blue-700">
                             <Switch
                               checked={leaderMeta.transport}
                               onCheckedChange={(checked) =>
@@ -1148,7 +1209,7 @@ export default function NouvelleChambrePage() {
                         </>
                       ) : null}
                       <div className={i === 0 ? "md:col-span-6" : "md:col-span-4"}>
-                        <Label className="text-xs text-indigo-700 mb-1 block">
+                        <Label className="text-xs text-blue-700 mb-1 block">
                           Passeport (obligatoire)
                         </Label>
                         <Input
@@ -1160,21 +1221,124 @@ export default function NouvelleChambrePage() {
                               e.target.files?.[0] || null
                             )
                           }
-                          className="border-2 border-indigo-100"
+                          className="border-2 border-blue-100"
                         />
                       </div>
                     </div>
                   ))}
                 </div>
 
-                {/* Documents fournisseur (leader) */}
-                <div className="bg-gradient-to-r from-cyan-50 to-sky-50 p-4 rounded-xl border border-cyan-200">
-                  <h3 className="text-lg font-semibold text-cyan-900 mb-4">
-                    Documents fournisseur (leader)
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
+                  <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" />
+                    Paiements
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-4">
+                    {payments.map((payment, index) => (
+                      <div key={index} className="p-4 border border-blue-200 rounded-lg bg-white/60">
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                          <div className="md:col-span-4 space-y-2">
+                            <Label className="text-blue-700 font-medium text-sm">Mode de paiement</Label>
+                            <Select
+                              value={payment.type}
+                              onValueChange={(value) =>
+                                setPaymentField(index, "type", value)
+                              }
+                            >
+                              <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
+                                <SelectValue placeholder="Sélectionner paiement" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="especes">Espèces</SelectItem>
+                                <SelectItem value="virement">Virement</SelectItem>
+                                <SelectItem value="carte">Carte</SelectItem>
+                                <SelectItem value="cheque">Chèque</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="md:col-span-3 space-y-2">
+                            <Label className="text-blue-700 font-medium text-sm">Montant (DH)</Label>
+                            <Input
+                              value={payment.amount}
+                              onChange={(e) =>
+                                setPaymentField(index, "amount", e.target.value)
+                              }
+                              placeholder="Montant"
+                              className="h-10 border-2 border-blue-200"
+                            />
+                          </div>
+                          <div className="md:col-span-3 space-y-2">
+                            <Label className="text-blue-700 font-medium text-sm">Reçu</Label>
+                            <Input
+                              type="file"
+                              accept=".pdf,image/png,image/jpeg,image/webp"
+                              onChange={(e) =>
+                                setPaymentField(
+                                  index,
+                                  "receipt",
+                                  e.target.files?.[0] || null
+                                )
+                              }
+                              className="h-10 border-2 border-blue-200"
+                            />
+                          </div>
+                          <div className="md:col-span-2 flex items-end">
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              onClick={() => removePaymentRow(index)}
+                              disabled={payments.length === 1}
+                              className="w-full"
+                            >
+                              Supprimer
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    <Button type="button" onClick={addPaymentRow} className="bg-blue-600 hover:bg-blue-700">
+                      Ajouter un paiement
+                    </Button>
                     <div className="space-y-2">
-                      <Label>Visa</Label>
+                      <Label className="text-blue-700 font-medium text-sm">Montant déjà payé (leader)</Label>
+                      <Input
+                        value={paidAmount}
+                        onChange={(e) => setPaidAmount(e.target.value)}
+                        placeholder="0"
+                        className="h-10 border-2 border-blue-200"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
+                  <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Documents Fournisseur
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
+                    <div className="bg-white p-4 rounded-lg border border-blue-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="text-blue-700 font-medium">Statut Visa</Label>
+                        <Switch
+                          checked={supplierStatus.statutVisa}
+                          onCheckedChange={(checked) =>
+                            setSupplierStatus((prev) => ({ ...prev, statutVisa: checked }))
+                          }
+                          className="data-[state=checked]:bg-blue-600"
+                        />
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {supplierStatus.statutVisa ? (
+                          <div className="flex items-center gap-2 text-green-600">
+                            <CheckCircle className="h-4 w-4" /> Pret
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-orange-600">
+                            <Bell className="h-4 w-4" /> En attente
+                          </div>
+                        )}
+                      </div>
                       <Input
                         type="file"
                         accept=".pdf,image/png,image/jpeg,image/webp"
@@ -1184,104 +1348,59 @@ export default function NouvelleChambrePage() {
                             visa: e.target.files?.[0] || null,
                           }))
                         }
-                        className="border-2 border-cyan-200"
+                        className="mt-3 border-2 border-blue-200"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Billet</Label>
-                      <Input
-                        type="file"
-                        accept=".pdf,image/png,image/jpeg,image/webp"
-                        onChange={(e) =>
-                          setSupplierDocuments((prev) => ({
-                            ...prev,
-                            flightBooked: e.target.files?.[0] || null,
-                          }))
-                        }
-                        className="border-2 border-cyan-200"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Réservation hôtel</Label>
-                      <Input
-                        type="file"
-                        accept=".pdf,image/png,image/jpeg,image/webp"
-                        onChange={(e) =>
-                          setSupplierDocuments((prev) => ({
-                            ...prev,
-                            hotelBooked: e.target.files?.[0] || null,
-                          }))
-                        }
-                        className="border-2 border-cyan-200"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Paiement leader */}
-                <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-xl border border-amber-200">
-                  <h3 className="text-lg font-semibold text-amber-900 mb-4 flex items-center gap-2">
-                    <CreditCard className="h-5 w-5" />
-                    Paiement (leader)
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Montant déjà payé (DH)</Label>
-                      <Input
-                        value={paidAmount}
-                        onChange={(e) => setPaidAmount(e.target.value)}
-                        placeholder="0"
-                        className="h-10 border-2 border-amber-200"
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-4 space-y-3">
-                    {payments.map((payment, index) => (
-                      <div
-                        key={index}
-                        className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 rounded-lg border border-amber-200 bg-white/80"
-                      >
-                        <Input
-                          placeholder="Montant"
-                          value={payment.amount}
-                          onChange={(e) =>
-                            setPaymentField(index, "amount", e.target.value)
-                          }
-                          className="border-2 border-amber-100"
-                        />
-                        <Input
-                          placeholder="Type (Cash, Virement...)"
-                          value={payment.type}
-                          onChange={(e) =>
-                            setPaymentField(index, "type", e.target.value)
-                          }
-                          className="border-2 border-amber-100"
-                        />
+                      <div className="bg-white p-4 rounded-lg border border-blue-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="text-blue-700 font-medium">Statut Vol</Label>
+                          <Switch
+                            checked={supplierStatus.statutVol}
+                            onCheckedChange={(checked) =>
+                              setSupplierStatus((prev) => ({ ...prev, statutVol: checked }))
+                            }
+                            className="data-[state=checked]:bg-blue-600"
+                          />
+                        </div>
                         <Input
                           type="file"
                           accept=".pdf,image/png,image/jpeg,image/webp"
                           onChange={(e) =>
-                            setPaymentField(
-                              index,
-                              "receipt",
-                              e.target.files?.[0] || null
-                            )
+                            setSupplierDocuments((prev) => ({
+                              ...prev,
+                              flightBooked: e.target.files?.[0] || null,
+                            }))
                           }
-                          className="border-2 border-amber-100"
+                          className="mt-3 border-2 border-blue-200"
                         />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => removePaymentRow(index)}
-                          disabled={payments.length === 1}
-                        >
-                          Supprimer
-                        </Button>
                       </div>
-                    ))}
-                    <Button type="button" variant="outline" onClick={addPaymentRow}>
-                      Ajouter un paiement
-                    </Button>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="bg-white p-4 rounded-lg border border-blue-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="text-blue-700 font-medium">Statut Hôtel</Label>
+                          <Switch
+                            checked={supplierStatus.statutHotel}
+                            onCheckedChange={(checked) =>
+                              setSupplierStatus((prev) => ({ ...prev, statutHotel: checked }))
+                            }
+                            className="data-[state=checked]:bg-blue-600"
+                          />
+                        </div>
+                        <Input
+                          type="file"
+                          accept=".pdf,image/png,image/jpeg,image/webp"
+                          onChange={(e) =>
+                            setSupplierDocuments((prev) => ({
+                              ...prev,
+                              hotelBooked: e.target.files?.[0] || null,
+                            }))
+                          }
+                          className="mt-3 border-2 border-blue-200"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1291,19 +1410,55 @@ export default function NouvelleChambrePage() {
                       Annuler
                     </Button>
                   </Link>
-                  <Button
-                    type="submit"
-                    disabled={!canSubmit || isSubmitting}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    {isSubmitting
-                      ? "Enregistrement…"
-                      : "Créer le dossier chambre privée"}
-                  </Button>
                 </div>
               </form>
             </CardContent>
           </Card>
+        </div>
+      </div>
+
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-blue-200 bg-white/95 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200">
+                <span className="text-[10px] font-medium text-gray-600">Prix</span>
+                <span className="text-sm font-bold text-blue-800">
+                  {(Number(formData.prix || 0) || 0).toLocaleString("fr-FR")} DH
+                </span>
+              </div>
+              <div className="flex items-center gap-2 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200">
+                <span className="text-[10px] font-medium text-gray-600">Réduc.</span>
+                <Input
+                  value={reduction}
+                  onChange={(e) => setReduction(e.target.value)}
+                  className="h-7 w-24 border-amber-300 text-xs"
+                />
+              </div>
+              <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+                <span className="text-[10px] font-medium text-gray-600">Propos.</span>
+                <span className="text-sm font-bold text-emerald-800">
+                  {Math.max(
+                    (Number(formData.prix || 0) || 0) - (Number(reduction || 0) || 0),
+                    0
+                  ).toLocaleString("fr-FR")} DH
+                </span>
+              </div>
+            </div>
+            <Button
+              type="submit"
+              form="__next"
+              onClick={(e) => {
+                e.preventDefault();
+                const form = document.querySelector("form");
+                if (form) form.requestSubmit();
+              }}
+              disabled={!canSubmit || isSubmitting}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {isSubmitting ? "Enregistrement…" : "Confirmer la réservation"}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

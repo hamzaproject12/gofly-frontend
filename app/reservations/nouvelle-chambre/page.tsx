@@ -143,15 +143,6 @@ export default function NouvelleChambrePage() {
     remarque: "",
     transport: false,
   });
-  const [supplierDocuments, setSupplierDocuments] = useState<{
-    visa: File | null;
-    flightBooked: File | null;
-    hotelBooked: File | null;
-  }>({
-    visa: null,
-    flightBooked: null,
-    hotelBooked: null,
-  });
   const [payments, setPayments] = useState<PaymentRow[]>([
     { amount: "", type: "", receipt: null },
   ]);
@@ -558,37 +549,7 @@ export default function NouvelleChambrePage() {
         })
       );
 
-      // 2) Upload des documents fournisseurs (leader uniquement)
-      const uploadedFileIds: Record<string, number | null> = {
-        visa: null,
-        flightBooked: null,
-        hotelBooked: null,
-      };
-      const uploadSupplierDoc = async (
-        field: "visa" | "flightBooked" | "hotelBooked"
-      ) => {
-        const file = supplierDocuments[field];
-        if (!file) return;
-        const fd = new FormData();
-        fd.append(field, file);
-        fd.append("reservationId", String(leaderId));
-        const uploadRes = await fetch(api.url(api.endpoints.upload), {
-          method: "POST",
-          body: fd,
-        });
-        if (!uploadRes.ok) {
-          const uploadErr = await uploadRes.json().catch(() => ({}));
-          throw new Error(uploadErr.error || `Erreur upload ${field}`);
-        }
-        const uploadData = await uploadRes.json();
-        uploadedFileIds[field] = uploadData?.files?.[0]?.id ?? null;
-      };
-
-      await uploadSupplierDoc("visa");
-      await uploadSupplierDoc("flightBooked");
-      await uploadSupplierDoc("hotelBooked");
-
-      // 3) Paiements liés au leader
+      // 2) Paiements liés au leader
       for (const payment of payments) {
         if (!payment.amount || !payment.type) continue;
         let fichierId: number | null = null;
@@ -625,7 +586,7 @@ export default function NouvelleChambrePage() {
         }
       }
 
-      // 4) Expenses leader
+      // 3) Expenses leader
       if (programInfo) {
         const expensePayloads: Array<{
           description: string;
@@ -639,7 +600,6 @@ export default function NouvelleChambrePage() {
             description: `Service de vol (dossier chambre ${groupData.groupId})`,
             amount: programInfo.prixAvionDH,
             type: "Vol",
-            fichierId: uploadedFileIds.flightBooked || undefined,
           });
         }
         if (customization.includeVisa) {
@@ -647,7 +607,6 @@ export default function NouvelleChambrePage() {
             description: `Service de visa (dossier chambre ${groupData.groupId})`,
             amount: programInfo.prixVisaRiyal * programInfo.exchange,
             type: "Visa",
-            fichierId: uploadedFileIds.visa || undefined,
           });
         }
 
@@ -662,7 +621,6 @@ export default function NouvelleChambrePage() {
               customization.joursMadina *
               programInfo.exchange,
             type: "Hotel Madina",
-            fichierId: uploadedFileIds.hotelBooked || undefined,
           });
         }
         if (roomMakkah) {
@@ -674,7 +632,6 @@ export default function NouvelleChambrePage() {
               customization.joursMakkah *
               programInfo.exchange,
             type: "Hotel Makkah",
-            fichierId: uploadedFileIds.hotelBooked || undefined,
           });
         }
 
@@ -698,7 +655,7 @@ export default function NouvelleChambrePage() {
         }
       }
 
-      // 5) Patch statuts leader
+      // 4) Patch statuts leader
       const patchRes = await api.request(`/api/reservations/${leaderId}`, {
         method: "PATCH",
         body: JSON.stringify({
@@ -715,8 +672,7 @@ export default function NouvelleChambrePage() {
 
       toast({
         title: "Succès",
-        description:
-          "Dossier chambre privée créé avec passeports, paiements et dépenses leader.",
+        description: "Dossier chambre privée créé avec passeports et paiements leader.",
       });
       router.push("/reservations");
     } catch (error) {
@@ -962,37 +918,6 @@ export default function NouvelleChambrePage() {
                       </Select>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label className="text-blue-700 font-medium text-sm">
-                        Date de réservation *
-                      </Label>
-                      <Input
-                        type="date"
-                        value={formData.dateReservation}
-                        onChange={(e) =>
-                          setFormData((p) => ({
-                            ...p,
-                            dateReservation: e.target.value,
-                          }))
-                        }
-                        className="h-10 border-2 border-blue-200 rounded-lg"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-blue-700 font-medium text-sm">
-                        Prix total dossier (leader) *
-                      </Label>
-                      <Input
-                        value={formData.prix}
-                        onChange={(e) => {
-                          setUserEditedPrix(true);
-                          setFormData((p) => ({ ...p, prix: e.target.value }));
-                        }}
-                        className="h-10 border-2 border-blue-200 rounded-lg"
-                        placeholder="Calculé automatiquement (modifiable)"
-                      />
-                    </div>
                   </div>
 
                   {isCustomizationOpen && (
@@ -1339,17 +1264,6 @@ export default function NouvelleChambrePage() {
                           </div>
                         )}
                       </div>
-                      <Input
-                        type="file"
-                        accept=".pdf,image/png,image/jpeg,image/webp"
-                        onChange={(e) =>
-                          setSupplierDocuments((prev) => ({
-                            ...prev,
-                            visa: e.target.files?.[0] || null,
-                          }))
-                        }
-                        className="mt-3 border-2 border-blue-200"
-                      />
                     </div>
                     <div className="space-y-2">
                       <div className="bg-white p-4 rounded-lg border border-blue-200">
@@ -1363,17 +1277,6 @@ export default function NouvelleChambrePage() {
                             className="data-[state=checked]:bg-blue-600"
                           />
                         </div>
-                        <Input
-                          type="file"
-                          accept=".pdf,image/png,image/jpeg,image/webp"
-                          onChange={(e) =>
-                            setSupplierDocuments((prev) => ({
-                              ...prev,
-                              flightBooked: e.target.files?.[0] || null,
-                            }))
-                          }
-                          className="mt-3 border-2 border-blue-200"
-                        />
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -1388,17 +1291,6 @@ export default function NouvelleChambrePage() {
                             className="data-[state=checked]:bg-blue-600"
                           />
                         </div>
-                        <Input
-                          type="file"
-                          accept=".pdf,image/png,image/jpeg,image/webp"
-                          onChange={(e) =>
-                            setSupplierDocuments((prev) => ({
-                              ...prev,
-                              hotelBooked: e.target.files?.[0] || null,
-                            }))
-                          }
-                          className="mt-3 border-2 border-blue-200"
-                        />
                       </div>
                     </div>
                   </div>
@@ -1417,6 +1309,7 @@ export default function NouvelleChambrePage() {
         </div>
       </div>
 
+      {calculatePrice > 0 && (
       <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-blue-200 bg-white/95 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -1461,6 +1354,7 @@ export default function NouvelleChambrePage() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -19,16 +19,13 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import {
   Sparkles,
-  Users,
   User,
-  Hotel,
   Wallet,
   CreditCard,
   Settings,
   Info,
   CheckCircle,
   FileText,
-  Bell,
   Leaf,
   ShieldCheck,
   Crown,
@@ -148,6 +145,9 @@ export default function NouvelleChambrePage() {
   const [payments, setPayments] = useState<PaymentRow[]>([
     { amount: "", type: "", receipt: null },
   ]);
+  const [attachmentPreviews, setAttachmentPreviews] = useState<
+    Record<string, { url: string; type: string; name: string }>
+  >({});
   const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
   const [supplierStatus, setSupplierStatus] = useState({
     statutVisa: false,
@@ -417,6 +417,20 @@ export default function NouvelleChambrePage() {
       next[index] = file;
       return next;
     });
+    setAttachmentPreviews((prev) => {
+      const key = `occupant_${index}`;
+      const next = { ...prev };
+      if (!file) {
+        delete next[key];
+        return next;
+      }
+      next[key] = {
+        url: URL.createObjectURL(file),
+        type: file.type,
+        name: file.name,
+      };
+      return next;
+    });
   };
 
   const setPaymentField = (
@@ -429,6 +443,22 @@ export default function NouvelleChambrePage() {
       next[index] = { ...next[index], [field]: value } as PaymentRow;
       return next;
     });
+    if (field === "receipt") {
+      setAttachmentPreviews((prev) => {
+        const key = `payment_${index}`;
+        const next = { ...prev };
+        if (!(value instanceof File)) {
+          delete next[key];
+          return next;
+        }
+        next[key] = {
+          url: URL.createObjectURL(value),
+          type: value.type,
+          name: value.name,
+        };
+        return next;
+      });
+    }
   };
 
   const addPaymentRow = () => {
@@ -437,6 +467,11 @@ export default function NouvelleChambrePage() {
 
   const removePaymentRow = (index: number) => {
     setPayments((prev) => prev.filter((_, i) => i !== index));
+    setAttachmentPreviews((prev) => {
+      const next = { ...prev };
+      delete next[`payment_${index}`];
+      return next;
+    });
   };
 
   const sortedRoomCandidatesMadina = useMemo(
@@ -760,7 +795,7 @@ export default function NouvelleChambrePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
-              <form onSubmit={handleSubmit} className="space-y-6 pb-24">
+              <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-2">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
@@ -781,7 +816,7 @@ export default function NouvelleChambrePage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                     <div className="space-y-2">
                       <Label className="text-blue-700 font-medium text-sm">
                         Programme *
@@ -899,7 +934,9 @@ export default function NouvelleChambrePage() {
                         })}
                       </div>
                     </div>
+                  </div>
 
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div className="space-y-2">
                       <Label className="text-blue-700 font-medium text-sm">
                         Hôtel à Madina *
@@ -1120,7 +1157,7 @@ export default function NouvelleChambrePage() {
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-2">
                   <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
                     <User className="h-5 w-5" />
                     Informations Client
@@ -1240,11 +1277,28 @@ export default function NouvelleChambrePage() {
                                 }
                                 className="border-2 border-blue-100 bg-white"
                               />
-                              {occupantPassportFiles[i] && (
-                                <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
-                                  <CheckCircle className="h-3 w-3" />
-                                  {occupantPassportFiles[i]?.name}
-                                </p>
+                              {attachmentPreviews[`occupant_${i}`] && (
+                                <div className="mt-3 p-2 border border-blue-200 rounded-lg bg-white">
+                                  <div className="text-xs text-blue-700 mb-2">
+                                    {attachmentPreviews[`occupant_${i}`].name}
+                                  </div>
+                                  <div className="w-full h-[180px] overflow-hidden rounded border border-blue-200 bg-gray-50 flex items-center justify-center">
+                                    {attachmentPreviews[`occupant_${i}`].type ===
+                                    "application/pdf" ? (
+                                      <embed
+                                        src={attachmentPreviews[`occupant_${i}`].url}
+                                        type="application/pdf"
+                                        className="w-full h-full"
+                                      />
+                                    ) : (
+                                      <img
+                                        src={attachmentPreviews[`occupant_${i}`].url}
+                                        alt="Passeport"
+                                        className="w-full h-full object-contain"
+                                      />
+                                    )}
+                                  </div>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -1270,7 +1324,18 @@ export default function NouvelleChambrePage() {
                               className="h-10 border-2 border-blue-100 focus:border-blue-400"
                             />
                           </div>
-                          <div className="md:col-span-6 space-y-1">
+                          <div className="md:col-span-2 space-y-1">
+                            <Label className="text-xs text-blue-700">N° Passeport</Label>
+                            <Input
+                              placeholder="Numéro passeport"
+                              value={o.passportNumber}
+                              onChange={(e) =>
+                                updateOccupant(i, "passportNumber", e.target.value)
+                              }
+                              className="h-10 border-2 border-blue-100 focus:border-blue-400"
+                            />
+                          </div>
+                          <div className="md:col-span-4 space-y-1">
                             <Label className="text-xs text-blue-700">Passeport (obligatoire)</Label>
                             <div className="flex items-center gap-2">
                               <Input
@@ -1285,6 +1350,29 @@ export default function NouvelleChambrePage() {
                                 <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
                               )}
                             </div>
+                            {attachmentPreviews[`occupant_${i}`] && (
+                              <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
+                                <div className="text-xs text-blue-700 mb-2">
+                                  {attachmentPreviews[`occupant_${i}`].name}
+                                </div>
+                                <div className="w-full h-[120px] overflow-hidden rounded border border-blue-200 bg-gray-50 flex items-center justify-center">
+                                  {attachmentPreviews[`occupant_${i}`].type ===
+                                  "application/pdf" ? (
+                                    <embed
+                                      src={attachmentPreviews[`occupant_${i}`].url}
+                                      type="application/pdf"
+                                      className="w-full h-full"
+                                    />
+                                  ) : (
+                                    <img
+                                      src={attachmentPreviews[`occupant_${i}`].url}
+                                      alt="Passeport accompagnant"
+                                      className="w-full h-full object-contain"
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -1348,6 +1436,29 @@ export default function NouvelleChambrePage() {
                                 className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
                               />
                             </div>
+                            {attachmentPreviews[`payment_${index}`] && (
+                              <div className="mt-2 p-2 border border-orange-200 rounded-lg bg-white">
+                                <div className="text-xs text-orange-700 mb-2">
+                                  {attachmentPreviews[`payment_${index}`].name}
+                                </div>
+                                <div className="w-full h-[150px] overflow-hidden rounded border border-orange-200 bg-orange-50 flex items-center justify-center">
+                                  {attachmentPreviews[`payment_${index}`].type ===
+                                  "application/pdf" ? (
+                                    <embed
+                                      src={attachmentPreviews[`payment_${index}`].url}
+                                      type="application/pdf"
+                                      className="w-full h-full"
+                                    />
+                                  ) : (
+                                    <img
+                                      src={attachmentPreviews[`payment_${index}`].url}
+                                      alt="Reçu de paiement"
+                                      className="max-h-full max-w-full object-contain"
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="mt-4 flex justify-end">
@@ -1374,15 +1485,6 @@ export default function NouvelleChambrePage() {
                       <Plus className="mr-2 h-5 w-5" />
                       Ajouter un paiement
                     </Button>
-                    <div className="space-y-2 pt-2">
-                      <Label className="text-orange-700 font-medium text-sm">Montant déjà payé (leader)</Label>
-                      <Input
-                        value={paidAmount}
-                        onChange={(e) => setPaidAmount(e.target.value)}
-                        placeholder="0"
-                        className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg max-w-xs"
-                      />
-                    </div>
                   </div>
                 </div>
 
@@ -1486,6 +1588,13 @@ export default function NouvelleChambrePage() {
                       Annuler
                     </Button>
                   </Link>
+                  <Button
+                    type="submit"
+                    disabled={!canSubmit || isSubmitting}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {isSubmitting ? "Enregistrement..." : "Enregistrer"}
+                  </Button>
                 </div>
               </form>
             </CardContent>
@@ -1494,50 +1603,52 @@ export default function NouvelleChambrePage() {
       </div>
 
       {calculatePrice > 0 && (
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-blue-200 bg-white/95 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200">
-                <span className="text-[10px] font-medium text-gray-600">Prix</span>
-                <span className="text-sm font-bold text-blue-800">
-                  {(Number(formData.prix || 0) || 0).toLocaleString("fr-FR")} DH
-                </span>
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-emerald-200 shadow-2xl z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg border-2 bg-emerald-50 border-emerald-300 shadow-lg">
+                  <Wallet className="h-4 w-4 text-emerald-800" />
+                  <span className="text-sm font-medium text-emerald-700">Total:</span>
+                  <span className="font-bold text-emerald-900 text-lg">
+                    {(Number(formData.prix || 0) || 0).toLocaleString("fr-FR")} DH
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 bg-red-50 px-3 py-2 rounded-lg border border-red-200">
+                  <span className="text-sm font-medium text-red-700">Réduction:</span>
+                  <Input
+                    value={reduction}
+                    onChange={(e) => setReduction(e.target.value)}
+                    className="w-24 h-7 text-sm border border-red-300 focus:border-red-500 rounded text-center"
+                    placeholder="0"
+                  />
+                  <span className="text-sm text-red-600 font-medium">DH</span>
+                </div>
+                <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-lg border border-green-200">
+                  <span className="text-sm font-medium text-green-700">Proposition:</span>
+                  <span className="font-bold text-green-900 text-lg">
+                    {Math.max(
+                      (Number(formData.prix || 0) || 0) - (Number(reduction || 0) || 0),
+                      0
+                    ).toLocaleString("fr-FR")}{" "}
+                    DH
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200">
-                <span className="text-[10px] font-medium text-gray-600">Réduc.</span>
-                <Input
-                  value={reduction}
-                  onChange={(e) => setReduction(e.target.value)}
-                  className="h-7 w-24 border-amber-300 text-xs"
-                />
-              </div>
-              <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
-                <span className="text-[10px] font-medium text-gray-600">Propos.</span>
-                <span className="text-sm font-bold text-emerald-800">
-                  {Math.max(
-                    (Number(formData.prix || 0) || 0) - (Number(reduction || 0) || 0),
-                    0
-                  ).toLocaleString("fr-FR")} DH
-                </span>
-              </div>
+              <Button
+                type="submit"
+                disabled={!canSubmit || isSubmitting}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 text-lg"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.querySelector("form")?.requestSubmit();
+                }}
+              >
+                {isSubmitting ? "Enregistrement..." : "Confirmer la Réservation"}
+              </Button>
             </div>
-            <Button
-              type="submit"
-              form="__next"
-              onClick={(e) => {
-                e.preventDefault();
-                const form = document.querySelector("form");
-                if (form) form.requestSubmit();
-              }}
-              disabled={!canSubmit || isSubmitting}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {isSubmitting ? "Enregistrement…" : "Confirmer la réservation"}
-            </Button>
           </div>
         </div>
-      </div>
       )}
     </div>
   );

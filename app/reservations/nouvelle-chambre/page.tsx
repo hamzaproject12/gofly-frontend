@@ -20,6 +20,8 @@ import { useToast } from "@/components/ui/use-toast";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -78,6 +80,22 @@ type PaymentRow = {
   type: string;
   receipt: File | null;
 };
+
+type OcrExtractData = {
+  first_name?: string;
+  last_name?: string;
+  passport?: string;
+  personal_id_number?: string;
+  sex?: string;
+};
+
+function mapOcrSexToGender(sex: string | undefined): "Homme" | "Femme" | null {
+  if (!sex || typeof sex !== "string") return null;
+  const u = sex.trim().toUpperCase();
+  if (u === "F" || u === "FEMALE" || u === "FÉMININ") return "Femme";
+  if (u === "M" || u === "MALE" || u === "MASCULIN") return "Homme";
+  return null;
+}
 
 const ROOM_CAPACITY: Record<string, number> = {
   SINGLE: 1,
@@ -165,6 +183,17 @@ export default function NouvelleChambrePage() {
     title: string;
     type: string;
   } | null>(null);
+  /** Données OCR à valider avant application sur l’occupant ciblé (index = leader ou accompagnant) */
+  const [ocrValidation, setOcrValidation] = useState<{
+    occupantIndex: number;
+    firstName: string;
+    lastName: string;
+    passport: string;
+    sex?: string;
+  } | null>(null);
+  const [ocrProcessingIndex, setOcrProcessingIndex] = useState<number | null>(
+    null
+  );
   const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
   const [supplierStatus, setSupplierStatus] = useState({
     statutVisa: false,
@@ -517,6 +546,47 @@ export default function NouvelleChambrePage() {
         });
       };
       reader.readAsDataURL(file);
+
+      void (async () => {
+        setOcrProcessingIndex(index);
+        try {
+          const fd = new FormData();
+          fd.append("file", file);
+          const res = await fetch("/api/passport-ocr", {
+            method: "POST",
+            body: fd,
+          });
+          const json = (await res.json()) as {
+            status?: string;
+            data?: OcrExtractData;
+            error?: string;
+          };
+          if (!res.ok) {
+            throw new Error(json.error || "Service OCR indisponible");
+          }
+          const raw = json.data || {};
+          setOcrValidation({
+            occupantIndex: index,
+            firstName: String(raw.first_name ?? "").trim(),
+            lastName: String(raw.last_name ?? "").trim(),
+            passport: String(
+              raw.passport ?? raw.personal_id_number ?? ""
+            ).trim(),
+            sex: typeof raw.sex === "string" ? raw.sex : undefined,
+          });
+        } catch (err) {
+          toast({
+            title: "Lecture automatique du passeport",
+            description:
+              err instanceof Error
+                ? err.message
+                : "Impossible d’analyser l’image. Vous pouvez saisir les champs manuellement.",
+            variant: "destructive",
+          });
+        } finally {
+          setOcrProcessingIndex(null);
+        }
+      })();
     } else {
       setOccupantPreviews((p) => {
         const x = [...p];
@@ -524,6 +594,30 @@ export default function NouvelleChambrePage() {
         return x;
       });
     }
+  };
+
+  const applyOcrValidation = () => {
+    if (!ocrValidation) return;
+    const { occupantIndex, firstName, lastName, passport, sex } = ocrValidation;
+    updateOccupant(occupantIndex, "lastName", lastName);
+    updateOccupant(occupantIndex, "firstName", firstName);
+    updateOccupant(occupantIndex, "passportNumber", passport);
+    const g = mapOcrSexToGender(sex);
+    if (g) {
+      if (occupantIndex === 0) {
+        setFormData((p) => ({ ...p, gender: g }));
+      } else {
+        updateOccupant(occupantIndex, "gender", g);
+      }
+    }
+    setOcrValidation(null);
+    toast({
+      title: "Données appliquées",
+      description:
+        occupantIndex === 0
+          ? "Identité du leader mise à jour depuis le passeport."
+          : `Identité de l’accompagnant ${occupantIndex} mise à jour.`,
+    });
   };
 
   const setPaymentField = (
@@ -1464,7 +1558,7 @@ export default function NouvelleChambrePage() {
                                 accept="image/*,.pdf"
                                 onChange={(e) => handleOccupantPassportChange(i, e)}
                                 className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                                disabled={isSubmitting}
+                                disabled={isSubmitting || ocrProcessingIndex === i}
                               />
                               {occupantPassportFiles[i] && (
                                 <Button
@@ -1479,6 +1573,11 @@ export default function NouvelleChambrePage() {
                                 </Button>
                               )}
                             </div>
+                            {ocrProcessingIndex === i && (
+                              <p className="text-xs text-blue-600 animate-pulse">
+                                Analyse OCR du passeport en cours…
+                              </p>
+                            )}
                             {occupantPreviews[i] && (
                               <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
                                 <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
@@ -1610,7 +1709,7 @@ export default function NouvelleChambrePage() {
                                 accept="image/*,.pdf"
                                 onChange={(e) => handleOccupantPassportChange(i, e)}
                                 className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                                disabled={isSubmitting}
+                                disabled={isSubmitting || ocrProcessingIndex === i}
                               />
                               {occupantPassportFiles[i] && (
                                 <Button
@@ -1625,6 +1724,11 @@ export default function NouvelleChambrePage() {
                                 </Button>
                               )}
                             </div>
+                            {ocrProcessingIndex === i && (
+                              <p className="text-xs text-blue-600 animate-pulse">
+                                Analyse OCR du passeport en cours…
+                              </p>
+                            )}
                             {occupantPreviews[i] && (
                               <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
                                 <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
@@ -2046,6 +2150,83 @@ export default function NouvelleChambrePage() {
           </div>
         </div>
       )}
+
+      <Dialog
+        open={ocrValidation !== null}
+        onOpenChange={(open) => {
+          if (!open) setOcrValidation(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Valider les données extraites du passeport</DialogTitle>
+            <DialogDescription>
+              {ocrValidation &&
+                (ocrValidation.occupantIndex === 0
+                  ? "Leader : vérifiez le nom, le prénom et le numéro de passeport avant de les appliquer au formulaire."
+                  : `Accompagnant ${ocrValidation.occupantIndex} : vérifiez ces informations pour la bonne personne.`)}
+            </DialogDescription>
+          </DialogHeader>
+          {ocrValidation && (
+            <div className="grid gap-3 py-2">
+              <div className="space-y-1">
+                <Label htmlFor="ocr-lastName">Nom</Label>
+                <Input
+                  id="ocr-lastName"
+                  value={ocrValidation.lastName}
+                  onChange={(e) =>
+                    setOcrValidation((prev) =>
+                      prev ? { ...prev, lastName: e.target.value } : null
+                    )
+                  }
+                  placeholder="Nom"
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="ocr-firstName">Prénom</Label>
+                <Input
+                  id="ocr-firstName"
+                  value={ocrValidation.firstName}
+                  onChange={(e) =>
+                    setOcrValidation((prev) =>
+                      prev ? { ...prev, firstName: e.target.value } : null
+                    )
+                  }
+                  placeholder="Prénom"
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="ocr-passport">N° Passeport</Label>
+                <Input
+                  id="ocr-passport"
+                  value={ocrValidation.passport}
+                  onChange={(e) =>
+                    setOcrValidation((prev) =>
+                      prev ? { ...prev, passport: e.target.value } : null
+                    )
+                  }
+                  placeholder="Numéro de passeport"
+                  className="h-10"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOcrValidation(null)}
+            >
+              Annuler
+            </Button>
+            <Button type="button" onClick={applyOcrValidation}>
+              OK — Appliquer aux champs
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
         <DialogContent className="max-w-[90vw] max-h-[90vh] p-0">

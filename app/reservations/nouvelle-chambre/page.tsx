@@ -649,6 +649,24 @@ export default function NouvelleChambrePage() {
     }
   }, [sortedRoomCandidatesMakkah]);
 
+  const prixGenere =
+    calculatePrice > 0 &&
+    String(formData.prix || "").trim() !== "" &&
+    Number(formData.prix) > 0;
+
+  const champsIdentiteOk =
+    occupants.length === capacity &&
+    capacity >= 2 &&
+    occupants.every((o, i) => {
+      const fn = (o.firstName || "").trim();
+      const ln = (o.lastName || "").trim();
+      if (i === 0) {
+        const ph = (o.phone || "").trim();
+        return Boolean(fn && ln && ph);
+      }
+      return Boolean(fn && ln);
+    });
+
   const canSubmit =
     !!formData.programId &&
     !!formData.typeChambre &&
@@ -657,11 +675,8 @@ export default function NouvelleChambrePage() {
     !!formData.hotelMakkah &&
     !!roomMadinaId &&
     !!roomMakkahId &&
-    !!formData.prix &&
-    occupants.length === capacity &&
-    occupants.every((o, i) =>
-      i === 0 ? o.firstName && o.lastName && o.phone : o.firstName && o.lastName
-    ) &&
+    prixGenere &&
+    champsIdentiteOk &&
     occupantPassportFiles.length === capacity &&
     occupantPassportFiles.every(Boolean);
 
@@ -1378,7 +1393,7 @@ export default function NouvelleChambrePage() {
                                 />
                               </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-3 items-center">
+                            <div className="grid grid-cols-2 gap-3 items-end">
                               <div className="space-y-1">
                                 <Label className="text-xs text-blue-700">Genre</Label>
                                 <Select
@@ -1397,6 +1412,19 @@ export default function NouvelleChambrePage() {
                                 </Select>
                               </div>
                               <div className="space-y-1">
+                                <Label className="text-xs text-blue-700">N° Passeport</Label>
+                                <Input
+                                  placeholder="Numéro passeport"
+                                  value={o.passportNumber}
+                                  onChange={(e) =>
+                                    updateOccupant(i, "passportNumber", e.target.value)
+                                  }
+                                  className="h-10 border-2 border-blue-100 focus:border-blue-400"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 items-center">
+                              <div className="space-y-1">
                                 <Label className="text-xs text-blue-700">Transport</Label>
                                 <div className="flex items-center gap-2 h-10 px-3 border-2 border-blue-100 rounded-lg bg-white">
                                   <Switch
@@ -1411,17 +1439,17 @@ export default function NouvelleChambrePage() {
                                   </span>
                                 </div>
                               </div>
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-xs text-blue-700">Remarque</Label>
-                              <Input
-                                placeholder="Remarque (optionnel)"
-                                value={leaderMeta.remarque}
-                                onChange={(e) =>
-                                  setLeaderMeta((prev) => ({ ...prev, remarque: e.target.value }))
-                                }
-                                className="h-10 border-2 border-blue-100 focus:border-blue-400"
-                              />
+                              <div className="space-y-1">
+                                <Label className="text-xs text-blue-700">Remarque</Label>
+                                <Input
+                                  placeholder="Remarque (optionnel)"
+                                  value={leaderMeta.remarque}
+                                  onChange={(e) =>
+                                    setLeaderMeta((prev) => ({ ...prev, remarque: e.target.value }))
+                                  }
+                                  className="h-10 border-2 border-blue-100 focus:border-blue-400"
+                                />
+                              </div>
                             </div>
                           </div>
 
@@ -1496,14 +1524,14 @@ export default function NouvelleChambrePage() {
                                     </Button>
                                   </div>
                                 </div>
-                                <div className="w-full h-[350px] overflow-hidden rounded-lg border border-blue-200">
+                                <div className="w-full max-h-36 h-36 overflow-hidden rounded-lg border border-blue-200 bg-slate-50 flex items-center justify-center">
                                   {occupantPreviews[i]?.type === "application/pdf" ? (
                                     occupantPreviews[i]!.url.startsWith("blob:") ||
                                     occupantPreviews[i]!.url.startsWith("data:") ? (
                                       <embed
                                         src={occupantPreviews[i]!.url}
                                         type="application/pdf"
-                                        className="w-full h-full"
+                                        className="w-full h-full min-h-0"
                                       />
                                     ) : (
                                       <div className="w-full h-full flex items-center justify-center bg-gray-50">
@@ -1511,10 +1539,10 @@ export default function NouvelleChambrePage() {
                                           href={occupantPreviews[i]!.url}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors"
+                                          className="flex flex-col items-center justify-center gap-1 p-2 hover:bg-blue-50 rounded-lg transition-colors"
                                         >
-                                          <FileText className="h-16 w-16 text-red-600" />
-                                          <span className="text-sm font-medium text-blue-700">
+                                          <FileText className="h-10 w-10 text-red-600" />
+                                          <span className="text-xs font-medium text-blue-700">
                                             Voir le PDF
                                           </span>
                                         </a>
@@ -1524,7 +1552,7 @@ export default function NouvelleChambrePage() {
                                     <img
                                       src={occupantPreviews[i]!.url}
                                       alt="Passeport"
-                                      className="w-full h-full object-contain"
+                                      className="max-w-full max-h-full w-auto h-auto object-contain"
                                     />
                                   )}
                                 </div>
@@ -1642,14 +1670,14 @@ export default function NouvelleChambrePage() {
                                     </Button>
                                   </div>
                                 </div>
-                                <div className="w-full h-[350px] overflow-hidden rounded-lg border border-blue-200">
+                                <div className="w-full max-h-36 h-36 overflow-hidden rounded-lg border border-blue-200 bg-slate-50 flex items-center justify-center">
                                   {occupantPreviews[i]?.type === "application/pdf" ? (
                                     occupantPreviews[i]!.url.startsWith("blob:") ||
                                     occupantPreviews[i]!.url.startsWith("data:") ? (
                                       <embed
                                         src={occupantPreviews[i]!.url}
                                         type="application/pdf"
-                                        className="w-full h-full"
+                                        className="w-full h-full min-h-0"
                                       />
                                     ) : (
                                       <div className="w-full h-full flex items-center justify-center bg-gray-50">
@@ -1657,10 +1685,10 @@ export default function NouvelleChambrePage() {
                                           href={occupantPreviews[i]!.url}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors"
+                                          className="flex flex-col items-center justify-center gap-1 p-2 hover:bg-blue-50 rounded-lg transition-colors"
                                         >
-                                          <FileText className="h-16 w-16 text-red-600" />
-                                          <span className="text-sm font-medium text-blue-700">
+                                          <FileText className="h-10 w-10 text-red-600" />
+                                          <span className="text-xs font-medium text-blue-700">
                                             Voir le PDF
                                           </span>
                                         </a>
@@ -1670,7 +1698,7 @@ export default function NouvelleChambrePage() {
                                     <img
                                       src={occupantPreviews[i]!.url}
                                       alt="Passeport accompagnant"
-                                      className="w-full h-full object-contain"
+                                      className="max-w-full max-h-full w-auto h-auto object-contain"
                                     />
                                   )}
                                 </div>

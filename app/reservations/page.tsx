@@ -690,7 +690,7 @@ export default function ReservationsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-            <form onSubmit={handleFilterChange} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <form onSubmit={handleFilterChange} className="grid grid-cols-1 md:grid-cols-4 gap-4 md:items-end">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
@@ -728,19 +728,25 @@ export default function ReservationsPage() {
                 </SelectContent>
               </Select>
 
-              <Select value={chambreFilter} onValueChange={handleChambreChange}>
-                <SelectTrigger className="h-12 border-2 focus:border-blue-500">
-                  <SelectValue placeholder="Type de chambre" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="toutes">Toutes les chambres</SelectItem>
-                  <SelectItem value="SINGLE">1 personne</SelectItem>
-                  <SelectItem value="DOUBLE">2 personnes</SelectItem>
-                  <SelectItem value="TRIPLE">3 personnes</SelectItem>
-                  <SelectItem value="QUAD">4 personnes</SelectItem>
-                  <SelectItem value="QUINT">5 personnes</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold text-gray-600">
+                  Chambre
+                </span>
+                <Select value={chambreFilter} onValueChange={handleChambreChange}>
+                  <SelectTrigger className="h-12 border-2 focus:border-blue-500">
+                    <SelectValue placeholder="Toutes les chambres" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="toutes">Toutes les chambres</SelectItem>
+                    <SelectItem value="FAMILLE">Famille</SelectItem>
+                    <SelectItem value="SINGLE">1 personne</SelectItem>
+                    <SelectItem value="DOUBLE">2 personnes</SelectItem>
+                    <SelectItem value="TRIPLE">3 personnes</SelectItem>
+                    <SelectItem value="QUAD">4 personnes</SelectItem>
+                    <SelectItem value="QUINT">5 personnes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </form>
           </CardContent>
         </Card>
@@ -777,8 +783,8 @@ export default function ReservationsPage() {
                         <div className="flex-1 flex flex-col md:flex-row md:items-center gap-3 min-w-[180px]">
                           <span className="font-bold text-xl text-blue-900 tracking-tight uppercase">{reservation.nom} {reservation.prenom}</span>
                           {reservation.typeReservation === "CHAMBRE_PRIVEE" ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1">
-                              👨‍👩‍👧‍👦 {reservation.groupSize} personnes
+                            <span className="inline-flex items-center text-xs font-bold text-green-800 bg-green-100 border border-green-300 rounded px-2 py-1">
+                              Famille
                             </span>
                           ) : reservation.groupSize > 1 ? (
                             <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1">

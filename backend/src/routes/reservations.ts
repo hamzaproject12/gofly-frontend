@@ -7,6 +7,17 @@ import jwt from 'jsonwebtoken';
 const router = express.Router();
 const prisma = new PrismaClient();
 
+/** Filtre liste / stats : roomType Prisma ou "FAMILLE" = chambres privées (famille) */
+function applyRoomTypeQuery(where: Record<string, unknown>, roomType: unknown) {
+  const rt = typeof roomType === 'string' ? roomType : '';
+  if (!rt || rt === 'toutes') return;
+  if (rt === 'FAMILLE' || rt === 'CHAMBRE_PRIVEE') {
+    (where as { typeReservation: string }).typeReservation = 'CHAMBRE_PRIVEE';
+  } else {
+    (where as { roomType: string }).roomType = rt;
+  }
+}
+
 // Fonction helper pour calculer le nombre de places selon le type de chambre
 function getPlacesByRoomType(roomType: string): number {
   // Chaque réservation décrémente de 1 place
@@ -88,9 +99,7 @@ router.get('/', async (req, res) => {
       }
     }
     
-    if (roomType && roomType !== 'toutes') {
-      where.roomType = roomType;
-    }
+    applyRoomTypeQuery(where, roomType);
 
     if (dateFrom || dateTo) {
       where.reservationDate = {};
@@ -180,9 +189,7 @@ router.get('/stats', async (req, res) => {
       };
     }
     
-    if (roomType && roomType !== 'toutes') {
-      where.roomType = roomType;
-    }
+    applyRoomTypeQuery(where, roomType);
     
     if (dateFrom || dateTo) {
       where.reservationDate = {};

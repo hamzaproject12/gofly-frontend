@@ -1520,6 +1520,304 @@ export default function EditReservation() {
   const totalProgress = [section1Complete, section2Complete, section3Complete, section4Complete]
     .filter(Boolean).length * 25
 
+  const isChambrePrivee = reservationData?.typeReservation === "CHAMBRE_PRIVEE"
+
+  const renderVoyageCustomizationBlock = () => {
+    if (!isCustomizationOpen || !formData.programId || !programDetail) return null;
+    return (
+      <div className="mt-4 mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
+        <div className="flex flex-wrap items-center gap-6 lg:gap-8">
+          <div className="flex items-center gap-6">
+            <span className="text-sm font-semibold text-blue-700">Services:</span>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">✈️</span>
+              <span className="text-sm font-medium text-blue-700">Avion</span>
+              <Switch
+                checked={customization.includeAvion}
+                onCheckedChange={(checked) =>
+                  setCustomization((prev) => ({ ...prev, includeAvion: checked }))
+                }
+                className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">📄</span>
+              <span className="text-sm font-medium text-blue-700">Visa</span>
+              <Switch
+                checked={customization.includeVisa}
+                onCheckedChange={(checked) =>
+                  setCustomization((prev) => ({ ...prev, includeVisa: checked }))
+                }
+                className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+              />
+            </div>
+          </div>
+          <div className="w-px h-8 bg-blue-300 hidden sm:block" />
+          <div className="flex flex-wrap items-center gap-6">
+            <span className="text-sm font-semibold text-blue-700">Durée:</span>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🕌</span>
+              <span className="text-sm font-medium text-blue-700">Madina</span>
+              <Input
+                type="number"
+                min={0}
+                value={customization.joursMadina}
+                onChange={(e) =>
+                  setCustomization((prev) => ({
+                    ...prev,
+                    joursMadina: parseInt(e.target.value, 10) || 0,
+                  }))
+                }
+                className="w-16 h-8 text-xs border border-blue-200 focus:border-blue-500 rounded text-center"
+              />
+              <span className="text-xs text-blue-500">
+                (déf: {programDetail.nbJoursMadina ?? 0})
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🕋</span>
+              <span className="text-sm font-medium text-blue-700">Makkah</span>
+              <Input
+                type="number"
+                min={0}
+                value={customization.joursMakkah}
+                onChange={(e) =>
+                  setCustomization((prev) => ({
+                    ...prev,
+                    joursMakkah: parseInt(e.target.value, 10) || 0,
+                  }))
+                }
+                className="w-16 h-8 text-xs border border-blue-200 focus:border-blue-500 rounded text-center"
+              />
+              <span className="text-xs text-blue-500">
+                (déf: {programDetail.nbJoursMakkah ?? 0})
+              </span>
+            </div>
+          </div>
+          <div className="w-px h-8 bg-blue-300 hidden sm:block" />
+          <Button
+            type="button"
+            onClick={() =>
+              setCustomization((c) => ({
+                ...c,
+                includeAvion: true,
+                includeVisa: true,
+                joursMadina: programDetail.nbJoursMadina ?? 0,
+                joursMakkah: programDetail.nbJoursMakkah ?? 0,
+              }))
+            }
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+          >
+            Réinitialiser
+          </Button>
+        </div>
+        {reservationData?.isLeader &&
+          reservationData?.typeReservation === "CHAMBRE_PRIVEE" &&
+          suggestedChambrePrix > 0 && (
+            <p className="mt-3 text-xs text-emerald-800">
+              Prix suggéré (lit × capacité, comme nouvelle chambre / nouvelle réservation) :{" "}
+              <span className="font-semibold">
+                {suggestedChambrePrix.toLocaleString("fr-FR")} DH
+              </span>
+              . Vous pouvez ajuster le montant ci-dessous.
+            </p>
+          )}
+      </div>
+    );
+  };
+
+  const renderLeaderPassportBlock = () => (
+    <div className="space-y-2 min-w-0">
+      <Label className="text-xs text-blue-700 font-medium">Passeport (obligatoire)</Label>
+      {(!getDocumentUrl("passport") && !documents.passport) || passportToDelete !== null ? (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Input
+              type="file"
+              ref={(el) => {
+                if (el) fileInputs.current.passeport = el;
+              }}
+              onChange={(e) => {
+                handleFileChange(e, "passport");
+                if (e.target.files && e.target.files.length > 0) {
+                  setPassportToDelete(null);
+                }
+              }}
+              accept="image/*,.pdf"
+              className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+            />
+            {passportToDelete !== null && (
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                onClick={() => setPassportToDelete(null)}
+                className="text-gray-600 hover:text-gray-800"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Annuler
+              </Button>
+            )}
+          </div>
+          {passportToDelete !== null && (
+            <p className="text-xs text-orange-600">
+              L&apos;ancien passeport sera remplacé par le nouveau fichier
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-blue-700">
+              {documents.passport ? "Nouveau passeport" : "Aperçu du passeport"}
+            </span>
+            <div className="flex items-center gap-2">
+              {(previews.passport || getDocumentUrl("passport")) && !documents.passport && (
+                <button
+                  type="button"
+                  className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const url = previews.passport?.url || getDocumentUrl("passport") || "";
+                    const type = previews.passport?.type || getDocumentType("passport");
+                    setPreviewImage({ url, title: "Passeport", type });
+                  }}
+                >
+                  <ZoomIn className="h-3 w-3 mr-1" />
+                  Zoom
+                </button>
+              )}
+              {(previews.passport || getDocumentUrl("passport")) && !documents.passport && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  onClick={() => {
+                    const fileId = getPassportFileId();
+                    if (fileId) {
+                      setPassportToDelete(fileId);
+                    }
+                  }}
+                  className="text-orange-600 hover:text-orange-800 hover:bg-orange-50"
+                >
+                  <Edit className="h-3 w-3 mr-1" />
+                  Remplacer
+                </Button>
+              )}
+              {documents.passport && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  onClick={() => {
+                    handleRemoveDocument("passport");
+                    if (passportToDelete) {
+                      setPassportToDelete(null);
+                    }
+                  }}
+                  className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Supprimer
+                </Button>
+              )}
+            </div>
+          </div>
+          <div className="w-full max-h-36 h-36 overflow-hidden rounded-lg border border-blue-200 bg-slate-50 flex items-center justify-center">
+            {(() => {
+              const passportUrl = documents.passport
+                ? previews.passport?.url
+                : previews.passport?.url || getDocumentUrl("passport");
+              const passportType = documents.passport
+                ? previews.passport?.type
+                : previews.passport?.type || getDocumentType("passport");
+              const isPdf = passportType === "application/pdf";
+
+              if (documents.passport) {
+                if (isPdf) {
+                  if (
+                    previews.passport?.url?.startsWith("blob:") ||
+                    previews.passport?.url?.startsWith("data:")
+                  ) {
+                    return (
+                      <embed
+                        src={previews.passport.url}
+                        type="application/pdf"
+                        className="w-full h-full"
+                      />
+                    );
+                  }
+                  return (
+                    <PdfPreviewBox
+                      url={previews.passport?.url || null}
+                      title="Nouveau passeport"
+                      onZoom={() =>
+                        setPreviewImage({
+                          url: previews.passport?.url || "",
+                          title: "Nouveau passeport",
+                          type: "application/pdf",
+                        })
+                      }
+                    />
+                  );
+                }
+                return (
+                  <img
+                    src={previews.passport?.url || ""}
+                    alt="Nouveau passeport"
+                    className="max-w-full max-h-full w-auto h-auto object-contain cursor-pointer"
+                    onClick={() =>
+                      setPreviewImage({
+                        url: previews.passport?.url || "",
+                        title: "Nouveau passeport",
+                        type: previews.passport?.type || "image/*",
+                      })
+                    }
+                  />
+                );
+              }
+              if (!passportUrl) {
+                return (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400 text-sm">
+                    Aucun passeport attaché
+                  </div>
+                );
+              }
+              if (isPdf) {
+                return (
+                  <PdfPreviewBox
+                    url={passportUrl}
+                    title="Passeport"
+                    onZoom={() => {
+                      setPreviewImage({
+                        url: passportUrl || "",
+                        title: "Passeport",
+                        type: "application/pdf",
+                      });
+                    }}
+                  />
+                );
+              }
+              return (
+                <img
+                  src={passportUrl}
+                  alt="Passeport"
+                  className="max-w-full max-h-full w-auto h-auto object-contain cursor-pointer"
+                  onClick={() => {
+                    setPreviewImage({ url: passportUrl, title: "Passeport", type: passportType });
+                  }}
+                />
+              );
+            })()}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
@@ -1649,132 +1947,342 @@ export default function EditReservation() {
                   </div>
                 </div>
 
-                {isCustomizationOpen && formData.programId && programDetail && (
-                  <div className="mt-4 mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <div className="flex flex-wrap items-center gap-6 lg:gap-8">
-                      <div className="flex items-center gap-6">
-                        <span className="text-sm font-semibold text-blue-700">Services:</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">✈️</span>
-                          <span className="text-sm font-medium text-blue-700">Avion</span>
-                          <Switch
-                            checked={customization.includeAvion}
-                            onCheckedChange={(checked) =>
-                              setCustomization((prev) => ({ ...prev, includeAvion: checked }))
-                            }
-                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">📄</span>
-                          <span className="text-sm font-medium text-blue-700">Visa</span>
-                          <Switch
-                            checked={customization.includeVisa}
-                            onCheckedChange={(checked) =>
-                              setCustomization((prev) => ({ ...prev, includeVisa: checked }))
-                            }
-                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                          />
-                        </div>
-                      </div>
-                      <div className="w-px h-8 bg-blue-300 hidden sm:block" />
-                      <div className="flex flex-wrap items-center gap-6">
-                        <span className="text-sm font-semibold text-blue-700">Durée:</span>
-                        <div className="flex items-center gap-2">
+                {isChambrePrivee ? (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 mb-2">
                           <span className="text-lg">🕌</span>
-                          <span className="text-sm font-medium text-blue-700">Madina</span>
-                          <Input
-                            type="number"
-                            min={0}
-                            value={customization.joursMadina}
-                            onChange={(e) =>
-                              setCustomization((prev) => ({
-                                ...prev,
-                                joursMadina: parseInt(e.target.value, 10) || 0,
-                              }))
-                            }
-                            className="w-16 h-8 text-xs border border-blue-200 focus:border-blue-500 rounded text-center"
-                          />
-                          <span className="text-xs text-blue-500">
-                            (déf: {programDetail.nbJoursMadina ?? 0})
-                          </span>
+                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina *</Label>
+                          <button
+                            type="button"
+                            onClick={() => setShowRoomGuide(true)}
+                            className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-colors"
+                            title="Guide des chambres"
+                          >
+                            <Info className="h-4 w-4" />
+                          </button>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">🕋</span>
-                          <span className="text-sm font-medium text-blue-700">Makkah</span>
-                          <Input
-                            type="number"
-                            min={0}
-                            value={customization.joursMakkah}
-                            onChange={(e) =>
-                              setCustomization((prev) => ({
-                                ...prev,
-                                joursMakkah: parseInt(e.target.value, 10) || 0,
-                              }))
-                            }
-                            className="w-16 h-8 text-xs border border-blue-200 focus:border-blue-500 rounded text-center"
-                          />
-                          <span className="text-xs text-blue-500">
-                            (déf: {programDetail.nbJoursMakkah ?? 0})
+                        <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                          <span className="text-gray-900 font-medium">
+                            {getHotelName(formData.hotelMadina, "madina")}
                           </span>
                         </div>
                       </div>
-                      <div className="w-px h-8 bg-blue-300 hidden sm:block" />
-                      <Button
-                        type="button"
-                        onClick={() =>
-                          setCustomization((c) => ({
-                            ...c,
-                            includeAvion: true,
-                            includeVisa: true,
-                            joursMadina: programDetail.nbJoursMadina ?? 0,
-                            joursMakkah: programDetail.nbJoursMakkah ?? 0,
-                          }))
-                        }
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
-                      >
-                        Réinitialiser
-                      </Button>
-                    </div>
-                    {reservationData?.isLeader &&
-                      reservationData?.typeReservation === "CHAMBRE_PRIVEE" &&
-                      suggestedChambrePrix > 0 && (
-                        <p className="mt-3 text-xs text-emerald-800">
-                          Prix suggéré (lit × capacité, comme nouvelle chambre / nouvelle réservation) :{" "}
-                          <span className="font-semibold">
-                            {suggestedChambrePrix.toLocaleString("fr-FR")} DH
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-lg">🕋</span>
+                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah *</Label>
+                          <button
+                            type="button"
+                            onClick={() => setShowRoomGuide(true)}
+                            className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-colors"
+                            title="Guide des chambres"
+                          >
+                            <Info className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                          <span className="text-gray-900 font-medium">
+                            {getHotelName(formData.hotelMakkah, "makkah")}
                           </span>
-                          . Vous pouvez ajuster le montant ci-dessous.
-                        </p>
-                      )}
-                  </div>
-                )}
+                        </div>
+                      </div>
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Prix total dossier (DH) *</Label>
-                    <Input
-                      value={formData.prix}
-                      onChange={(e) => setFormData({ ...formData, prix: e.target.value })}
-                      className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                      placeholder="Montant"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Date de réservation *</Label>
-                    <Input
-                      type="date"
-                      value={formData.dateReservation}
-                      onChange={(e) => setFormData({ ...formData, dateReservation: e.target.value })}
-                      className="h-10 border-2 border-blue-200 rounded-lg"
-                    />
-                  </div>
-                </div>
+                    {renderVoyageCustomizationBlock()}
 
-                {/* Hôtels & chambres — même présentation « points » que Nouvelle Réservation */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                      <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Info className="h-4 w-4 text-green-700" />
+                          <span className="text-xs font-medium text-green-700">
+                            Chambres disponibles à Madina (libres uniquement)
+                          </span>
+                        </div>
+                        <div className="grid gap-2">
+                          {programDetail?.rooms &&
+                          formData.hotelMadina &&
+                          formData.hotelMadina !== "none" &&
+                          formData.typeChambre &&
+                          formData.gender
+                            ? (() => {
+                                const hid = resolveHotelId(formData.hotelMadina, "madina");
+                                if (!hid)
+                                  return (
+                                    <div className="text-xs text-gray-500 py-2">—</div>
+                                  );
+                                const filteredRooms = programDetail.rooms.filter(
+                                  (room: any) =>
+                                    room.hotelId === hid &&
+                                    room.roomType === formData.typeChambre &&
+                                    (room.gender === formData.gender ||
+                                      room.gender === "Mixte" ||
+                                      !room.gender)
+                                );
+                                if (filteredRooms.length === 0) {
+                                  return (
+                                    <div className="text-xs text-gray-500 text-center py-2">
+                                      Aucune chambre trouvée
+                                    </div>
+                                  );
+                                }
+                                const sortedRooms = sortRoomsByAlgorithm(
+                                  filteredRooms,
+                                  formData.gender
+                                );
+                                return sortedRooms.map((room: any, index: number) => {
+                                  const placesOccupees =
+                                    room.nbrPlaceTotal - room.nbrPlaceRestantes;
+                                  const placesDisponibles = room.nbrPlaceRestantes;
+                                  const isGroupRoom = (room.listeIdsReservation || []).some(
+                                    (rid: number) => groupReservationIds.includes(rid)
+                                  );
+                                  return (
+                                    <div
+                                      key={index}
+                                      className={`relative p-2 rounded border transition-all ${
+                                        isGroupRoom
+                                          ? "border-yellow-400 bg-yellow-50"
+                                          : "border-gray-300 bg-white"
+                                      }`}
+                                    >
+                                      <div className="flex items-center">
+                                        <div className="flex items-center gap-2 w-20">
+                                          <span className="text-sm">
+                                            {getGenderIconRoom(room.gender)}
+                                          </span>
+                                          <span className="text-xs font-medium text-gray-700">
+                                            ({placesDisponibles}/{room.nbrPlaceTotal})
+                                          </span>
+                                        </div>
+                                        <div className="flex-1 flex justify-center">
+                                          <div className="flex gap-1.5">
+                                            {Array.from(
+                                              { length: room.nbrPlaceTotal },
+                                              (_, placeIndex) => {
+                                                const gn = groupReservationIds.length;
+                                                const take = isGroupRoom
+                                                  ? Math.min(gn, room.nbrPlaceRestantes)
+                                                  : 0;
+                                                const y0 = placesOccupees;
+                                                const y1 = y0 + take - 1;
+                                                let placeColor = "bg-gray-300";
+                                                let placeTitle = `Place ${placeIndex + 1}`;
+                                                if (placeIndex < placesOccupees) {
+                                                  placeColor = "bg-red-500";
+                                                  placeTitle = `Place ${placeIndex + 1} occupée`;
+                                                } else if (
+                                                  isGroupRoom &&
+                                                  take > 0 &&
+                                                  placeIndex >= y0 &&
+                                                  placeIndex <= y1
+                                                ) {
+                                                  placeColor = "bg-yellow-400";
+                                                  placeTitle = `Place ${placeIndex + 1} — dossier groupe`;
+                                                } else {
+                                                  placeColor = "bg-green-500";
+                                                  placeTitle = `Place ${placeIndex + 1} libre`;
+                                                }
+                                                return (
+                                                  <div
+                                                    key={placeIndex}
+                                                    className={`w-4 h-4 rounded-full ${placeColor} transition-all`}
+                                                    title={placeTitle}
+                                                  />
+                                                );
+                                              }
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="w-8 flex justify-end">
+                                          {isGroupRoom && (
+                                            <div
+                                              className="w-3 h-3 bg-yellow-400 rounded-full"
+                                              title="Chambre du dossier"
+                                            />
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                });
+                              })()
+                            : null}
+                        </div>
+                      </div>
+                      <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Info className="h-4 w-4 text-green-700" />
+                          <span className="text-xs font-medium text-green-700">
+                            Chambres disponibles à Makkah (libres uniquement)
+                          </span>
+                        </div>
+                        <div className="grid gap-2">
+                          {programDetail?.rooms &&
+                          formData.hotelMakkah &&
+                          formData.hotelMakkah !== "none" &&
+                          formData.typeChambre &&
+                          formData.gender
+                            ? (() => {
+                                const hid = resolveHotelId(formData.hotelMakkah, "makkah");
+                                if (!hid)
+                                  return (
+                                    <div className="text-xs text-gray-500 py-2">—</div>
+                                  );
+                                const filteredRooms = programDetail.rooms.filter(
+                                  (room: any) =>
+                                    room.hotelId === hid &&
+                                    room.roomType === formData.typeChambre &&
+                                    (room.gender === formData.gender ||
+                                      room.gender === "Mixte" ||
+                                      !room.gender)
+                                );
+                                if (filteredRooms.length === 0) {
+                                  return (
+                                    <div className="text-xs text-gray-500 text-center py-2">
+                                      Aucune chambre trouvée
+                                    </div>
+                                  );
+                                }
+                                const sortedRooms = sortRoomsByAlgorithm(
+                                  filteredRooms,
+                                  formData.gender
+                                );
+                                return sortedRooms.map((room: any, index: number) => {
+                                  const placesOccupees =
+                                    room.nbrPlaceTotal - room.nbrPlaceRestantes;
+                                  const placesDisponibles = room.nbrPlaceRestantes;
+                                  const isGroupRoom = (room.listeIdsReservation || []).some(
+                                    (rid: number) => groupReservationIds.includes(rid)
+                                  );
+                                  return (
+                                    <div
+                                      key={index}
+                                      className={`relative p-2 rounded border transition-all ${
+                                        isGroupRoom
+                                          ? "border-yellow-400 bg-yellow-50"
+                                          : "border-gray-300 bg-white"
+                                      }`}
+                                    >
+                                      <div className="flex items-center">
+                                        <div className="flex items-center gap-2 w-20">
+                                          <span className="text-sm">
+                                            {getGenderIconRoom(room.gender)}
+                                          </span>
+                                          <span className="text-xs font-medium text-gray-700">
+                                            ({placesDisponibles}/{room.nbrPlaceTotal})
+                                          </span>
+                                        </div>
+                                        <div className="flex-1 flex justify-center">
+                                          <div className="flex gap-1.5">
+                                            {Array.from(
+                                              { length: room.nbrPlaceTotal },
+                                              (_, placeIndex) => {
+                                                const gn = groupReservationIds.length;
+                                                const take = isGroupRoom
+                                                  ? Math.min(gn, room.nbrPlaceRestantes)
+                                                  : 0;
+                                                const y0 = placesOccupees;
+                                                const y1 = y0 + take - 1;
+                                                let placeColor = "bg-gray-300";
+                                                let placeTitle = `Place ${placeIndex + 1}`;
+                                                if (placeIndex < placesOccupees) {
+                                                  placeColor = "bg-red-500";
+                                                  placeTitle = `Place ${placeIndex + 1} occupée`;
+                                                } else if (
+                                                  isGroupRoom &&
+                                                  take > 0 &&
+                                                  placeIndex >= y0 &&
+                                                  placeIndex <= y1
+                                                ) {
+                                                  placeColor = "bg-yellow-400";
+                                                  placeTitle = `Place ${placeIndex + 1} — dossier groupe`;
+                                                } else {
+                                                  placeColor = "bg-green-500";
+                                                  placeTitle = `Place ${placeIndex + 1} libre`;
+                                                }
+                                                return (
+                                                  <div
+                                                    key={placeIndex}
+                                                    className={`w-4 h-4 rounded-full ${placeColor} transition-all`}
+                                                    title={placeTitle}
+                                                  />
+                                                );
+                                              }
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="w-8 flex justify-end">
+                                          {isGroupRoom && (
+                                            <div
+                                              className="w-3 h-3 bg-yellow-400 rounded-full"
+                                              title="Chambre du dossier"
+                                            />
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                });
+                              })()
+                            : null}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 mt-2">
+                      <div className="space-y-2">
+                        <Label className="text-blue-700 font-medium text-sm">Prix total dossier (DH) *</Label>
+                        <Input
+                          value={formData.prix}
+                          onChange={(e) => setFormData({ ...formData, prix: e.target.value })}
+                          className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                          placeholder="Montant"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-blue-700 font-medium text-sm">Date de réservation *</Label>
+                        <Input
+                          type="date"
+                          value={formData.dateReservation}
+                          onChange={(e) =>
+                            setFormData({ ...formData, dateReservation: e.target.value })
+                          }
+                          className="h-10 border-2 border-blue-200 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {renderVoyageCustomizationBlock()}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div className="space-y-2">
+                        <Label className="text-blue-700 font-medium text-sm">Prix total dossier (DH) *</Label>
+                        <Input
+                          value={formData.prix}
+                          onChange={(e) => setFormData({ ...formData, prix: e.target.value })}
+                          className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                          placeholder="Montant"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-blue-700 font-medium text-sm">Date de réservation *</Label>
+                        <Input
+                          type="date"
+                          value={formData.dateReservation}
+                          onChange={(e) =>
+                            setFormData({ ...formData, dateReservation: e.target.value })
+                          }
+                          className="h-10 border-2 border-blue-200 rounded-lg"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Hôtels & chambres — même présentation « points » que Nouvelle Réservation */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-lg">🕌</span>
@@ -2043,6 +2551,8 @@ export default function EditReservation() {
                       )}
                   </div>
                 </div>
+                    </>
+                  )}
               </div>
 
               {/* Section 2: Informations Client */}
@@ -2052,7 +2562,112 @@ export default function EditReservation() {
                       Informations Client
                       {section1Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
                     </h3>
-                
+
+                {isChambrePrivee ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start mb-4">
+                    <div className="space-y-4 min-w-0">
+                      <div className="p-4 rounded-lg border border-blue-200 bg-white/80">
+                        <div className="text-xs font-semibold text-blue-700 flex items-center gap-2 mb-3">
+                          <User className="h-4 w-4" />
+                          Leader
+                        </div>
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-blue-700">Nom *</Label>
+                              <div className="h-10 px-3 py-2 border-2 border-blue-100 rounded-lg bg-blue-50/80 flex items-center">
+                                <span className="text-gray-900 font-medium">{formData.nom || "N/A"}</span>
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-blue-700">Prénom *</Label>
+                              <div className="h-10 px-3 py-2 border-2 border-blue-100 rounded-lg bg-blue-50/80 flex items-center">
+                                <span className="text-gray-900 font-medium">{formData.prenom || "N/A"}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-blue-700">Téléphone *</Label>
+                              <div className="h-10 px-3 py-2 border-2 border-blue-100 rounded-lg bg-blue-50/80 flex items-center">
+                                <span className="text-gray-900 font-medium">{formData.telephone || "N/A"}</span>
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-blue-700">Groupe</Label>
+                              <Input
+                                value={formData.groupe}
+                                onChange={(e) => setFormData({ ...formData, groupe: e.target.value })}
+                                placeholder="Groupe (optionnel)"
+                                className="h-10 border-2 border-blue-100 focus:border-blue-400"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-blue-700">Genre</Label>
+                              <Select
+                                value={formData.gender}
+                                onValueChange={(v) => setFormData({ ...formData, gender: v })}
+                              >
+                                <SelectTrigger className="h-10 border-2 border-blue-100 focus:border-blue-400">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Homme">Homme</SelectItem>
+                                  <SelectItem value="Femme">Femme</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-blue-700">N° Passeport</Label>
+                              <Input
+                                value={formData.passportNumber}
+                                onChange={(e) =>
+                                  setFormData({ ...formData, passportNumber: e.target.value })
+                                }
+                                placeholder="Numéro passeport"
+                                className="h-10 border-2 border-blue-100 focus:border-blue-400"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-blue-700">Transport</Label>
+                              <div className="flex items-center gap-2 h-10 px-3 border-2 border-blue-100 rounded-lg bg-white">
+                                <Switch
+                                  checked={formData.transport || false}
+                                  onCheckedChange={(checked) =>
+                                    setFormData((prev) => ({ ...prev, transport: checked }))
+                                  }
+                                  className="data-[state=checked]:bg-blue-600"
+                                />
+                                <span className="text-sm text-gray-700">
+                                  {formData.transport ? "Oui" : "Non"}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-blue-700">Remarque</Label>
+                              <Input
+                                value={formData.remarque}
+                                onChange={(e) =>
+                                  setFormData({ ...formData, remarque: e.target.value })
+                                }
+                                placeholder="Remarque (optionnel)"
+                                className="h-10 border-2 border-blue-100 focus:border-blue-400"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="min-w-0 lg:sticky lg:top-28">
+                      {renderLeaderPassportBlock()}
+                    </div>
+                  </div>
+                ) : (
+                  <>
                 {/* Première ligne : groupe, nom, prénom, transport */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                       <div className="space-y-2">
@@ -2126,6 +2741,8 @@ export default function EditReservation() {
                       </div>
                       </div>
                 </div>
+                  </>
+                )}
 
                 {reservationData?.isLeader && accompagnants.length > 0 && (
                   <div className="mt-4 p-4 border border-blue-200 rounded-lg bg-white">
@@ -2310,191 +2927,8 @@ export default function EditReservation() {
                   </div>
                 )}
 
-                  {/* Passeport - Ajouté dans Informations Client */}
-                  <div className="space-y-2 md:col-span-3">
-                    <Label className="text-blue-700 font-medium text-sm">Passeport *</Label>
-                    {(!getDocumentUrl('passport') && !documents.passport) || passportToDelete !== null ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="file"
-                            ref={(el) => {
-                              if (el) fileInputs.current.passeport = el;
-                            }}
-                            onChange={(e) => {
-                              handleFileChange(e, 'passport');
-                              // Réinitialiser passportToDelete si on upload un nouveau fichier
-                              if (e.target.files && e.target.files.length > 0) {
-                                setPassportToDelete(null);
-                              }
-                            }}
-                            accept="image/*,.pdf"
-                            className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                          />
-                          {passportToDelete !== null && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              type="button"
-                              onClick={() => setPassportToDelete(null)}
-                              className="text-gray-600 hover:text-gray-800"
-                            >
-                              <X className="h-4 w-4 mr-1" />
-                              Annuler
-                            </Button>
-                          )}
-                        </div>
-                        {passportToDelete !== null && (
-                          <p className="text-xs text-orange-600">L'ancien passeport sera remplacé par le nouveau fichier</p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-blue-700">
-                            {documents.passport ? 'Nouveau passeport' : 'Aperçu du passeport'}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            {(previews.passport || getDocumentUrl('passport')) && !documents.passport && (
-                              <button
-                                type="button"
-                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded"
-                                onClick={e => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  const url = previews.passport?.url || getDocumentUrl('passport') || '';
-                                  const type = previews.passport?.type || getDocumentType('passport');
-                                  setPreviewImage({ url, title: 'Passeport', type });
-                                }}
-                              >
-                                <ZoomIn className="h-3 w-3 mr-1" />
-                                Zoom
-                              </button>
-                            )}
-                            {(previews.passport || getDocumentUrl('passport')) && !documents.passport && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                type="button"
-                                onClick={() => {
-                                  const fileId = getPassportFileId();
-                                  if (fileId) {
-                                    setPassportToDelete(fileId);
-                                  }
-                                }}
-                                className="text-orange-600 hover:text-orange-800 hover:bg-orange-50"
-                              >
-                                <Edit className="h-3 w-3 mr-1" />
-                                Remplacer
-                              </Button>
-                            )}
-                            {documents.passport && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                type="button"
-                                onClick={() => {
-                                  handleRemoveDocument('passport');
-                                  if (passportToDelete) {
-                                    setPassportToDelete(null);
-                                  }
-                                }}
-                                className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                Supprimer
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        <div className="w-full h-[350px] overflow-hidden rounded-lg border border-blue-200">
-                          {(() => {
-                            // Debug logging
-                            const passportUrl = documents.passport ? previews.passport?.url : (previews.passport?.url || getDocumentUrl('passport'));
-                            const passportType = documents.passport ? previews.passport?.type : (previews.passport?.type || getDocumentType('passport'));
-                            const isPdf = passportType === 'application/pdf';
-                            
-                            console.log('🔍 Debug - Rendering passport preview:', {
-                              hasNewDocument: !!documents.passport,
-                              hasPreview: !!previews.passport,
-                              previewType: previews.passport?.type,
-                              documentUrl: getDocumentUrl('passport'),
-                              finalUrl: passportUrl,
-                              finalType: passportType,
-                              isPdf: isPdf
-                            });
-                            
-                            if (documents.passport) {
-                              // Afficher le nouveau fichier uploadé
-                              if (isPdf) {
-                                if (previews.passport?.url?.startsWith('blob:') || previews.passport?.url?.startsWith('data:')) {
-                                  return (
-                                    <embed
-                                      src={previews.passport.url}
-                                      type="application/pdf"
-                                      className="w-full h-full"
-                                    />
-                                  );
-                                } else {
-                                  // Use Blob Proxy for Cloudinary URLs
-                                  return (
-                                    <PdfPreviewBox 
-                                      url={previews.passport?.url || null} 
-                                      title="Nouveau passeport" 
-                                      onZoom={() => setPreviewImage({ url: previews.passport?.url || '', title: 'Nouveau passeport', type: 'application/pdf' })} 
-                                    />
-                                  );
-                                }
-                              } else {
-                                return (
-                                  <img
-                                    src={previews.passport?.url || ''}
-                                    alt="Nouveau passeport"
-                                    className="w-full h-full object-contain cursor-pointer"
-                                    onClick={() => setPreviewImage({ url: previews.passport?.url || '', title: 'Nouveau passeport', type: previews.passport?.type || 'image/*' })}
-                                  />
-                                );
-                              }
-                            } else {
-                              // Afficher l'ancien fichier existant
-                              if (!passportUrl) {
-                                return (
-                                  <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
-                                    Aucun passeport attaché
-                                  </div>
-                                );
-                              }
-                              
-                              if (isPdf) {
-                                // Use Blob Proxy for existing Cloudinary PDFs
-                                return (
-                                  <PdfPreviewBox 
-                                    url={passportUrl} 
-                                    title="Passeport" 
-                                    onZoom={() => {
-                                      setPreviewImage({ url: passportUrl || '', title: 'Passeport', type: 'application/pdf' });
-                                    }} 
-                                  />
-                                );
-                              } else {
-                                return (
-                                  <img
-                                    src={passportUrl}
-                                    alt="Passeport"
-                                    className="w-full h-full object-contain cursor-pointer"
-                                    onClick={() => {
-                                      setPreviewImage({ url: passportUrl, title: 'Passeport', type: passportType });
-                                    }}
-                                  />
-                                );
-                              }
-                            }
-                          })()}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                {!isChambrePrivee && renderLeaderPassportBlock()}
+              </div>
 
               {/* Section 3: Paiements */}
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">

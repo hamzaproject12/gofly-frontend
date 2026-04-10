@@ -18,19 +18,27 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Sparkles,
   User,
   Wallet,
   CreditCard,
   Settings,
   Info,
-  CheckCircle,
   FileText,
   Leaf,
   ShieldCheck,
   Crown,
   Trash2,
   Plus,
+  ZoomIn,
+  X,
+  Download,
 } from "lucide-react";
 
 interface Hotel {
@@ -145,9 +153,18 @@ export default function NouvelleChambrePage() {
   const [payments, setPayments] = useState<PaymentRow[]>([
     { amount: "", type: "", receipt: null },
   ]);
-  const [attachmentPreviews, setAttachmentPreviews] = useState<
-    Record<string, { url: string; type: string; name: string }>
-  >({});
+  /** Aperçus locaux alignés sur les index occupants / paiements (comme Nouvelle Réservation) */
+  const [occupantPreviews, setOccupantPreviews] = useState<
+    Array<{ url: string; type: string } | null>
+  >([]);
+  const [paymentPreviews, setPaymentPreviews] = useState<
+    Array<{ url: string; type: string } | null>
+  >([null]);
+  const [previewImage, setPreviewImage] = useState<{
+    url: string;
+    title: string;
+    type: string;
+  } | null>(null);
   const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
   const [supplierStatus, setSupplierStatus] = useState({
     statutVisa: false,
@@ -237,6 +254,12 @@ export default function NouvelleChambrePage() {
     if (!capacity) {
       setOccupants([]);
       setOccupantPassportFiles([]);
+      setOccupantPreviews((prev) => {
+        prev.forEach((p) => {
+          if (p?.url?.startsWith("blob:")) URL.revokeObjectURL(p.url);
+        });
+        return [];
+      });
       return;
     }
     setOccupants((prev) =>
@@ -254,6 +277,16 @@ export default function NouvelleChambrePage() {
     setOccupantPassportFiles((prev) =>
       Array.from({ length: capacity }, (_, i) => prev[i] || null)
     );
+    setOccupantPreviews((prev) => {
+      const next = Array.from({ length: capacity }, (_, i) =>
+        i < prev.length ? prev[i] : null
+      );
+      for (let i = capacity; i < prev.length; i++) {
+        const p = prev[i];
+        if (p?.url?.startsWith("blob:")) URL.revokeObjectURL(p.url);
+      }
+      return next;
+    });
   }, [capacity, formData.gender]);
 
   const roomCandidatesMadina = useMemo(() => {
@@ -411,26 +444,86 @@ export default function NouvelleChambrePage() {
     });
   };
 
-  const setOccupantPassportFile = (index: number, file: File | null) => {
+  const revokePreviewEntry = (entry: { url: string; type: string } | null) => {
+    if (entry?.url?.startsWith("blob:")) URL.revokeObjectURL(entry.url);
+  };
+
+  const isPdfFile = (fileNameOrUrl: string | null | undefined): boolean => {
+    if (!fileNameOrUrl || typeof fileNameOrUrl !== "string") return false;
+    const lower = fileNameOrUrl.toLowerCase();
+    return lower.includes(".pdf") || /\.pdf(\?|$|#)/i.test(fileNameOrUrl);
+  };
+
+  const fixCloudinaryUrlForPdf = (url: string): string => {
+    if (!url || typeof url !== "string") return url;
+    if (
+      url.includes("cloudinary.com") &&
+      url.includes("/image/upload/") &&
+      isPdfFile(url)
+    ) {
+      return url;
+    }
+    return url;
+  };
+
+  const removeOccupantPassport = (index: number) => {
+    setOccupantPassportFiles((prev) => {
+      const next = [...prev];
+      next[index] = null;
+      return next;
+    });
+    setOccupantPreviews((prev) => {
+      const next = [...prev];
+      revokePreviewEntry(next[index]);
+      next[index] = null;
+      return next;
+    });
+  };
+
+  const handleOccupantPassportChange = (
+    index: number,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!(file.type === "application/pdf" || file.type.startsWith("image/"))) {
+      toast({
+        title: "Erreur",
+        description:
+          "Format de fichier non supporté. Seuls les fichiers PDF et images sont acceptés.",
+        variant: "destructive",
+      });
+      return;
+    }
     setOccupantPassportFiles((prev) => {
       const next = [...prev];
       next[index] = file;
       return next;
     });
-    setAttachmentPreviews((prev) => {
-      const key = `occupant_${index}`;
-      const next = { ...prev };
-      if (!file) {
-        delete next[key];
-        return next;
-      }
-      next[key] = {
-        url: URL.createObjectURL(file),
-        type: file.type,
-        name: file.name,
-      };
+    setOccupantPreviews((prev) => {
+      const next = [...prev];
+      revokePreviewEntry(next[index]);
+      next[index] = null;
       return next;
     });
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setOccupantPreviews((p) => {
+          const x = [...p];
+          revokePreviewEntry(x[index]);
+          x[index] = { url: reader.result as string, type: file.type };
+          return x;
+        });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setOccupantPreviews((p) => {
+        const x = [...p];
+        x[index] = { url: URL.createObjectURL(file), type: file.type };
+        return x;
+      });
+    }
   };
 
   const setPaymentField = (
@@ -443,35 +536,80 @@ export default function NouvelleChambrePage() {
       next[index] = { ...next[index], [field]: value } as PaymentRow;
       return next;
     });
-    if (field === "receipt") {
-      setAttachmentPreviews((prev) => {
-        const key = `payment_${index}`;
-        const next = { ...prev };
-        if (!(value instanceof File)) {
-          delete next[key];
-          return next;
-        }
-        next[key] = {
-          url: URL.createObjectURL(value),
-          type: value.type,
-          name: value.name,
-        };
-        return next;
+  };
+
+  const clearPaymentReceipt = (index: number) => {
+    setPayments((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], receipt: null };
+      return next;
+    });
+    setPaymentPreviews((prev) => {
+      const next = [...prev];
+      revokePreviewEntry(next[index]);
+      next[index] = null;
+      return next;
+    });
+  };
+
+  const handlePaymentReceiptChange = (
+    index: number,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!(file.type === "application/pdf" || file.type.startsWith("image/"))) {
+      toast({
+        title: "Erreur",
+        description:
+          "Format de fichier non supporté. Seuls les fichiers PDF et images sont acceptés.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setPayments((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], receipt: file };
+      return next;
+    });
+    setPaymentPreviews((prev) => {
+      const next = [...prev];
+      revokePreviewEntry(next[index]);
+      next[index] = null;
+      return next;
+    });
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPaymentPreviews((p) => {
+          const x = [...p];
+          revokePreviewEntry(x[index]);
+          x[index] = { url: reader.result as string, type: file.type };
+          return x;
+        });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setPaymentPreviews((p) => {
+        const x = [...p];
+        x[index] = { url: URL.createObjectURL(file), type: file.type };
+        return x;
       });
     }
   };
 
   const addPaymentRow = () => {
     setPayments((prev) => [...prev, { amount: "", type: "", receipt: null }]);
+    setPaymentPreviews((prev) => [...prev, null]);
   };
 
   const removePaymentRow = (index: number) => {
-    setPayments((prev) => prev.filter((_, i) => i !== index));
-    setAttachmentPreviews((prev) => {
-      const next = { ...prev };
-      delete next[`payment_${index}`];
-      return next;
+    setPaymentPreviews((prev) => {
+      const p = prev[index];
+      revokePreviewEntry(p);
+      return prev.filter((_, i) => i !== index);
     });
+    setPayments((prev) => prev.filter((_, i) => i !== index));
   };
 
   const sortedRoomCandidatesMadina = useMemo(
@@ -1097,16 +1235,28 @@ export default function NouvelleChambrePage() {
                               </span>
                             </div>
                             <div className="flex gap-1.5">
-                              {Array.from({ length: room.nbrPlaceTotal }, (_, idx) => (
-                                <div
-                                  key={idx}
-                                  className={`w-4 h-4 rounded-full ${
-                                    roomMadinaId === String(room.id) && idx === 0
-                                      ? "bg-yellow-400"
-                                      : "bg-green-500"
-                                  }`}
-                                />
-                              ))}
+                              {Array.from({ length: room.nbrPlaceTotal }, (_, idx) => {
+                                const placesOccupees =
+                                  room.nbrPlaceTotal - room.nbrPlaceRestantes;
+                                const isSelectedRoom =
+                                  roomMadinaId === String(room.id);
+                                const litReserve =
+                                  isSelectedRoom &&
+                                  idx >= placesOccupees &&
+                                  idx < placesOccupees + capacity;
+                                let placeColor = "bg-gray-300";
+                                if (idx < placesOccupees)
+                                  placeColor = "bg-red-500";
+                                else if (litReserve) placeColor = "bg-yellow-400";
+                                else placeColor = "bg-green-500";
+                                return (
+                                  <div
+                                    key={idx}
+                                    className={`w-4 h-4 rounded-full ${placeColor}`}
+                                    title={`Place ${idx + 1}`}
+                                  />
+                                );
+                              })}
                             </div>
                           </div>
                         ))}
@@ -1139,16 +1289,28 @@ export default function NouvelleChambrePage() {
                               </span>
                             </div>
                             <div className="flex gap-1.5">
-                              {Array.from({ length: room.nbrPlaceTotal }, (_, idx) => (
-                                <div
-                                  key={idx}
-                                  className={`w-4 h-4 rounded-full ${
-                                    roomMakkahId === String(room.id) && idx === 0
-                                      ? "bg-yellow-400"
-                                      : "bg-green-500"
-                                  }`}
-                                />
-                              ))}
+                              {Array.from({ length: room.nbrPlaceTotal }, (_, idx) => {
+                                const placesOccupees =
+                                  room.nbrPlaceTotal - room.nbrPlaceRestantes;
+                                const isSelectedRoom =
+                                  roomMakkahId === String(room.id);
+                                const litReserve =
+                                  isSelectedRoom &&
+                                  idx >= placesOccupees &&
+                                  idx < placesOccupees + capacity;
+                                let placeColor = "bg-gray-300";
+                                if (idx < placesOccupees)
+                                  placeColor = "bg-red-500";
+                                else if (litReserve) placeColor = "bg-yellow-400";
+                                else placeColor = "bg-green-500";
+                                return (
+                                  <div
+                                    key={idx}
+                                    className={`w-4 h-4 rounded-full ${placeColor}`}
+                                    title={`Place ${idx + 1}`}
+                                  />
+                                );
+                              })}
                             </div>
                           </div>
                         ))}
@@ -1263,109 +1425,250 @@ export default function NouvelleChambrePage() {
                             </div>
                           </div>
 
-                          {/* Colonne droite : passeport */}
-                          <div className="space-y-1">
-                            <Label className="text-xs text-blue-700 mb-1 block">
+                          {/* Colonne droite : passeport (même UX que Nouvelle Réservation) */}
+                          <div className="space-y-2">
+                            <Label className="text-xs text-blue-700 font-medium">
                               Passeport (obligatoire)
                             </Label>
-                            <div className="border-2 border-dashed border-blue-200 rounded-lg p-4 bg-blue-50/50 h-[calc(100%-1.5rem)] flex flex-col justify-center">
+                            <div className="flex items-center gap-2">
                               <Input
                                 type="file"
-                                accept=".pdf,image/png,image/jpeg,image/webp"
-                                onChange={(e) =>
-                                  setOccupantPassportFile(i, e.target.files?.[0] || null)
-                                }
-                                className="border-2 border-blue-100 bg-white"
+                                accept="image/*,.pdf"
+                                onChange={(e) => handleOccupantPassportChange(i, e)}
+                                className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                                disabled={isSubmitting}
                               />
-                              {attachmentPreviews[`occupant_${i}`] && (
-                                <div className="mt-3 p-2 border border-blue-200 rounded-lg bg-white">
-                                  <div className="text-xs text-blue-700 mb-2">
-                                    {attachmentPreviews[`occupant_${i}`].name}
+                              {occupantPassportFiles[i] && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeOccupantPassport(i)}
+                                  className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                                  disabled={isSubmitting}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                            {occupantPreviews[i] && (
+                              <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
+                                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                                  <span className="text-sm font-medium text-blue-700">
+                                    Aperçu du passeport
+                                  </span>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <button
+                                      type="button"
+                                      className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded text-sm flex items-center gap-1"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setPreviewImage({
+                                          url: occupantPreviews[i]!.url,
+                                          title: "Passeport",
+                                          type: occupantPreviews[i]!.type,
+                                        });
+                                      }}
+                                    >
+                                      <ZoomIn className="h-3 w-3" />
+                                      Zoom
+                                    </button>
+                                    <a
+                                      href={occupantPreviews[i]!.url}
+                                      download={
+                                        occupantPassportFiles[i]?.name || "passeport"
+                                      }
+                                      className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded text-sm inline-flex items-center gap-1"
+                                    >
+                                      <Download className="h-3 w-3" />
+                                      Télécharger
+                                    </a>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => removeOccupantPassport(i)}
+                                      className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                                    >
+                                      <Trash2 className="h-3 w-3 mr-1" />
+                                      Supprimer
+                                    </Button>
                                   </div>
-                                  <div className="w-full h-[180px] overflow-hidden rounded border border-blue-200 bg-gray-50 flex items-center justify-center">
-                                    {attachmentPreviews[`occupant_${i}`].type ===
-                                    "application/pdf" ? (
+                                </div>
+                                <div className="w-full h-[350px] overflow-hidden rounded-lg border border-blue-200">
+                                  {occupantPreviews[i]?.type === "application/pdf" ? (
+                                    occupantPreviews[i]!.url.startsWith("blob:") ||
+                                    occupantPreviews[i]!.url.startsWith("data:") ? (
                                       <embed
-                                        src={attachmentPreviews[`occupant_${i}`].url}
+                                        src={occupantPreviews[i]!.url}
                                         type="application/pdf"
                                         className="w-full h-full"
                                       />
                                     ) : (
-                                      <img
-                                        src={attachmentPreviews[`occupant_${i}`].url}
-                                        alt="Passeport"
-                                        className="w-full h-full object-contain"
-                                      />
-                                    )}
-                                  </div>
+                                      <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                                        <a
+                                          href={occupantPreviews[i]!.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors"
+                                        >
+                                          <FileText className="h-16 w-16 text-red-600" />
+                                          <span className="text-sm font-medium text-blue-700">
+                                            Voir le PDF
+                                          </span>
+                                        </a>
+                                      </div>
+                                    )
+                                  ) : (
+                                    <img
+                                      src={occupantPreviews[i]!.url}
+                                      alt="Passeport"
+                                      className="w-full h-full object-contain"
+                                    />
+                                  )}
                                 </div>
-                              )}
-                            </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ) : (
-                        /* ── Accompagnant: nom | prénom | passeport sur une ligne ── */
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                          <div className="md:col-span-3 space-y-1">
-                            <Label className="text-xs text-blue-700">Nom *</Label>
-                            <Input
-                              placeholder="Nom"
-                              value={o.lastName}
-                              onChange={(e) => updateOccupant(i, "lastName", e.target.value)}
-                              className="h-10 border-2 border-blue-100 focus:border-blue-400"
-                            />
-                          </div>
-                          <div className="md:col-span-3 space-y-1">
-                            <Label className="text-xs text-blue-700">Prénom *</Label>
-                            <Input
-                              placeholder="Prénom"
-                              value={o.firstName}
-                              onChange={(e) => updateOccupant(i, "firstName", e.target.value)}
-                              className="h-10 border-2 border-blue-100 focus:border-blue-400"
-                            />
-                          </div>
-                          <div className="md:col-span-2 space-y-1">
-                            <Label className="text-xs text-blue-700">N° Passeport</Label>
-                            <Input
-                              placeholder="Numéro passeport"
-                              value={o.passportNumber}
-                              onChange={(e) =>
-                                updateOccupant(i, "passportNumber", e.target.value)
-                              }
-                              className="h-10 border-2 border-blue-100 focus:border-blue-400"
-                            />
-                          </div>
-                          <div className="md:col-span-4 space-y-1">
-                            <Label className="text-xs text-blue-700">Passeport (obligatoire)</Label>
-                            <div className="flex items-center gap-2">
+                        /* ── Accompagnant: 50% champs / 50% attachement + aperçu ── */
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div className="space-y-1">
+                                <Label className="text-xs text-blue-700">Nom *</Label>
+                                <Input
+                                  placeholder="Nom"
+                                  value={o.lastName}
+                                  onChange={(e) =>
+                                    updateOccupant(i, "lastName", e.target.value)
+                                  }
+                                  className="h-10 border-2 border-blue-100 focus:border-blue-400"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs text-blue-700">Prénom *</Label>
+                                <Input
+                                  placeholder="Prénom"
+                                  value={o.firstName}
+                                  onChange={(e) =>
+                                    updateOccupant(i, "firstName", e.target.value)
+                                  }
+                                  className="h-10 border-2 border-blue-100 focus:border-blue-400"
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-blue-700">N° Passeport</Label>
                               <Input
-                                type="file"
-                                accept=".pdf,image/png,image/jpeg,image/webp"
+                                placeholder="Numéro passeport"
+                                value={o.passportNumber}
                                 onChange={(e) =>
-                                  setOccupantPassportFile(i, e.target.files?.[0] || null)
+                                  updateOccupant(i, "passportNumber", e.target.value)
                                 }
                                 className="h-10 border-2 border-blue-100 focus:border-blue-400"
                               />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs text-blue-700 font-medium">
+                              Passeport (obligatoire)
+                            </Label>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="file"
+                                accept="image/*,.pdf"
+                                onChange={(e) => handleOccupantPassportChange(i, e)}
+                                className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                                disabled={isSubmitting}
+                              />
                               {occupantPassportFiles[i] && (
-                                <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeOccupantPassport(i)}
+                                  className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                                  disabled={isSubmitting}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               )}
                             </div>
-                            {attachmentPreviews[`occupant_${i}`] && (
+                            {occupantPreviews[i] && (
                               <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
-                                <div className="text-xs text-blue-700 mb-2">
-                                  {attachmentPreviews[`occupant_${i}`].name}
+                                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                                  <span className="text-sm font-medium text-blue-700">
+                                    Aperçu du passeport
+                                  </span>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <button
+                                      type="button"
+                                      className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded text-sm flex items-center gap-1"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setPreviewImage({
+                                          url: occupantPreviews[i]!.url,
+                                          title: `Passeport accompagnant ${i}`,
+                                          type: occupantPreviews[i]!.type,
+                                        });
+                                      }}
+                                    >
+                                      <ZoomIn className="h-3 w-3" />
+                                      Zoom
+                                    </button>
+                                    <a
+                                      href={occupantPreviews[i]!.url}
+                                      download={
+                                        occupantPassportFiles[i]?.name || "passeport"
+                                      }
+                                      className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded text-sm inline-flex items-center gap-1"
+                                    >
+                                      <Download className="h-3 w-3" />
+                                      Télécharger
+                                    </a>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => removeOccupantPassport(i)}
+                                      className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                                    >
+                                      <Trash2 className="h-3 w-3 mr-1" />
+                                      Supprimer
+                                    </Button>
+                                  </div>
                                 </div>
-                                <div className="w-full h-[120px] overflow-hidden rounded border border-blue-200 bg-gray-50 flex items-center justify-center">
-                                  {attachmentPreviews[`occupant_${i}`].type ===
-                                  "application/pdf" ? (
-                                    <embed
-                                      src={attachmentPreviews[`occupant_${i}`].url}
-                                      type="application/pdf"
-                                      className="w-full h-full"
-                                    />
+                                <div className="w-full h-[350px] overflow-hidden rounded-lg border border-blue-200">
+                                  {occupantPreviews[i]?.type === "application/pdf" ? (
+                                    occupantPreviews[i]!.url.startsWith("blob:") ||
+                                    occupantPreviews[i]!.url.startsWith("data:") ? (
+                                      <embed
+                                        src={occupantPreviews[i]!.url}
+                                        type="application/pdf"
+                                        className="w-full h-full"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                                        <a
+                                          href={occupantPreviews[i]!.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors"
+                                        >
+                                          <FileText className="h-16 w-16 text-red-600" />
+                                          <span className="text-sm font-medium text-blue-700">
+                                            Voir le PDF
+                                          </span>
+                                        </a>
+                                      </div>
+                                    )
                                   ) : (
                                     <img
-                                      src={attachmentPreviews[`occupant_${i}`].url}
+                                      src={occupantPreviews[i]!.url}
                                       alt="Passeport accompagnant"
                                       className="w-full h-full object-contain"
                                     />
@@ -1425,42 +1728,107 @@ export default function NouvelleChambrePage() {
                             <div className="flex items-center gap-2">
                               <Input
                                 type="file"
-                                accept=".pdf,image/png,image/jpeg,image/webp"
-                                onChange={(e) =>
-                                  setPaymentField(
-                                    index,
-                                    "receipt",
-                                    e.target.files?.[0] || null
-                                  )
-                                }
+                                accept="image/*,.pdf"
+                                onChange={(e) => handlePaymentReceiptChange(index, e)}
                                 className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
+                                disabled={isSubmitting}
                               />
+                              {payment.receipt && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => clearPaymentReceipt(index)}
+                                  className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                                  disabled={isSubmitting}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
-                            {attachmentPreviews[`payment_${index}`] && (
-                              <div className="mt-2 p-2 border border-orange-200 rounded-lg bg-white">
-                                <div className="text-xs text-orange-700 mb-2">
-                                  {attachmentPreviews[`payment_${index}`].name}
-                                </div>
-                                <div className="w-full h-[150px] overflow-hidden rounded border border-orange-200 bg-orange-50 flex items-center justify-center">
-                                  {attachmentPreviews[`payment_${index}`].type ===
-                                  "application/pdf" ? (
-                                    <embed
-                                      src={attachmentPreviews[`payment_${index}`].url}
-                                      type="application/pdf"
-                                      className="w-full h-full"
-                                    />
-                                  ) : (
-                                    <img
-                                      src={attachmentPreviews[`payment_${index}`].url}
-                                      alt="Reçu de paiement"
-                                      className="max-h-full max-w-full object-contain"
-                                    />
-                                  )}
-                                </div>
-                              </div>
-                            )}
                           </div>
                         </div>
+                        {paymentPreviews[index] && (
+                          <div className="mt-4 w-full p-2 border border-orange-200 rounded-lg bg-white">
+                            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                              <span className="text-sm font-medium text-orange-700">
+                                Aperçu du reçu
+                              </span>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <button
+                                  type="button"
+                                  className="text-orange-600 hover:text-orange-800 hover:bg-orange-50 p-2 rounded text-sm flex items-center gap-1"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setPreviewImage({
+                                      url: paymentPreviews[index]!.url,
+                                      title: "Reçu paiement",
+                                      type:
+                                        paymentPreviews[index]!.type || "image/*",
+                                    });
+                                  }}
+                                >
+                                  <ZoomIn className="h-3 w-3" />
+                                  Zoom
+                                </button>
+                                <a
+                                  href={paymentPreviews[index]!.url}
+                                  download={
+                                    payment.receipt?.name || "recu-paiement"
+                                  }
+                                  className="text-orange-600 hover:text-orange-800 hover:bg-orange-50 px-2 py-1 rounded text-sm inline-flex items-center gap-1"
+                                >
+                                  <Download className="h-3 w-3" />
+                                  Télécharger
+                                </a>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => clearPaymentReceipt(index)}
+                                  className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Supprimer
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="w-full h-[200px] overflow-hidden rounded-lg border border-orange-200">
+                              {paymentPreviews[index]?.type ===
+                              "application/pdf" ? (
+                                paymentPreviews[index]!.url.startsWith("blob:") ||
+                                paymentPreviews[index]!.url.startsWith("data:") ? (
+                                  <embed
+                                    src={paymentPreviews[index]!.url}
+                                    type="application/pdf"
+                                    className="w-full h-full"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-orange-50">
+                                    <a
+                                      href={paymentPreviews[index]!.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-orange-100 rounded-lg transition-colors"
+                                    >
+                                      <FileText className="h-16 w-16 text-red-600" />
+                                      <span className="text-sm font-medium text-orange-700">
+                                        Voir le PDF
+                                      </span>
+                                    </a>
+                                  </div>
+                                )
+                              ) : (
+                                <img
+                                  src={paymentPreviews[index]!.url}
+                                  alt="Reçu de paiement"
+                                  className="w-full h-full object-contain"
+                                />
+                              )}
+                            </div>
+                          </div>
+                        )}
                         <div className="mt-4 flex justify-end">
                           <Button
                             type="button"
@@ -1650,6 +2018,73 @@ export default function NouvelleChambrePage() {
           </div>
         </div>
       )}
+
+      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
+        <DialogContent className="max-w-[90vw] max-h-[90vh] p-0">
+          <DialogHeader className="p-4 border-b">
+            <DialogTitle className="flex items-center justify-between">
+              <span>{previewImage?.title}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setPreviewImage(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 p-2 rounded"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="relative w-full h-[calc(90vh-80px)] flex items-center justify-center bg-gray-100 overflow-auto">
+            {previewImage && (
+              <div className="w-full h-full flex items-center justify-center p-4">
+                {previewImage.type === "application/pdf" ? (
+                  previewImage.url.startsWith("blob:") ||
+                  previewImage.url.startsWith("data:") ? (
+                    <embed
+                      src={previewImage.url}
+                      type="application/pdf"
+                      className="w-full h-full"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center gap-4 p-8">
+                      <FileText className="h-24 w-24 text-red-600" />
+                      <a
+                        href={fixCloudinaryUrlForPdf(previewImage.url)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                      >
+                        Ouvrir le PDF dans un nouvel onglet
+                      </a>
+                    </div>
+                  )
+                ) : (
+                  <img
+                    src={previewImage.url}
+                    alt={previewImage.title}
+                    className="max-w-full max-h-full object-contain cursor-zoom-in"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const img = e.currentTarget;
+                      if (img.style.transform === "scale(1.5)") {
+                        img.style.transform = "scale(1)";
+                        img.style.cursor = "zoom-in";
+                      } else {
+                        img.style.transform = "scale(1.5)";
+                        img.style.cursor = "zoom-out";
+                      }
+                    }}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

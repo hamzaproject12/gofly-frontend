@@ -1491,8 +1491,8 @@ export default function EditReservation() {
           )}
         </div>
       ) : (
-        <div className="mt-1 flex flex-col flex-1 min-h-0 rounded-xl border border-blue-200 bg-white p-3 shadow-sm">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-3">
+        <div className="mt-1 flex flex-col flex-1 min-h-0 rounded-xl border border-blue-200 bg-white p-3 shadow-sm h-full">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-2 shrink-0">
             <span className="text-sm font-semibold text-blue-800 shrink-0">
               {documents.passport ? "Nouveau passeport" : "Aperçu du passeport"}
             </span>
@@ -1561,7 +1561,7 @@ export default function EditReservation() {
               )}
             </div>
           </div>
-          <div className="w-full min-h-[17rem] h-72 flex-1 overflow-hidden rounded-lg border border-blue-200 bg-slate-50 flex items-center justify-center">
+          <div className="w-full min-h-0 max-h-[min(15rem,38vh)] h-[min(15rem,38vh)] sm:max-h-[min(17rem,40vh)] sm:h-[min(17rem,40vh)] flex-1 overflow-hidden rounded-lg border border-blue-200 bg-slate-50 flex items-center justify-center">
             {(() => {
               const passportUrl = documents.passport
                 ? previews.passport?.url
@@ -1692,19 +1692,62 @@ export default function EditReservation() {
                       Modifier la Réservation
                     </CardTitle>
                     <div className="flex flex-wrap items-center gap-3">
-                      <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/30">
-                        <Wallet className="h-4 w-4 text-white" />
-                        <span className="text-sm text-white/80 font-medium">Prix</span>
-                        <span className="text-lg font-bold text-white">
-                          {totalPrice.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                      <div
+                        className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 bg-emerald-500/25 backdrop-blur-sm px-3 py-2 rounded-xl border border-emerald-200/40 shadow-sm"
+                        title="Montant total du dossier"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Wallet className="h-4 w-4 text-emerald-100 shrink-0" />
+                          <span className="text-xs sm:text-sm text-emerald-50/95 font-semibold uppercase tracking-wide">
+                            Prix engagé
+                          </span>
+                        </div>
+                        <span className="text-lg font-bold text-white tabular-nums sm:ml-1">
+                          {totalPrice.toLocaleString("fr-FR", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}{" "}
+                          DH
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/30">
-                        <CreditCard className="h-4 w-4 text-white" />
-                        <span className="text-sm text-white/80 font-medium">Reste à payer</span>
-                        <span className="text-lg font-bold text-white">
-                          {remainingAmount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH
+                      <div
+                        className={`flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 px-3 py-2 rounded-xl border shadow-sm backdrop-blur-sm ${
+                          remainingAmount <= 0
+                            ? "bg-green-600/35 border-green-200/50"
+                            : "bg-amber-500/30 border-amber-200/45"
+                        }`}
+                        title={
+                          remainingAmount <= 0
+                            ? "Dossier soldé"
+                            : "Montant encore dû sur le dossier"
+                        }
+                      >
+                        <div className="flex items-center gap-2">
+                          <CreditCard
+                            className={`h-4 w-4 shrink-0 ${
+                              remainingAmount <= 0 ? "text-green-100" : "text-amber-100"
+                            }`}
+                          />
+                          <span
+                            className={`text-xs sm:text-sm font-semibold uppercase tracking-wide ${
+                              remainingAmount <= 0 ? "text-green-50/95" : "text-amber-50/95"
+                            }`}
+                          >
+                            Reste à payer
+                          </span>
+                        </div>
+                        <span className="text-lg font-bold tabular-nums text-white sm:ml-1">
+                          {remainingAmount.toLocaleString("fr-FR", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}{" "}
+                          DH
                         </span>
+                        {remainingAmount <= 0 && (
+                          <span className="text-[10px] sm:text-xs font-medium text-green-100/90 sm:ml-2">
+                            Soldé
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2122,8 +2165,8 @@ export default function EditReservation() {
 
                 {isChambrePrivee ? (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch mb-4">
-                    <div className="space-y-4 min-w-0 flex flex-col">
-                      <div className="p-4 rounded-lg border border-blue-200 bg-white/80 flex-1">
+                    <div className="space-y-4 min-w-0 flex flex-col h-full min-h-0">
+                      <div className="p-4 rounded-lg border border-blue-200 bg-white/80 flex-1 min-h-0 flex flex-col">
                         <div className="text-xs font-semibold text-blue-700 flex items-center gap-2 mb-3">
                           <User className="h-4 w-4" />
                           Leader
@@ -2219,7 +2262,7 @@ export default function EditReservation() {
                         </div>
                       </div>
                     </div>
-                    <div className="min-w-0 flex flex-col self-stretch lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
+                    <div className="min-w-0 flex flex-col self-stretch justify-end min-h-0">
                       {renderLeaderPassportBlock()}
                     </div>
                   </div>
@@ -2321,7 +2364,7 @@ export default function EditReservation() {
                             className="rounded-lg border border-indigo-100 bg-indigo-50/30 p-3 space-y-3"
                           >
                             {isChambrePrivee ? (
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                                 <div className="space-y-3 min-w-0">
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div className="space-y-1">
@@ -2377,43 +2420,47 @@ export default function EditReservation() {
                                     />
                                   </div>
                                 </div>
-                                <div className="space-y-2 min-w-0">
-                                  <Label className="text-xs text-blue-700 font-medium">
-                                    Passeport (obligatoire)
-                                  </Label>
-                                  <div className="flex items-center gap-2">
-                                    <Input
-                                      type="file"
-                                      accept="image/*,.pdf"
-                                      onChange={(e) => handleMemberPassportChange(a.id, e)}
-                                      className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg min-w-0 flex-1"
-                                    />
-                                    {memberPassportFiles[a.id] && (
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => {
-                                          setMemberPassportFiles((prev) => ({
-                                            ...prev,
-                                            [a.id]: null,
-                                          }));
-                                          setPreviews((prev) => {
-                                            const n = { ...prev };
-                                            delete n[passKey];
-                                            return n;
-                                          });
-                                        }}
-                                        className="text-red-600 hover:text-red-800 shrink-0"
-                                        title="Retirer le fichier"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    )}
-                                  </div>
+                                <div className="space-y-2 min-w-0 flex flex-col">
+                                  {(!(hasPreview && !markPassportReplace && pvUrl)) && (
+                                    <>
+                                      <Label className="text-xs text-blue-700 font-medium">
+                                        Passeport (obligatoire)
+                                      </Label>
+                                      <div className="flex items-center gap-2">
+                                        <Input
+                                          type="file"
+                                          accept="image/*,.pdf"
+                                          onChange={(e) => handleMemberPassportChange(a.id, e)}
+                                          className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg min-w-0 flex-1"
+                                        />
+                                        {memberPassportFiles[a.id] && (
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => {
+                                              setMemberPassportFiles((prev) => ({
+                                                ...prev,
+                                                [a.id]: null,
+                                              }));
+                                              setPreviews((prev) => {
+                                                const n = { ...prev };
+                                                delete n[passKey];
+                                                return n;
+                                              });
+                                            }}
+                                            className="text-red-600 hover:text-red-800 shrink-0"
+                                            title="Retirer le fichier"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </>
+                                  )}
                                   {hasPreview && !markPassportReplace && pvUrl && (
-                                    <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
-                                      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                                    <div className="p-2 border border-blue-200 rounded-lg bg-white flex flex-col min-h-0 w-full">
+                                      <div className="flex items-center justify-between mb-2 flex-wrap gap-2 shrink-0">
                                         <span className="text-sm font-medium text-blue-700">
                                           Aperçu du passeport
                                         </span>
@@ -2444,6 +2491,28 @@ export default function EditReservation() {
                                             <Download className="h-3 w-3" />
                                             Télécharger
                                           </a>
+                                          {memberPassportFiles[a.id] && (
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="icon"
+                                              className="text-red-600 hover:text-red-800 h-8 w-8 shrink-0"
+                                              title="Retirer le fichier"
+                                              onClick={() => {
+                                                setMemberPassportFiles((prev) => ({
+                                                  ...prev,
+                                                  [a.id]: null,
+                                                }));
+                                                setPreviews((prev) => {
+                                                  const n = { ...prev };
+                                                  delete n[passKey];
+                                                  return n;
+                                                });
+                                              }}
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          )}
                                           {fid && (
                                             <Button
                                               type="button"
@@ -2469,7 +2538,7 @@ export default function EditReservation() {
                                           )}
                                         </div>
                                       </div>
-                                      <div className="w-full min-h-[14rem] h-64 overflow-hidden rounded-lg border border-blue-200 bg-slate-50 flex items-center justify-center">
+                                      <div className="w-full min-h-0 max-h-[min(11rem,32vh)] h-[min(11rem,32vh)] sm:max-h-[min(12rem,34vh)] sm:h-[min(12rem,34vh)] overflow-hidden rounded-lg border border-blue-200 bg-slate-50 flex items-center justify-center">
                                         {pvIsPdf ? (
                                           pvUrl.startsWith("blob:") || pvUrl.startsWith("data:") ? (
                                             <embed

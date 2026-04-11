@@ -1320,76 +1320,6 @@ export default function EditReservation() {
     return ids;
   }, [reservationId, accompagnants]);
 
-  const suggestedChambrePrix = useMemo(() => {
-    if (
-      !programDetail?.rooms ||
-      !reservationData?.isLeader ||
-      reservationData?.typeReservation !== "CHAMBRE_PRIVEE"
-    ) {
-      return 0;
-    }
-    const hidM = resolveHotelId(formData.hotelMadina, "madina");
-    const hidK = resolveHotelId(formData.hotelMakkah, "makkah");
-    if (!hidM || !hidK || !formData.typeChambre) return 0;
-    const nbPersonnes = ROOM_CAPACITY_EDIT[formData.typeChambre] || 1;
-    const inGroup = (r: any) =>
-      (r.listeIdsReservation || []).some((id: number) =>
-        groupReservationIds.includes(id)
-      );
-    const roomMadina = programDetail.rooms.find(
-      (r: any) =>
-        r.hotelId === hidM &&
-        r.roomType === formData.typeChambre &&
-        (inGroup(r) || formData.gender === r.gender || r.gender === "Mixte")
-    );
-    const roomMakkah = programDetail.rooms.find(
-      (r: any) =>
-        r.hotelId === hidK &&
-        r.roomType === formData.typeChambre &&
-        (inGroup(r) || formData.gender === r.gender || r.gender === "Mixte")
-    );
-    if (!roomMadina || !roomMakkah) return 0;
-    const plan = reservationData.plan || "Normal";
-    const getProfitByPlan = () => {
-      switch (plan) {
-        case "Économique":
-          return programDetail.profitEconomique || programDetail.profit || 0;
-        case "VIP":
-          return programDetail.profitVIP || programDetail.profit || 0;
-        default:
-          return programDetail.profitNormal || programDetail.profit || 0;
-      }
-    };
-    const ex = programDetail.exchange ?? 1;
-    const prixAvion = customization.includeAvion ? programDetail.prixAvionDH ?? 0 : 0;
-    const prixVisa = customization.includeVisa ? programDetail.prixVisaRiyal ?? 0 : 0;
-    const profit = getProfitByPlan();
-    const prixRoomMadina = roomMadina.prixRoom || 0;
-    const prixRoomMakkah = roomMakkah.prixRoom || 0;
-    const prixHotelMadina =
-      formData.hotelMadina && formData.hotelMadina !== "none"
-        ? prixRoomMadina * nbPersonnes * customization.joursMadina
-        : 0;
-    const prixHotelMakkah =
-      formData.hotelMakkah && formData.hotelMakkah !== "none"
-        ? prixRoomMakkah * nbPersonnes * customization.joursMakkah
-        : 0;
-    const prixFinal =
-      prixAvion +
-      profit +
-      (prixVisa + prixHotelMakkah + prixHotelMadina) * ex;
-    return Math.round(prixFinal);
-  }, [
-    programDetail,
-    reservationData,
-    formData.hotelMadina,
-    formData.hotelMakkah,
-    formData.typeChambre,
-    formData.gender,
-    customization,
-    groupReservationIds,
-  ]);
-
   const getGenderIconRoom = (gender: string) => {
     switch (gender) {
       case "Homme":
@@ -1521,114 +1451,8 @@ export default function EditReservation() {
 
   const isChambrePrivee = reservationData?.typeReservation === "CHAMBRE_PRIVEE"
 
-  const renderVoyageCustomizationBlock = () => {
-    if (!formData.programId || !programDetail) return null;
-    return (
-      <div className="mt-4 mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
-        <div className="flex flex-wrap items-center gap-6 lg:gap-8">
-          <div className="flex items-center gap-6">
-            <span className="text-sm font-semibold text-blue-700">Services:</span>
-            <div className="flex items-center gap-2">
-              <span className="text-lg">✈️</span>
-              <span className="text-sm font-medium text-blue-700">Avion</span>
-              <Switch
-                checked={customization.includeAvion}
-                onCheckedChange={(checked) =>
-                  setCustomization((prev) => ({ ...prev, includeAvion: checked }))
-                }
-                className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-lg">📄</span>
-              <span className="text-sm font-medium text-blue-700">Visa</span>
-              <Switch
-                checked={customization.includeVisa}
-                onCheckedChange={(checked) =>
-                  setCustomization((prev) => ({ ...prev, includeVisa: checked }))
-                }
-                className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-              />
-            </div>
-          </div>
-          <div className="w-px h-8 bg-blue-300 hidden sm:block" />
-          <div className="flex flex-wrap items-center gap-6">
-            <span className="text-sm font-semibold text-blue-700">Durée:</span>
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🕌</span>
-              <span className="text-sm font-medium text-blue-700">Madina</span>
-              <Input
-                type="number"
-                min={0}
-                value={customization.joursMadina}
-                onChange={(e) =>
-                  setCustomization((prev) => ({
-                    ...prev,
-                    joursMadina: parseInt(e.target.value, 10) || 0,
-                  }))
-                }
-                className="w-16 h-8 text-xs border border-blue-200 focus:border-blue-500 rounded text-center"
-              />
-              <span className="text-xs text-blue-500">
-                (déf: {programDetail.nbJoursMadina ?? 0})
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🕋</span>
-              <span className="text-sm font-medium text-blue-700">Makkah</span>
-              <Input
-                type="number"
-                min={0}
-                value={customization.joursMakkah}
-                onChange={(e) =>
-                  setCustomization((prev) => ({
-                    ...prev,
-                    joursMakkah: parseInt(e.target.value, 10) || 0,
-                  }))
-                }
-                className="w-16 h-8 text-xs border border-blue-200 focus:border-blue-500 rounded text-center"
-              />
-              <span className="text-xs text-blue-500">
-                (déf: {programDetail.nbJoursMakkah ?? 0})
-              </span>
-            </div>
-          </div>
-          <div className="w-px h-8 bg-blue-300 hidden sm:block" />
-          <Button
-            type="button"
-            onClick={() =>
-              setCustomization((c) => ({
-                ...c,
-                includeAvion: true,
-                includeVisa: true,
-                joursMadina: programDetail.nbJoursMadina ?? 0,
-                joursMakkah: programDetail.nbJoursMakkah ?? 0,
-              }))
-            }
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
-          >
-            Réinitialiser
-          </Button>
-        </div>
-        {reservationData?.isLeader &&
-          reservationData?.typeReservation === "CHAMBRE_PRIVEE" &&
-          suggestedChambrePrix > 0 && (
-            <p className="mt-3 text-xs text-emerald-800">
-              Prix suggéré (lit × capacité, comme nouvelle chambre / nouvelle réservation) :{" "}
-              <span className="font-semibold">
-                {suggestedChambrePrix.toLocaleString("fr-FR")} DH
-              </span>
-              .
-            </p>
-          )}
-      </div>
-    );
-  };
-
   const renderLeaderPassportBlock = () => (
-    <div className="space-y-2 min-w-0">
+    <div className="flex flex-col flex-1 min-h-0 min-w-0 space-y-3">
       <Label className="text-xs text-blue-700 font-medium">Passeport (obligatoire)</Label>
       {(!getDocumentUrl("passport") && !documents.passport) || passportToDelete !== null ? (
         <div className="space-y-2">
@@ -1667,16 +1491,16 @@ export default function EditReservation() {
           )}
         </div>
       ) : (
-        <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-blue-700">
+        <div className="mt-1 flex flex-col flex-1 min-h-0 rounded-xl border border-blue-200 bg-white p-3 shadow-sm">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-3">
+            <span className="text-sm font-semibold text-blue-800 shrink-0">
               {documents.passport ? "Nouveau passeport" : "Aperçu du passeport"}
             </span>
-            <div className="flex items-center gap-2">
-              {(previews.passport || getDocumentUrl("passport")) && !documents.passport && (
+            <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+              {(previews.passport || getDocumentUrl("passport")) && (
                 <button
                   type="button"
-                  className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded"
+                  className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1.5 rounded-md text-sm inline-flex items-center gap-1 border border-transparent hover:border-blue-200"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -1685,9 +1509,21 @@ export default function EditReservation() {
                     setPreviewImage({ url, title: "Passeport", type });
                   }}
                 >
-                  <ZoomIn className="h-3 w-3 mr-1" />
+                  <ZoomIn className="h-4 w-4" />
                   Zoom
                 </button>
+              )}
+              {(previews.passport?.url || getDocumentUrl("passport")) && (
+                <a
+                  href={(previews.passport?.url || getDocumentUrl("passport"))!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1.5 rounded-md text-sm inline-flex items-center gap-1 border border-transparent hover:border-blue-200"
+                >
+                  <Download className="h-4 w-4" />
+                  Télécharger
+                </a>
               )}
               {(previews.passport || getDocumentUrl("passport")) && !documents.passport && (
                 <Button
@@ -1700,9 +1536,9 @@ export default function EditReservation() {
                       setPassportToDelete(fileId);
                     }
                   }}
-                  className="text-orange-600 hover:text-orange-800 hover:bg-orange-50"
+                  className="text-orange-600 hover:text-orange-800 hover:bg-orange-50 h-9"
                 >
-                  <Edit className="h-3 w-3 mr-1" />
+                  <Edit className="h-4 w-4 mr-1" />
                   Remplacer
                 </Button>
               )}
@@ -1717,15 +1553,15 @@ export default function EditReservation() {
                       setPassportToDelete(null);
                     }
                   }}
-                  className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                  className="text-red-600 hover:text-red-800 hover:bg-red-50 h-9"
                 >
-                  <Trash2 className="h-3 w-3 mr-1" />
+                  <Trash2 className="h-4 w-4 mr-1" />
                   Supprimer
                 </Button>
               )}
             </div>
           </div>
-          <div className="w-full max-h-36 h-36 overflow-hidden rounded-lg border border-blue-200 bg-slate-50 flex items-center justify-center">
+          <div className="w-full min-h-[17rem] h-72 flex-1 overflow-hidden rounded-lg border border-blue-200 bg-slate-50 flex items-center justify-center">
             {(() => {
               const passportUrl = documents.passport
                 ? previews.passport?.url
@@ -1849,7 +1685,7 @@ export default function EditReservation() {
 
         {/* Structure identique à Nouvelle Réservation */}
         <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
-                <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-0 z-40 shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-20 z-40 shadow-lg">
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <CardTitle className="text-xl flex items-center gap-3">
                       <Sparkles className="h-6 w-6" />
@@ -1976,13 +1812,9 @@ export default function EditReservation() {
                         </div>
                       </div>
                     </div>
-
-                    {renderVoyageCustomizationBlock()}
                   </>
                 ) : (
                   <>
-                    {renderVoyageCustomizationBlock()}
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div className="space-y-2">
                         <Label className="text-blue-700 font-medium text-sm">Prix total dossier (DH) *</Label>
@@ -2289,9 +2121,9 @@ export default function EditReservation() {
                     </h3>
 
                 {isChambrePrivee ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start mb-4">
-                    <div className="space-y-4 min-w-0">
-                      <div className="p-4 rounded-lg border border-blue-200 bg-white/80">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch mb-4">
+                    <div className="space-y-4 min-w-0 flex flex-col">
+                      <div className="p-4 rounded-lg border border-blue-200 bg-white/80 flex-1">
                         <div className="text-xs font-semibold text-blue-700 flex items-center gap-2 mb-3">
                           <User className="h-4 w-4" />
                           Leader
@@ -2387,7 +2219,7 @@ export default function EditReservation() {
                         </div>
                       </div>
                     </div>
-                    <div className="min-w-0 lg:sticky lg:top-28">
+                    <div className="min-w-0 flex flex-col self-stretch lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
                       {renderLeaderPassportBlock()}
                     </div>
                   </div>
@@ -2602,16 +2434,16 @@ export default function EditReservation() {
                                             <ZoomIn className="h-3 w-3" />
                                             Aperçu
                                           </button>
-                                          {pvUrl.startsWith("blob:") || pvUrl.startsWith("data:") ? null : (
-                                            <a
-                                              href={pvUrl}
-                                              download={memberPassportFiles[a.id]?.name || "passeport"}
-                                              className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded text-sm inline-flex items-center gap-1"
-                                            >
-                                              <Download className="h-3 w-3" />
-                                              Télécharger
-                                            </a>
-                                          )}
+                                          <a
+                                            href={pvUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            download={memberPassportFiles[a.id]?.name || "passeport"}
+                                            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded text-sm inline-flex items-center gap-1"
+                                          >
+                                            <Download className="h-3 w-3" />
+                                            Télécharger
+                                          </a>
                                           {fid && (
                                             <Button
                                               type="button"
@@ -2637,7 +2469,7 @@ export default function EditReservation() {
                                           )}
                                         </div>
                                       </div>
-                                      <div className="w-full max-h-36 h-36 overflow-hidden rounded-lg border border-blue-200 bg-slate-50 flex items-center justify-center">
+                                      <div className="w-full min-h-[14rem] h-64 overflow-hidden rounded-lg border border-blue-200 bg-slate-50 flex items-center justify-center">
                                         {pvIsPdf ? (
                                           pvUrl.startsWith("blob:") || pvUrl.startsWith("data:") ? (
                                             <embed

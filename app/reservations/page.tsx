@@ -783,7 +783,11 @@ export default function ReservationsPage() {
                         <div className="flex-1 flex flex-col md:flex-row md:items-center gap-3 min-w-[180px]">
                           <span className="font-bold text-xl text-blue-900 tracking-tight uppercase">{reservation.nom} {reservation.prenom}</span>
                           {reservation.typeReservation === "CHAMBRE_PRIVEE" ? (
-                            <span className="inline-flex items-center font-bold text-xl text-green-900 bg-green-100 border-2 border-green-400 rounded-lg px-3 py-1.5 tracking-tight uppercase shadow-sm">
+                            <span
+                              className="inline-flex items-center gap-1.5 shrink-0 rounded-full border border-emerald-400/70 bg-gradient-to-r from-emerald-50 to-emerald-100/90 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-emerald-900 shadow-sm ring-1 ring-emerald-200/60"
+                              title="Dossier chambre privée"
+                            >
+                              <HotelIcon className="h-3.5 w-3.5 text-emerald-700" aria-hidden />
                               Chambre
                             </span>
                           ) : reservation.groupSize > 1 ? (

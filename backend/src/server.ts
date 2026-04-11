@@ -17,6 +17,7 @@ import analyticsRouter from './routes/analytics';
 import roomAvailabilityRouter from './routes/room-availability';
 import authRoutes from './routes/auth';
 import adminRoutes from './routes/admin';
+import exportRoutes from './routes/export';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -81,6 +82,7 @@ async function testDatabaseConnection() {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/export', exportRoutes);
 app.use('/api/programs', programRoutes);
 app.use('/api/reservations', reservationRoutes);
 app.use('/api/expenses', expenseRoutes);

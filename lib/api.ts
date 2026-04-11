@@ -67,6 +67,8 @@ export const api = {
     programOverview: (id: number) => `/api/programs/${id}/overview`,
     allProgramsOverview: '/api/programs/overview/all',
     globalStats: '/api/programs/stats/global',
+    /** Export Excel format agence (feuille par programme) */
+    exportReservationsAgency: '/api/export/reservations/agency',
     // Add other endpoints as needed
   }
 };

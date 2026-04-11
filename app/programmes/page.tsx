@@ -27,11 +27,13 @@ import {
   Settings,
   Trash2,
   AlertTriangle,
+  Download,
 } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/hooks/useAuth"
 import { DeleteConfirmation } from "@/components/ui/delete-confirmation"
 import RoleProtectedRoute from "../components/RoleProtectedRoute"
+import { useToast } from "@/hooks/use-toast"
 
 // Types pour les données de l'API
 interface ProgramOverview {
@@ -109,6 +111,8 @@ interface ProgramOverview {
 export default function ProgrammesPage() {
   // Hook pour gérer l'authentification
   const { isAdmin, loading: authLoading } = useAuth()
+  const { toast } = useToast()
+  const [exportingProgramId, setExportingProgramId] = useState<number | null>(null)
   
   // États pour les filtres
   const [searchQuery, setSearchQuery] = useState("")
@@ -199,6 +203,49 @@ export default function ProgrammesPage() {
       programme,
       isHardDelete: true
     })
+  }
+
+  const handleExportProgram = async (programId: number, programName: string) => {
+    try {
+      setExportingProgramId(programId)
+      const params = new URLSearchParams({ programId: String(programId) })
+      const res = await api.request(
+        `${api.endpoints.exportReservationsAgency}?${params.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            Accept:
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          },
+        }
+      )
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error || "Export échoué")
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      const safe = programName.replace(/[/\\?%*:[\]]/g, "_").slice(0, 40)
+      a.download = `export-${safe}-${new Date().toISOString().slice(0, 10)}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast({
+        title: "Export Excel",
+        description: `Programme « ${programName} » exporté.`,
+      })
+    } catch (e) {
+      toast({
+        title: "Export impossible",
+        description: e instanceof Error ? e.message : "Erreur inconnue",
+        variant: "destructive",
+      })
+    } finally {
+      setExportingProgramId(null)
+    }
   }
 
   const handleDeleteConfirm = async () => {
@@ -488,14 +535,25 @@ export default function ProgrammesPage() {
           {activeProgrammes.map((programme) => (
             <Card key={programme.id} className="border-none shadow-lg hover:shadow-xl transition-all overflow-hidden">
               <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 pb-4">
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start gap-3 flex-wrap">
                   <div>
                     <CardTitle className="text-xl text-blue-800">{programme.name}</CardTitle>
                     <CardDescription className="mt-1">
                       Créé le {new Date(programme.created_at).toLocaleDateString("fr-FR")}
                     </CardDescription>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex flex-col items-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+                      disabled={exportingProgramId === programme.id}
+                      onClick={() => handleExportProgram(programme.id, programme.name)}
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      {exportingProgramId === programme.id ? "Export…" : "Excel agence"}
+                    </Button>
                     <div className="text-2xl font-bold text-yellow-600">
                       {(programme.totalRevenue || 0).toLocaleString()} DH
                     </div>

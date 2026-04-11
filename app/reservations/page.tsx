@@ -27,6 +27,7 @@ import {
   Stamp,
   Hotel as HotelIcon,
   Plane,
+  Download,
 } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect, useCallback, useMemo } from "react"
@@ -163,6 +164,7 @@ export default function ReservationsPage() {
   const { toast } = useToast()
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [reservationToDelete, setReservationToDelete] = useState<number | null>(null);
+  const [exporting, setExporting] = useState(false);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -207,6 +209,63 @@ export default function ReservationsPage() {
   const handleChambreChange = (value: string) => {
     setChambreFilter(value);
   };
+
+  const handleExportAgency = useCallback(async () => {
+    try {
+      setExporting(true);
+      const params = new URLSearchParams({
+        program: programmeFilter,
+        status: statutFilter,
+        roomType: chambreFilter,
+        ...(filters.dateFrom && { dateFrom: filters.dateFrom }),
+        ...(filters.dateTo && { dateTo: filters.dateTo }),
+        ...(filters.search && { search: filters.search }),
+      });
+      const res = await api.request(
+        `${api.endpoints.exportReservationsAgency}?${params.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            Accept:
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          },
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error || "Export échoué");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `export-agence-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({
+        title: "Export Excel",
+        description: "Le fichier a été téléchargé (une feuille par programme).",
+      });
+    } catch (e) {
+      toast({
+        title: "Export impossible",
+        description: e instanceof Error ? e.message : "Erreur inconnue",
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(false);
+    }
+  }, [
+    programmeFilter,
+    statutFilter,
+    chambreFilter,
+    filters.dateFrom,
+    filters.dateTo,
+    filters.search,
+    toast,
+  ]);
 
   // Déclarer fetchData en premier pour éviter les problèmes d'ordre
   const fetchData = useCallback(async (page = 1) => {
@@ -684,10 +743,22 @@ export default function ReservationsPage() {
         {/* Filtres */}
         <Card className="mb-8 border-none shadow-lg overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 pb-2">
-            <CardTitle className="text-blue-800 flex items-center gap-2 text-lg">
-              <Filter className="h-5 w-5 text-blue-600" />
-              Filtres et recherche
-            </CardTitle>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <CardTitle className="text-blue-800 flex items-center gap-2 text-lg">
+                <Filter className="h-5 w-5 text-blue-600" />
+                Filtres et recherche
+              </CardTitle>
+              <Button
+                type="button"
+                variant="outline"
+                className="border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 shrink-0"
+                disabled={exporting}
+                onClick={handleExportAgency}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {exporting ? "Export…" : "Exporter Excel (agence)"}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-6">
             <form onSubmit={handleFilterChange} className="grid grid-cols-1 md:grid-cols-4 gap-4 md:items-end">

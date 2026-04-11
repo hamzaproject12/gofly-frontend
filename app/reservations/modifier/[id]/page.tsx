@@ -20,7 +20,6 @@ import {
   FileText,
   Sparkles,
   Bell,
-  Settings,
   Search,
   Calendar,
   Users,
@@ -35,6 +34,7 @@ import {
   Leaf,
   ShieldCheck,
   Crown,
+  Download,
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/components/ui/use-toast"
@@ -322,7 +322,6 @@ export default function EditReservation() {
   const [programs, setPrograms] = useState<Program[]>([])
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string; type: string } | null>(null)
   const [showRoomGuide, setShowRoomGuide] = useState(false)
-  const [isCustomizationOpen, setIsCustomizationOpen] = useState(false)
   const [customization, setCustomization] = useState({
     includeAvion: true,
     includeVisa: true,
@@ -1523,7 +1522,7 @@ export default function EditReservation() {
   const isChambrePrivee = reservationData?.typeReservation === "CHAMBRE_PRIVEE"
 
   const renderVoyageCustomizationBlock = () => {
-    if (!isCustomizationOpen || !formData.programId || !programDetail) return null;
+    if (!formData.programId || !programDetail) return null;
     return (
       <div className="mt-4 mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
         <div className="flex flex-wrap items-center gap-6 lg:gap-8">
@@ -1621,7 +1620,7 @@ export default function EditReservation() {
               <span className="font-semibold">
                 {suggestedChambrePrix.toLocaleString("fr-FR")} DH
               </span>
-              . Vous pouvez ajuster le montant ci-dessous.
+              .
             </p>
           )}
       </div>
@@ -1883,18 +1882,6 @@ export default function EditReservation() {
                     <Sparkles className="h-5 w-5" />
                     Configuration du Voyage
                   </h3>
-                  {formData.programId && programDetail && (
-                    <Button
-                      type="button"
-                      onClick={() => setIsCustomizationOpen(!isCustomizationOpen)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-blue-700 hover:bg-blue-200 hover:text-blue-800 transition-all"
-                    >
-                      <Settings className="h-4 w-4 mr-2" />
-                      {isCustomizationOpen ? "Masquer" : "Éditer"}
-                    </Button>
-                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
@@ -1991,268 +1978,6 @@ export default function EditReservation() {
                     </div>
 
                     {renderVoyageCustomizationBlock()}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                      <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Info className="h-4 w-4 text-green-700" />
-                          <span className="text-xs font-medium text-green-700">
-                            Chambres disponibles à Madina (libres uniquement)
-                          </span>
-                        </div>
-                        <div className="grid gap-2">
-                          {programDetail?.rooms &&
-                          formData.hotelMadina &&
-                          formData.hotelMadina !== "none" &&
-                          formData.typeChambre &&
-                          formData.gender
-                            ? (() => {
-                                const hid = resolveHotelId(formData.hotelMadina, "madina");
-                                if (!hid)
-                                  return (
-                                    <div className="text-xs text-gray-500 py-2">—</div>
-                                  );
-                                const filteredRooms = programDetail.rooms.filter(
-                                  (room: any) =>
-                                    room.hotelId === hid &&
-                                    room.roomType === formData.typeChambre &&
-                                    (room.gender === formData.gender ||
-                                      room.gender === "Mixte" ||
-                                      !room.gender)
-                                );
-                                if (filteredRooms.length === 0) {
-                                  return (
-                                    <div className="text-xs text-gray-500 text-center py-2">
-                                      Aucune chambre trouvée
-                                    </div>
-                                  );
-                                }
-                                const sortedRooms = sortRoomsByAlgorithm(
-                                  filteredRooms,
-                                  formData.gender
-                                );
-                                return sortedRooms.map((room: any, index: number) => {
-                                  const placesOccupees =
-                                    room.nbrPlaceTotal - room.nbrPlaceRestantes;
-                                  const placesDisponibles = room.nbrPlaceRestantes;
-                                  const isGroupRoom = (room.listeIdsReservation || []).some(
-                                    (rid: number) => groupReservationIds.includes(rid)
-                                  );
-                                  return (
-                                    <div
-                                      key={index}
-                                      className={`relative p-2 rounded border transition-all ${
-                                        isGroupRoom
-                                          ? "border-yellow-400 bg-yellow-50"
-                                          : "border-gray-300 bg-white"
-                                      }`}
-                                    >
-                                      <div className="flex items-center">
-                                        <div className="flex items-center gap-2 w-20">
-                                          <span className="text-sm">
-                                            {getGenderIconRoom(room.gender)}
-                                          </span>
-                                          <span className="text-xs font-medium text-gray-700">
-                                            ({placesDisponibles}/{room.nbrPlaceTotal})
-                                          </span>
-                                        </div>
-                                        <div className="flex-1 flex justify-center">
-                                          <div className="flex gap-1.5">
-                                            {Array.from(
-                                              { length: room.nbrPlaceTotal },
-                                              (_, placeIndex) => {
-                                                const gn = groupReservationIds.length;
-                                                const take = isGroupRoom
-                                                  ? Math.min(gn, room.nbrPlaceRestantes)
-                                                  : 0;
-                                                const y0 = placesOccupees;
-                                                const y1 = y0 + take - 1;
-                                                let placeColor = "bg-gray-300";
-                                                let placeTitle = `Place ${placeIndex + 1}`;
-                                                if (placeIndex < placesOccupees) {
-                                                  placeColor = "bg-red-500";
-                                                  placeTitle = `Place ${placeIndex + 1} occupée`;
-                                                } else if (
-                                                  isGroupRoom &&
-                                                  take > 0 &&
-                                                  placeIndex >= y0 &&
-                                                  placeIndex <= y1
-                                                ) {
-                                                  placeColor = "bg-yellow-400";
-                                                  placeTitle = `Place ${placeIndex + 1} — dossier groupe`;
-                                                } else {
-                                                  placeColor = "bg-green-500";
-                                                  placeTitle = `Place ${placeIndex + 1} libre`;
-                                                }
-                                                return (
-                                                  <div
-                                                    key={placeIndex}
-                                                    className={`w-4 h-4 rounded-full ${placeColor} transition-all`}
-                                                    title={placeTitle}
-                                                  />
-                                                );
-                                              }
-                                            )}
-                                          </div>
-                                        </div>
-                                        <div className="w-8 flex justify-end">
-                                          {isGroupRoom && (
-                                            <div
-                                              className="w-3 h-3 bg-yellow-400 rounded-full"
-                                              title="Chambre du dossier"
-                                            />
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                });
-                              })()
-                            : null}
-                        </div>
-                      </div>
-                      <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Info className="h-4 w-4 text-green-700" />
-                          <span className="text-xs font-medium text-green-700">
-                            Chambres disponibles à Makkah (libres uniquement)
-                          </span>
-                        </div>
-                        <div className="grid gap-2">
-                          {programDetail?.rooms &&
-                          formData.hotelMakkah &&
-                          formData.hotelMakkah !== "none" &&
-                          formData.typeChambre &&
-                          formData.gender
-                            ? (() => {
-                                const hid = resolveHotelId(formData.hotelMakkah, "makkah");
-                                if (!hid)
-                                  return (
-                                    <div className="text-xs text-gray-500 py-2">—</div>
-                                  );
-                                const filteredRooms = programDetail.rooms.filter(
-                                  (room: any) =>
-                                    room.hotelId === hid &&
-                                    room.roomType === formData.typeChambre &&
-                                    (room.gender === formData.gender ||
-                                      room.gender === "Mixte" ||
-                                      !room.gender)
-                                );
-                                if (filteredRooms.length === 0) {
-                                  return (
-                                    <div className="text-xs text-gray-500 text-center py-2">
-                                      Aucune chambre trouvée
-                                    </div>
-                                  );
-                                }
-                                const sortedRooms = sortRoomsByAlgorithm(
-                                  filteredRooms,
-                                  formData.gender
-                                );
-                                return sortedRooms.map((room: any, index: number) => {
-                                  const placesOccupees =
-                                    room.nbrPlaceTotal - room.nbrPlaceRestantes;
-                                  const placesDisponibles = room.nbrPlaceRestantes;
-                                  const isGroupRoom = (room.listeIdsReservation || []).some(
-                                    (rid: number) => groupReservationIds.includes(rid)
-                                  );
-                                  return (
-                                    <div
-                                      key={index}
-                                      className={`relative p-2 rounded border transition-all ${
-                                        isGroupRoom
-                                          ? "border-yellow-400 bg-yellow-50"
-                                          : "border-gray-300 bg-white"
-                                      }`}
-                                    >
-                                      <div className="flex items-center">
-                                        <div className="flex items-center gap-2 w-20">
-                                          <span className="text-sm">
-                                            {getGenderIconRoom(room.gender)}
-                                          </span>
-                                          <span className="text-xs font-medium text-gray-700">
-                                            ({placesDisponibles}/{room.nbrPlaceTotal})
-                                          </span>
-                                        </div>
-                                        <div className="flex-1 flex justify-center">
-                                          <div className="flex gap-1.5">
-                                            {Array.from(
-                                              { length: room.nbrPlaceTotal },
-                                              (_, placeIndex) => {
-                                                const gn = groupReservationIds.length;
-                                                const take = isGroupRoom
-                                                  ? Math.min(gn, room.nbrPlaceRestantes)
-                                                  : 0;
-                                                const y0 = placesOccupees;
-                                                const y1 = y0 + take - 1;
-                                                let placeColor = "bg-gray-300";
-                                                let placeTitle = `Place ${placeIndex + 1}`;
-                                                if (placeIndex < placesOccupees) {
-                                                  placeColor = "bg-red-500";
-                                                  placeTitle = `Place ${placeIndex + 1} occupée`;
-                                                } else if (
-                                                  isGroupRoom &&
-                                                  take > 0 &&
-                                                  placeIndex >= y0 &&
-                                                  placeIndex <= y1
-                                                ) {
-                                                  placeColor = "bg-yellow-400";
-                                                  placeTitle = `Place ${placeIndex + 1} — dossier groupe`;
-                                                } else {
-                                                  placeColor = "bg-green-500";
-                                                  placeTitle = `Place ${placeIndex + 1} libre`;
-                                                }
-                                                return (
-                                                  <div
-                                                    key={placeIndex}
-                                                    className={`w-4 h-4 rounded-full ${placeColor} transition-all`}
-                                                    title={placeTitle}
-                                                  />
-                                                );
-                                              }
-                                            )}
-                                          </div>
-                                        </div>
-                                        <div className="w-8 flex justify-end">
-                                          {isGroupRoom && (
-                                            <div
-                                              className="w-3 h-3 bg-yellow-400 rounded-full"
-                                              title="Chambre du dossier"
-                                            />
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                });
-                              })()
-                            : null}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 mt-2">
-                      <div className="space-y-2">
-                        <Label className="text-blue-700 font-medium text-sm">Prix total dossier (DH) *</Label>
-                        <Input
-                          value={formData.prix}
-                          onChange={(e) => setFormData({ ...formData, prix: e.target.value })}
-                          className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                          placeholder="Montant"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-blue-700 font-medium text-sm">Date de réservation *</Label>
-                        <Input
-                          type="date"
-                          value={formData.dateReservation}
-                          onChange={(e) =>
-                            setFormData({ ...formData, dateReservation: e.target.value })
-                          }
-                          className="h-10 border-2 border-blue-200 rounded-lg"
-                        />
-                      </div>
-                    </div>
                   </>
                 ) : (
                   <>
@@ -2755,138 +2480,339 @@ export default function EditReservation() {
                         const hasPreview = !!previews[passKey];
                         const fid = getMemberPassportFileId(a);
                         const markPassportReplace = memberPassportDelete[a.id] != null;
+                        const pvUrl = previews[passKey]?.url;
+                        const pvType = previews[passKey]?.type || "image/*";
+                        const pvIsPdf = pvType === "application/pdf";
                         return (
                           <div
                             key={a.id}
                             className="rounded-lg border border-indigo-100 bg-indigo-50/30 p-3 space-y-3"
                           >
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                              <Input
-                                value={a.lastName}
-                                onChange={(e) =>
-                                  setAccompagnants((prev) =>
-                                    prev.map((item) =>
-                                      item.id === a.id
-                                        ? { ...item, lastName: e.target.value }
-                                        : item
-                                    )
-                                  )
-                                }
-                                placeholder={`Nom accompagnant ${idx + 1}`}
-                                className="h-10 border-2 border-blue-200"
-                              />
-                              <Input
-                                value={a.firstName}
-                                onChange={(e) =>
-                                  setAccompagnants((prev) =>
-                                    prev.map((item) =>
-                                      item.id === a.id
-                                        ? { ...item, firstName: e.target.value }
-                                        : item
-                                    )
-                                  )
-                                }
-                                placeholder="Prénom"
-                                className="h-10 border-2 border-blue-200"
-                              />
-                              <Input
-                                value={a.phone}
-                                onChange={(e) =>
-                                  setAccompagnants((prev) =>
-                                    prev.map((item) =>
-                                      item.id === a.id
-                                        ? { ...item, phone: e.target.value }
-                                        : item
-                                    )
-                                  )
-                                }
-                                placeholder="Téléphone"
-                                className="h-10 border-2 border-blue-200"
-                                disabled
-                              />
-                              <Input
-                                value={a.passportNumber || ""}
-                                onChange={(e) =>
-                                  setAccompagnants((prev) =>
-                                    prev.map((item) =>
-                                      item.id === a.id
-                                        ? { ...item, passportNumber: e.target.value }
-                                        : item
-                                    )
-                                  )
-                                }
-                                placeholder="N° passeport"
-                                className="h-10 border-2 border-blue-200"
-                                disabled
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-blue-700 font-medium text-sm">
-                                Passeport (fichier) — accompagnant {idx + 1}
-                              </Label>
-                              {(!hasPreview || markPassportReplace) && !memberPassportFiles[a.id] ? (
-                                <Input
-                                  type="file"
-                                  accept="image/*,.pdf"
-                                  onChange={(e) => handleMemberPassportChange(a.id, e)}
-                                  className="h-10 border-2 border-blue-200"
-                                />
-                              ) : (
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <Input
-                                    type="file"
-                                    accept="image/*,.pdf"
-                                    onChange={(e) => handleMemberPassportChange(a.id, e)}
-                                    className="h-10 border-2 border-blue-200 max-w-xs"
-                                  />
-                                  {hasPreview && !markPassportReplace && (
-                                    <>
+                            {isChambrePrivee ? (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-3 min-w-0">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                      <Label className="text-xs text-blue-700">Nom *</Label>
+                                      <Input
+                                        value={a.lastName}
+                                        onChange={(e) =>
+                                          setAccompagnants((prev) =>
+                                            prev.map((item) =>
+                                              item.id === a.id
+                                                ? { ...item, lastName: e.target.value }
+                                                : item
+                                            )
+                                          )
+                                        }
+                                        placeholder={`Nom accompagnant ${idx + 1}`}
+                                        className="h-10 border-2 border-blue-100 focus:border-blue-400"
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-xs text-blue-700">Prénom *</Label>
+                                      <Input
+                                        value={a.firstName}
+                                        onChange={(e) =>
+                                          setAccompagnants((prev) =>
+                                            prev.map((item) =>
+                                              item.id === a.id
+                                                ? { ...item, firstName: e.target.value }
+                                                : item
+                                            )
+                                          )
+                                        }
+                                        placeholder="Prénom"
+                                        className="h-10 border-2 border-blue-100 focus:border-blue-400"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs text-blue-700">N° Passeport</Label>
+                                    <Input
+                                      value={a.passportNumber || ""}
+                                      onChange={(e) =>
+                                        setAccompagnants((prev) =>
+                                          prev.map((item) =>
+                                            item.id === a.id
+                                              ? { ...item, passportNumber: e.target.value }
+                                              : item
+                                          )
+                                        )
+                                      }
+                                      placeholder="Numéro passeport"
+                                      className="h-10 border-2 border-blue-100 focus:border-blue-400"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="space-y-2 min-w-0">
+                                  <Label className="text-xs text-blue-700 font-medium">
+                                    Passeport (obligatoire)
+                                  </Label>
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      type="file"
+                                      accept="image/*,.pdf"
+                                      onChange={(e) => handleMemberPassportChange(a.id, e)}
+                                      className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg min-w-0 flex-1"
+                                    />
+                                    {memberPassportFiles[a.id] && (
                                       <Button
                                         type="button"
                                         variant="ghost"
-                                        size="sm"
+                                        size="icon"
                                         onClick={() => {
-                                          const u = previews[passKey]?.url;
-                                          const t = previews[passKey]?.type || "image/*";
-                                          if (u) setPreviewImage({ url: u, title: "Passeport accompagnant", type: t });
+                                          setMemberPassportFiles((prev) => ({
+                                            ...prev,
+                                            [a.id]: null,
+                                          }));
+                                          setPreviews((prev) => {
+                                            const n = { ...prev };
+                                            delete n[passKey];
+                                            return n;
+                                          });
                                         }}
+                                        className="text-red-600 hover:text-red-800 shrink-0"
+                                        title="Retirer le fichier"
                                       >
-                                        <ZoomIn className="h-4 w-4 mr-1" />
-                                        Aperçu
+                                        <Trash2 className="h-4 w-4" />
                                       </Button>
-                                      {fid && (
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="sm"
-                                          className="text-orange-600"
-                                          onClick={() => {
-                                            if (fid)
-                                              setMemberPassportDelete((prev) => ({
-                                                ...prev,
-                                                [a.id]: fid,
-                                              }));
-                                            setPreviews((prev) => {
-                                              const n = { ...prev };
-                                              delete n[passKey];
-                                              return n;
-                                            });
-                                          }}
-                                        >
-                                          <Edit className="h-4 w-4 mr-1" />
-                                          Remplacer
-                                        </Button>
-                                      )}
-                                    </>
+                                    )}
+                                  </div>
+                                  {hasPreview && !markPassportReplace && pvUrl && (
+                                    <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
+                                      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                                        <span className="text-sm font-medium text-blue-700">
+                                          Aperçu du passeport
+                                        </span>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <button
+                                            type="button"
+                                            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded text-sm flex items-center gap-1"
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              setPreviewImage({
+                                                url: pvUrl,
+                                                title: `Passeport accompagnant ${idx + 1}`,
+                                                type: pvType,
+                                              });
+                                            }}
+                                          >
+                                            <ZoomIn className="h-3 w-3" />
+                                            Aperçu
+                                          </button>
+                                          {pvUrl.startsWith("blob:") || pvUrl.startsWith("data:") ? null : (
+                                            <a
+                                              href={pvUrl}
+                                              download={memberPassportFiles[a.id]?.name || "passeport"}
+                                              className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded text-sm inline-flex items-center gap-1"
+                                            >
+                                              <Download className="h-3 w-3" />
+                                              Télécharger
+                                            </a>
+                                          )}
+                                          {fid && (
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="sm"
+                                              className="text-orange-600"
+                                              onClick={() => {
+                                                if (fid)
+                                                  setMemberPassportDelete((prev) => ({
+                                                    ...prev,
+                                                    [a.id]: fid,
+                                                  }));
+                                                setPreviews((prev) => {
+                                                  const n = { ...prev };
+                                                  delete n[passKey];
+                                                  return n;
+                                                });
+                                              }}
+                                            >
+                                              <Edit className="h-3 w-3 mr-1" />
+                                              Remplacer
+                                            </Button>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="w-full max-h-36 h-36 overflow-hidden rounded-lg border border-blue-200 bg-slate-50 flex items-center justify-center">
+                                        {pvIsPdf ? (
+                                          pvUrl.startsWith("blob:") || pvUrl.startsWith("data:") ? (
+                                            <embed
+                                              src={pvUrl}
+                                              type="application/pdf"
+                                              className="w-full h-full min-h-0"
+                                            />
+                                          ) : (
+                                            <PdfPreviewBox
+                                              url={pvUrl}
+                                              title={`Passeport accompagnant ${idx + 1}`}
+                                              onZoom={() =>
+                                                setPreviewImage({
+                                                  url: pvUrl,
+                                                  title: `Passeport accompagnant ${idx + 1}`,
+                                                  type: "application/pdf",
+                                                })
+                                              }
+                                            />
+                                          )
+                                        ) : (
+                                          <img
+                                            src={pvUrl}
+                                            alt={`Passeport accompagnant ${idx + 1}`}
+                                            className="max-w-full max-h-full w-auto h-auto object-contain cursor-pointer"
+                                            onClick={() =>
+                                              setPreviewImage({
+                                                url: pvUrl,
+                                                title: `Passeport accompagnant ${idx + 1}`,
+                                                type: pvType,
+                                              })
+                                            }
+                                          />
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {memberPassportFiles[a.id] && (
+                                    <p className="text-xs text-emerald-700">
+                                      Nouveau fichier prêt à être enregistré avec la réservation.
+                                    </p>
                                   )}
                                 </div>
-                              )}
-                              {memberPassportFiles[a.id] && (
-                                <p className="text-xs text-emerald-700">
-                                  Nouveau fichier prêt à être enregistré avec la réservation.
-                                </p>
-                              )}
-                            </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                                  <Input
+                                    value={a.lastName}
+                                    onChange={(e) =>
+                                      setAccompagnants((prev) =>
+                                        prev.map((item) =>
+                                          item.id === a.id
+                                            ? { ...item, lastName: e.target.value }
+                                            : item
+                                        )
+                                      )
+                                    }
+                                    placeholder={`Nom accompagnant ${idx + 1}`}
+                                    className="h-10 border-2 border-blue-200"
+                                  />
+                                  <Input
+                                    value={a.firstName}
+                                    onChange={(e) =>
+                                      setAccompagnants((prev) =>
+                                        prev.map((item) =>
+                                          item.id === a.id
+                                            ? { ...item, firstName: e.target.value }
+                                            : item
+                                        )
+                                      )
+                                    }
+                                    placeholder="Prénom"
+                                    className="h-10 border-2 border-blue-200"
+                                  />
+                                  <Input
+                                    value={a.phone}
+                                    onChange={(e) =>
+                                      setAccompagnants((prev) =>
+                                        prev.map((item) =>
+                                          item.id === a.id
+                                            ? { ...item, phone: e.target.value }
+                                            : item
+                                        )
+                                      )
+                                    }
+                                    placeholder="Téléphone"
+                                    className="h-10 border-2 border-blue-200"
+                                    disabled
+                                  />
+                                  <Input
+                                    value={a.passportNumber || ""}
+                                    onChange={(e) =>
+                                      setAccompagnants((prev) =>
+                                        prev.map((item) =>
+                                          item.id === a.id
+                                            ? { ...item, passportNumber: e.target.value }
+                                            : item
+                                        )
+                                      )
+                                    }
+                                    placeholder="N° passeport"
+                                    className="h-10 border-2 border-blue-200"
+                                    disabled
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-blue-700 font-medium text-sm">
+                                    Passeport (fichier) — accompagnant {idx + 1}
+                                  </Label>
+                                  {(!hasPreview || markPassportReplace) && !memberPassportFiles[a.id] ? (
+                                    <Input
+                                      type="file"
+                                      accept="image/*,.pdf"
+                                      onChange={(e) => handleMemberPassportChange(a.id, e)}
+                                      className="h-10 border-2 border-blue-200"
+                                    />
+                                  ) : (
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <Input
+                                        type="file"
+                                        accept="image/*,.pdf"
+                                        onChange={(e) => handleMemberPassportChange(a.id, e)}
+                                        className="h-10 border-2 border-blue-200 max-w-xs"
+                                      />
+                                      {hasPreview && !markPassportReplace && (
+                                        <>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              const u = previews[passKey]?.url;
+                                              const t = previews[passKey]?.type || "image/*";
+                                              if (u) setPreviewImage({ url: u, title: "Passeport accompagnant", type: t });
+                                            }}
+                                          >
+                                            <ZoomIn className="h-4 w-4 mr-1" />
+                                            Aperçu
+                                          </Button>
+                                          {fid && (
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="sm"
+                                              className="text-orange-600"
+                                              onClick={() => {
+                                                if (fid)
+                                                  setMemberPassportDelete((prev) => ({
+                                                    ...prev,
+                                                    [a.id]: fid,
+                                                  }));
+                                                setPreviews((prev) => {
+                                                  const n = { ...prev };
+                                                  delete n[passKey];
+                                                  return n;
+                                                });
+                                              }}
+                                            >
+                                              <Edit className="h-4 w-4 mr-1" />
+                                              Remplacer
+                                            </Button>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                  {memberPassportFiles[a.id] && (
+                                    <p className="text-xs text-emerald-700">
+                                      Nouveau fichier prêt à être enregistré avec la réservation.
+                                    </p>
+                                  )}
+                                </div>
+                              </>
+                            )}
                             {(a.payments || []).length > 0 && (
                               <div className="text-xs text-gray-700 space-y-1">
                                 <span className="font-semibold">Paiements liés à ce membre :</span>

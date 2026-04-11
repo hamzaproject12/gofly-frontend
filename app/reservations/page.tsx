@@ -738,7 +738,7 @@ export default function ReservationsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="toutes">Toutes les chambres</SelectItem>
-                    <SelectItem value="FAMILLE">Famille</SelectItem>
+                    <SelectItem value="FAMILLE">Chambre (privée)</SelectItem>
                     <SelectItem value="SINGLE">1 personne</SelectItem>
                     <SelectItem value="DOUBLE">2 personnes</SelectItem>
                     <SelectItem value="TRIPLE">3 personnes</SelectItem>
@@ -783,8 +783,8 @@ export default function ReservationsPage() {
                         <div className="flex-1 flex flex-col md:flex-row md:items-center gap-3 min-w-[180px]">
                           <span className="font-bold text-xl text-blue-900 tracking-tight uppercase">{reservation.nom} {reservation.prenom}</span>
                           {reservation.typeReservation === "CHAMBRE_PRIVEE" ? (
-                            <span className="inline-flex items-center text-xs font-bold text-green-800 bg-green-100 border border-green-300 rounded px-2 py-1">
-                              Famille
+                            <span className="inline-flex items-center font-bold text-xl text-green-900 bg-green-100 border-2 border-green-400 rounded-lg px-3 py-1.5 tracking-tight uppercase shadow-sm">
+                              Chambre
                             </span>
                           ) : reservation.groupSize > 1 ? (
                             <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1">

@@ -18,6 +18,9 @@ import roomAvailabilityRouter from './routes/room-availability';
 import authRoutes from './routes/auth';
 import adminRoutes from './routes/admin';
 import exportRoutes from './routes/export';
+import fixedChargesRoutes from './routes/fixed-charges';
+import cron from 'node-cron';
+import { generateFixedChargesForYearMonth, formatYearMonth } from './services/fixedChargeGenerator';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -93,6 +96,7 @@ app.use('/api/balance', balanceRouter);
 app.use('/api/upload-cloudinary', uploadCloudinaryRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/room-availability', roomAvailabilityRouter);
+app.use('/api/fixed-charges', fixedChargesRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -171,4 +175,25 @@ app.listen(PORT, async () => {
   console.log('- /api/test');
   console.log('- /api/hotels-test');
   console.log('- /health');
-}); 
+  console.log('- /api/fixed-charges (admin — charges fixes)');
+
+  cron.schedule('0 6 1 * *', async () => {
+    try {
+      const ym = formatYearMonth(new Date());
+      const r = await generateFixedChargesForYearMonth(prisma, ym);
+      console.log(`[cron] Charges fixes ${ym}: créées=${r.created}, ignorées=${r.skipped}`);
+    } catch (err) {
+      console.error('[cron] Échec génération charges fixes:', err);
+    }
+  });
+
+  try {
+    const ym = formatYearMonth(new Date());
+    const r = await generateFixedChargesForYearMonth(prisma, ym);
+    if (r.created > 0) {
+      console.log(`[startup] Charges fixes ${ym}: ${r.created} ligne(s) générée(s)`);
+    }
+  } catch (err) {
+    console.error('[startup] Génération charges fixes:', err);
+  }
+});

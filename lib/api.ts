@@ -69,6 +69,8 @@ export const api = {
     globalStats: '/api/programs/stats/global',
     /** Export Excel format agence (feuille par programme) */
     exportReservationsAgency: '/api/export/reservations/agency',
+    /** Charges fixes mensuelles (admin) */
+    fixedCharges: '/api/fixed-charges',
     // Add other endpoints as needed
   }
 };

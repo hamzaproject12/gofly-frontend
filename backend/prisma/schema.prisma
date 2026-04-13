@@ -28,6 +28,42 @@ model Agent {
   updatedAt    DateTime      @updatedAt @map("updated_at")
   payments     Payment[]
   reservations Reservation[]
+  fixedCharges FixedCharge[]
+}
+
+enum FixedChargeCategory {
+  LOYER
+  SALAIRE
+  CHARGES_DIVERSES
+  AUTRE
+}
+
+model FixedCharge {
+  id          Int                 @id @default(autoincrement())
+  label       String              @db.VarChar(200)
+  amount      Float
+  category    FixedChargeCategory
+  agentId     Int?
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+  agent       Agent?              @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  occurrences FixedChargeOccurrence[]
+
+  @@index([isActive])
+}
+
+model FixedChargeOccurrence {
+  id            Int         @id @default(autoincrement())
+  fixedChargeId Int
+  yearMonth     String      @db.VarChar(7)
+  amount        Float
+  expenseId     Int         @unique
+  generatedAt   DateTime    @default(now()) @map("generated_at")
+  fixedCharge   FixedCharge @relation(fields: [fixedChargeId], references: [id], onDelete: Restrict)
+  expense       Expense     @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@unique([fixedChargeId, yearMonth])
 }
 
 model Program {
@@ -179,17 +215,18 @@ model Payment {
 }
 
 model Expense {
-  id            Int          @id @default(autoincrement())
-  description   String
-  amount        Float
-  date          DateTime     @default(now())
-  programId     Int?
-  type          String
-  fichierId     Int?
-  reservationId Int?
-  fichier       Fichier?     @relation(fields: [fichierId], references: [id])
-  program       Program?     @relation(fields: [programId], references: [id])
-  reservation   Reservation? @relation(fields: [reservationId], references: [id])
+  id                    Int                    @id @default(autoincrement())
+  description           String
+  amount                Float
+  date                  DateTime               @default(now())
+  programId             Int?
+  type                  String
+  fichierId             Int?
+  reservationId         Int?
+  fichier               Fichier?               @relation(fields: [fichierId], references: [id])
+  program               Program?               @relation(fields: [programId], references: [id])
+  reservation           Reservation?           @relation(fields: [reservationId], references: [id])
+  fixedChargeOccurrence FixedChargeOccurrence?
 }
 
 

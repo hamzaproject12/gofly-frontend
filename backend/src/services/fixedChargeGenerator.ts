@@ -6,6 +6,34 @@ export function formatYearMonth(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+export async function generateFixedChargesTestRun(
+  prisma: PrismaClient,
+  runAt: Date = new Date()
+): Promise<{ created: number; runAt: string }> {
+  const charges = await prisma.fixedCharge.findMany({
+    where: { isActive: true },
+  });
+
+  let created = 0;
+  const runAtIso = runAt.toISOString();
+
+  for (const fc of charges) {
+    await prisma.expense.create({
+      data: {
+        description: `[TEST CRON] ${fc.label} (${runAtIso})`,
+        amount: fc.amount,
+        date: runAt,
+        type: `Charge fixe test — ${fc.category}`,
+        programId: null,
+        reservationId: null,
+      },
+    });
+    created++;
+  }
+
+  return { created, runAt: runAtIso };
+}
+
 export async function generateFixedChargesForYearMonth(
   prisma: PrismaClient,
   yearMonth: string

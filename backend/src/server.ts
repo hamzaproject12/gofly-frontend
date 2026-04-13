@@ -20,16 +20,11 @@ import adminRoutes from './routes/admin';
 import exportRoutes from './routes/export';
 import fixedChargesRoutes from './routes/fixed-charges';
 import cron from 'node-cron';
-import {
-  generateFixedChargesForYearMonth,
-  generateFixedChargesTestRun,
-  formatYearMonth,
-} from './services/fixedChargeGenerator';
+import { generateFixedChargesForYearMonth, formatYearMonth } from './services/fixedChargeGenerator';
 
 const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5000;
-const TEST_CRON_EVERY_5_MIN = process.env.TEST_CRON_EVERY_5_MIN === 'true';
 
 // Configuration CORS pour développement et production
 const allowedOrigins = [
@@ -182,23 +177,11 @@ app.listen(PORT, async () => {
   console.log('- /health');
   console.log('- /api/fixed-charges (admin — charges fixes)');
 
-  const cronExpression = TEST_CRON_EVERY_5_MIN ? '*/5 * * * *' : '0 6 1 * *';
-  console.log(
-    TEST_CRON_EVERY_5_MIN
-      ? '[cron] Mode test actif: insertion toutes les 5 minutes'
-      : '[cron] Mode production actif: génération mensuelle'
-  );
-
-  cron.schedule(cronExpression, async () => {
+  cron.schedule('0 6 1 * *', async () => {
     try {
-      if (TEST_CRON_EVERY_5_MIN) {
-        const r = await generateFixedChargesTestRun(prisma);
-        console.log(`[cron-test] Charges fixes: ${r.created} insertion(s) à ${r.runAt}`);
-      } else {
-        const ym = formatYearMonth(new Date());
-        const r = await generateFixedChargesForYearMonth(prisma, ym);
-        console.log(`[cron] Charges fixes ${ym}: créées=${r.created}, ignorées=${r.skipped}`);
-      }
+      const ym = formatYearMonth(new Date());
+      const r = await generateFixedChargesForYearMonth(prisma, ym);
+      console.log(`[cron] Charges fixes ${ym}: créées=${r.created}, ignorées=${r.skipped}`);
     } catch (err) {
       console.error('[cron] Échec génération charges fixes:', err);
     }

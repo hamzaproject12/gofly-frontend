@@ -580,8 +580,8 @@ export default function ProgrammesPage() {
                           <MapPin className="h-5 w-5" />
                           Hôtels
                         </h4>
-                        <div className="space-y-4">
-                          <div>
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
+                          <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium text-blue-700 mb-2">Madina</p>
                             <div className="flex flex-wrap gap-2">
                               {programme.hotelsMadina.map((hotel, index) => (
@@ -595,7 +595,7 @@ export default function ProgrammesPage() {
                               ))}
                             </div>
                           </div>
-                          <div>
+                          <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium text-blue-700 mb-2">Makkah</p>
                             <div className="flex flex-wrap gap-2">
                               {programme.hotelsMakkah.map((hotel, index) => (
@@ -609,6 +609,21 @@ export default function ProgrammesPage() {
                               ))}
                             </div>
                           </div>
+                        </div>
+                        <div className="mt-4 rounded-lg border border-indigo-100 bg-indigo-50/70 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium text-indigo-700 flex items-center gap-2">
+                              <Bus className="h-4 w-4" />
+                              Transport
+                            </p>
+                            <Badge className="bg-indigo-100 text-indigo-700 border border-indigo-200 shrink-0">
+                              {(programme.transportStats?.withTransport || 0)}/{(programme.transportStats?.total || 0)}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 text-xs text-indigo-700/80">
+                            Avec transport: {programme.transportStats?.withTransport || 0} • Sans transport:{" "}
+                            {programme.transportStats?.withoutTransport || 0}
+                          </p>
                         </div>
                       </div>
 
@@ -758,20 +773,6 @@ export default function ProgrammesPage() {
                                 {(programme.totalRevenue || 0).toLocaleString()} DH
                               </p>
                             </div>
-                          </div>
-                          <div className="mt-4 rounded-lg border border-indigo-100 bg-indigo-50/70 p-3">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-medium text-indigo-700 flex items-center gap-2">
-                                <Bus className="h-4 w-4" />
-                                Transport
-                              </p>
-                              <Badge className="bg-indigo-100 text-indigo-700 border border-indigo-200">
-                                {(programme.transportStats?.withTransport || 0)}/{(programme.transportStats?.total || 0)}
-                              </Badge>
-                            </div>
-                            <p className="mt-1 text-xs text-indigo-700/80">
-                              Avec transport: {programme.transportStats?.withTransport || 0} • Sans transport: {programme.transportStats?.withoutTransport || 0}
-                            </p>
                           </div>
                         </div>
                       </div>

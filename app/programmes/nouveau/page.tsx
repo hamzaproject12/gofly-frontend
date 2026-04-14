@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { api } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -32,7 +32,10 @@ import {
   PiggyBank,
   User,
   Bed,
+  Calculator,
+  Info,
 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
@@ -43,6 +46,113 @@ interface Hotel {
   id: number;
   name: string;
   city: 'Madina' | 'Makkah';
+}
+
+type ChambresConfig = { [key: number]: { nb: string; prix: string } }
+
+function parseNum(s: string | undefined, fallback = 0): number {
+  const n = parseFloat(String(s ?? "").replace(",", "."))
+  return Number.isFinite(n) ? n : fallback
+}
+
+/** Prix moyen pondéré par nombre de chambres (Riyal / chambre) pour un type 1..5 */
+function weightedAvgRoomPriceRiyal(hotels: { chambres: ChambresConfig }[], type: number): number {
+  let sumNb = 0
+  let sumPxNb = 0
+  for (const h of hotels) {
+    const nb = parseInt(h.chambres[type]?.nb || "0", 10) || 0
+    const px = parseNum(h.chambres[type]?.prix, 0)
+    if (nb > 0 && px > 0) {
+      sumNb += nb
+      sumPxNb += px * nb
+    }
+  }
+  return sumNb > 0 ? sumPxNb / sumNb : 0
+}
+
+/** Places totales pour un type de chambre (nb chambres × capacité) */
+function placesByType(hotels: { chambres: ChambresConfig }[], type: number): number {
+  let p = 0
+  for (const h of hotels) {
+    const nb = parseInt(h.chambres[type]?.nb || "0", 10) || 0
+    p += nb * type
+  }
+  return p
+}
+
+/** Au moins une ligne chambre avec nombre et prix chambre renseignés (non nuls) */
+function hasHotelInventoryConfigured(hotels: { chambres: ChambresConfig }[]): boolean {
+  for (const h of hotels) {
+    for (let t = 1; t <= 5; t++) {
+      const nb = parseInt(h.chambres[t]?.nb || "0", 10) || 0
+      const px = parseNum(h.chambres[t]?.prix, 0)
+      if (nb > 0 && px > 0) return true
+    }
+  }
+  return false
+}
+
+function profitForPlan(
+  plan: "Économique" | "Normal" | "VIP",
+  profit: number,
+  profitEconomique: number,
+  profitNormal: number,
+  profitVIP: number
+): number {
+  switch (plan) {
+    case "Économique":
+      return profitEconomique || profit
+    case "VIP":
+      return profitVIP || profit
+    case "Normal":
+    default:
+      return profitNormal || profit
+  }
+}
+
+/**
+ * Même principe que `calculatePrice` dans `app/reservations/nouvelle/page.tsx` :
+ * prixAvion + profit(plan) + (visa + hôtels Madina + Makkah en Riyal) × exchange
+ * avec prix hôtel = (prix chambre / nb personnes du type) × jours ville.
+ */
+function unitTicketPriceDh(params: {
+  exchange: number
+  prixAvionDH: number
+  prixVisaRiyal: number
+  profit: number
+  profitEconomique: number
+  profitNormal: number
+  profitVIP: number
+  plan: "Économique" | "Normal" | "VIP"
+  roomTypeKey: number
+  prixRoomMadinaRiyal: number
+  prixRoomMakkahRiyal: number
+  joursMadina: number
+  joursMakkah: number
+  includeAvion: boolean
+  includeVisa: boolean
+}): number {
+  const nbPersonnes = params.roomTypeKey
+  const p = profitForPlan(
+    params.plan,
+    params.profit,
+    params.profitEconomique,
+    params.profitNormal,
+    params.profitVIP
+  )
+  const prixAvion = params.includeAvion ? params.prixAvionDH : 0
+  const prixVisa = params.includeVisa ? params.prixVisaRiyal : 0
+  const prixHotelMadina =
+    params.prixRoomMadinaRiyal > 0 && nbPersonnes > 0
+      ? (params.prixRoomMadinaRiyal / nbPersonnes) * params.joursMadina
+      : 0
+  const prixHotelMakkah =
+    params.prixRoomMakkahRiyal > 0 && nbPersonnes > 0
+      ? (params.prixRoomMakkahRiyal / nbPersonnes) * params.joursMakkah
+      : 0
+  const riyalTotal = prixVisa + prixHotelMadina + prixHotelMakkah
+  const prixFinal = prixAvion + p + riyalTotal * params.exchange
+  return Math.round(prixFinal)
 }
 
 export default function NouveauProgramme() {
@@ -90,6 +200,149 @@ export default function NouveauProgramme() {
   const [showAutreMadinaInput, setShowAutreMadinaInput] = useState(false);
   const [autreHotelMakkah, setAutreHotelMakkah] = useState("");
   const [showAutreMakkahInput, setShowAutreMakkahInput] = useState(false);
+
+  /** Hypothèses pour la simulation (même logique de prix que « Nouvelle réservation ») */
+  const [simIncludeAvion, setSimIncludeAvion] = useState(true)
+  const [simIncludeVisa, setSimIncludeVisa] = useState(true)
+  const [simPlan, setSimPlan] = useState<"Économique" | "Normal" | "VIP">("Normal")
+  const [simJoursMadina, setSimJoursMadina] = useState("")
+  const [simJoursMakkah, setSimJoursMakkah] = useState("")
+  /** Places réservées pour agents / staff : pas de paiement client, comptées en charges */
+  const [simAgentPlaces, setSimAgentPlaces] = useState("")
+  const [simAgentCostPerPlaceDH, setSimAgentCostPerPlaceDH] = useState("")
+  const [simAutresChargesDH, setSimAutresChargesDH] = useState("")
+
+  const simulationPreview = useMemo(() => {
+    const exchange = parseNum(formData.exchange, 1) || 1
+    const prixAvionDH = parseNum(formData.prixAvion, 0)
+    const prixVisaRiyal = parseNum(formData.prixVisaRiyal, 0)
+    const profit = parseNum(formData.profit, 0)
+    const profitEconomique = parseNum(formData.profitEconomique, 0)
+    const profitNormal = parseNum(formData.profitNormal, 0)
+    const profitVIP = parseNum(formData.profitVIP, 0)
+    const jM = parseNum(simJoursMadina || formData.nbJoursMadina, 0)
+    const jK = parseNum(simJoursMakkah || formData.nbJoursMakkah, 0)
+
+    const byType: {
+      typeKey: number
+      label: string
+      places: number
+      unitDh: number
+      subtotalDh: number
+    }[] = []
+
+    let revenueIfAllPayDh = 0
+    let totalTravelersMax = 0
+
+    const labels = ["", "Simple", "Double", "Triple", "Quadruple", "Quintuple"]
+
+    for (let t = 1; t <= 5; t++) {
+      const pm = weightedAvgRoomPriceRiyal(formData.hotelsMadina, t)
+      const pk = weightedAvgRoomPriceRiyal(formData.hotelsMakkah, t)
+      const madinaPlacesT = placesByType(formData.hotelsMadina, t)
+      const makkahPlacesT = placesByType(formData.hotelsMakkah, t)
+      const paired = Math.min(madinaPlacesT, makkahPlacesT)
+      if (paired <= 0) continue
+
+      const unitDh = unitTicketPriceDh({
+        exchange,
+        prixAvionDH,
+        prixVisaRiyal,
+        profit,
+        profitEconomique,
+        profitNormal,
+        profitVIP,
+        plan: simPlan,
+        roomTypeKey: t,
+        prixRoomMadinaRiyal: pm,
+        prixRoomMakkahRiyal: pk,
+        joursMadina: jM,
+        joursMakkah: jK,
+        includeAvion: simIncludeAvion,
+        includeVisa: simIncludeVisa,
+      })
+      const subtotalDh = paired * unitDh
+      revenueIfAllPayDh += subtotalDh
+      totalTravelersMax += paired
+      byType.push({
+        typeKey: t,
+        label: labels[t] ?? `Type ${t}`,
+        places: paired,
+        unitDh,
+        subtotalDh,
+      })
+    }
+
+    const avgTicketDh = totalTravelersMax > 0 ? revenueIfAllPayDh / totalTravelersMax : 0
+    let agentPlaces = Math.max(0, parseInt(simAgentPlaces, 10) || 0)
+    const agentOver = agentPlaces > totalTravelersMax
+    if (agentPlaces > totalTravelersMax) agentPlaces = totalTravelersMax
+    const payingTravelers = Math.max(0, totalTravelersMax - agentPlaces)
+    const revenueAfterAgentsDh = payingTravelers * avgTicketDh
+    const agentCostPer = parseNum(simAgentCostPerPlaceDH, 0)
+    const agentChargesTotalDh = agentPlaces * agentCostPer
+    const autresChargesDh = parseNum(simAutresChargesDH, 0)
+    const resultatPrevDh = revenueAfterAgentsDh - agentChargesTotalDh - autresChargesDh
+
+    return {
+      exchange,
+      joursMadinaEff: jM,
+      joursMakkahEff: jK,
+      byType,
+      totalTravelersMax,
+      revenueIfAllPayDh,
+      avgTicketDh,
+      agentPlaces,
+      agentOver,
+      payingTravelers,
+      revenueAfterAgentsDh,
+      agentChargesTotalDh,
+      autresChargesDh,
+      resultatPrevDh,
+    }
+  }, [
+    formData.exchange,
+    formData.prixAvion,
+    formData.prixVisaRiyal,
+    formData.profit,
+    formData.profitEconomique,
+    formData.profitNormal,
+    formData.profitVIP,
+    formData.nbJoursMadina,
+    formData.nbJoursMakkah,
+    formData.hotelsMadina,
+    formData.hotelsMakkah,
+    simIncludeAvion,
+    simIncludeVisa,
+    simPlan,
+    simJoursMadina,
+    simJoursMakkah,
+    simAgentPlaces,
+    simAgentCostPerPlaceDH,
+    simAutresChargesDH,
+  ])
+
+  const canRunSimulation = useMemo(() => {
+    if (!formData.nom.trim()) return false
+    if (!String(formData.exchange).trim()) return false
+    if (!String(formData.nbJoursMadina).trim()) return false
+    if (!String(formData.nbJoursMakkah).trim()) return false
+    if (!String(formData.prixAvion).trim()) return false
+    if (!String(formData.prixVisaRiyal).trim()) return false
+    if (formData.hotelsMadina.length === 0 || formData.hotelsMakkah.length === 0) return false
+    if (!hasHotelInventoryConfigured(formData.hotelsMadina)) return false
+    if (!hasHotelInventoryConfigured(formData.hotelsMakkah)) return false
+    return true
+  }, [
+    formData.nom,
+    formData.exchange,
+    formData.nbJoursMadina,
+    formData.nbJoursMakkah,
+    formData.prixAvion,
+    formData.prixVisaRiyal,
+    formData.hotelsMadina,
+    formData.hotelsMakkah,
+  ])
 
   // Charger les hôtels disponibles
   useEffect(() => {
@@ -855,6 +1108,282 @@ export default function NouveauProgramme() {
                         </div>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Simulation : après infos de base, financier et hôtels — champs désactivés tant que les prérequis ne sont pas remplis */}
+                  <div
+                    className={`bg-gradient-to-br from-violet-50 to-indigo-100 p-6 rounded-xl border border-violet-200 mb-6 ${!canRunSimulation ? "opacity-95" : ""}`}
+                  >
+                    <h3 className="text-lg font-semibold text-violet-900 mb-2 flex items-center gap-2">
+                      <Calculator className="h-5 w-5" />
+                      Simulation de rentabilité (prévisionnel)
+                    </h3>
+                    <p className="text-sm text-violet-800/90 mb-4 flex gap-2 items-start">
+                      <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                      <span>
+                        Remplissez d&apos;abord le nom du programme, les détails financiers (exchange, jours, avion, visa),
+                        puis sélectionnez les hôtels Madina et Makkah avec au moins une chambre (nombre et prix en Riyal).
+                        Ensuite, ajustez les hypothèses ci-dessous. Même logique que la page Nouvelle réservation pour le
+                        ticket ; les places agents réduisent le CA et ajoutent une charge.
+                      </span>
+                    </p>
+
+                    {!canRunSimulation && (
+                      <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                        <p className="font-semibold mb-2">Complétez le formulaire ci-dessus pour activer la simulation :</p>
+                        <ul className="list-disc pl-5 space-y-1">
+                          <li>Nom du programme</li>
+                          <li>Exchange, NB jours Madina et Makkah, prix avion (DH) et visa (Riyal)</li>
+                          <li>Au moins un hôtel à Madina et un à Makkah</li>
+                          <li>Pour chaque ville : au moins une ligne chambre avec nombre de chambres et prix (Riyal) renseignés</li>
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 ${!canRunSimulation ? "pointer-events-none opacity-55" : ""}`}>
+                      <div className="space-y-4 rounded-lg border border-violet-200 bg-white/70 p-4">
+                        <p className="text-sm font-semibold text-violet-900">Hypothèses de calcul</p>
+                        <div className="flex flex-wrap gap-4">
+                          <label className="flex items-center gap-2 text-sm text-violet-900 cursor-pointer">
+                            <Checkbox
+                              checked={simIncludeAvion}
+                              disabled={!canRunSimulation}
+                              onCheckedChange={(c) => setSimIncludeAvion(!!c)}
+                              className="data-[state=checked]:bg-violet-600 data-[state=checked]:border-violet-600"
+                            />
+                            Inclure le prix avion (DH)
+                          </label>
+                          <label className="flex items-center gap-2 text-sm text-violet-900 cursor-pointer">
+                            <Checkbox
+                              checked={simIncludeVisa}
+                              disabled={!canRunSimulation}
+                              onCheckedChange={(c) => setSimIncludeVisa(!!c)}
+                              className="data-[state=checked]:bg-violet-600 data-[state=checked]:border-violet-600"
+                            />
+                            Inclure le visa (Riyal → DH)
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-violet-800 text-sm">Plan tarifaire</Label>
+                            <Select
+                              value={simPlan}
+                              disabled={!canRunSimulation}
+                              onValueChange={(v) => setSimPlan(v as "Économique" | "Normal" | "VIP")}
+                            >
+                              <SelectTrigger className="border-violet-200 bg-white">
+                                <SelectValue placeholder="Plan" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Économique">Économique</SelectItem>
+                                <SelectItem value="Normal">Normal</SelectItem>
+                                <SelectItem value="VIP">VIP</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-violet-800 text-sm">Jours Madina / Makkah (simulation)</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                type="number"
+                                min={0}
+                                disabled={!canRunSimulation}
+                                placeholder={formData.nbJoursMadina || "Madina"}
+                                value={simJoursMadina}
+                                onChange={(e) => setSimJoursMadina(e.target.value)}
+                                className="border-violet-200"
+                              />
+                              <Input
+                                type="number"
+                                min={0}
+                                disabled={!canRunSimulation}
+                                placeholder={formData.nbJoursMakkah || "Makkah"}
+                                value={simJoursMakkah}
+                                onChange={(e) => setSimJoursMakkah(e.target.value)}
+                                className="border-violet-200"
+                              />
+                            </div>
+                            <p className="text-xs text-violet-700/80">Vide = reprend les champs « NB Jours » du formulaire.</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 rounded-lg border border-violet-200 bg-white/70 p-4">
+                        <p className="text-sm font-semibold text-violet-900">Agents (non payants) & autres charges</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="simAgentPlaces" className="text-violet-800 text-sm">
+                              Places agents (sans paiement client)
+                            </Label>
+                            <Input
+                              id="simAgentPlaces"
+                              type="number"
+                              min={0}
+                              disabled={!canRunSimulation}
+                              value={simAgentPlaces}
+                              onChange={(e) => setSimAgentPlaces(e.target.value)}
+                              placeholder="0"
+                              className="border-violet-200"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="simAgentCost" className="text-violet-800 text-sm">
+                              Charge par place agent (DH)
+                            </Label>
+                            <Input
+                              id="simAgentCost"
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              disabled={!canRunSimulation}
+                              value={simAgentCostPerPlaceDH}
+                              onChange={(e) => setSimAgentCostPerPlaceDH(e.target.value)}
+                              placeholder="Ex: coût réel / place"
+                              className="border-violet-200"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="simAutres" className="text-violet-800 text-sm">
+                            Autres charges fixes prévisionnelles (DH)
+                          </Label>
+                          <Input
+                            id="simAutres"
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            disabled={!canRunSimulation}
+                            value={simAutresChargesDH}
+                            onChange={(e) => setSimAutresChargesDH(e.target.value)}
+                            placeholder="0"
+                            className="border-violet-200"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {canRunSimulation && simulationPreview.agentOver && (
+                      <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
+                        Le nombre de places agents dépasse la capacité simulée ({simulationPreview.totalTravelersMax}). La
+                        valeur est plafonnée pour le calcul.
+                      </p>
+                    )}
+
+                    <div className={`rounded-xl border border-violet-200 bg-white/90 overflow-hidden ${!canRunSimulation ? "opacity-60" : ""}`}>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-violet-100">
+                        <div className="bg-white p-4">
+                          <p className="text-xs text-violet-700">Capacité (voyageurs)</p>
+                          <p className="text-xl font-bold text-violet-950">
+                            {canRunSimulation ? simulationPreview.totalTravelersMax : "—"}
+                          </p>
+                        </div>
+                        <div className="bg-white p-4">
+                          <p className="text-xs text-violet-700">CA si tout payant</p>
+                          <p className="text-xl font-bold text-violet-950">
+                            {canRunSimulation
+                              ? `${Math.round(simulationPreview.revenueIfAllPayDh).toLocaleString("fr-FR")} DH`
+                              : "—"}
+                          </p>
+                        </div>
+                        <div className="bg-white p-4">
+                          <p className="text-xs text-violet-700">Ticket moyen (estim.)</p>
+                          <p className="text-xl font-bold text-violet-950">
+                            {canRunSimulation
+                              ? `${Math.round(simulationPreview.avgTicketDh).toLocaleString("fr-FR")} DH`
+                              : "—"}
+                          </p>
+                        </div>
+                        <div className="bg-white p-4">
+                          <p className="text-xs text-violet-700">Résultat prévisionnel</p>
+                          <p
+                            className={`text-xl font-bold ${
+                              !canRunSimulation
+                                ? "text-violet-400"
+                                : simulationPreview.resultatPrevDh >= 0
+                                  ? "text-emerald-700"
+                                  : "text-red-700"
+                            }`}
+                          >
+                            {canRunSimulation
+                              ? `${Math.round(simulationPreview.resultatPrevDh).toLocaleString("fr-FR")} DH`
+                              : "—"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="px-4 py-3 border-t border-violet-100 text-sm text-violet-800 space-y-1">
+                        <div className="flex flex-wrap justify-between gap-2">
+                          <span>Places payantes (après agents)</span>
+                          <span className="font-medium">
+                            {canRunSimulation ? simulationPreview.payingTravelers : "—"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap justify-between gap-2">
+                          <span>Chiffre d&apos;affaires retenu</span>
+                          <span className="font-medium">
+                            {canRunSimulation
+                              ? `${Math.round(simulationPreview.revenueAfterAgentsDh).toLocaleString("fr-FR")} DH`
+                              : "—"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap justify-between gap-2">
+                          <span>Charges agents (total)</span>
+                          <span className="font-medium">
+                            {canRunSimulation
+                              ? `−${Math.round(simulationPreview.agentChargesTotalDh).toLocaleString("fr-FR")} DH`
+                              : "—"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap justify-between gap-2">
+                          <span>Autres charges</span>
+                          <span className="font-medium">
+                            {canRunSimulation
+                              ? `−${Math.round(simulationPreview.autresChargesDh).toLocaleString("fr-FR")} DH`
+                              : "—"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-violet-600 pt-2">
+                          {canRunSimulation ? (
+                            <>
+                              Change utilisé : {simulationPreview.exchange} · Jours Madina / Makkah :{" "}
+                              {simulationPreview.joursMadinaEff} / {simulationPreview.joursMakkahEff}
+                            </>
+                          ) : (
+                            "Renseignez les champs requis pour afficher le détail."
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    {canRunSimulation && simulationPreview.byType.length > 0 ? (
+                      <div className="mt-4 overflow-x-auto rounded-lg border border-violet-200 bg-white/80">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-violet-100 text-left text-violet-800">
+                              <th className="p-2 font-medium">Type chambre</th>
+                              <th className="p-2 font-medium">Places (min Madina/Makkah)</th>
+                              <th className="p-2 font-medium">Prix / pers. (DH)</th>
+                              <th className="p-2 font-medium">Sous-total (DH)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {simulationPreview.byType.map((row) => (
+                              <tr key={row.typeKey} className="border-b border-violet-50">
+                                <td className="p-2">{row.label}</td>
+                                <td className="p-2">{row.places}</td>
+                                <td className="p-2">{row.unitDh.toLocaleString("fr-FR")}</td>
+                                <td className="p-2 font-medium">{Math.round(row.subtotalDh).toLocaleString("fr-FR")}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="mt-4 text-sm text-violet-700 bg-white/60 border border-violet-100 rounded-lg px-3 py-2">
+                        {canRunSimulation
+                          ? "Aucune capacité simulée avec la configuration actuelle (vérifiez les types de chambre des deux côtés)."
+                          : "Les montants et le tableau détaillé s’affichent une fois les prérequis remplis (voir encadré orange)."}
+                      </p>
+                    )}
                   </div>
 
                   {/* Dates limites */}

@@ -75,6 +75,11 @@ export interface ProgramOverview {
   totalReservations: number;
   completedReservations: number;
   pendingReservations: number;
+  transportStats: {
+    withTransport: number;
+    withoutTransport: number;
+    total: number;
+  };
   
   // Soft delete
   isDeleted?: boolean;
@@ -150,6 +155,16 @@ export class ProgramOverviewService {
         }
       });
 
+      const reservationsWithTransport = await prisma.reservation.count({
+        where: {
+          programId: programId,
+          NOT: [
+            { transport: null },
+            { transport: '' }
+          ]
+        }
+      });
+
       // 7. Calculer les agrégations
       const totalRevenue = revenueData._sum.amount || 0;
       const totalExpenses = expensesData.reduce((sum, exp) => sum + exp.amount, 0);
@@ -196,6 +211,11 @@ export class ProgramOverviewService {
         totalReservations: reservationsStats._count.id,
         completedReservations,
         pendingReservations: reservationsStats._count.id - completedReservations,
+        transportStats: {
+          withTransport: reservationsWithTransport,
+          withoutTransport: reservationsStats._count.id - reservationsWithTransport,
+          total: reservationsStats._count.id
+        },
         
         isDeleted: program.isDeleted,
         deletedAt: program.deletedAt?.toISOString() || null

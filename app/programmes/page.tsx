@@ -28,6 +28,7 @@ import {
   Trash2,
   AlertTriangle,
   Download,
+  Bus,
 } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/hooks/useAuth"
@@ -104,6 +105,11 @@ interface ProgramOverview {
   totalReservations: number;
   completedReservations: number;
   pendingReservations: number;
+  transportStats: {
+    withTransport: number;
+    withoutTransport: number;
+    total: number;
+  };
   isDeleted?: boolean;
   deletedAt?: string | null;
 }
@@ -533,8 +539,8 @@ export default function ProgrammesPage() {
         {/* Liste des programmes actifs */}
         <div className="space-y-6">
           {activeProgrammes.map((programme) => (
-            <Card key={programme.id} className="border-none shadow-lg hover:shadow-xl transition-all overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 pb-4">
+            <Card key={programme.id} className="overflow-hidden border border-blue-100/80 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all">
+              <CardHeader className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-100 pb-4 border-b border-blue-100/60">
                 <div className="flex justify-between items-start gap-3 flex-wrap">
                   <div>
                     <CardTitle className="text-xl text-blue-800">{programme.name}</CardTitle>
@@ -543,17 +549,6 @@ export default function ProgrammesPage() {
                     </CardDescription>
                   </div>
                   <div className="text-right flex flex-col items-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
-                      disabled={exportingProgramId === programme.id}
-                      onClick={() => handleExportProgram(programme.id, programme.name)}
-                    >
-                      <Download className="h-4 w-4 mr-1" />
-                      {exportingProgramId === programme.id ? "Export…" : "Excel agence"}
-                    </Button>
                     <div className="text-2xl font-bold text-yellow-600">
                       {(programme.totalRevenue || 0).toLocaleString()} DH
                     </div>
@@ -563,7 +558,7 @@ export default function ProgrammesPage() {
               </CardHeader>
               <CardContent className="p-0">
                 <Tabs defaultValue="details" className="w-full">
-                  <TabsList className="w-full justify-start bg-gray-50 px-6 pt-2 border-b">
+                  <TabsList className="w-full justify-start bg-gradient-to-r from-slate-50 to-blue-50 px-6 pt-2 border-b border-blue-100">
                     <TabsTrigger value="details" className="data-[state=active]:bg-white">
                       Détails
                     </TabsTrigger>
@@ -580,7 +575,7 @@ export default function ProgrammesPage() {
                   <TabsContent value="details" className="p-6 space-y-6">
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                       {/* Hôtels */}
-                      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                      <div className="bg-gradient-to-br from-white to-blue-50/40 p-4 rounded-lg shadow-sm border border-blue-100">
                         <h4 className="font-medium mb-3 flex items-center gap-2 text-blue-700">
                           <MapPin className="h-5 w-5" />
                           Hôtels
@@ -618,7 +613,7 @@ export default function ProgrammesPage() {
                       </div>
 
                       {/* Réservations par type de chambre */}
-                      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                      <div className="bg-gradient-to-br from-white to-indigo-50/30 p-4 rounded-lg shadow-sm border border-blue-100">
                         <h4 className="font-medium mb-3 flex items-center gap-2 text-blue-700">
                           <Users className="h-5 w-5" />
                           Réservations par chambre
@@ -648,7 +643,7 @@ export default function ProgrammesPage() {
                       </div>
 
                       {/* Dates limites */}
-                      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                      <div className="bg-gradient-to-br from-white to-orange-50/40 p-4 rounded-lg shadow-sm border border-orange-100">
                         <h4 className="font-medium mb-3 flex items-center gap-2 text-orange-700">
                           <Clock className="h-5 w-5" />
                           Échéances
@@ -724,7 +719,7 @@ export default function ProgrammesPage() {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                        <div className="bg-gradient-to-br from-white to-blue-50/40 p-4 rounded-lg shadow-sm border border-blue-100">
                           <h4 className="text-sm font-medium text-gray-500 mb-3">Par type de chambre</h4>
                           <div className="space-y-3">
                             <RoomCapacityDisplay 
@@ -750,7 +745,7 @@ export default function ProgrammesPage() {
                           </div>
                         </div>
 
-                        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                        <div className="bg-gradient-to-br from-white to-indigo-50/30 p-4 rounded-lg shadow-sm border border-blue-100">
                           <h4 className="text-sm font-medium text-gray-500 mb-3">Statistiques</h4>
                           <div className="grid grid-cols-2 gap-4">
                             <div className="text-center p-3 bg-blue-50 rounded-lg">
@@ -764,6 +759,20 @@ export default function ProgrammesPage() {
                               </p>
                             </div>
                           </div>
+                          <div className="mt-4 rounded-lg border border-indigo-100 bg-indigo-50/70 p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium text-indigo-700 flex items-center gap-2">
+                                <Bus className="h-4 w-4" />
+                                Transport
+                              </p>
+                              <Badge className="bg-indigo-100 text-indigo-700 border border-indigo-200">
+                                {(programme.transportStats?.withTransport || 0)}/{(programme.transportStats?.total || 0)}
+                              </Badge>
+                            </div>
+                            <p className="mt-1 text-xs text-indigo-700/80">
+                              Avec transport: {programme.transportStats?.withTransport || 0} • Sans transport: {programme.transportStats?.withoutTransport || 0}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -773,7 +782,7 @@ export default function ProgrammesPage() {
                     <TabsContent value="finances" className="p-6">
                       <div className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                          <div className="bg-gradient-to-br from-white to-green-50/30 p-4 rounded-lg shadow-sm border border-green-100">
                             <h4 className="text-sm font-medium text-gray-500 mb-2">Revenus</h4>
                             <p className="text-2xl font-bold text-green-600">
                               {(programme.totalRevenue || 0).toLocaleString()} DH
@@ -781,7 +790,7 @@ export default function ProgrammesPage() {
                             <p className="text-xs text-gray-500">Total des paiements</p>
                           </div>
 
-                          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                          <div className="bg-gradient-to-br from-white to-red-50/30 p-4 rounded-lg shadow-sm border border-red-100">
                             <h4 className="text-sm font-medium text-gray-500 mb-2">Dépenses</h4>
                             <p className="text-2xl font-bold text-red-600">
                               {(programme.totalExpenses || 0).toLocaleString()} DH
@@ -789,7 +798,7 @@ export default function ProgrammesPage() {
                             <p className="text-xs text-gray-500">Total des coûts</p>
                           </div>
 
-                          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                          <div className="bg-gradient-to-br from-white to-blue-50/30 p-4 rounded-lg shadow-sm border border-blue-100">
                             <h4 className="text-sm font-medium text-gray-500 mb-2">Bénéfice</h4>
                             <p className="text-2xl font-bold text-blue-600">
                               {(programme.netProfit || 0).toLocaleString()} DH
@@ -798,7 +807,7 @@ export default function ProgrammesPage() {
                           </div>
                         </div>
 
-                        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                        <div className="bg-gradient-to-br from-white to-slate-50 p-4 rounded-lg shadow-sm border border-slate-200">
                           <h4 className="text-sm font-medium text-gray-500 mb-3">Répartition des dépenses</h4>
                           <div className="space-y-3">
                             {getExpensesForDisplay(programme).map((depense, index) => (
@@ -875,6 +884,17 @@ export default function ProgrammesPage() {
                         </Button>
                       </Link>
                     )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+                      disabled={exportingProgramId === programme.id}
+                      onClick={() => handleExportProgram(programme.id, programme.name)}
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      {exportingProgramId === programme.id ? "Export…" : "Excel agence"}
+                    </Button>
                   </div>
                   
                 {/* Boutons d'action à droite */}

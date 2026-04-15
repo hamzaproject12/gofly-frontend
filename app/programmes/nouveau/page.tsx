@@ -185,6 +185,37 @@ function unitTicketPriceDh(params: {
   return Math.round(prixFinal)
 }
 
+/**
+ * Coût agence par voyageur (vol + hôtels + visa en DH), sans marge commerciale.
+ * Même décomposition que le prix client (`unitTicketPriceDh`) mais sans le terme `profit`.
+ */
+function unitAgencyCostTravelerDh(params: {
+  exchange: number
+  prixAvionDH: number
+  prixVisaRiyal: number
+  roomTypeKey: number
+  prixRoomMadinaRiyal: number
+  prixRoomMakkahRiyal: number
+  joursMadina: number
+  joursMakkah: number
+  includeAvion: boolean
+  includeVisa: boolean
+}): number {
+  const nbPersonnes = params.roomTypeKey
+  const prixAvion = params.includeAvion ? params.prixAvionDH : 0
+  const prixVisa = params.includeVisa ? params.prixVisaRiyal : 0
+  const prixHotelMadina =
+    params.prixRoomMadinaRiyal > 0 && nbPersonnes > 0
+      ? (params.prixRoomMadinaRiyal / nbPersonnes) * params.joursMadina
+      : 0
+  const prixHotelMakkah =
+    params.prixRoomMakkahRiyal > 0 && nbPersonnes > 0
+      ? (params.prixRoomMakkahRiyal / nbPersonnes) * params.joursMakkah
+      : 0
+  const riyalTotal = prixVisa + prixHotelMadina + prixHotelMakkah
+  return Math.round(prixAvion + riyalTotal * params.exchange)
+}
+
 export default function NouveauProgramme() {
   const { toast } = useToast()
   const router = useRouter()
@@ -397,6 +428,7 @@ export default function NouveauProgramme() {
     }[] = []
 
     let revenueIfAllPayDh = 0
+    let costVolHotelVisaAllTravelersDh = 0
     let totalTravelersMax = 0
 
     const labels = ["", "Simple", "Double", "Triple", "Quadruple", "Quintuple"]
@@ -427,6 +459,19 @@ export default function NouveauProgramme() {
         includeVisa: simIncludeVisa,
       })
       const subtotalDh = paired * unitDh
+      const unitCostDh = unitAgencyCostTravelerDh({
+        exchange,
+        prixAvionDH,
+        prixVisaRiyal,
+        roomTypeKey: t,
+        prixRoomMadinaRiyal: pm,
+        prixRoomMakkahRiyal: pk,
+        joursMadina: jM,
+        joursMakkah: jK,
+        includeAvion: simIncludeAvion,
+        includeVisa: simIncludeVisa,
+      })
+      costVolHotelVisaAllTravelersDh += paired * unitCostDh
       revenueIfAllPayDh += subtotalDh
       totalTravelersMax += paired
       byType.push({
@@ -447,7 +492,8 @@ export default function NouveauProgramme() {
     const agentCostPer = parseNum(simAgentCostPerPlaceDH, 0)
     const agentChargesTotalDh = agentPlaces * agentCostPer
     const autresChargesDh = parseNum(simAutresChargesDH, 0)
-    const totalChargesDh = agentChargesTotalDh + autresChargesDh
+    const totalChargesDh =
+      costVolHotelVisaAllTravelersDh + agentChargesTotalDh + autresChargesDh
     const resultatPrevDh = revenueAfterAgentsDh - totalChargesDh
 
     return {
@@ -462,6 +508,7 @@ export default function NouveauProgramme() {
       agentOver,
       payingTravelers,
       revenueAfterAgentsDh,
+      costVolHotelVisaAllTravelersDh,
       agentChargesTotalDh,
       autresChargesDh,
       totalChargesDh,
@@ -1299,8 +1346,9 @@ export default function NouveauProgramme() {
                         Remplissez d&apos;abord le nom du programme, les détails financiers (exchange, jours, avion, visa),
                         puis sélectionnez les hôtels Madina et Makkah avec au moins une chambre (nombre et prix en Riyal).
                         Ensuite, ajustez les hypothèses ci-dessous (même logique que « Nouvelle réservation » pour le prix).
-                        Le total paiement prévu correspond aux voyageurs payants ; le gain net prévu déduit les charges
-                        agents et les autres charges.
+                        Le total paiement prévu correspond aux voyageurs payants ; le total charges inclut le coût agence
+                        (vol + hôtel + visa, sans marge) pour tous les voyageurs de la capacité simulée, plus les charges
+                        agents et les autres charges saisies.
                       </span>
                     </p>
 
@@ -1474,7 +1522,7 @@ export default function NouveauProgramme() {
                               : "—"}
                           </p>
                           <p className="text-[11px] text-violet-600 mt-1 leading-snug">
-                            Charges agents + autres charges saisies.
+                            Coût vol+hôtel+visa (tous voyageurs) + charges agents + autres charges.
                           </p>
                         </div>
                         <div className="bg-white p-4">
@@ -1493,7 +1541,7 @@ export default function NouveauProgramme() {
                               : "—"}
                           </p>
                           <p className="text-[11px] text-violet-600 mt-1 leading-snug">
-                            Total paiement prévu − total charges.
+                            Total paiement prévu − total charges (coût voyage inclus).
                           </p>
                         </div>
                       </div>
@@ -1519,23 +1567,31 @@ export default function NouveauProgramme() {
                           </span>
                         </div>
                         <div className="flex flex-wrap justify-between gap-2">
-                          <span>Charges agents (total)</span>
+                          <span>Coût agence vol + hôtel + visa (tous les voyageurs)</span>
                           <span className="font-medium">
                             {canRunSimulation
-                              ? `−${Math.round(simulationPreview.agentChargesTotalDh).toLocaleString("fr-FR")} DH`
+                              ? `${Math.round(simulationPreview.costVolHotelVisaAllTravelersDh).toLocaleString("fr-FR")} DH`
                               : "—"}
                           </span>
                         </div>
                         <div className="flex flex-wrap justify-between gap-2">
-                          <span>Autres charges</span>
+                          <span>Charges agents (saisies)</span>
                           <span className="font-medium">
                             {canRunSimulation
-                              ? `−${Math.round(simulationPreview.autresChargesDh).toLocaleString("fr-FR")} DH`
+                              ? `${Math.round(simulationPreview.agentChargesTotalDh).toLocaleString("fr-FR")} DH`
+                              : "—"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap justify-between gap-2">
+                          <span>Autres charges (saisies)</span>
+                          <span className="font-medium">
+                            {canRunSimulation
+                              ? `${Math.round(simulationPreview.autresChargesDh).toLocaleString("fr-FR")} DH`
                               : "—"}
                           </span>
                         </div>
                         <div className="flex flex-wrap justify-between gap-2 pt-1 border-t border-violet-100/80 font-semibold text-violet-950">
-                          <span>Total charges (agents + autres)</span>
+                          <span>Total charges</span>
                           <span>
                             {canRunSimulation
                               ? `${Math.round(simulationPreview.totalChargesDh).toLocaleString("fr-FR")} DH`

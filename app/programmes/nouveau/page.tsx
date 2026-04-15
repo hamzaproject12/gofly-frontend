@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/components/ui/use-toast"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   CalendarIcon,
   Plus,
@@ -188,6 +188,7 @@ function unitTicketPriceDh(params: {
 export default function NouveauProgramme() {
   const { toast } = useToast()
   const router = useRouter()
+  const pathname = usePathname()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [hotelsMadina, setHotelsMadina] = useState<Hotel[]>([])
   const [hotelsMakkah, setHotelsMakkah] = useState<Hotel[]>([])
@@ -241,6 +242,8 @@ export default function NouveauProgramme() {
   const [simAgentPlaces, setSimAgentPlaces] = useState("")
   const [simAgentCostPerPlaceDH, setSimAgentCostPerPlaceDH] = useState("")
   const [simAutresChargesDH, setSimAutresChargesDH] = useState("")
+  const [showValidationReasons, setShowValidationReasons] = useState(false)
+  const [showSimulationSection, setShowSimulationSection] = useState(false)
 
   const hasUnsavedChanges = useMemo(() => {
     const hasDates = Object.values(formData.datesLimites).some(Boolean)
@@ -286,6 +289,49 @@ export default function NouveauProgramme() {
     window.addEventListener("beforeunload", onBeforeUnload)
     return () => window.removeEventListener("beforeunload", onBeforeUnload)
   }, [hasUnsavedChanges, isSubmitting])
+
+  useEffect(() => {
+    if (!hasUnsavedChanges || isSubmitting) return
+
+    const shouldWarnNavigation = () =>
+      window.confirm("Vous avez des modifications non enregistrees. Quitter sans enregistrer ?")
+
+    const onDocumentClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      const link = target?.closest("a[href]") as HTMLAnchorElement | null
+      if (!link) return
+      if (link.target === "_blank") return
+      if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
+      const href = link.getAttribute("href")
+      if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return
+
+      try {
+        const url = new URL(link.href, window.location.origin)
+        const isSamePath = url.pathname === pathname
+        if (isSamePath) return
+        if (!shouldWarnNavigation()) {
+          event.preventDefault()
+          event.stopPropagation()
+        }
+      } catch {
+        // Ignore malformed urls
+      }
+    }
+
+    const onPopState = () => {
+      if (shouldWarnNavigation()) return
+      window.history.pushState(null, "", window.location.href)
+    }
+
+    document.addEventListener("click", onDocumentClick, true)
+    window.history.pushState(null, "", window.location.href)
+    window.addEventListener("popstate", onPopState)
+
+    return () => {
+      document.removeEventListener("click", onDocumentClick, true)
+      window.removeEventListener("popstate", onPopState)
+    }
+  }, [hasUnsavedChanges, isSubmitting, pathname])
 
   const validateRequiredFields = useMemo(() => {
     const reasons: string[] = []
@@ -720,30 +766,10 @@ export default function NouveauProgramme() {
                           <Calendar className="h-4 w-4" />
                           Date de création
                         </Label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              className="w-full justify-start text-left font-normal h-12 border-2 border-blue-200 hover:border-blue-300 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4 text-blue-500" />
-                              {formData.dateCreation ? (
-                                format(formData.dateCreation, "PPP", { locale: fr })
-                              ) : (
-                                <span>Sélectionner une date</span>
-                              )}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0 shadow-xl border-0">
-                            <CalendarComponent
-                              mode="single"
-                              selected={formData.dateCreation}
-                              onSelect={(date) => setFormData({ ...formData, dateCreation: date || new Date() })}
-                              initialFocus
-                              className="rounded-lg"
-                            />
-                          </PopoverContent>
-                        </Popover>
+                        <div className="w-full flex items-center h-12 px-3 border-2 border-blue-200 rounded-lg bg-slate-50 text-slate-700 shadow-sm">
+                          <CalendarIcon className="mr-2 h-4 w-4 text-blue-500" />
+                          <span>{format(formData.dateCreation, "PPP", { locale: fr })}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1250,10 +1276,21 @@ export default function NouveauProgramme() {
                     id="simulation-rentabilite"
                     className={`scroll-mt-24 bg-gradient-to-br from-violet-50 to-indigo-100 p-6 rounded-xl border border-violet-200 mb-6 ring-1 ring-violet-200/50 ${!canRunSimulation ? "opacity-95" : ""}`}
                   >
-                    <h3 className="text-lg font-semibold text-violet-900 mb-2 flex items-center gap-2">
-                      <Calculator className="h-5 w-5" />
-                      Simulation de rentabilité (prévisionnel)
-                    </h3>
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+                      <h3 className="text-lg font-semibold text-violet-900 flex items-center gap-2">
+                        <Calculator className="h-5 w-5" />
+                        Simulation de rentabilité (prévisionnel)
+                      </h3>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-violet-300 text-violet-900 hover:bg-violet-100"
+                        onClick={() => setShowSimulationSection((prev) => !prev)}
+                      >
+                        {showSimulationSection ? "Masquer" : "Afficher"}
+                      </Button>
+                    </div>
                     <p className="text-sm text-violet-800/90 mb-4 flex gap-2 items-start">
                       <Info className="h-4 w-4 shrink-0 mt-0.5" />
                       <span>
@@ -1264,7 +1301,7 @@ export default function NouveauProgramme() {
                       </span>
                     </p>
 
-                    {!canRunSimulation && (
+                    {!canRunSimulation && showSimulationSection && (
                       <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
                         <p className="font-semibold mb-2">Complétez le formulaire ci-dessus pour activer la simulation :</p>
                         <ul className="list-disc pl-5 space-y-1">
@@ -1276,6 +1313,8 @@ export default function NouveauProgramme() {
                       </div>
                     )}
 
+                    {showSimulationSection && (
+                    <>
                     <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 ${!canRunSimulation ? "pointer-events-none opacity-55" : ""}`}>
                       <div className="space-y-4 rounded-lg border border-violet-200 bg-white/70 p-4">
                         <p className="text-sm font-semibold text-violet-900">Hypothèses de calcul</p>
@@ -1520,6 +1559,8 @@ export default function NouveauProgramme() {
                           : "Les montants et le tableau détaillé s’affichent une fois les prérequis remplis (voir encadré orange)."}
                       </p>
                     )}
+                    </>
+                    )}
                   </div>
 
                   {/* Dates limites */}
@@ -1608,14 +1649,27 @@ export default function NouveauProgramme() {
                     </div>
                     {!isFormValid && (
                       <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
-                        <p className="font-semibold mb-1">
-                          Enregistrer le programme est desactive. Raisons:
-                        </p>
-                        <ul className="list-disc pl-5 space-y-1">
-                          {validateRequiredFields.map((reason, idx) => (
-                            <li key={`${reason}-${idx}`}>{reason}</li>
-                          ))}
-                        </ul>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <p className="font-semibold">
+                            Enregistrer le programme est desactive ({validateRequiredFields.length} raison(s)).
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="border-red-300 text-red-900 hover:bg-red-100"
+                            onClick={() => setShowValidationReasons((prev) => !prev)}
+                          >
+                            {showValidationReasons ? "Masquer les raisons" : "Voir les raisons"}
+                          </Button>
+                        </div>
+                        {showValidationReasons && (
+                          <ul className="list-disc pl-5 space-y-1 mt-2">
+                            {validateRequiredFields.map((reason, idx) => (
+                              <li key={`${reason}-${idx}`}>{reason}</li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
                     )}
                   </div>

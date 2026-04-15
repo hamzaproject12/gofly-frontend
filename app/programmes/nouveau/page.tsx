@@ -92,6 +92,36 @@ function hasHotelInventoryConfigured(hotels: { chambres: ChambresConfig }[]): bo
   return false
 }
 
+function hasAtLeastOneFullyPricedRoom(hotel: { chambres: ChambresConfig }): boolean {
+  for (let t = 1; t <= 5; t++) {
+    const nb = parseInt(hotel.chambres[t]?.nb || "0", 10) || 0
+    const px = parseNum(hotel.chambres[t]?.prix, 0)
+    if (nb > 0 && px > 0) return true
+  }
+  return false
+}
+
+function hasRoomsWithoutPrice(hotel: { chambres: ChambresConfig }): boolean {
+  for (let t = 1; t <= 5; t++) {
+    const nb = parseInt(hotel.chambres[t]?.nb || "0", 10) || 0
+    const prixRaw = String(hotel.chambres[t]?.prix ?? "").trim()
+    const px = parseNum(prixRaw, 0)
+    if (nb > 0 && (!prixRaw || px <= 0)) return true
+  }
+  return false
+}
+
+function totalBedsByCity(hotels: { chambres: ChambresConfig }[]): number {
+  let total = 0
+  for (const hotel of hotels) {
+    for (let t = 1; t <= 5; t++) {
+      const nb = parseInt(hotel.chambres[t]?.nb || "0", 10) || 0
+      total += nb * t
+    }
+  }
+  return total
+}
+
 function profitForPlan(
   plan: "Économique" | "Normal" | "VIP",
   profit: number,
@@ -211,6 +241,95 @@ export default function NouveauProgramme() {
   const [simAgentPlaces, setSimAgentPlaces] = useState("")
   const [simAgentCostPerPlaceDH, setSimAgentCostPerPlaceDH] = useState("")
   const [simAutresChargesDH, setSimAutresChargesDH] = useState("")
+
+  const hasUnsavedChanges = useMemo(() => {
+    const hasDates = Object.values(formData.datesLimites).some(Boolean)
+    const hasMadinaRooms = formData.hotelsMadina.some((h) =>
+      Array.from({ length: 5 }, (_, i) => i + 1).some((t) => {
+        const nb = parseInt(h.chambres[t]?.nb || "0", 10) || 0
+        const prix = String(h.chambres[t]?.prix ?? "").trim()
+        return nb > 0 || prix.length > 0
+      })
+    )
+    const hasMakkahRooms = formData.hotelsMakkah.some((h) =>
+      Array.from({ length: 5 }, (_, i) => i + 1).some((t) => {
+        const nb = parseInt(h.chambres[t]?.nb || "0", 10) || 0
+        const prix = String(h.chambres[t]?.prix ?? "").trim()
+        return nb > 0 || prix.length > 0
+      })
+    )
+
+    return Boolean(
+      formData.nom.trim() ||
+      formData.nbJoursMadina.trim() ||
+      formData.nbJoursMakkah.trim() ||
+      formData.exchange.trim() ||
+      formData.prixAvion.trim() ||
+      formData.prixVisaRiyal.trim() ||
+      formData.profitEconomique.trim() ||
+      formData.profitNormal.trim() ||
+      formData.profitVIP.trim() ||
+      formData.hotelsMadina.length > 0 ||
+      formData.hotelsMakkah.length > 0 ||
+      hasDates ||
+      hasMadinaRooms ||
+      hasMakkahRooms
+    )
+  }, [formData])
+
+  useEffect(() => {
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges || isSubmitting) return
+      event.preventDefault()
+      event.returnValue = ""
+    }
+    window.addEventListener("beforeunload", onBeforeUnload)
+    return () => window.removeEventListener("beforeunload", onBeforeUnload)
+  }, [hasUnsavedChanges, isSubmitting])
+
+  const validateRequiredFields = useMemo(() => {
+    const reasons: string[] = []
+    if (!formData.nom.trim()) reasons.push("Le nom du programme est obligatoire.")
+    if (!formData.nbJoursMadina.trim()) reasons.push("NB jours Madina est obligatoire.")
+    if (!formData.nbJoursMakkah.trim()) reasons.push("NB jours Makkah est obligatoire.")
+    if (!formData.exchange.trim()) reasons.push("Exchange est obligatoire.")
+    if (!formData.prixAvion.trim()) reasons.push("Prix avion est obligatoire.")
+    if (!formData.prixVisaRiyal.trim()) reasons.push("Prix visa est obligatoire.")
+    if (!formData.profitEconomique.trim()) reasons.push("Profit Economique est obligatoire.")
+    if (!formData.profitNormal.trim()) reasons.push("Profit Normal est obligatoire.")
+    if (!formData.profitVIP.trim()) reasons.push("Profit VIP est obligatoire.")
+
+    if (!formData.datesLimites.passport) reasons.push("Date limite passeport est obligatoire.")
+    if (!formData.datesLimites.visa) reasons.push("Date limite visa est obligatoire.")
+    if (!formData.datesLimites.billets) reasons.push("Date limite billets est obligatoire.")
+    if (!formData.datesLimites.hotels) reasons.push("Date limite hotels est obligatoire.")
+
+    if (formData.hotelsMadina.length === 0) reasons.push("Selectionnez au moins un hotel a Madina.")
+    if (formData.hotelsMakkah.length === 0) reasons.push("Selectionnez au moins un hotel a Makkah.")
+
+    for (const hotel of formData.hotelsMadina) {
+      if (!hasAtLeastOneFullyPricedRoom(hotel)) {
+        reasons.push(`Hotel Madina "${hotel.name}" doit contenir au moins 1 chambre avec prix.`)
+      }
+      if (hasRoomsWithoutPrice(hotel)) {
+        reasons.push(`Hotel Madina "${hotel.name}" contient des chambres sans prix.`)
+      }
+    }
+
+    for (const hotel of formData.hotelsMakkah) {
+      if (!hasAtLeastOneFullyPricedRoom(hotel)) {
+        reasons.push(`Hotel Makkah "${hotel.name}" doit contenir au moins 1 chambre avec prix.`)
+      }
+      if (hasRoomsWithoutPrice(hotel)) {
+        reasons.push(`Hotel Makkah "${hotel.name}" contient des chambres sans prix.`)
+      }
+    }
+
+    return reasons
+  }, [formData])
+
+  const madinaBedsCount = useMemo(() => totalBedsByCity(formData.hotelsMadina), [formData.hotelsMadina])
+  const makkahBedsCount = useMemo(() => totalBedsByCity(formData.hotelsMakkah), [formData.hotelsMakkah])
 
   const simulationPreview = useMemo(() => {
     const exchange = parseNum(formData.exchange, 1) || 1
@@ -544,14 +663,7 @@ export default function NouveauProgramme() {
     }
   }
 
-  const isFormValid =
-    formData.nom &&
-    formData.hotelsMadina.length > 0 &&
-    formData.hotelsMakkah.length > 0 &&
-    formData.datesLimites.visa &&
-    formData.datesLimites.hotels &&
-    formData.datesLimites.billets &&
-    formData.datesLimites.passport
+  const isFormValid = validateRequiredFields.length === 0
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
@@ -565,7 +677,20 @@ export default function NouveauProgramme() {
                   <Sparkles className="h-6 w-6" />
                   Créer un nouveau programme
                 </CardTitle>
-                <CardDescription className="text-blue-100">Configurez les détails du programme</CardDescription>
+                <CardDescription className="text-blue-100 space-y-2">
+                  <span className="block">Configurez les détails du programme.</span>
+                  <span className="block text-sm text-blue-50/95 leading-relaxed">
+                    Bloc violet{" "}
+                    <a
+                      href="#simulation-rentabilite"
+                      className="font-medium underline underline-offset-2 decoration-blue-200 hover:text-white"
+                    >
+                      Simulation de rentabilité (prévisionnel)
+                    </a>
+                    {" "}
+                    : sous les sections Hôtels Madina et Makkah (faites défiler), ou cliquez ici pour y aller.
+                  </span>
+                </CardDescription>
               </CardHeader>
               <CardContent className="p-6 space-y-6">
                 <form onSubmit={handleSubmit}>
@@ -635,7 +760,7 @@ export default function NouveauProgramme() {
                       <div className="space-y-2">
                         <Label htmlFor="nbJoursMadina" className="text-green-700 font-medium flex items-center gap-2">
                           <MapPin className="h-4 w-4" />
-                          NB Jours Madina
+                          NB Jours Madina *
                         </Label>
                         <Input
                           id="nbJoursMadina"
@@ -649,7 +774,7 @@ export default function NouveauProgramme() {
                       <div className="space-y-2">
                         <Label htmlFor="nbJoursMakkah" className="text-green-700 font-medium flex items-center gap-2">
                           <MapPin className="h-4 w-4" />
-                          NB Jours Makkah
+                          NB Jours Makkah *
                         </Label>
                         <Input
                           id="nbJoursMakkah"
@@ -663,7 +788,7 @@ export default function NouveauProgramme() {
                       <div className="space-y-2">
                         <Label htmlFor="exchange" className="text-green-700 font-medium flex items-center gap-2">
                           <DollarSign className="h-4 w-4" />
-                          Exchange
+                          Exchange *
                         </Label>
                         <Input
                           id="exchange"
@@ -678,7 +803,7 @@ export default function NouveauProgramme() {
                       <div className="space-y-2">
                         <Label htmlFor="prixAvion" className="text-green-700 font-medium flex items-center gap-2">
                           <Plane className="h-4 w-4" />
-                          Prix Avion (DH)
+                          Prix Avion (DH) *
                         </Label>
                         <Input
                           id="prixAvion"
@@ -692,7 +817,7 @@ export default function NouveauProgramme() {
                       <div className="space-y-2">
                         <Label htmlFor="prixVisaRiyal" className="text-green-700 font-medium flex items-center gap-2">
                           <BadgeCheck className="h-4 w-4" />
-                          Prix Visa (Riyal)
+                          Prix Visa (Riyal) *
                         </Label>
                         <Input
                           id="prixVisaRiyal"
@@ -714,7 +839,7 @@ export default function NouveauProgramme() {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="profitEconomique" className="text-green-700 font-medium flex items-center gap-2">
-                            Profit Économique (DH)
+                            Profit Économique (DH) *
                           </Label>
                           <Input
                             id="profitEconomique"
@@ -727,7 +852,7 @@ export default function NouveauProgramme() {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="profitNormal" className="text-green-700 font-medium flex items-center gap-2">
-                            Profit Normal (DH)
+                            Profit Normal (DH) *
                           </Label>
                           <Input
                             id="profitNormal"
@@ -740,7 +865,7 @@ export default function NouveauProgramme() {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="profitVIP" className="text-green-700 font-medium flex items-center gap-2">
-                            Profit VIP (DH)
+                            Profit VIP (DH) *
                           </Label>
                           <Input
                             id="profitVIP"
@@ -759,10 +884,15 @@ export default function NouveauProgramme() {
                   <div className="flex flex-col gap-6 mb-6">
                     {/* Hôtels à Madina */}
                     <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-xl border border-yellow-200 mb-6 w-full">
-                      <h3 className="text-lg font-semibold text-yellow-800 mb-4 flex items-center gap-2">
-                        <MapPin className="h-5 w-5" />
-                        Hôtels à Madina
-                      </h3>
+                      <div className="mb-4 flex items-center justify-between gap-4">
+                        <h3 className="text-lg font-semibold text-yellow-800 flex items-center gap-2">
+                          <MapPin className="h-5 w-5" />
+                          Hôtels à Madina *
+                        </h3>
+                        <div className="text-xs md:text-sm font-semibold text-yellow-900 bg-yellow-200/70 px-3 py-1.5 rounded-full">
+                          {madinaBedsCount} lits Madina / {makkahBedsCount} lits Makkah
+                        </div>
+                      </div>
                       <div className="flex flex-col gap-4">
                         {hotelsMadina.length === 0 ? (
                           <div className="text-center py-4 text-gray-500">
@@ -932,10 +1062,15 @@ export default function NouveauProgramme() {
 
                     {/* Hôtels à Makkah */}
                     <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
-                      <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
-                        <MapPin className="h-5 w-5" />
-                        Hôtels à Makkah
-                      </h3>
+                      <div className="mb-4 flex items-center justify-between gap-4">
+                        <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
+                          <MapPin className="h-5 w-5" />
+                          Hôtels à Makkah *
+                        </h3>
+                        <div className="text-xs md:text-sm font-semibold text-blue-900 bg-blue-200/70 px-3 py-1.5 rounded-full">
+                          {makkahBedsCount} lits Makkah / {madinaBedsCount} lits Madina
+                        </div>
+                      </div>
 
                       <div className="space-y-3">
                         {hotelsMakkah.length === 0 ? (
@@ -1112,7 +1247,8 @@ export default function NouveauProgramme() {
 
                   {/* Simulation : après infos de base, financier et hôtels — champs désactivés tant que les prérequis ne sont pas remplis */}
                   <div
-                    className={`bg-gradient-to-br from-violet-50 to-indigo-100 p-6 rounded-xl border border-violet-200 mb-6 ${!canRunSimulation ? "opacity-95" : ""}`}
+                    id="simulation-rentabilite"
+                    className={`scroll-mt-24 bg-gradient-to-br from-violet-50 to-indigo-100 p-6 rounded-xl border border-violet-200 mb-6 ring-1 ring-violet-200/50 ${!canRunSimulation ? "opacity-95" : ""}`}
                   >
                     <h3 className="text-lg font-semibold text-violet-900 mb-2 flex items-center gap-2">
                       <Calculator className="h-5 w-5" />
@@ -1406,7 +1542,7 @@ export default function NouveauProgramme() {
                         const selectedDate: Date | undefined = dateValue ?? undefined;
                         return (
                           <div key={item.key} className="space-y-2">
-                            <Label className="text-orange-700 font-medium text-sm">{item.label}</Label>
+                            <Label className="text-orange-700 font-medium text-sm">{item.label} *</Label>
                             <Popover>
                               <PopoverTrigger asChild>
                                 <Button
@@ -1443,21 +1579,45 @@ export default function NouveauProgramme() {
                   </div>
 
                   {/* Boutons d'action */}
-                  <div className="flex gap-4 mt-8">
-                    <Button
-                      onClick={handleSubmit}
-                      disabled={!isFormValid}
-                      className="flex-1 h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Save className="mr-2 h-5 w-5" />
-                      Enregistrer le programme
-                    </Button>
-                    <Link href="/programmes" className="flex-1">
-                      <Button variant="outline" className="w-full h-12 border-2 border-gray-300 hover:border-gray-400">
-                        <ArrowLeft className="mr-2 h-5 w-5" />
-                        Annuler
+                  <div className="flex flex-col gap-3 mt-8">
+                    <div className="flex gap-4">
+                      <Button
+                        onClick={handleSubmit}
+                        disabled={!isFormValid}
+                        className="flex-1 h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Save className="mr-2 h-5 w-5" />
+                        Enregistrer le programme
                       </Button>
-                    </Link>
+                      <Link href="/programmes" className="flex-1">
+                        <Button
+                          variant="outline"
+                          className="w-full h-12 border-2 border-gray-300 hover:border-gray-400"
+                          onClick={(e) => {
+                            if (!hasUnsavedChanges || isSubmitting) return
+                            const shouldLeave = window.confirm(
+                              "Vous avez des modifications non enregistrees. Quitter sans enregistrer ?"
+                            )
+                            if (!shouldLeave) e.preventDefault()
+                          }}
+                        >
+                          <ArrowLeft className="mr-2 h-5 w-5" />
+                          Annuler
+                        </Button>
+                      </Link>
+                    </div>
+                    {!isFormValid && (
+                      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+                        <p className="font-semibold mb-1">
+                          Enregistrer le programme est desactive. Raisons:
+                        </p>
+                        <ul className="list-disc pl-5 space-y-1">
+                          {validateRequiredFields.map((reason, idx) => (
+                            <li key={`${reason}-${idx}`}>{reason}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </form>
               </CardContent>

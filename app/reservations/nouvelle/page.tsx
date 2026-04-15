@@ -2615,29 +2615,20 @@ export default function NouvelleReservation() {
 
                     <div className="space-y-2">
                       <Label className="text-blue-700 font-medium text-sm">Passeport *</Label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="file"
-                          ref={(el) => {
-                            if (el) fileInputs.current.passeport = el;
-                          }}
-                          onChange={(e) => handleFileChange(e, "passport")}
-                          accept="image/*,.pdf"
-                          className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                          disabled={isSubmitting}
-                        />
-                        {documents.passport && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveDocument("passport")}
-                            className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                      {!documents.passport && (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="file"
+                            ref={(el) => {
+                              if (el) fileInputs.current.passeport = el;
+                            }}
+                            onChange={(e) => handleFileChange(e, "passport")}
+                            accept="image/*,.pdf"
+                            className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
                             disabled={isSubmitting}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
+                          />
+                        </div>
+                      )}
                       {ocrProcessingPassport && (
                         <p className="text-xs text-blue-600 animate-pulse">
                           Analyse OCR du passeport en cours…
@@ -2671,7 +2662,7 @@ export default function NouvelleReservation() {
                               </Button>
                             </div>
                           </div>
-                          <div className="w-full h-[350px] overflow-hidden rounded-lg border border-blue-200">
+                          <div className="w-full h-[190px] overflow-hidden rounded-lg border border-blue-200">
                             {previews.passport?.type === "application/pdf" ? (
                               previews.passport.url.startsWith("blob:") || previews.passport.url.startsWith("data:") ? (
                                 <embed
@@ -2747,25 +2738,29 @@ export default function NouvelleReservation() {
                             <div className="md:col-span-6 space-y-2">
                               <Label className="text-orange-700 font-medium text-sm">Reçu de paiement</Label>
                               <div className="flex items-center gap-2">
-                                <Input
-                                  type="file"
-                                  onChange={e => handlePaymentFileChange(e, index)}
-                                  accept="image/*,.pdf"
-                                  className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
-                                  disabled={isSubmitting}
-                                />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleGeneratePaymentReceipt(index)}
-                                  disabled={isSubmitting || !canGeneratePaymentReceipt(index)}
-                                  className="h-10 border-orange-300 text-orange-700 hover:bg-orange-50 whitespace-nowrap"
-                                  title="Genere un recu automatique"
-                                >
-                                  <Download className="h-3.5 w-3.5 mr-1.5" />
-                                  Generer recu
-                                </Button>
+                                {!documents.payment?.[index] && (
+                                  <>
+                                    <Input
+                                      type="file"
+                                      onChange={e => handlePaymentFileChange(e, index)}
+                                      accept="image/*,.pdf"
+                                      className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
+                                      disabled={isSubmitting}
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleGeneratePaymentReceipt(index)}
+                                      disabled={isSubmitting || !canGeneratePaymentReceipt(index)}
+                                      className="h-10 border-orange-300 text-orange-700 hover:bg-orange-50 whitespace-nowrap"
+                                      title="Genere un recu automatique"
+                                    >
+                                      <Download className="h-3.5 w-3.5 mr-1.5" />
+                                      Generer recu
+                                    </Button>
+                                  </>
+                                )}
                                 {documents.payment?.[index] && (
                                   <Button
                                     variant="ghost"

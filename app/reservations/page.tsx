@@ -197,7 +197,7 @@ export default function ReservationsPage() {
   };
 
   const handleProgrammeChange = (value: string) => {
-    setProgrammeFilter(value);
+    setProgrammeFilter(value.trim());
   };
 
   const handleStatutChange = (value: string) => {
@@ -305,7 +305,7 @@ export default function ReservationsPage() {
       // Extraire les données de pagination
       const { reservations: reservationsData, pagination } = reservationsResponse;
       
-      setPrograms(programsData);
+      setPrograms(programsData.map((program) => ({ ...program, name: program.name.trim() })));
       setStats(statsData);
       
       // Mettre à jour l'état de pagination
@@ -718,7 +718,7 @@ export default function ReservationsPage() {
         {/* Filtres */}
         <Card className="mb-8 border-none shadow-lg overflow-hidden bg-white/95 backdrop-blur">
           <CardContent className="p-4 md:p-5">
-            <form onSubmit={handleFilterChange} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-3 lg:gap-4 items-end">
+            <form onSubmit={handleFilterChange} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-10 gap-3 lg:gap-4 items-end">
               <div className="relative xl:col-span-3 min-w-0">
                 <span className="mb-1.5 block text-xs font-semibold text-gray-600">Recherche</span>
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -734,7 +734,7 @@ export default function ReservationsPage() {
               <div className="xl:col-span-2 min-w-0">
                 <span className="mb-1.5 block text-xs font-semibold text-gray-600">Programme</span>
                 <Select value={programmeFilter} onValueChange={handleProgrammeChange}>
-                <SelectTrigger className="h-11 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40">
+                <SelectTrigger className="h-11 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40 pl-3">
                   <SelectValue placeholder="Programme" />
                 </SelectTrigger>
                 <SelectContent>
@@ -799,19 +799,6 @@ export default function ReservationsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="xl:col-span-2 min-w-0">
-                <span className="mb-1.5 block text-xs font-semibold text-gray-600">&nbsp;</span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-11 w-full rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 shrink-0 whitespace-nowrap"
-                  disabled={exporting}
-                  onClick={handleExportAgency}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  {exporting ? "Export…" : "Exporter Excel (agence)"}
-                </Button>
-              </div>
             </form>
           </CardContent>
         </Card>
@@ -819,11 +806,21 @@ export default function ReservationsPage() {
         {/* Liste des Réservations */}
         <Card className="border-none shadow-lg overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 pb-2">
-            <div className="flex items-center">
+            <div className="flex items-center justify-between gap-3">
               <CardTitle className="text-blue-800 flex items-center gap-2 text-lg">
                 <Users className="h-5 w-5 text-blue-600" />
                 Liste des Réservations
               </CardTitle>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 shrink-0 whitespace-nowrap"
+                disabled={exporting}
+                onClick={handleExportAgency}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {exporting ? "Export…" : "Exporter Excel (agence)"}
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="p-0">

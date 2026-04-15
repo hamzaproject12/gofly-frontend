@@ -715,6 +715,93 @@ export default function NouvelleChambrePage() {
     }
   };
 
+  const canGeneratePaymentReceipt = (index: number) => {
+    const payment = payments[index];
+    if (!payment) return false;
+    const amount = Number(payment.amount);
+    const leader = occupants[0];
+    return Boolean(
+      payment.type &&
+      !Number.isNaN(amount) &&
+      amount > 0 &&
+      leader?.firstName?.trim() &&
+      leader?.lastName?.trim() &&
+      leader?.phone?.trim()
+    );
+  };
+
+  const handleGeneratePaymentReceipt = async (index: number) => {
+    if (!canGeneratePaymentReceipt(index)) return;
+    const payment = payments[index];
+    const leader = occupants[0];
+    if (!payment || !leader) return;
+
+    const amount = Number(payment.amount) || 0;
+    const paymentDate = new Date().toISOString().slice(0, 10);
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200;
+    canvas.height = 800;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de générer le reçu pour le moment.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#e5e7eb";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(30, 30, canvas.width - 60, canvas.height - 60);
+
+    ctx.fillStyle = "#1f2937";
+    ctx.font = "bold 42px Arial";
+    ctx.fillText("Recu de paiement", 60, 100);
+    ctx.fillStyle = "#4b5563";
+    ctx.font = "22px Arial";
+    ctx.fillText(`Date: ${paymentDate}`, 60, 150);
+    ctx.fillText(`Programme: ${formData.programme || "-"}`, 60, 190);
+    ctx.fillStyle = "#111827";
+    ctx.font = "bold 28px Arial";
+    ctx.fillText("Client", 60, 265);
+    ctx.font = "22px Arial";
+    ctx.fillText(`Nom complet: ${leader.lastName} ${leader.firstName}`, 60, 310);
+    ctx.fillText(`Telephone: ${leader.phone}`, 60, 345);
+    ctx.font = "bold 28px Arial";
+    ctx.fillText("Paiement", 60, 430);
+    ctx.font = "22px Arial";
+    ctx.fillText(`Type: ${payment.type}`, 60, 475);
+    ctx.fillText(`Montant: ${amount.toLocaleString("fr-FR")} DH`, 60, 510);
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/png")
+    );
+    if (!blob) {
+      toast({
+        title: "Erreur",
+        description: "Generation du recu echouee.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const file = new File([blob], `recu-${Date.now()}.png`, { type: "image/png" });
+    setPaymentField(index, "receipt", file);
+    setPaymentPreviews((prev) => {
+      const next = [...prev];
+      revokePreviewEntry(next[index]);
+      next[index] = { url: URL.createObjectURL(file), type: file.type };
+      return next;
+    });
+    toast({
+      title: "Recu genere",
+      description: "Le recu est attache et sera enregistre avec la reservation.",
+    });
+  };
+
   const addPaymentRow = () => {
     setPayments((prev) => [...prev, { amount: "", type: "", receipt: null }]);
     setPaymentPreviews((prev) => [...prev, null]);
@@ -1600,27 +1687,17 @@ export default function NouvelleChambrePage() {
                             <Label className="text-xs text-blue-700 font-medium">
                               Passeport (obligatoire)
                             </Label>
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="file"
-                                accept="image/*,.pdf"
-                                onChange={(e) => handleOccupantPassportChange(i, e)}
-                                className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                                disabled={isSubmitting || ocrProcessingIndex === i}
-                              />
-                              {occupantPassportFiles[i] && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => removeOccupantPassport(i)}
-                                  className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                                  disabled={isSubmitting}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
+                            {!occupantPassportFiles[i] && (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="file"
+                                  accept="image/*,.pdf"
+                                  onChange={(e) => handleOccupantPassportChange(i, e)}
+                                  className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                                  disabled={isSubmitting || ocrProcessingIndex === i}
+                                />
+                              </div>
+                            )}
                             {ocrProcessingIndex === i && (
                               <p className="text-xs text-blue-600 animate-pulse">
                                 Analyse OCR du passeport en cours…
@@ -1752,27 +1829,17 @@ export default function NouvelleChambrePage() {
                             <Label className="text-xs text-blue-700 font-medium">
                               Passeport (obligatoire)
                             </Label>
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="file"
-                                accept="image/*,.pdf"
-                                onChange={(e) => handleOccupantPassportChange(i, e)}
-                                className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                                disabled={isSubmitting || ocrProcessingIndex === i}
-                              />
-                              {occupantPassportFiles[i] && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => removeOccupantPassport(i)}
-                                  className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                                  disabled={isSubmitting}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
+                            {!occupantPassportFiles[i] && (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="file"
+                                  accept="image/*,.pdf"
+                                  onChange={(e) => handleOccupantPassportChange(i, e)}
+                                  className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                                  disabled={isSubmitting || ocrProcessingIndex === i}
+                                />
+                              </div>
+                            )}
                             {ocrProcessingIndex === i && (
                               <p className="text-xs text-blue-600 animate-pulse">
                                 Analyse OCR du passeport en cours…
@@ -1907,13 +1974,28 @@ export default function NouvelleChambrePage() {
                           <div className="md:col-span-6 space-y-2">
                             <Label className="text-orange-700 font-medium text-sm">Reçu de paiement</Label>
                             <div className="flex items-center gap-2">
-                              <Input
-                                type="file"
-                                accept="image/*,.pdf"
-                                onChange={(e) => handlePaymentReceiptChange(index, e)}
-                                className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
-                                disabled={isSubmitting}
-                              />
+                              {!payment.receipt && (
+                                <>
+                                  <Input
+                                    type="file"
+                                    accept="image/*,.pdf"
+                                    onChange={(e) => handlePaymentReceiptChange(index, e)}
+                                    className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
+                                    disabled={isSubmitting}
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleGeneratePaymentReceipt(index)}
+                                    disabled={isSubmitting || !canGeneratePaymentReceipt(index)}
+                                    className="h-10 border-orange-300 text-orange-700 hover:bg-orange-50 whitespace-nowrap"
+                                  >
+                                    <Download className="h-3.5 w-3.5 mr-1.5" />
+                                    Generer recu
+                                  </Button>
+                                </>
+                              )}
                               {payment.receipt && (
                                 <Button
                                   type="button"

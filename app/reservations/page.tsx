@@ -622,7 +622,7 @@ export default function ReservationsPage() {
             <h1 className="text-2xl font-bold text-gray-900">Gestion des Réservations</h1>
             <p className="text-gray-500 mt-1">Gérez et suivez toutes vos réservations Omra</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Link href="/reservations/nouvelle">
               <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transition-all">
                 <Plus className="mr-2 h-4 w-4" />
@@ -630,7 +630,10 @@ export default function ReservationsPage() {
               </Button>
             </Link>
             <Link href="/reservations/nouvelle-chambre">
-              <Button variant="outline" className="shadow-sm">
+              <Button
+                className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-md hover:shadow-lg transition-all"
+              >
+                <HotelIcon className="mr-2 h-4 w-4" />
                 Chambre Privée
               </Button>
             </Link>
@@ -713,22 +716,25 @@ export default function ReservationsPage() {
         </div>
 
         {/* Filtres */}
-        <Card className="mb-8 border-none shadow-lg overflow-hidden">
-          <CardContent className="p-6">
-            <form onSubmit={handleFilterChange} className="grid grid-cols-1 md:grid-cols-6 gap-4 md:items-end">
-              <div className="relative">
+        <Card className="mb-8 border-none shadow-lg overflow-hidden bg-white/95 backdrop-blur">
+          <CardContent className="p-4 md:p-5">
+            <form onSubmit={handleFilterChange} className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-4 items-end">
+              <div className="relative lg:col-span-3">
+                <span className="mb-1.5 block text-xs font-semibold text-gray-600">Recherche</span>
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
                   type="text"
                   placeholder="Rechercher par nom, téléphone, programme..."
                   value={filters.search}
                   onChange={(e) => handleSearch(e.target.value)}
-                  className="pl-10 h-12 border-2 focus:border-blue-500"
+                  className="pl-10 h-11 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40"
                 />
               </div>
 
-              <Select value={programmeFilter} onValueChange={handleProgrammeChange}>
-                <SelectTrigger className="h-12 border-2 focus:border-blue-500">
+              <div className="lg:col-span-2">
+                <span className="mb-1.5 block text-xs font-semibold text-gray-600">Programme</span>
+                <Select value={programmeFilter} onValueChange={handleProgrammeChange}>
+                <SelectTrigger className="h-11 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40">
                   <SelectValue placeholder="Programme" />
                 </SelectTrigger>
                 <SelectContent>
@@ -740,9 +746,12 @@ export default function ReservationsPage() {
                   ))}
                 </SelectContent>
               </Select>
+              </div>
 
-              <Select value={statutFilter} onValueChange={handleStatutChange}>
-                <SelectTrigger className="h-12 border-2 focus:border-blue-500">
+              <div className="lg:col-span-2">
+                <span className="mb-1.5 block text-xs font-semibold text-gray-600">Statut</span>
+                <Select value={statutFilter} onValueChange={handleStatutChange}>
+                <SelectTrigger className="h-11 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40">
                   <SelectValue placeholder="Statut" />
                 </SelectTrigger>
                 <SelectContent>
@@ -752,13 +761,12 @@ export default function ReservationsPage() {
                   <SelectItem value="Urgent">Urgente</SelectItem>
                 </SelectContent>
               </Select>
+              </div>
 
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-semibold text-gray-600">
-                  Chambre
-                </span>
+              <div className="lg:col-span-2">
+                <span className="mb-1.5 block text-xs font-semibold text-gray-600">Chambre</span>
                 <Select value={chambreFilter} onValueChange={handleChambreChange}>
-                  <SelectTrigger className="h-12 border-2 focus:border-blue-500">
+                  <SelectTrigger className="h-11 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40">
                     <SelectValue placeholder="Toutes les chambres" />
                   </SelectTrigger>
                   <SelectContent>
@@ -772,32 +780,38 @@ export default function ReservationsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <Select
-                value={rowsPerPage.toString()}
-                onValueChange={(value) => {
-                  setRowsPerPage(Number(value));
-                  setCurrentPage(1);
-                }}
-              >
-                <SelectTrigger className="h-12 border-2 focus:border-blue-500">
-                  <SelectValue placeholder="10 / page" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10 / page</SelectItem>
-                  <SelectItem value="30">30 / page</SelectItem>
-                  <SelectItem value="50">50 / page</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-12 border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 shrink-0"
-                disabled={exporting}
-                onClick={handleExportAgency}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                {exporting ? "Export…" : "Exporter Excel (agence)"}
-              </Button>
+              <div className="lg:col-span-1">
+                <span className="mb-1.5 block text-xs font-semibold text-gray-600">Lignes</span>
+                <Select
+                  value={rowsPerPage.toString()}
+                  onValueChange={(value) => {
+                    setRowsPerPage(Number(value));
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="h-11 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40">
+                    <SelectValue placeholder="10 / page" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10 / page</SelectItem>
+                    <SelectItem value="30">30 / page</SelectItem>
+                    <SelectItem value="50">50 / page</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="lg:col-span-2">
+                <span className="mb-1.5 block text-xs font-semibold text-gray-600">&nbsp;</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 w-full rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 shrink-0"
+                  disabled={exporting}
+                  onClick={handleExportAgency}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  {exporting ? "Export…" : "Exporter Excel (agence)"}
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>

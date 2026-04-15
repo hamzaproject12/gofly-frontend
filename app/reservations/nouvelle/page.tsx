@@ -41,6 +41,8 @@ import { useRouter } from "next/navigation"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -109,6 +111,40 @@ type Documents = {
   paiements: File[];
 };
 
+type OcrExtractData = {
+  first_name?: string;
+  last_name?: string;
+  passport?: string;
+  personal_id_number?: string;
+  sex?: string;
+};
+
+const PHONE_REGEX = /^\+\d{3}\s\d{9}$/;
+const PASSPORT_REGEX = /^[A-Z]{2}\d{7}$/;
+
+function formatPhoneInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 12);
+  if (!digits) return "";
+  const country = digits.slice(0, 3);
+  const local = digits.slice(3, 12);
+  return local ? `+${country} ${local}` : `+${country}`;
+}
+
+function formatPassportInput(value: string): string {
+  const chars = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const letters = chars.replace(/[^A-Z]/g, "").slice(0, 2);
+  const numbers = chars.replace(/[^0-9]/g, "").slice(0, 7);
+  return `${letters}${numbers}`;
+}
+
+function mapOcrSexToGender(sex: string | undefined): "Homme" | "Femme" | null {
+  if (!sex || typeof sex !== "string") return null;
+  const u = sex.trim().toUpperCase();
+  if (u === "F" || u === "FEMALE" || u === "FÉMININ") return "Femme";
+  if (u === "M" || u === "MALE" || u === "MASCULIN") return "Homme";
+  return null;
+}
+
 export default function NouvelleReservation() {
   const { toast } = useToast()
   const router = useRouter()
@@ -172,6 +208,13 @@ export default function NouvelleReservation() {
     paiements: []
   })
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string; type: string } | null>(null);
+  const [ocrProcessingPassport, setOcrProcessingPassport] = useState(false);
+  const [ocrValidation, setOcrValidation] = useState<{
+    firstName: string;
+    lastName: string;
+    passport: string;
+    sex?: string;
+  } | null>(null);
   const [showRoomGuide, setShowRoomGuide] = useState(false);
   const [selectedPlaces, setSelectedPlaces] = useState<{[roomId: number]: number[]}>({});
   
@@ -1005,6 +1048,48 @@ export default function NouvelleReservation() {
           }));
         };
         reader.readAsDataURL(file);
+
+        if (type === "passport") {
+          void (async () => {
+            setOcrProcessingPassport(true);
+            try {
+              const fd = new FormData();
+              fd.append("file", file);
+              const res = await fetch("/api/passport-ocr", {
+                method: "POST",
+                body: fd,
+              });
+              const json = (await res.json()) as {
+                status?: string;
+                data?: OcrExtractData;
+                error?: string;
+              };
+              if (!res.ok) {
+                throw new Error(json.error || "Service OCR indisponible");
+              }
+              const raw = json.data || {};
+              setOcrValidation({
+                firstName: String(raw.first_name ?? "").trim(),
+                lastName: String(raw.last_name ?? "").trim(),
+                passport: formatPassportInput(
+                  String(raw.passport ?? raw.personal_id_number ?? "").trim()
+                ),
+                sex: typeof raw.sex === "string" ? raw.sex : undefined,
+              });
+            } catch (err) {
+              toast({
+                title: "Lecture automatique du passeport",
+                description:
+                  err instanceof Error
+                    ? err.message
+                    : "Impossible d’analyser l’image. Vous pouvez saisir les champs manuellement.",
+                variant: "destructive",
+              });
+            } finally {
+              setOcrProcessingPassport(false);
+            }
+          })();
+        }
       } else if (file.type === 'application/pdf') {
         setPreviews(prev => ({
           ...prev,
@@ -1025,6 +1110,25 @@ export default function NouvelleReservation() {
         variant: "destructive",
       });
     }
+  };
+
+  const applyOcrValidation = () => {
+    if (!ocrValidation) return;
+    const genderFromOcr = mapOcrSexToGender(ocrValidation.sex);
+    setFormData((prev) => ({
+      ...prev,
+      nom: ocrValidation.lastName || prev.nom,
+      prenom: ocrValidation.firstName || prev.prenom,
+      passportNumber: ocrValidation.passport
+        ? formatPassportInput(ocrValidation.passport)
+        : prev.passportNumber,
+      ...(genderFromOcr ? { gender: genderFromOcr } : {}),
+    }));
+    setOcrValidation(null);
+    toast({
+      title: "Données appliquées",
+      description: "Les informations extraites du passeport ont été appliquées.",
+    });
   };
 
   const handleRemoveDocument = (type: DocumentType) => {
@@ -1147,6 +1251,25 @@ export default function NouvelleReservation() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const telephone = (formData.telephone || "").trim();
+    const passportNumber = (formData.passportNumber || "").trim();
+    if (!PHONE_REGEX.test(telephone)) {
+      toast({
+        title: "Téléphone invalide",
+        description: "Format attendu: +XXX XXXXXXXXX (ex: +212 123456789).",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (passportNumber && !PASSPORT_REGEX.test(passportNumber)) {
+      toast({
+        title: "Passeport invalide",
+        description: "Format attendu: 2 lettres + 7 chiffres (ex: AB1234567).",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const hasIncompletePayment = paiements.some((paiement, index) => {
       const montantVide = paiement.montant === "" || Number.isNaN(Number(paiement.montant));
@@ -2334,10 +2457,17 @@ export default function NouvelleReservation() {
                       <Label className="text-blue-700 font-medium text-sm">N° passport</Label>
                       <Input
                         value={formData.passportNumber}
-                        onChange={(e) => setFormData({ ...formData, passportNumber: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            passportNumber: formatPassportInput(e.target.value),
+                          })
+                        }
                         placeholder="Numéro de passeport"
+                        maxLength={9}
                         className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
                       />
+                      <p className="text-[11px] text-blue-600">Format: AB1234567</p>
                     </div>
 
                     <div className="space-y-2">
@@ -2357,10 +2487,18 @@ export default function NouvelleReservation() {
                       <Label className="text-blue-700 font-medium text-sm">Téléphone *</Label>
                       <Input
                         value={formData.telephone}
-                        onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
-                        placeholder="Numéro de téléphone"
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            telephone: formatPhoneInput(e.target.value),
+                          })
+                        }
+                        placeholder="+212 123456789"
+                        inputMode="numeric"
+                        maxLength={14}
                         className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
                       />
+                      <p className="text-[11px] text-blue-600">Format: +XXX XXXXXXXXX</p>
                     </div>
                   </div>
 
@@ -2390,6 +2528,11 @@ export default function NouvelleReservation() {
                         </Button>
                       )}
                     </div>
+                    {ocrProcessingPassport && (
+                      <p className="text-xs text-blue-600 animate-pulse">
+                        Analyse OCR du passeport en cours…
+                      </p>
+                    )}
                     {previews.passport && (
                       <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
                         <div className="flex items-center justify-between mb-2">
@@ -2879,6 +3022,82 @@ export default function NouvelleReservation() {
       )}
 
       {/* Modal de prévisualisation */}
+      <Dialog
+        open={ocrValidation !== null}
+        onOpenChange={(open) => {
+          if (!open) setOcrValidation(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Valider les données extraites du passeport</DialogTitle>
+            <DialogDescription>
+              Vérifiez le nom, le prénom et le numéro de passeport avant de les appliquer au formulaire.
+            </DialogDescription>
+          </DialogHeader>
+          {ocrValidation && (
+            <div className="grid gap-3 py-2">
+              <div className="space-y-1">
+                <Label htmlFor="ocr-lastName">Nom</Label>
+                <Input
+                  id="ocr-lastName"
+                  value={ocrValidation.lastName}
+                  onChange={(e) =>
+                    setOcrValidation((prev) =>
+                      prev ? { ...prev, lastName: e.target.value } : null
+                    )
+                  }
+                  placeholder="Nom"
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="ocr-firstName">Prénom</Label>
+                <Input
+                  id="ocr-firstName"
+                  value={ocrValidation.firstName}
+                  onChange={(e) =>
+                    setOcrValidation((prev) =>
+                      prev ? { ...prev, firstName: e.target.value } : null
+                    )
+                  }
+                  placeholder="Prénom"
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="ocr-passport">N° Passeport</Label>
+                <Input
+                  id="ocr-passport"
+                  value={ocrValidation.passport}
+                  onChange={(e) =>
+                    setOcrValidation((prev) =>
+                      prev
+                        ? { ...prev, passport: formatPassportInput(e.target.value) }
+                        : null
+                    )
+                  }
+                  placeholder="AB1234567"
+                  className="h-10"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOcrValidation(null)}
+            >
+              Ignorer
+            </Button>
+            <Button type="button" onClick={applyOcrValidation}>
+              OK — Appliquer aux champs
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
         <DialogContent className="max-w-[90vw] max-h-[90vh] p-0">
           <DialogHeader className="p-4 border-b">

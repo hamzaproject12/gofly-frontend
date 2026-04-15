@@ -104,6 +104,23 @@ const ROOM_CAPACITY: Record<string, number> = {
   QUAD: 4,
   QUINT: 5,
 };
+const PHONE_REGEX = /^\+\d{3}\s\d{9}$/;
+const PASSPORT_REGEX = /^[A-Z]{2}\d{7}$/;
+
+function formatPhoneInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 12);
+  if (!digits) return "";
+  const country = digits.slice(0, 3);
+  const local = digits.slice(3, 12);
+  return local ? `+${country} ${local}` : `+${country}`;
+}
+
+function formatPassportInput(value: string): string {
+  const chars = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const letters = chars.replace(/[^A-Z]/g, "").slice(0, 2);
+  const numbers = chars.replace(/[^0-9]/g, "").slice(0, 7);
+  return `${letters}${numbers}`;
+}
 
 const planThemes = {
   Économique: { name: "Économique", icon: Leaf },
@@ -466,9 +483,15 @@ export default function NouvelleChambrePage() {
     field: keyof Occupant,
     value: string
   ) => {
+    const normalizedValue =
+      field === "phone"
+        ? formatPhoneInput(value)
+        : field === "passportNumber"
+          ? formatPassportInput(value)
+          : value;
     setOccupants((prev) => {
       const next = [...prev];
-      next[index] = { ...next[index], [field]: value };
+      next[index] = { ...next[index], [field]: normalizedValue };
       return next;
     });
   };
@@ -754,11 +777,12 @@ export default function NouvelleChambrePage() {
     occupants.every((o, i) => {
       const fn = (o.firstName || "").trim();
       const ln = (o.lastName || "").trim();
+      const pp = (o.passportNumber || "").trim();
       if (i === 0) {
         const ph = (o.phone || "").trim();
-        return Boolean(fn && ln && ph);
+        return Boolean(fn && ln && ph && PHONE_REGEX.test(ph) && PASSPORT_REGEX.test(pp));
       }
-      return Boolean(fn && ln);
+      return Boolean(fn && ln && PASSPORT_REGEX.test(pp));
     });
 
   const canSubmit =
@@ -776,6 +800,26 @@ export default function NouvelleChambrePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const leaderPhone = (occupants[0]?.phone || "").trim();
+    if (!PHONE_REGEX.test(leaderPhone)) {
+      toast({
+        title: "Téléphone invalide",
+        description: "Format attendu: +XXX XXXXXXXXX (ex: +212 123456789).",
+        variant: "destructive",
+      });
+      return;
+    }
+    const invalidPassportIndex = occupants.findIndex(
+      (o) => !PASSPORT_REGEX.test((o.passportNumber || "").trim())
+    );
+    if (invalidPassportIndex !== -1) {
+      toast({
+        title: "Passeport invalide",
+        description: `Format attendu: 2 lettres + 7 chiffres (ex: AB1234567) pour ${invalidPassportIndex === 0 ? "le leader" : `l’accompagnant ${invalidPassportIndex}`}.`,
+        variant: "destructive",
+      });
+      return;
+    }
     if (!canSubmit) return;
 
     setIsSubmitting(true);
@@ -1472,8 +1516,11 @@ export default function NouvelleChambrePage() {
                                   placeholder="Téléphone"
                                   value={o.phone}
                                   onChange={(e) => updateOccupant(i, "phone", e.target.value)}
+                                  inputMode="numeric"
+                                  maxLength={14}
                                   className="h-10 border-2 border-blue-100 focus:border-blue-400"
                                 />
+                                <p className="text-[11px] text-blue-600">Format: +XXX XXXXXXXXX</p>
                               </div>
                               <div className="space-y-1">
                                 <Label className="text-xs text-blue-700">Groupe</Label>
@@ -1513,8 +1560,10 @@ export default function NouvelleChambrePage() {
                                   onChange={(e) =>
                                     updateOccupant(i, "passportNumber", e.target.value)
                                   }
+                                  maxLength={9}
                                   className="h-10 border-2 border-blue-100 focus:border-blue-400"
                                 />
+                                <p className="text-[11px] text-blue-600">Format: AB1234567</p>
                               </div>
                             </div>
                             <div className="grid grid-cols-2 gap-3 items-center">
@@ -1695,8 +1744,10 @@ export default function NouvelleChambrePage() {
                                 onChange={(e) =>
                                   updateOccupant(i, "passportNumber", e.target.value)
                                 }
+                                maxLength={9}
                                 className="h-10 border-2 border-blue-100 focus:border-blue-400"
                               />
+                              <p className="text-[11px] text-blue-600">Format: AB1234567</p>
                             </div>
                           </div>
                           <div className="space-y-2">
@@ -2219,7 +2270,7 @@ export default function NouvelleChambrePage() {
               variant="outline"
               onClick={() => setOcrValidation(null)}
             >
-              Annuler
+              Ignorer
             </Button>
             <Button type="button" onClick={applyOcrValidation}>
               OK — Appliquer aux champs

@@ -447,7 +447,8 @@ export default function NouveauProgramme() {
     const agentCostPer = parseNum(simAgentCostPerPlaceDH, 0)
     const agentChargesTotalDh = agentPlaces * agentCostPer
     const autresChargesDh = parseNum(simAutresChargesDH, 0)
-    const resultatPrevDh = revenueAfterAgentsDh - agentChargesTotalDh - autresChargesDh
+    const totalChargesDh = agentChargesTotalDh + autresChargesDh
+    const resultatPrevDh = revenueAfterAgentsDh - totalChargesDh
 
     return {
       exchange,
@@ -463,6 +464,7 @@ export default function NouveauProgramme() {
       revenueAfterAgentsDh,
       agentChargesTotalDh,
       autresChargesDh,
+      totalChargesDh,
       resultatPrevDh,
     }
   }, [
@@ -1296,8 +1298,9 @@ export default function NouveauProgramme() {
                       <span>
                         Remplissez d&apos;abord le nom du programme, les détails financiers (exchange, jours, avion, visa),
                         puis sélectionnez les hôtels Madina et Makkah avec au moins une chambre (nombre et prix en Riyal).
-                        Ensuite, ajustez les hypothèses ci-dessous. Même logique que la page Nouvelle réservation pour le
-                        ticket ; les places agents réduisent le CA et ajoutent une charge.
+                        Ensuite, ajustez les hypothèses ci-dessous (même logique que « Nouvelle réservation » pour le prix).
+                        Le total paiement prévu correspond aux voyageurs payants ; le gain net prévu déduit les charges
+                        agents et les autres charges.
                       </span>
                     </p>
 
@@ -1453,23 +1456,29 @@ export default function NouveauProgramme() {
                           </p>
                         </div>
                         <div className="bg-white p-4">
-                          <p className="text-xs text-violet-700">CA si tout payant</p>
+                          <p className="text-xs text-violet-700">Total paiement prévu</p>
                           <p className="text-xl font-bold text-violet-950">
                             {canRunSimulation
-                              ? `${Math.round(simulationPreview.revenueIfAllPayDh).toLocaleString("fr-FR")} DH`
+                              ? `${Math.round(simulationPreview.revenueAfterAgentsDh).toLocaleString("fr-FR")} DH`
                               : "—"}
+                          </p>
+                          <p className="text-[11px] text-violet-600 mt-1 leading-snug">
+                            Encaissements des places payantes (hypothèses + détail par type ci-dessous).
                           </p>
                         </div>
                         <div className="bg-white p-4">
-                          <p className="text-xs text-violet-700">Ticket moyen (estim.)</p>
+                          <p className="text-xs text-violet-700">Total charges</p>
                           <p className="text-xl font-bold text-violet-950">
                             {canRunSimulation
-                              ? `${Math.round(simulationPreview.avgTicketDh).toLocaleString("fr-FR")} DH`
+                              ? `${Math.round(simulationPreview.totalChargesDh).toLocaleString("fr-FR")} DH`
                               : "—"}
+                          </p>
+                          <p className="text-[11px] text-violet-600 mt-1 leading-snug">
+                            Charges agents + autres charges saisies.
                           </p>
                         </div>
                         <div className="bg-white p-4">
-                          <p className="text-xs text-violet-700">Résultat prévisionnel</p>
+                          <p className="text-xs text-violet-700">Gain net prévu</p>
                           <p
                             className={`text-xl font-bold ${
                               !canRunSimulation
@@ -1483,6 +1492,9 @@ export default function NouveauProgramme() {
                               ? `${Math.round(simulationPreview.resultatPrevDh).toLocaleString("fr-FR")} DH`
                               : "—"}
                           </p>
+                          <p className="text-[11px] text-violet-600 mt-1 leading-snug">
+                            Total paiement prévu − total charges.
+                          </p>
                         </div>
                       </div>
                       <div className="px-4 py-3 border-t border-violet-100 text-sm text-violet-800 space-y-1">
@@ -1493,10 +1505,16 @@ export default function NouveauProgramme() {
                           </span>
                         </div>
                         <div className="flex flex-wrap justify-between gap-2">
-                          <span>Chiffre d&apos;affaires retenu</span>
+                          <span>Places agents (non payantes)</span>
+                          <span className="font-medium">
+                            {canRunSimulation ? simulationPreview.agentPlaces : "—"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap justify-between gap-2">
+                          <span>Réf. CA si capacité pleine et tous payants</span>
                           <span className="font-medium">
                             {canRunSimulation
-                              ? `${Math.round(simulationPreview.revenueAfterAgentsDh).toLocaleString("fr-FR")} DH`
+                              ? `${Math.round(simulationPreview.revenueIfAllPayDh).toLocaleString("fr-FR")} DH`
                               : "—"}
                           </span>
                         </div>
@@ -1513,6 +1531,14 @@ export default function NouveauProgramme() {
                           <span className="font-medium">
                             {canRunSimulation
                               ? `−${Math.round(simulationPreview.autresChargesDh).toLocaleString("fr-FR")} DH`
+                              : "—"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap justify-between gap-2 pt-1 border-t border-violet-100/80 font-semibold text-violet-950">
+                          <span>Total charges (agents + autres)</span>
+                          <span>
+                            {canRunSimulation
+                              ? `${Math.round(simulationPreview.totalChargesDh).toLocaleString("fr-FR")} DH`
                               : "—"}
                           </span>
                         </div>

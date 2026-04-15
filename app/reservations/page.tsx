@@ -9,8 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Plus,
   Search,
-  Filter,
-  ArrowUpDown,
   Calendar,
   MapPin,
   Users,
@@ -150,7 +148,6 @@ export default function ReservationsPage() {
   const [programs, setPrograms] = useState<Program[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState("")
   const [programmeFilter, setProgrammeFilter] = useState("tous")
   const [statutFilter, setStatutFilter] = useState("all")
   const [chambreFilter, setChambreFilter] = useState("toutes")
@@ -172,6 +169,7 @@ export default function ReservationsPage() {
   const [totalReservations, setTotalReservations] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [hasPrevPage, setHasPrevPage] = useState(false);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   
   // Filtres avancés
   const [filters, setFilters] = useState({
@@ -275,19 +273,25 @@ export default function ReservationsPage() {
       // Construire l'URL avec tous les filtres et la pagination
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: '10',
+        limit: rowsPerPage.toString(),
         program: programmeFilter,
         status: statutFilter,
         roomType: chambreFilter,
         ...(filters.dateFrom && { dateFrom: filters.dateFrom }),
-        ...(filters.dateTo && { dateTo: filters.dateTo }),
-        ...(filters.search && { search: filters.search })
+        ...(filters.dateTo && { dateTo: filters.dateTo })
+      });
+      const statsParams = new URLSearchParams({
+        program: programmeFilter,
+        status: statutFilter,
+        roomType: chambreFilter,
+        ...(filters.dateFrom && { dateFrom: filters.dateFrom }),
+        ...(filters.dateTo && { dateTo: filters.dateTo })
       });
       
       const [reservationsRes, programsRes, statsRes] = await Promise.all([
         fetch(api.url(`/api/reservations?${params}`)),
         fetch(api.url(api.endpoints.programs)),
-        fetch(api.url(`/api/reservations/stats?${params}`))
+        fetch(api.url(`/api/reservations/stats?${statsParams}`))
       ]);
 
       if (!reservationsRes.ok || !programsRes.ok || !statsRes.ok) {
@@ -431,7 +435,7 @@ export default function ReservationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [programmeFilter, statutFilter, chambreFilter, filters]);
+  }, [programmeFilter, statutFilter, chambreFilter, filters.dateFrom, filters.dateTo, rowsPerPage]);
 
   // Fonction de suppression de réservation (après fetchData)
   const handleDeleteReservation = useCallback(async (id: number) => {
@@ -508,34 +512,22 @@ export default function ReservationsPage() {
     }
   }, [mounted, fetchData])
 
-  // Debounce pour la recherche
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (filters.search !== '') {
-        setCurrentPage(1);
-        fetchData(1);
-      }
-    }, 500); // Attendre 500ms après que l'utilisateur arrête de taper
-
-    return () => clearTimeout(timeoutId);
-  }, [filters.search, fetchData]);
-
   // Filtrage côté client après transformation
   const filteredReservations = useMemo(() => {
     return reservations.filter((reservation) => {
       // Filtre par recherche
       const searchMatch =
-        reservation.nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        reservation.prenom.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        reservation.telephone.includes(searchQuery) ||
-        reservation.programme.toLowerCase().includes(searchQuery.toLowerCase());
+        reservation.nom.toLowerCase().includes(filters.search.toLowerCase()) ||
+        reservation.prenom.toLowerCase().includes(filters.search.toLowerCase()) ||
+        reservation.telephone.includes(filters.search) ||
+        reservation.programme.toLowerCase().includes(filters.search.toLowerCase());
 
       // Filtre par statut (utilise le statut final affiché)
       const statusMatch = statutFilter === "all" || reservation.statut === statutFilter;
 
       return searchMatch && statusMatch;
     });
-  }, [reservations, searchQuery, statutFilter]);
+  }, [reservations, filters.search, statutFilter]);
 
   const getRowColor = (reservation: any) => {
     if (reservation.statut === "Complet") return "border-l-4 border-green-500 bg-green-50"
@@ -584,26 +576,6 @@ export default function ReservationsPage() {
     if (a.statut !== "Urgent" && b.statut === "Urgent") return 1;
     return 0;
   });
-
-  // Add computed stats based on filtered reservations
-  const computedStats = useMemo(() => {
-    const filtered = reservations.filter(reservation => {
-      const searchMatch =
-        reservation.nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        reservation.prenom.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        reservation.telephone.includes(searchQuery) ||
-        reservation.programme.toLowerCase().includes(searchQuery.toLowerCase());
-
-      return searchMatch;
-    });
-
-    return {
-      total: filtered.length,
-      complete: filtered.filter(r => r.statut === 'Complet').length,
-      incomplete: filtered.filter(r => r.statut === 'Incomplet').length,
-      urgent: filtered.filter(r => r.statut === 'Urgent').length
-    };
-  }, [reservations, searchQuery]);
 
   if (!mounted) {
     return null
@@ -674,7 +646,7 @@ export default function ReservationsPage() {
               <div className="flex items-center justify-between mb-4">
                 <Users className="h-8 w-8 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{computedStats.total}</div>
+                  <div className="text-2xl font-bold">{stats.total}</div>
                   <div className="text-xs text-white/80">réservations</div>
                 </div>
               </div>
@@ -692,7 +664,7 @@ export default function ReservationsPage() {
               <div className="flex items-center justify-between mb-4">
                 <CheckCircle className="h-8 w-8 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{computedStats.complete}</div>
+                  <div className="text-2xl font-bold">{stats.complete}</div>
                   <div className="text-xs text-white/80">complètes</div>
                 </div>
               </div>
@@ -710,7 +682,7 @@ export default function ReservationsPage() {
               <div className="flex items-center justify-between mb-4">
                 <AlertCircle className="h-8 w-8 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{computedStats.incomplete}</div>
+                  <div className="text-2xl font-bold">{stats.incomplete}</div>
                   <div className="text-xs text-white/80">incomplètes</div>
                 </div>
               </div>
@@ -728,7 +700,7 @@ export default function ReservationsPage() {
               <div className="flex items-center justify-between mb-4">
                 <AlertTriangle className="h-8 w-8 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{computedStats.urgent}</div>
+                  <div className="text-2xl font-bold">{stats.urgent}</div>
                   <div className="text-xs text-white/80">urgentes</div>
                 </div>
               </div>
@@ -742,26 +714,8 @@ export default function ReservationsPage() {
 
         {/* Filtres */}
         <Card className="mb-8 border-none shadow-lg overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 pb-2">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <CardTitle className="text-blue-800 flex items-center gap-2 text-lg">
-                <Filter className="h-5 w-5 text-blue-600" />
-                Filtres et recherche
-              </CardTitle>
-              <Button
-                type="button"
-                variant="outline"
-                className="border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 shrink-0"
-                disabled={exporting}
-                onClick={handleExportAgency}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                {exporting ? "Export…" : "Exporter Excel (agence)"}
-              </Button>
-            </div>
-          </CardHeader>
           <CardContent className="p-6">
-            <form onSubmit={handleFilterChange} className="grid grid-cols-1 md:grid-cols-4 gap-4 md:items-end">
+            <form onSubmit={handleFilterChange} className="grid grid-cols-1 md:grid-cols-6 gap-4 md:items-end">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
@@ -818,6 +772,32 @@ export default function ReservationsPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <Select
+                value={rowsPerPage.toString()}
+                onValueChange={(value) => {
+                  setRowsPerPage(Number(value));
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="h-12 border-2 focus:border-blue-500">
+                  <SelectValue placeholder="10 / page" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10 / page</SelectItem>
+                  <SelectItem value="30">30 / page</SelectItem>
+                  <SelectItem value="50">50 / page</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-12 border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 shrink-0"
+                disabled={exporting}
+                onClick={handleExportAgency}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {exporting ? "Export…" : "Exporter Excel (agence)"}
+              </Button>
             </form>
           </CardContent>
         </Card>
@@ -825,15 +805,11 @@ export default function ReservationsPage() {
         {/* Liste des Réservations */}
         <Card className="border-none shadow-lg overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 pb-2">
-            <div className="flex justify-between items-center">
+            <div className="flex items-center">
               <CardTitle className="text-blue-800 flex items-center gap-2 text-lg">
                 <Users className="h-5 w-5 text-blue-600" />
                 Liste des Réservations
               </CardTitle>
-              <Button variant="ghost" size="sm" className="text-blue-700">
-                <ArrowUpDown className="h-4 w-4 mr-1" />
-                Trier
-              </Button>
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -997,13 +973,13 @@ export default function ReservationsPage() {
                           {/* Colonne 4 : Actions (boutons) */}
                           <div className="flex flex-col items-center justify-center h-full px-1">
                             <div className="flex flex-row items-center justify-center gap-2 w-full h-full">
-                              <Link href={`/reservations/${reservation.id}`} legacyBehavior>
+                              {/* <Link href={`/reservations/${reservation.id}`} legacyBehavior>
                                 <a title="Afficher détails" className="group">
                                   <button type="button" className="rounded-full p-1.5 bg-white shadow hover:bg-blue-100 transition-all border border-blue-200 group-hover:scale-110">
                                     <Search className="h-4 w-4 text-blue-600 group-hover:text-blue-800 transition-colors" />
                                   </button>
                                 </a>
-                              </Link>
+                              </Link> */}
                               <Link href={`/reservations/modifier/${reservation.id}`} legacyBehavior>
                                 <a title="Modifier" className="group">
                                   <button type="button" className="rounded-full p-1.5 bg-white shadow hover:bg-yellow-100 transition-all border border-yellow-200 group-hover:scale-110">
@@ -1065,7 +1041,7 @@ export default function ReservationsPage() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
                 <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <span>Affichage de {((currentPage - 1) * 10) + 1} à {Math.min(currentPage * 10, totalReservations)} sur {totalReservations} réservations</span>
+                  <span>Affichage de {((currentPage - 1) * rowsPerPage) + 1} à {Math.min(currentPage * rowsPerPage, totalReservations)} sur {totalReservations} réservations</span>
                 </div>
                 
                 <div className="flex items-center gap-2">

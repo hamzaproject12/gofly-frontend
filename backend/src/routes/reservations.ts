@@ -176,7 +176,8 @@ router.get('/', async (req, res) => {
 // Get reservation statistics with dynamic filters
 router.get('/stats', async (req, res) => {
   try {
-    const { program, roomType, dateFrom, dateTo } = req.query;
+    const { program, roomType, dateFrom, dateTo, status } = req.query;
+    const DAYS_URGENCY_WINDOW = 18;
     
     // Construire les filtres pour les stats
     const where: any = {
@@ -201,35 +202,71 @@ router.get('/stats', async (req, res) => {
       }
     }
 
-    const totalReservations = await prisma.reservation.count({ where });
-    
-    const completReservations = await prisma.reservation.count({
-      where: {
-        ...where,
-        status: 'COMPLETED'
-      }
-    });
-    
-    const incompletReservations = await prisma.reservation.count({
-      where: {
-        ...where,
-        status: 'PENDING'
-      }
-    });
-    
-    const urgentReservations = await prisma.reservation.count({
-      where: {
-        ...where,
-        status: 'CONFIRMED'
+    // Pour des stats cohérentes avec l'UI, on recalcule le statut "Urgent" dynamiquement
+    // et on compte les personnes (leader + accompagnants), pas seulement le nombre de dossiers.
+    const reservations = await prisma.reservation.findMany({
+      where,
+      include: {
+        accompagnants: {
+          select: { id: true, statutPasseport: true, statutVisa: true, statutHotel: true, statutVol: true }
+        },
+        program: {
+          select: {
+            visaDeadline: true,
+            hotelDeadline: true,
+            flightDeadline: true,
+            passportDeadline: true
+          }
+        }
       }
     });
 
-    res.json({
-      total: totalReservations,
-      complet: completReservations,
-      incomplet: incompletReservations,
-      urgent: urgentReservations
-    });
+    const now = new Date();
+    const stats = reservations.reduce(
+      (acc, reservation: any) => {
+        const members = [reservation, ...(reservation.accompagnants || [])];
+        const groupSize = members.length;
+        const passportGroupOk = members.every((m: any) => Boolean(m.statutPasseport));
+        const visaGroupOk = members.every((m: any) => Boolean(m.statutVisa));
+        const hotelGroupOk = members.every((m: any) => Boolean(m.statutHotel));
+        const flightGroupOk = members.every((m: any) => Boolean(m.statutVol));
+
+        let finalStatus = reservation.status as string;
+        if (reservation.status !== 'Complet') {
+          let isUrgent = false;
+          const deadlines = [
+            { ok: passportGroupOk, date: reservation.program?.passportDeadline },
+            { ok: visaGroupOk, date: reservation.program?.visaDeadline },
+            { ok: hotelGroupOk, date: reservation.program?.hotelDeadline },
+            { ok: flightGroupOk, date: reservation.program?.flightDeadline }
+          ];
+          for (const deadline of deadlines) {
+            if (deadline.ok || !deadline.date) continue;
+            const diff = (new Date(deadline.date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+            if (diff >= 0 && diff <= DAYS_URGENCY_WINDOW) {
+              isUrgent = true;
+              break;
+            }
+          }
+          if (isUrgent) {
+            finalStatus = 'Urgent';
+          }
+        }
+
+        if (status && status !== 'all' && finalStatus !== status) {
+          return acc;
+        }
+
+        acc.total += groupSize;
+        if (finalStatus === 'Complet') acc.complete += groupSize;
+        else if (finalStatus === 'Urgent') acc.urgent += groupSize;
+        else acc.incomplete += groupSize;
+        return acc;
+      },
+      { total: 0, complete: 0, incomplete: 0, urgent: 0 }
+    );
+
+    res.json(stats);
   } catch (error) {
     console.error('Error fetching stats:', error);
     res.status(500).json({ error: 'Error fetching reservation statistics' });

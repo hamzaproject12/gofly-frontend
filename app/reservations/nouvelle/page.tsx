@@ -34,6 +34,7 @@ import {
   Leaf,
   ShieldCheck,
   Crown,
+  Download,
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/components/ui/use-toast"
@@ -66,6 +67,7 @@ interface Hotel {
 interface Paiement {
   type: string;
   montant: string;
+  date: string;
   recu: string | null;
 }
 
@@ -971,7 +973,7 @@ export default function NouvelleReservation() {
   }, [paiements])
 
   const ajouterPaiement = () => {
-    setPaiements([...paiements, { montant: "", type: "", recu: null }])
+    setPaiements([...paiements, { montant: "", type: "", date: new Date().toISOString().split("T")[0], recu: null }])
     setDocuments(prev => ({
       ...prev,
       payment: [...(prev.payment || []), null]
@@ -1232,6 +1234,104 @@ export default function NouvelleReservation() {
       fileName: file.name,
       fileType: file.type,
       localPreview: true
+    });
+  };
+
+  const canGeneratePaymentReceipt = (index: number) => {
+    const paiement = paiements[index];
+    if (!paiement) return false;
+    const montant = Number(paiement.montant);
+    return Boolean(
+      paiement.type &&
+      !Number.isNaN(montant) &&
+      montant > 0 &&
+      formData.nom.trim() &&
+      formData.prenom.trim() &&
+      formData.telephone.trim()
+    );
+  };
+
+  const handleGeneratePaymentReceipt = async (index: number) => {
+    const paiement = paiements[index];
+    if (!paiement || !canGeneratePaymentReceipt(index)) return;
+
+    const montant = Number(paiement.montant) || 0;
+    const paymentDate = paiement.date || new Date().toISOString().slice(0, 10);
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200;
+    canvas.height = 800;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de générer le reçu pour le moment.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.strokeStyle = "#e5e7eb";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(30, 30, canvas.width - 60, canvas.height - 60);
+
+    ctx.fillStyle = "#1f2937";
+    ctx.font = "bold 42px Arial";
+    ctx.fillText("Recu de paiement", 60, 100);
+
+    ctx.fillStyle = "#4b5563";
+    ctx.font = "22px Arial";
+    ctx.fillText(`Date: ${paymentDate}`, 60, 150);
+    ctx.fillText(`Programme: ${formData.programme || "-"}`, 60, 190);
+
+    ctx.fillStyle = "#111827";
+    ctx.font = "bold 28px Arial";
+    ctx.fillText("Client", 60, 265);
+    ctx.font = "22px Arial";
+    ctx.fillText(`Nom complet: ${formData.nom} ${formData.prenom}`, 60, 310);
+    ctx.fillText(`Telephone: ${formData.telephone}`, 60, 345);
+
+    ctx.font = "bold 28px Arial";
+    ctx.fillText("Paiement", 60, 430);
+    ctx.font = "22px Arial";
+    ctx.fillText(`Type: ${paiement.type}`, 60, 475);
+    ctx.fillText(`Montant: ${montant.toLocaleString("fr-FR")} DH`, 60, 510);
+
+    ctx.fillStyle = "#6b7280";
+    ctx.font = "18px Arial";
+    ctx.fillText("Document genere automatiquement depuis la page Nouvelle reservation.", 60, 610);
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/png")
+    );
+    if (!blob) {
+      toast({
+        title: "Erreur",
+        description: "Generation du recu echouee.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const fileName = `recu-${Date.now()}.png`;
+    const file = new File([blob], fileName, { type: "image/png" });
+
+    setDocuments((prev) => {
+      const newPayments = [...(prev.payment || [])];
+      newPayments[index] = file;
+      return { ...prev, payment: newPayments };
+    });
+    mettreAJourPaiement(index, "recu", file.name);
+    setPreviews((prev) => ({
+      ...prev,
+      [`payment_${index}`]: { url: URL.createObjectURL(file), type: file.type },
+    }));
+
+    toast({
+      title: "Recu genere",
+      description: "Le recu est attache et sera enregistre avec la reservation.",
     });
   };
 
@@ -2404,196 +2504,205 @@ export default function NouvelleReservation() {
                     {section1Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
                   </h3>
                   
-                  {/* Première ligne : groupe, nom, prénom, transport */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                    <div className="space-y-2">
-                      <Label className="text-blue-700 font-medium text-sm">Groupe</Label>
-                      <Input
-                        value={formData.groupe}
-                        onChange={(e) => setFormData({ ...formData, groupe: e.target.value })}
-                        placeholder="Nom du groupe"
-                        className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-blue-700 font-medium text-sm">Nom *</Label>
-                      <Input
-                        value={formData.nom}
-                        onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-                        placeholder="Nom du client"
-                        className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-blue-700 font-medium text-sm">Prénom *</Label>
-                      <Input
-                        value={formData.prenom}
-                        onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
-                        placeholder="Prénom du client"
-                        className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-blue-700 font-medium text-sm">Transport</Label>
-                      <div className="flex items-center gap-2 h-10 px-3 border-2 border-blue-200 rounded-lg bg-white">
-                        <Switch
-                          checked={formData.transport || false}
-                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, transport: checked }))}
-                          className="data-[state=checked]:bg-blue-600"
-                        />
-                        <span className="text-sm text-gray-700">
-                          {formData.transport ? 'Oui' : 'Non'}
-                        </span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-blue-700">Nom *</Label>
+                          <Input
+                            value={formData.nom}
+                            onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
+                            placeholder="Nom du client"
+                            className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-blue-700">Prénom *</Label>
+                          <Input
+                            value={formData.prenom}
+                            onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
+                            placeholder="Prénom du client"
+                            className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                          />
+                        </div>
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Deuxième ligne : passport (input text), remarque */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div className="space-y-2">
-                      <Label className="text-blue-700 font-medium text-sm">N° passport</Label>
-                      <Input
-                        value={formData.passportNumber}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            passportNumber: formatPassportInput(e.target.value),
-                          })
-                        }
-                        placeholder="Numéro de passeport"
-                        maxLength={9}
-                        className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                      />
-                      <p className="text-[11px] text-blue-600">Format: AB1234567</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-blue-700 font-medium text-sm">Remarque</Label>
-                      <Input
-                        value={formData.remarque}
-                        onChange={(e) => setFormData({ ...formData, remarque: e.target.value })}
-                        placeholder="Remarques additionnelles"
-                        className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Téléphone - toujours nécessaire */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <div className="space-y-2">
-                      <Label className="text-blue-700 font-medium text-sm">Téléphone *</Label>
-                      <Input
-                        value={formData.telephone}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            telephone: formatPhoneInput(e.target.value),
-                          })
-                        }
-                        placeholder="+212 123456789"
-                        inputMode="numeric"
-                        maxLength={14}
-                        className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                      />
-                      <p className="text-[11px] text-blue-600">Format: +XXX XXXXXXXXX</p>
-                    </div>
-                  </div>
-
-                  {/* Passeport - Fichier */}
-                  <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Passeport *</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="file"
-                        ref={(el) => {
-                          if (el) fileInputs.current.passeport = el;
-                        }}
-                        onChange={(e) => handleFileChange(e, 'passport')}
-                        accept="image/*,.pdf"
-                        className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                        disabled={isSubmitting}
-                      />
-                      {documents.passport && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveDocument('passport')}
-                          className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                          disabled={isSubmitting}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    {ocrProcessingPassport && (
-                      <p className="text-xs text-blue-600 animate-pulse">
-                        Analyse OCR du passeport en cours…
-                      </p>
-                    )}
-                    {previews.passport && (
-                      <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-blue-700">Aperçu du passeport</span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded"
-                              onClick={e => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setPreviewImage({ url: previews.passport.url, title: 'Passeport', type: previews.passport.type });
-                              }}
-                            >
-                              <ZoomIn className="h-3 w-3 mr-1" />
-                              Zoom
-                            </button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveDocument('passport')}
-                              className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-3 w-3 mr-1" />
-                              Supprimer
-                            </Button>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-blue-700">Téléphone *</Label>
+                          <Input
+                            value={formData.telephone}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                telephone: formatPhoneInput(e.target.value),
+                              })
+                            }
+                            placeholder="+212 123456789"
+                            inputMode="numeric"
+                            maxLength={14}
+                            className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-blue-700">Groupe</Label>
+                          <Input
+                            value={formData.groupe}
+                            onChange={(e) => setFormData({ ...formData, groupe: e.target.value })}
+                            placeholder="Nom du groupe"
+                            className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 items-end">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-blue-700">Genre</Label>
+                          <Select
+                            value={formData.gender}
+                            onValueChange={(value) =>
+                              setFormData({ ...formData, gender: value })
+                            }
+                          >
+                            <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
+                              <SelectValue placeholder="Sélectionner le genre" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Homme">Homme</SelectItem>
+                              <SelectItem value="Femme">Femme</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-blue-700">N° passeport</Label>
+                          <Input
+                            value={formData.passportNumber}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                passportNumber: formatPassportInput(e.target.value),
+                              })
+                            }
+                            placeholder="AB1234567"
+                            maxLength={9}
+                            className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 items-center">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-blue-700">Transport</Label>
+                          <div className="flex items-center gap-2 h-10 px-3 border-2 border-blue-200 rounded-lg bg-white">
+                            <Switch
+                              checked={formData.transport || false}
+                              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, transport: checked }))}
+                              className="data-[state=checked]:bg-blue-600"
+                            />
+                            <span className="text-sm text-gray-700">
+                              {formData.transport ? "Oui" : "Non"}
+                            </span>
                           </div>
                         </div>
-                        <div className="w-full h-[350px] overflow-hidden rounded-lg border border-blue-200">
-                          {previews.passport?.type === 'application/pdf' ? (
-                            // Pour les PDFs locaux, utiliser embed pour l'aperçu
-                            previews.passport.url.startsWith('blob:') || previews.passport.url.startsWith('data:') ? (
-                              <embed
-                                src={previews.passport.url}
-                                type="application/pdf"
-                                className="w-full h-full"
-                              />
-                            ) : (
-                              // Pour les URLs Cloudinary, utiliser un lien
-                              <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                                <a
-                                  href={previews.passport.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors"
-                                >
-                                  <FileText className="h-16 w-16 text-red-600" />
-                                  <span className="text-sm font-medium text-blue-700">Voir le PDF</span>
-                                </a>
-                              </div>
-                            )
-                          ) : (
-                            <img
-                              src={previews.passport.url}
-                              alt="Passeport"
-                              className="w-full h-full object-contain"
-                            />
-                          )}
+                        <div className="space-y-1">
+                          <Label className="text-xs text-blue-700">Remarque</Label>
+                          <Input
+                            value={formData.remarque}
+                            onChange={(e) => setFormData({ ...formData, remarque: e.target.value })}
+                            placeholder="Remarques additionnelles"
+                            className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                          />
                         </div>
                       </div>
-                    )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-blue-700 font-medium text-sm">Passeport *</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="file"
+                          ref={(el) => {
+                            if (el) fileInputs.current.passeport = el;
+                          }}
+                          onChange={(e) => handleFileChange(e, "passport")}
+                          accept="image/*,.pdf"
+                          className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                          disabled={isSubmitting}
+                        />
+                        {documents.passport && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveDocument("passport")}
+                            className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                            disabled={isSubmitting}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      {ocrProcessingPassport && (
+                        <p className="text-xs text-blue-600 animate-pulse">
+                          Analyse OCR du passeport en cours…
+                        </p>
+                      )}
+                      {previews.passport && (
+                        <div className="mt-2 p-2 border border-blue-200 rounded-lg bg-white">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-blue-700">Aperçu du passeport</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded"
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setPreviewImage({ url: previews.passport.url, title: "Passeport", type: previews.passport.type });
+                                }}
+                              >
+                                <ZoomIn className="h-3 w-3 mr-1" />
+                                Zoom
+                              </button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveDocument("passport")}
+                                className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" />
+                                Supprimer
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="w-full h-[350px] overflow-hidden rounded-lg border border-blue-200">
+                            {previews.passport?.type === "application/pdf" ? (
+                              previews.passport.url.startsWith("blob:") || previews.passport.url.startsWith("data:") ? (
+                                <embed
+                                  src={previews.passport.url}
+                                  type="application/pdf"
+                                  className="w-full h-full"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                                  <a
+                                    href={previews.passport.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-blue-50 rounded-lg transition-colors"
+                                  >
+                                    <FileText className="h-16 w-16 text-red-600" />
+                                    <span className="text-sm font-medium text-blue-700">Voir le PDF</span>
+                                  </a>
+                                </div>
+                              )
+                            ) : (
+                              <img
+                                src={previews.passport.url}
+                                alt="Passeport"
+                                className="w-full h-full object-contain"
+                              />
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -2645,6 +2754,18 @@ export default function NouvelleReservation() {
                                   className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
                                   disabled={isSubmitting}
                                 />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleGeneratePaymentReceipt(index)}
+                                  disabled={isSubmitting || !canGeneratePaymentReceipt(index)}
+                                  className="h-10 border-orange-300 text-orange-700 hover:bg-orange-50 whitespace-nowrap"
+                                  title="Genere un recu automatique"
+                                >
+                                  <Download className="h-3.5 w-3.5 mr-1.5" />
+                                  Generer recu
+                                </Button>
                                 {documents.payment?.[index] && (
                                   <Button
                                     variant="ghost"

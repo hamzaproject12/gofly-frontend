@@ -1555,7 +1555,7 @@ export default function NouvelleChambrePage() {
                               <div className="space-y-1">
                                 <Label className="text-xs text-blue-700">N° Passeport</Label>
                                 <Input
-                                  placeholder="Numéro passeport"
+                                  placeholder="AB1234567"
                                   value={o.passportNumber}
                                   onChange={(e) =>
                                     updateOccupant(i, "passportNumber", e.target.value)
@@ -1563,7 +1563,6 @@ export default function NouvelleChambrePage() {
                                   maxLength={9}
                                   className="h-10 border-2 border-blue-100 focus:border-blue-400"
                                 />
-                                <p className="text-[11px] text-blue-600">Format: AB1234567</p>
                               </div>
                             </div>
                             <div className="grid grid-cols-2 gap-3 items-center">
@@ -1739,7 +1738,7 @@ export default function NouvelleChambrePage() {
                             <div className="space-y-1">
                               <Label className="text-xs text-blue-700">N° Passeport</Label>
                               <Input
-                                placeholder="Numéro passeport"
+                                placeholder="AB1234567"
                                 value={o.passportNumber}
                                 onChange={(e) =>
                                   updateOccupant(i, "passportNumber", e.target.value)
@@ -1747,7 +1746,6 @@ export default function NouvelleChambrePage() {
                                 maxLength={9}
                                 className="h-10 border-2 border-blue-100 focus:border-blue-400"
                               />
-                              <p className="text-[11px] text-blue-600">Format: AB1234567</p>
                             </div>
                           </div>
                           <div className="space-y-2">

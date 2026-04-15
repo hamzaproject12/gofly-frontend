@@ -680,7 +680,7 @@ router.put('/:id', async (req, res) => {
     const reservationId = parseInt(req.params.id);
     const currentReservation: any = await prisma.reservation.findUnique({
       where: { id: reservationId },
-      select: { parentId: true, paidAmount: true } as any
+      select: { parentId: true, paidAmount: true, isLeader: true, groupId: true } as any
     } as any);
     const isAccompagnant = Boolean(currentReservation?.parentId);
 
@@ -733,6 +733,23 @@ router.put('/:id', async (req, res) => {
       where: { id: reservationId },
       data: updateData
     });
+
+    // Si on met à jour un leader de groupe, propager les statuts partagés aux accompagnants
+    if (!isAccompagnant && currentReservation?.isLeader && currentReservation?.groupId) {
+      const sharedUpdateData: any = {};
+      if (statutVisa !== undefined) sharedUpdateData.statutVisa = statutVisa;
+      if (statutHotel !== undefined) sharedUpdateData.statutHotel = statutHotel;
+      if (statutVol !== undefined) sharedUpdateData.statutVol = statutVol;
+      if (status !== undefined) sharedUpdateData.status = status;
+      if (reservationDate !== undefined) sharedUpdateData.reservationDate = new Date(reservationDate);
+
+      if (Object.keys(sharedUpdateData).length > 0) {
+        await prisma.reservation.updateMany({
+          where: { parentId: reservationId },
+          data: sharedUpdateData
+        });
+      }
+    }
 
     console.log('✅ Réservation mise à jour:', {
       id: reservation.id,
@@ -836,6 +853,13 @@ router.patch('/:id', async (req, res) => {
       statutVol
     } = req.body;
 
+    const reservationId = parseInt(req.params.id);
+    const existingReservation: any = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      select: { parentId: true, isLeader: true, groupId: true } as any
+    } as any);
+    const isAccompagnant = Boolean(existingReservation?.parentId);
+
     // Mettre à jour la réservation avec les statuts
     const reservation = await prisma.reservation.update({
       where: { id: parseInt(req.params.id) },
@@ -847,6 +871,22 @@ router.patch('/:id', async (req, res) => {
         statutVol: statutVol ?? undefined
       }
     });
+
+    // Même propagation pour PATCH depuis un leader
+    if (!isAccompagnant && existingReservation?.isLeader && existingReservation?.groupId) {
+      const sharedUpdateData: any = {};
+      if (status !== undefined) sharedUpdateData.status = status;
+      if (statutVisa !== undefined) sharedUpdateData.statutVisa = statutVisa;
+      if (statutHotel !== undefined) sharedUpdateData.statutHotel = statutHotel;
+      if (statutVol !== undefined) sharedUpdateData.statutVol = statutVol;
+
+      if (Object.keys(sharedUpdateData).length > 0) {
+        await prisma.reservation.updateMany({
+          where: { parentId: reservation.id },
+          data: sharedUpdateData
+        });
+      }
+    }
 
     // Mettre à jour les documents si fournis
     if (documents) {

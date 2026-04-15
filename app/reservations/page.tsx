@@ -718,8 +718,8 @@ export default function ReservationsPage() {
         {/* Filtres */}
         <Card className="mb-8 border-none shadow-lg overflow-hidden bg-white/95 backdrop-blur">
           <CardContent className="p-4 md:p-5">
-            <form onSubmit={handleFilterChange} className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-4 items-end">
-              <div className="relative lg:col-span-3">
+            <form onSubmit={handleFilterChange} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-3 lg:gap-4 items-end">
+              <div className="relative xl:col-span-3 min-w-0">
                 <span className="mb-1.5 block text-xs font-semibold text-gray-600">Recherche</span>
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
@@ -731,7 +731,7 @@ export default function ReservationsPage() {
                 />
               </div>
 
-              <div className="lg:col-span-2">
+              <div className="xl:col-span-2 min-w-0">
                 <span className="mb-1.5 block text-xs font-semibold text-gray-600">Programme</span>
                 <Select value={programmeFilter} onValueChange={handleProgrammeChange}>
                 <SelectTrigger className="h-11 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40">
@@ -748,7 +748,7 @@ export default function ReservationsPage() {
               </Select>
               </div>
 
-              <div className="lg:col-span-2">
+              <div className="xl:col-span-2 min-w-0">
                 <span className="mb-1.5 block text-xs font-semibold text-gray-600">Statut</span>
                 <Select value={statutFilter} onValueChange={handleStatutChange}>
                 <SelectTrigger className="h-11 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40">
@@ -763,7 +763,7 @@ export default function ReservationsPage() {
               </Select>
               </div>
 
-              <div className="lg:col-span-2">
+              <div className="xl:col-span-2 min-w-0">
                 <span className="mb-1.5 block text-xs font-semibold text-gray-600">Chambre</span>
                 <Select value={chambreFilter} onValueChange={handleChambreChange}>
                   <SelectTrigger className="h-11 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40">
@@ -780,7 +780,7 @@ export default function ReservationsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="lg:col-span-1">
+              <div className="xl:col-span-1 min-w-0">
                 <span className="mb-1.5 block text-xs font-semibold text-gray-600">Lignes</span>
                 <Select
                   value={rowsPerPage.toString()}
@@ -789,22 +789,22 @@ export default function ReservationsPage() {
                     setCurrentPage(1);
                   }}
                 >
-                  <SelectTrigger className="h-11 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40">
-                    <SelectValue placeholder="10 / page" />
+                  <SelectTrigger className="h-11 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40 min-w-[110px]">
+                    <SelectValue placeholder="10/page" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="10">10 / page</SelectItem>
-                    <SelectItem value="30">30 / page</SelectItem>
-                    <SelectItem value="50">50 / page</SelectItem>
+                    <SelectItem value="10">10/page</SelectItem>
+                    <SelectItem value="30">30/page</SelectItem>
+                    <SelectItem value="50">50/page</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="lg:col-span-2">
+              <div className="xl:col-span-2 min-w-0">
                 <span className="mb-1.5 block text-xs font-semibold text-gray-600">&nbsp;</span>
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-11 w-full rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 shrink-0"
+                  className="h-11 w-full rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 shrink-0 whitespace-nowrap"
                   disabled={exporting}
                   onClick={handleExportAgency}
                 >

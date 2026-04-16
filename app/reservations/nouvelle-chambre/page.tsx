@@ -41,6 +41,7 @@ import {
   ZoomIn,
   X,
   Download,
+  ChevronUp,
 } from "lucide-react";
 
 interface Hotel {
@@ -149,8 +150,6 @@ export default function NouvelleChambrePage() {
 
   const [paidAmount, setPaidAmount] = useState("");
   const [familyMixed, setFamilyMixed] = useState(true);
-  /** Si l'utilisateur modifie le prix à la main, ne plus l'écraser par le calcul auto */
-  const [userEditedPrix, setUserEditedPrix] = useState(false);
 
   const [programInfo, setProgramInfo] = useState<{
     nbJoursMadina: number;
@@ -217,7 +216,11 @@ export default function NouvelleChambrePage() {
     statutVol: false,
     statutHotel: false,
   });
-  const [reduction, setReduction] = useState("0");
+  const [reduction, setReduction] = useState(0);
+  const [prixMode, setPrixMode] = useState<"reduction" | "proposition" | null>(
+    null
+  );
+  const [prixPropose, setPrixPropose] = useState<number | null>(null);
 
   const capacity = formData.typeChambre
     ? ROOM_CAPACITY[formData.typeChambre] || 0
@@ -453,10 +456,22 @@ export default function NouvelleChambrePage() {
   ]);
 
   useEffect(() => {
-    if (calculatePrice > 0 && !userEditedPrix) {
-      setFormData((prev) => ({ ...prev, prix: String(calculatePrice) }));
+    if (calculatePrice > 0) {
+      let prixFinal: number;
+      if (
+        prixMode === "proposition" &&
+        prixPropose !== null &&
+        prixPropose >= calculatePrice
+      ) {
+        prixFinal = Math.max(0, Math.round(prixPropose));
+      } else if (prixMode === "reduction") {
+        prixFinal = Math.max(0, Math.round(calculatePrice - reduction));
+      } else {
+        prixFinal = Math.max(0, Math.round(calculatePrice));
+      }
+      setFormData((prev) => ({ ...prev, prix: String(prixFinal) }));
     }
-  }, [calculatePrice, userEditedPrix]);
+  }, [calculatePrice, reduction, prixPropose, prixMode]);
 
   const hotelNameMadina = useMemo(() => {
     if (!formData.hotelMadina || formData.hotelMadina === "none") {
@@ -884,6 +899,10 @@ export default function NouvelleChambrePage() {
     champsIdentiteOk &&
     occupantPassportFiles.length === capacity &&
     occupantPassportFiles.every(Boolean);
+  const propositionInvalid =
+    prixMode === "proposition" &&
+    prixPropose !== null &&
+    prixPropose < calculatePrice;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -943,7 +962,7 @@ export default function NouvelleChambrePage() {
               statutVisa: supplierStatus.statutVisa,
               statutHotel: supplierStatus.statutHotel,
               statutVol: supplierStatus.statutVol,
-              reduction: Number(reduction || 0),
+              reduction: prixMode === "reduction" ? reduction || 0 : 0,
               plan: customization.plan,
               groupe: leaderMeta.groupe || null,
               remarque: leaderMeta.remarque || null,
@@ -1029,71 +1048,77 @@ export default function NouvelleChambrePage() {
         }
       }
 
-      // 3) Expenses leader
+      // 3) Expenses pour chaque membre (leader + accompagnants)
       if (programInfo) {
-        const expensePayloads: Array<{
-          description: string;
-          amount: number;
-          type: string;
-          fichierId?: number;
-        }> = [];
-
-        if (customization.includeAvion) {
-          expensePayloads.push({
-            description: `Service de vol (dossier chambre ${groupData.groupId})`,
-            amount: programInfo.prixAvionDH,
-            type: "Vol",
-          });
-        }
-        if (customization.includeVisa) {
-          expensePayloads.push({
-            description: `Service de visa (dossier chambre ${groupData.groupId})`,
-            amount: programInfo.prixVisaRiyal * programInfo.exchange,
-            type: "Visa",
-          });
-        }
-
         const roomMadina = programInfo.rooms.find((r) => r.id === Number(roomMadinaId));
         const roomMakkah = programInfo.rooms.find((r) => r.id === Number(roomMakkahId));
-        if (roomMadina) {
-          expensePayloads.push({
-            description: `Service hôtel Madina (dossier chambre ${groupData.groupId})`,
-            amount:
-              roomMadina.prixRoom *
-              capacity *
-              customization.joursMadina *
-              programInfo.exchange,
-            type: "Hotel Madina",
-          });
-        }
-        if (roomMakkah) {
-          expensePayloads.push({
-            description: `Service hôtel Makkah (dossier chambre ${groupData.groupId})`,
-            amount:
-              roomMakkah.prixRoom *
-              capacity *
-              customization.joursMakkah *
-              programInfo.exchange,
-            type: "Hotel Makkah",
-          });
-        }
+        for (let index = 0; index < createdReservations.length; index++) {
+          const reservation = createdReservations[index];
+          const occupant = leaderOccupants[index];
+          const fullName = `${occupant?.firstName || ""} ${
+            occupant?.lastName || ""
+          }`.trim();
+          const expensePayloads: Array<{
+            description: string;
+            amount: number;
+            type: string;
+            fichierId?: number;
+          }> = [];
 
-        for (const expense of expensePayloads) {
-          const expenseRes = await api.request(api.url(api.endpoints.expenses), {
-            method: "POST",
-            body: JSON.stringify({
-              description: expense.description,
-              amount: expense.amount,
-              date: new Date().toISOString(),
-              type: expense.type,
-              fichierId: expense.fichierId,
-              programId: Number(formData.programId),
-              reservationId: leaderId,
-            }),
-          });
-          if (!expenseRes.ok) {
-            const expenseErr = await expenseRes.json().catch(() => ({}));
-            throw new Error(expenseErr.error || `Erreur création expense ${expense.type}`);
+          if (customization.includeAvion) {
+            expensePayloads.push({
+              description: `Service de vol pour ${fullName}`,
+              amount: programInfo.prixAvionDH,
+              type: "Vol",
+            });
+          }
+          if (customization.includeVisa) {
+            expensePayloads.push({
+              description: `Service de visa pour ${fullName}`,
+              amount: programInfo.prixVisaRiyal * programInfo.exchange,
+              type: "Visa",
+            });
+          }
+          if (roomMadina) {
+            expensePayloads.push({
+              description: `Service hôtel Madina pour ${fullName}`,
+              amount:
+                roomMadina.prixRoom *
+                customization.joursMadina *
+                programInfo.exchange,
+              type: "Hotel Madina",
+            });
+          }
+          if (roomMakkah) {
+            expensePayloads.push({
+              description: `Service hôtel Makkah pour ${fullName}`,
+              amount:
+                roomMakkah.prixRoom *
+                customization.joursMakkah *
+                programInfo.exchange,
+              type: "Hotel Makkah",
+            });
+          }
+
+          for (const expense of expensePayloads) {
+            const expenseRes = await api.request(api.url(api.endpoints.expenses), {
+              method: "POST",
+              body: JSON.stringify({
+                description: expense.description,
+                amount: expense.amount,
+                date: new Date().toISOString(),
+                type: expense.type,
+                fichierId: expense.fichierId,
+                programId: Number(formData.programId),
+                reservationId: reservation.id,
+              }),
+            });
+            if (!expenseRes.ok) {
+              const expenseErr = await expenseRes.json().catch(() => ({}));
+              throw new Error(
+                expenseErr.error || `Erreur création expense ${expense.type}`
+              );
+            }
           }
         }
       }
@@ -1194,7 +1219,7 @@ export default function NouvelleChambrePage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
                     <div className="space-y-2">
                       <Label className="text-blue-700 font-medium text-sm">
                         Programme *
@@ -1253,29 +1278,6 @@ export default function NouvelleChambrePage() {
 
                     <div className="space-y-2">
                       <Label className="text-blue-700 font-medium text-sm">
-                        Genre *
-                      </Label>
-                      <Select
-                        value={formData.gender}
-                        onValueChange={(v) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            gender: v as "Homme" | "Femme",
-                          }))
-                        }
-                      >
-                        <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Homme">Homme</SelectItem>
-                          <SelectItem value="Femme">Femme</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-blue-700 font-medium text-sm">
                         Plan *
                       </Label>
                       <div
@@ -1325,9 +1327,16 @@ export default function NouvelleChambrePage() {
                           setFormData((p) => ({ ...p, hotelMadina: v }));
                           setRoomMadinaId("");
                         }}
+                        disabled={!formData.programId}
                       >
                         <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
-                          <SelectValue placeholder="Sélectionner un hôtel à Madina" />
+                          <SelectValue
+                            placeholder={
+                              formData.programId
+                                ? "Sélectionner un hôtel à Madina"
+                                : "Sélectionnez d'abord un programme"
+                            }
+                          />
                         </SelectTrigger>
                         <SelectContent>
                           {hotelsMadina.map((h) => (
@@ -1349,9 +1358,16 @@ export default function NouvelleChambrePage() {
                           setFormData((p) => ({ ...p, hotelMakkah: v }));
                           setRoomMakkahId("");
                         }}
+                        disabled={!formData.programId}
                       >
                         <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
-                          <SelectValue placeholder="Sélectionner un hôtel à Makkah" />
+                          <SelectValue
+                            placeholder={
+                              formData.programId
+                                ? "Sélectionner un hôtel à Makkah"
+                                : "Sélectionnez d'abord un programme"
+                            }
+                          />
                         </SelectTrigger>
                         <SelectContent>
                           {hotelsMakkah.map((h) => (
@@ -1447,7 +1463,8 @@ export default function NouvelleChambrePage() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                  {formData.programId && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                     <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
                       <div className="flex items-center gap-2 mb-2">
                         <Info className="h-4 w-4 text-green-700" />
@@ -1556,7 +1573,8 @@ export default function NouvelleChambrePage() {
                         ))}
                       </div>
                     </div>
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-2">
@@ -1684,9 +1702,11 @@ export default function NouvelleChambrePage() {
 
                           {/* Colonne droite : passeport (même UX que Nouvelle Réservation) */}
                           <div className="space-y-2">
-                            <Label className="text-xs text-blue-700 font-medium">
-                              Passeport (obligatoire)
-                            </Label>
+                            {!occupantPassportFiles[i] && (
+                              <Label className="text-xs text-blue-700 font-medium">
+                                Passeport (obligatoire)
+                              </Label>
+                            )}
                             {!occupantPassportFiles[i] && (
                               <div className="flex items-center gap-2">
                                 <Input
@@ -1826,9 +1846,11 @@ export default function NouvelleChambrePage() {
                             </div>
                           </div>
                           <div className="space-y-2">
-                            <Label className="text-xs text-blue-700 font-medium">
-                              Passeport (obligatoire)
-                            </Label>
+                            {!occupantPassportFiles[i] && (
+                              <Label className="text-xs text-blue-700 font-medium">
+                                Passeport (obligatoire)
+                              </Label>
+                            )}
                             {!occupantPassportFiles[i] && (
                               <div className="flex items-center gap-2">
                                 <Input
@@ -1972,7 +1994,11 @@ export default function NouvelleChambrePage() {
                             />
                           </div>
                           <div className="md:col-span-6 space-y-2">
-                            <Label className="text-orange-700 font-medium text-sm">Reçu de paiement</Label>
+                            {!paymentPreviews[index] && (
+                              <Label className="text-orange-700 font-medium text-sm">
+                                Reçu de paiement
+                              </Label>
+                            )}
                             <div className="flex items-center gap-2">
                               {!payment.receipt && (
                                 <>
@@ -1996,102 +2022,90 @@ export default function NouvelleChambrePage() {
                                   </Button>
                                 </>
                               )}
-                              {payment.receipt && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => clearPaymentReceipt(index)}
-                                  className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                                  disabled={isSubmitting}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
                             </div>
-                          </div>
-                        </div>
-                        {paymentPreviews[index] && (
-                          <div className="mt-4 w-full p-2 border border-orange-200 rounded-lg bg-white">
-                            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                              <span className="text-sm font-medium text-orange-700">
-                                Aperçu du reçu
-                              </span>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <button
-                                  type="button"
-                                  className="text-orange-600 hover:text-orange-800 hover:bg-orange-50 p-2 rounded text-sm flex items-center gap-1"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setPreviewImage({
-                                      url: paymentPreviews[index]!.url,
-                                      title: "Reçu paiement",
-                                      type:
-                                        paymentPreviews[index]!.type || "image/*",
-                                    });
-                                  }}
-                                >
-                                  <ZoomIn className="h-3 w-3" />
-                                  Zoom
-                                </button>
-                                <a
-                                  href={paymentPreviews[index]!.url}
-                                  download={
-                                    payment.receipt?.name || "recu-paiement"
-                                  }
-                                  className="text-orange-600 hover:text-orange-800 hover:bg-orange-50 px-2 py-1 rounded text-sm inline-flex items-center gap-1"
-                                >
-                                  <Download className="h-3 w-3" />
-                                  Télécharger
-                                </a>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => clearPaymentReceipt(index)}
-                                  className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                                >
-                                  <Trash2 className="h-3 w-3 mr-1" />
-                                  Supprimer
-                                </Button>
-                              </div>
-                            </div>
-                            <div className="w-full h-[200px] overflow-hidden rounded-lg border border-orange-200">
-                              {paymentPreviews[index]?.type ===
-                              "application/pdf" ? (
-                                paymentPreviews[index]!.url.startsWith("blob:") ||
-                                paymentPreviews[index]!.url.startsWith("data:") ? (
-                                  <embed
-                                    src={paymentPreviews[index]!.url}
-                                    type="application/pdf"
-                                    className="w-full h-full"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center bg-orange-50">
+                            {paymentPreviews[index] && (
+                              <div className="w-full p-2 border border-orange-200 rounded-lg bg-white">
+                                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                                  <span className="text-sm font-medium text-orange-700">
+                                    Aperçu du reçu
+                                  </span>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <button
+                                      type="button"
+                                      className="text-orange-600 hover:text-orange-800 hover:bg-orange-50 p-2 rounded text-sm flex items-center gap-1"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setPreviewImage({
+                                          url: paymentPreviews[index]!.url,
+                                          title: "Reçu paiement",
+                                          type:
+                                            paymentPreviews[index]!.type || "image/*",
+                                        });
+                                      }}
+                                    >
+                                      <ZoomIn className="h-3 w-3" />
+                                      Zoom
+                                    </button>
                                     <a
                                       href={paymentPreviews[index]!.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-orange-100 rounded-lg transition-colors"
+                                      download={
+                                        payment.receipt?.name || "recu-paiement"
+                                      }
+                                      className="text-orange-600 hover:text-orange-800 hover:bg-orange-50 px-2 py-1 rounded text-sm inline-flex items-center gap-1"
                                     >
-                                      <FileText className="h-16 w-16 text-red-600" />
-                                      <span className="text-sm font-medium text-orange-700">
-                                        Voir le PDF
-                                      </span>
+                                      <Download className="h-3 w-3" />
+                                      Télécharger
                                     </a>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => clearPaymentReceipt(index)}
+                                      className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                                    >
+                                      <Trash2 className="h-3 w-3 mr-1" />
+                                      Supprimer
+                                    </Button>
                                   </div>
-                                )
-                              ) : (
-                                <img
-                                  src={paymentPreviews[index]!.url}
-                                  alt="Reçu de paiement"
-                                  className="w-full h-full object-contain"
-                                />
-                              )}
-                            </div>
+                                </div>
+                                <div className="w-full h-[200px] overflow-hidden rounded-lg border border-orange-200">
+                                  {paymentPreviews[index]?.type ===
+                                  "application/pdf" ? (
+                                    paymentPreviews[index]!.url.startsWith("blob:") ||
+                                    paymentPreviews[index]!.url.startsWith("data:") ? (
+                                      <embed
+                                        src={paymentPreviews[index]!.url}
+                                        type="application/pdf"
+                                        className="w-full h-full"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center bg-orange-50">
+                                        <a
+                                          href={paymentPreviews[index]!.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex flex-col items-center justify-center gap-2 p-4 hover:bg-orange-100 rounded-lg transition-colors"
+                                        >
+                                          <FileText className="h-16 w-16 text-red-600" />
+                                          <span className="text-sm font-medium text-orange-700">
+                                            Voir le PDF
+                                          </span>
+                                        </a>
+                                      </div>
+                                    )
+                                  ) : (
+                                    <img
+                                      src={paymentPreviews[index]!.url}
+                                      alt="Reçu de paiement"
+                                      className="w-full h-full object-contain"
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </div>
                         <div className="mt-4 flex justify-end">
                           <Button
                             type="button"
@@ -2221,7 +2235,7 @@ export default function NouvelleChambrePage() {
                   </Link>
                   <Button
                     type="submit"
-                    disabled={!canSubmit || isSubmitting}
+                    disabled={!canSubmit || isSubmitting || propositionInvalid}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
                     {isSubmitting ? "Enregistrement..." : "Enregistrer"}
@@ -2245,30 +2259,80 @@ export default function NouvelleChambrePage() {
                     {(Number(formData.prix || 0) || 0).toLocaleString("fr-FR")} DH
                   </span>
                 </div>
-                <div className="flex items-center gap-2 bg-red-50 px-3 py-2 rounded-lg border border-red-200">
-                  <span className="text-sm font-medium text-red-700">Réduction:</span>
-                  <Input
-                    value={reduction}
-                    onChange={(e) => setReduction(e.target.value)}
-                    className="w-24 h-7 text-sm border border-red-300 focus:border-red-500 rounded text-center"
-                    placeholder="0"
-                  />
-                  <span className="text-sm text-red-600 font-medium">DH</span>
+                <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-gray-300">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-medium text-gray-600">Réduc.</span>
+                    <Switch
+                      checked={prixMode === "reduction"}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setPrixMode("reduction");
+                          setPrixPropose(null);
+                        } else {
+                          setPrixMode(null);
+                          setReduction(0);
+                        }
+                      }}
+                      className="data-[state=checked]:bg-red-500 scale-75"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-medium text-gray-600">Propos.</span>
+                    <Switch
+                      checked={prixMode === "proposition"}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setPrixMode("proposition");
+                          setReduction(0);
+                        } else {
+                          setPrixMode(null);
+                          setPrixPropose(null);
+                        }
+                      }}
+                      className="data-[state=checked]:bg-green-500 scale-75"
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-lg border border-green-200">
-                  <span className="text-sm font-medium text-green-700">Proposition:</span>
-                  <span className="font-bold text-green-900 text-lg">
-                    {Math.max(
-                      (Number(formData.prix || 0) || 0) - (Number(reduction || 0) || 0),
-                      0
-                    ).toLocaleString("fr-FR")}{" "}
-                    DH
-                  </span>
-                </div>
+                {prixMode === "reduction" && (
+                  <div className="flex items-center gap-2 bg-red-50 px-3 py-2 rounded-lg border border-red-200">
+                    <X className="h-4 w-4 text-red-600" />
+                    <span className="text-sm font-medium text-red-700">Réduction:</span>
+                    <Input
+                      type="text"
+                      value={reduction === 0 ? "" : reduction}
+                      onChange={(e) => {
+                        const value =
+                          e.target.value === "" ? 0 : parseInt(e.target.value, 10) || 0;
+                        setReduction(Math.min(value, calculatePrice));
+                      }}
+                      className="w-24 h-7 text-sm border border-red-300 focus:border-red-500 rounded text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      placeholder="0"
+                    />
+                    <span className="text-sm text-red-600 font-medium">DH</span>
+                  </div>
+                )}
+                {prixMode === "proposition" && (
+                  <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-lg border border-green-200">
+                    <ChevronUp className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-700">Proposition:</span>
+                    <Input
+                      type="text"
+                      value={prixPropose === null ? "" : prixPropose}
+                      onChange={(e) => {
+                        const value =
+                          e.target.value === "" ? null : parseInt(e.target.value, 10) || null;
+                        setPrixPropose(value);
+                      }}
+                      className="w-24 h-7 text-sm border border-green-300 focus:border-green-500 rounded text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      placeholder={calculatePrice.toString()}
+                    />
+                    <span className="text-sm text-green-600 font-medium">DH</span>
+                  </div>
+                )}
               </div>
               <Button
                 type="submit"
-                disabled={!canSubmit || isSubmitting}
+                disabled={!canSubmit || isSubmitting || propositionInvalid}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 text-lg"
                 onClick={(e) => {
                   e.preventDefault();

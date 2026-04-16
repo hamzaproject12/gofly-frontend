@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -57,6 +57,9 @@ export default function DepensesPage() {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [openDetailsByGroup, setOpenDetailsByGroup] = useState<
+    Record<string, boolean>
+  >({})
 
   // États pour les filtres
   const [searchQuery, setSearchQuery] = useState("")
@@ -123,6 +126,56 @@ export default function DepensesPage() {
 
     return searchMatch && programmeMatch && typeMatch
   })
+
+  const groupedDepenses = useMemo(() => {
+    const groups = new Map<string, Expense[]>()
+
+    for (const depense of filteredDepenses) {
+      const key = depense.reservation?.id
+        ? `res_${depense.reservation.id}`
+        : `expense_${depense.id}`
+      const existing = groups.get(key) || []
+      existing.push(depense)
+      groups.set(key, existing)
+    }
+
+    return Array.from(groups.entries())
+      .map(([key, items]) => {
+        const sorted = [...items].sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        )
+        const first = sorted[0]
+
+        const sums: Record<string, number> = {
+          Vol: 0,
+          "Hotel Madina": 0,
+          "Hotel Makkah": 0,
+          Visa: 0,
+        }
+
+        const totalsAll = sorted.reduce((sum, d) => sum + d.montant, 0)
+        const totalsCore = sorted.reduce((sum, d) => {
+          if (d.type in sums) {
+            sums[d.type] += d.montant
+            return sum + d.montant
+          }
+          return sum
+        }, 0)
+
+        return {
+          key,
+          items: sorted,
+          reservationId: first.reservation?.id ?? null,
+          reservationName: first.reservation?.nom ?? "Non attribué",
+          programme: first.programme,
+          date: first.date,
+          sums,
+          totalsCore,
+          totalsAll,
+        }
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [filteredDepenses])
 
   // Utiliser les statistiques de l'API ou calculer côté client
   const totalDepenses = (typeof stats.total === 'number' ? stats.total : (stats.total as any)?.amount) || filteredDepenses.reduce((sum, depense) => sum + depense.montant, 0)
@@ -398,26 +451,21 @@ export default function DepensesPage() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            {/* Header de colonnes */}
-            <div className="hidden md:grid grid-cols-5 gap-2 px-6 py-2 bg-blue-100 border-b border-blue-200 rounded-t-xl font-semibold text-blue-900 text-sm uppercase tracking-wide">
-              <div className="flex items-center gap-1"><Calendar className="h-4 w-4" /> Date</div>
-              <div className="flex items-center gap-1"><Users className="h-4 w-4" /> Programme</div>
-              <div className="flex items-center gap-1"><Receipt className="h-4 w-4" /> Type</div>
-              <div>Description</div>
-              <div className="text-right">Montant</div>
-            </div>
-            <div className="divide-y">
-              {filteredDepenses.length === 0 ? (
+            <div className="p-4">
+              {groupedDepenses.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-gray-100 mb-4">
                     <Receipt className="h-6 w-6 text-gray-400" />
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Aucune dépense trouvée</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Aucune dépense trouvée
+                  </h3>
                   <p className="text-gray-500 mb-4">
-                    {searchQuery || programmeFilter !== "tous" || typeFilter !== "tous" 
+                    {searchQuery ||
+                    programmeFilter !== "tous" ||
+                    typeFilter !== "tous"
                       ? "Aucune dépense ne correspond aux filtres appliqués."
-                      : "Commencez par ajouter une nouvelle dépense."
-                    }
+                      : "Commencez par ajouter une nouvelle dépense."}
                   </p>
                   <Link href="/depenses/nouvelle">
                     <Button>
@@ -427,35 +475,141 @@ export default function DepensesPage() {
                   </Link>
                 </div>
               ) : (
-                filteredDepenses.map((depense) => (
-                <div key={depense.id} className="mx-2 mb-3">
-                  <div className="relative group transition-all duration-300 rounded-xl shadow border hover:scale-[1.01] hover:shadow-xl bg-white grid grid-cols-1 md:grid-cols-5 gap-2 p-4 items-center">
-                    {/* Date */}
-                    <div className="flex items-center gap-2 min-w-[110px]">
-                      <Calendar className="h-5 w-5 text-blue-400" />
-                      <span className="font-medium text-gray-700">{new Date(depense.date).toLocaleDateString("fr-FR")}</span>
+                groupedDepenses.map((group) => {
+                  const isOpen = !!openDetailsByGroup[group.key]
+                  const displayTotal =
+                    group.totalsCore > 0 ? group.totalsCore : group.totalsAll
+                  const coreTypes = new Set([
+                    "Vol",
+                    "Hotel Madina",
+                    "Hotel Makkah",
+                    "Visa",
+                  ])
+                  const detailsItems = group.items.filter((d) =>
+                    coreTypes.has(d.type)
+                  )
+
+                  return (
+                    <div key={group.key} className="mx-2 mb-3">
+                      <div className="relative group transition-all duration-300 rounded-xl shadow border hover:scale-[1.01] hover:shadow-xl bg-white overflow-hidden">
+                        <div className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <div className="flex items-center gap-2 min-w-[140px]">
+                              <Calendar className="h-5 w-5 text-blue-400" />
+                              <span className="font-medium text-gray-700">
+                                {new Date(group.date).toLocaleDateString(
+                                  "fr-FR"
+                                )}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <Users className="h-5 w-5 text-blue-400" />
+                              <span className="font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-1">
+                                {group.reservationName}
+                              </span>
+                            </div>
+
+                            {group.programme && (
+                              <span className="text-xs font-semibold text-gray-600 bg-gray-50 border border-gray-200 rounded px-3 py-1">
+                                {group.programme}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3 flex-wrap justify-end">
+                            <div className="flex flex-col sm:items-end">
+                              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                Total
+                              </span>
+                              <span className="font-bold text-xl text-blue-900">
+                                {displayTotal.toLocaleString()} DH
+                              </span>
+                            </div>
+
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setOpenDetailsByGroup((prev) => ({
+                                  ...prev,
+                                  [group.key]: !prev[group.key],
+                                }))
+                              }}
+                              className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                            >
+                              {isOpen ? "Masquer détails" : "Détails"}
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="px-4 pb-4">
+                          <div className="flex flex-wrap gap-2">
+                            {(["Hotel Madina", "Hotel Makkah", "Visa", "Vol"] as const).map(
+                              (type) => (
+                                <Badge
+                                  key={type}
+                                  className={getTypeColor(type)}
+                                >
+                                  {type}:{" "}
+                                  {(
+                                    group.sums[type as keyof typeof group.sums] ||
+                                    0
+                                  ).toLocaleString()}{" "}
+                                  DH
+                                </Badge>
+                              )
+                            )}
+                          </div>
+                        </div>
+
+                        {isOpen && (
+                          <div className="border-t bg-gray-50 p-4">
+                            <div className="space-y-2">
+                              {detailsItems.length === 0 ? (
+                                <p className="text-sm text-gray-600">
+                                  Aucun détail pour ce groupe.
+                                </p>
+                              ) : (
+                                detailsItems.map((depense) => (
+                                  <div
+                                    key={depense.id}
+                                    className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 bg-white border rounded-lg p-3"
+                                  >
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        {getTypeIcon(depense.type)}
+                                        <span
+                                          className={`font-semibold rounded px-3 py-1 ${getTypeColor(depense.type)} border border-current/10`}
+                                        >
+                                          {depense.type}
+                                        </span>
+                                        <span className="text-xs text-gray-500">
+                                          {new Date(depense.date).toLocaleDateString(
+                                            "fr-FR"
+                                          )}
+                                        </span>
+                                      </div>
+                                      <div className="mt-1 text-gray-900 font-medium text-sm break-words">
+                                        {depense.description}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className="font-bold text-blue-900">
+                                        {depense.montant.toLocaleString()} DH
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    {/* Programme */}
-                    <div className="flex items-center gap-2 min-w-[180px]">
-                      <Users className="h-5 w-5 text-blue-400" />
-                      <span className="font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-1">{depense.programme}</span>
-                    </div>
-                    {/* Type */}
-                    <div className="flex items-center gap-2 min-w-[100px]">
-                      {getTypeIcon(depense.type)}
-                      <span className={`font-semibold rounded px-3 py-1 ${depense.type === "Vol" ? "bg-blue-100 text-blue-800 border border-blue-200" : depense.type === "Hôtel" ? "bg-green-100 text-green-800 border border-green-200" : "bg-gray-100 text-gray-800 border border-gray-200"}`}>{depense.type}</span>
-                    </div>
-                    {/* Description */}
-                    <div className="flex-1 min-w-[180px]">
-                      <span className="text-gray-900 font-medium text-base">{depense.description}</span>
-                    </div>
-                    {/* Montant */}
-                    <div className="flex flex-col items-end min-w-[120px]">
-                      <span className="font-bold text-xl text-blue-900">{depense.montant.toLocaleString()} DH</span>
-                    </div>
-                  </div>
-                </div>
-                ))
+                  )
+                })
               )}
             </div>
           </CardContent>

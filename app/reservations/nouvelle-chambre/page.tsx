@@ -1083,9 +1083,8 @@ export default function NouvelleChambrePage() {
             expensePayloads.push({
               description: `Service hôtel Madina pour ${fullName}`,
               amount:
-                roomMadina.prixRoom *
-                customization.joursMadina *
-                programInfo.exchange,
+                (roomMadina.prixRoom * customization.joursMadina * programInfo.exchange) /
+                Math.max(1, capacity),
               type: "Hotel Madina",
             });
           }
@@ -1093,9 +1092,8 @@ export default function NouvelleChambrePage() {
             expensePayloads.push({
               description: `Service hôtel Makkah pour ${fullName}`,
               amount:
-                roomMakkah.prixRoom *
-                customization.joursMakkah *
-                programInfo.exchange,
+                (roomMakkah.prixRoom * customization.joursMakkah * programInfo.exchange) /
+                Math.max(1, capacity),
               type: "Hotel Makkah",
             });
           }

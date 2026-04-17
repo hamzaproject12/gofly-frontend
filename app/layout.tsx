@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import ConditionalLayout from './components/ConditionalLayout'
+import { UnsavedChangesProvider } from './components/UnsavedChangesProvider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -26,9 +27,11 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className={inter.className} suppressHydrationWarning>
-        <ConditionalLayout>
-          {children}
-        </ConditionalLayout>
+        <UnsavedChangesProvider>
+          <ConditionalLayout>
+            {children}
+          </ConditionalLayout>
+        </UnsavedChangesProvider>
       </body>
     </html>
   )

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -127,12 +128,6 @@ const planThemes = {
   Normal: { name: "Normal", icon: ShieldCheck },
   VIP: { name: "VIP", icon: Crown },
 } as const;
-
-const LEAVE_UNSAVED_CONFIRM_FR =
-  "Voulez-vous vraiment quitter ? Les informations saisies ne seront pas enregistrées.";
-
-/** Permet au bouton « Confirmer » hors du <form> de soumettre le bon formulaire (pas le 1er <form> du layout). */
-const NOUVELLE_CHAMBRE_FORM_ID = "nouvelle-chambre-reservation-form";
 
 export default function NouvelleChambrePage() {
   const { toast } = useToast();
@@ -923,126 +918,6 @@ export default function NouvelleChambrePage() {
     prixPropose !== null &&
     prixPropose < calculatePrice;
 
-  /** Brouillon non sauvegardé : navigation ou fermeture d’onglet avec confirmation */
-  const hasUnsavedDraft = useMemo(() => {
-    if (loading) return false;
-
-    const fd = formData;
-    if (fd.programId || fd.programme.trim()) return true;
-    if (fd.typeChambre) return true;
-    if (fd.hotelMadina || fd.hotelMakkah) return true;
-    if (String(fd.prix || "").trim()) return true;
-
-    if (
-      occupants.some(
-        (o) =>
-          `${o.firstName}${o.lastName}${o.phone}${o.passportNumber}`.trim().length >
-          0
-      )
-    )
-      return true;
-
-    if (occupantPassportFiles.some(Boolean)) return true;
-
-    if (paidAmount.trim()) return true;
-
-    if (payments.some((p) => (p.amount || "").trim() || p.receipt)) return true;
-
-    if (
-      leaderMeta.groupe.trim() ||
-      leaderMeta.remarque.trim() ||
-      leaderMeta.transport
-    )
-      return true;
-
-    if (!familyMixed) return true;
-
-    if (reduction > 0 || prixMode !== null || prixPropose !== null) return true;
-
-    if (
-      supplierStatus.statutVisa ||
-      supplierStatus.statutVol ||
-      supplierStatus.statutHotel
-    )
-      return true;
-
-    if (
-      customization.plan !== "Normal" ||
-      !customization.includeAvion ||
-      !customization.includeVisa
-    )
-      return true;
-
-    if (
-      programInfo &&
-      (customization.joursMadina !== programInfo.nbJoursMadina ||
-        customization.joursMakkah !== programInfo.nbJoursMakkah)
-    )
-      return true;
-
-    return false;
-  }, [
-    loading,
-    formData,
-    occupants,
-    occupantPassportFiles,
-    paidAmount,
-    payments,
-    leaderMeta,
-    familyMixed,
-    reduction,
-    prixMode,
-    prixPropose,
-    supplierStatus,
-    customization,
-    programInfo,
-  ]);
-
-  useEffect(() => {
-    if (!hasUnsavedDraft) return;
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [hasUnsavedDraft]);
-
-  useEffect(() => {
-    if (!hasUnsavedDraft) return;
-    const onClickCapture = (e: MouseEvent) => {
-      if (e.defaultPrevented) return;
-      const el = (e.target as HTMLElement | null)?.closest?.("a[href]");
-      if (!el) return;
-      if (el.hasAttribute("data-skip-unsaved-prompt")) return;
-      const a = el as HTMLAnchorElement;
-      const href = a.getAttribute("href");
-      if (!href || href === "#" || href.startsWith("javascript:")) return;
-      if (a.hasAttribute("download")) return;
-
-      let url: URL;
-      try {
-        url = new URL(href, window.location.href);
-      } catch {
-        return;
-      }
-
-      if (
-        url.origin === window.location.origin &&
-        url.pathname === window.location.pathname &&
-        url.search === window.location.search
-      ) {
-        return;
-      }
-
-      if (!window.confirm(LEAVE_UNSAVED_CONFIRM_FR)) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    document.addEventListener("click", onClickCapture, true);
-    return () => document.removeEventListener("click", onClickCapture, true);
-  }, [hasUnsavedDraft]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const leaderPhone = (occupants[0]?.phone || "").trim();
@@ -1355,11 +1230,7 @@ export default function NouvelleChambrePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
-              <form
-                id={NOUVELLE_CHAMBRE_FORM_ID}
-                onSubmit={handleSubmit}
-                className="space-y-6"
-              >
+              <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-2">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
@@ -2387,6 +2258,21 @@ export default function NouvelleChambrePage() {
                     Les statuts s'affichent uniquement pour les services activés.
                   </p>
                 </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <Link href="/reservations">
+                    <Button variant="outline" type="button">
+                      Annuler
+                    </Button>
+                  </Link>
+                  <Button
+                    type="submit"
+                    disabled={!canSubmit || isSubmitting || propositionInvalid}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {isSubmitting ? "Enregistrement..." : "Enregistrer"}
+                  </Button>
+                </div>
               </form>
             </CardContent>
           </Card>
@@ -2478,13 +2364,16 @@ export default function NouvelleChambrePage() {
               </div>
               <Button
                 type="submit"
-                form={NOUVELLE_CHAMBRE_FORM_ID}
                 disabled={
                   !minimumIdentityForConfirm ||
                   isSubmitting ||
                   propositionInvalid
                 }
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 text-lg disabled:opacity-50"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.querySelector("form")?.requestSubmit();
+                }}
               >
                 {isSubmitting ? "Enregistrement..." : "Confirmer la Réservation"}
               </Button>

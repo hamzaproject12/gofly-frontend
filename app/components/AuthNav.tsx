@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from "@/lib/api";
 import { siteConfig } from "@/lib/config";
+import { UNSAVED_LEAVE_PROMPT, useUnsavedChanges } from "./UnsavedChangesProvider";
 
 interface Agent {
   id: number;
@@ -16,6 +16,7 @@ interface Agent {
 }
 
 export default function AuthNav() {
+  const { isDirty } = useUnsavedChanges();
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [showProfile, setShowProfile] = useState(false);
@@ -23,7 +24,6 @@ export default function AuthNav() {
   const [showCommercialMenu, setShowCommercialMenu] = useState(false);
   const [showFinancesMenu, setShowFinancesMenu] = useState(false);
   const [showAdminMenu, setShowAdminMenu] = useState(false);
-  const router = useRouter();
 
   useEffect(() => {
     checkAuthStatus();
@@ -63,6 +63,10 @@ export default function AuthNav() {
   };
 
   const handleLogout = async () => {
+    if (isDirty && !window.confirm(UNSAVED_LEAVE_PROMPT)) {
+      setShowProfile(false);
+      return;
+    }
     try {
       console.log('Déconnexion en cours...');
       const response = await api.request('/api/auth/logout', {
@@ -95,7 +99,10 @@ export default function AuthNav() {
 
   if (loading) {
     return (
-      <nav className="bg-white/95 backdrop-blur-lg shadow-xl border-b border-blue-100 fixed top-0 left-0 right-0 z-50">
+      <nav
+        className="bg-white/95 backdrop-blur-lg shadow-xl border-b border-blue-100 fixed top-0 left-0 right-0 z-50"
+        data-skip-unsaved-dirty
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-20">
             <div className="flex items-center">
@@ -112,7 +119,10 @@ export default function AuthNav() {
 
   if (!agent) {
     return (
-      <nav className="bg-white/95 backdrop-blur-lg shadow-xl border-b border-blue-100 fixed top-0 left-0 right-0 z-50">
+      <nav
+        className="bg-white/95 backdrop-blur-lg shadow-xl border-b border-blue-100 fixed top-0 left-0 right-0 z-50"
+        data-skip-unsaved-dirty
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-20">
             <div className="flex items-center">
@@ -139,7 +149,10 @@ export default function AuthNav() {
   }
 
   return (
-    <nav className="bg-white/95 backdrop-blur-lg shadow-xl border-b border-blue-100 fixed top-0 left-0 right-0 z-50">
+    <nav
+      className="bg-white/95 backdrop-blur-lg shadow-xl border-b border-blue-100 fixed top-0 left-0 right-0 z-50"
+      data-skip-unsaved-dirty
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
           <div className="flex items-center space-x-4">

@@ -931,15 +931,43 @@ router.delete('/:id', async (req, res) => {
 
     const reservation = await prisma.reservation.findUnique({
       where: { id: reservationId },
+      select: {
+        id: true,
+        isLeader: true,
+        groupId: true,
+        parentId: true,
+      },
     });
 
     if (!reservation) {
       return res.status(404).json({ error: 'Réservation non trouvée' });
     }
 
-    // 1. Récupérer tous les fichiers liés à la réservation
+    /** Suppression du leader d'un groupe (chambre privée ou lit avec accompagnants) = tous les membres + libération des rooms */
+    let reservationIdsToRemove: number[] = [reservationId];
+    if (reservation.isLeader) {
+      if (reservation.groupId) {
+        const members = await prisma.reservation.findMany({
+          where: { groupId: reservation.groupId },
+          select: { id: true },
+        });
+        reservationIdsToRemove = members.map((m) => m.id);
+      } else {
+        const kids = await prisma.reservation.findMany({
+          where: { parentId: reservation.id },
+          select: { id: true },
+        });
+        if (kids.length > 0) {
+          reservationIdsToRemove = [reservation.id, ...kids.map((k) => k.id)];
+        }
+      }
+    }
+
+    const idsSet = new Set(reservationIdsToRemove);
+
+    // 1. Récupérer tous les fichiers liés à chaque réservation concernée
     const fichiers = await prisma.fichier.findMany({
-      where: { reservationId },
+      where: { reservationId: { in: reservationIdsToRemove } },
     });
     // 2. Supprimer physiquement chaque fichier du disque
     for (const fichier of fichiers) {
@@ -957,22 +985,22 @@ router.delete('/:id', async (req, res) => {
     }
 
     await prisma.$transaction(async (tx) => {
-      // 3. Supprimer/neutraliser les dépenses liées à la réservation
+      // 3. Supprimer/neutraliser les dépenses liées
       await tx.expense.deleteMany({
-        where: { reservationId },
+        where: { reservationId: { in: reservationIdsToRemove } },
       });
 
-      // 4. Mettre à jour les rooms impactées
+      // 4. Mettre à jour les rooms impactées (retirer tous les IDs du groupe, libérer toutes les places)
       const roomsToUpdate = await tx.room.findMany({
         where: {
           listeIdsReservation: {
-            has: reservationId,
+            hasSome: reservationIdsToRemove,
           },
         },
       });
 
       for (const room of roomsToUpdate) {
-        const updatedReservationIds = room.listeIdsReservation.filter((id) => id !== reservationId);
+        const updatedReservationIds = room.listeIdsReservation.filter((id) => !idsSet.has(id));
         const recalculatedRemaining = Math.max(0, room.nbrPlaceTotal - updatedReservationIds.length);
 
         await tx.room.update({
@@ -984,9 +1012,18 @@ router.delete('/:id', async (req, res) => {
         });
       }
 
-      // 5. Supprimer la réservation (CASCADE pour fichiers et paiements)
-      await tx.reservation.delete({
-        where: { id: reservationId },
+      // 5. Supprimer les réservations : accompagnants d'abord (FK parent), puis leader(s)
+      await tx.reservation.deleteMany({
+        where: {
+          id: { in: reservationIdsToRemove },
+          isLeader: false,
+        },
+      });
+      await tx.reservation.deleteMany({
+        where: {
+          id: { in: reservationIdsToRemove },
+          isLeader: true,
+        },
       });
     });
 

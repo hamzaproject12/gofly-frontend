@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -128,6 +127,9 @@ const planThemes = {
   Normal: { name: "Normal", icon: ShieldCheck },
   VIP: { name: "VIP", icon: Crown },
 } as const;
+
+const LEAVE_UNSAVED_CONFIRM_FR =
+  "Voulez-vous vraiment quitter ? Les informations saisies ne seront pas enregistrées.";
 
 export default function NouvelleChambrePage() {
   const { toast } = useToast();
@@ -873,8 +875,8 @@ export default function NouvelleChambrePage() {
     String(formData.prix || "").trim() !== "" &&
     Number(formData.prix) > 0;
 
-  /** Minimum pour afficher la barre « Confirmer la Réservation » : config → prix + leader (nom, prénom, tél.) + chaque accompagnant (nom, prénom) */
-  const minimumIdentityForConfirmBar =
+  /** Minimum pour activer « Confirmer la Réservation » : leader (nom, prénom, n° tel.) + chaque accompagnant (nom, prénom). La barre prix s’affiche dès que le prix est calculé. */
+  const minimumIdentityForConfirm =
     occupants.length === capacity &&
     capacity >= 2 &&
     occupants.every((o, i) => {
@@ -886,9 +888,6 @@ export default function NouvelleChambrePage() {
       }
       return fn.length > 0 && ln.length > 0;
     });
-
-  const showConfirmReservationBar =
-    calculatePrice > 0 && minimumIdentityForConfirmBar;
 
   const champsIdentiteOk =
     occupants.length === capacity &&
@@ -921,6 +920,126 @@ export default function NouvelleChambrePage() {
     prixPropose !== null &&
     prixPropose < calculatePrice;
 
+  /** Brouillon non sauvegardé : navigation ou fermeture d’onglet avec confirmation */
+  const hasUnsavedDraft = useMemo(() => {
+    if (loading) return false;
+
+    const fd = formData;
+    if (fd.programId || fd.programme.trim()) return true;
+    if (fd.typeChambre) return true;
+    if (fd.hotelMadina || fd.hotelMakkah) return true;
+    if (String(fd.prix || "").trim()) return true;
+
+    if (
+      occupants.some(
+        (o) =>
+          `${o.firstName}${o.lastName}${o.phone}${o.passportNumber}`.trim().length >
+          0
+      )
+    )
+      return true;
+
+    if (occupantPassportFiles.some(Boolean)) return true;
+
+    if (paidAmount.trim()) return true;
+
+    if (payments.some((p) => (p.amount || "").trim() || p.receipt)) return true;
+
+    if (
+      leaderMeta.groupe.trim() ||
+      leaderMeta.remarque.trim() ||
+      leaderMeta.transport
+    )
+      return true;
+
+    if (!familyMixed) return true;
+
+    if (reduction > 0 || prixMode !== null || prixPropose !== null) return true;
+
+    if (
+      supplierStatus.statutVisa ||
+      supplierStatus.statutVol ||
+      supplierStatus.statutHotel
+    )
+      return true;
+
+    if (
+      customization.plan !== "Normal" ||
+      !customization.includeAvion ||
+      !customization.includeVisa
+    )
+      return true;
+
+    if (
+      programInfo &&
+      (customization.joursMadina !== programInfo.nbJoursMadina ||
+        customization.joursMakkah !== programInfo.nbJoursMakkah)
+    )
+      return true;
+
+    return false;
+  }, [
+    loading,
+    formData,
+    occupants,
+    occupantPassportFiles,
+    paidAmount,
+    payments,
+    leaderMeta,
+    familyMixed,
+    reduction,
+    prixMode,
+    prixPropose,
+    supplierStatus,
+    customization,
+    programInfo,
+  ]);
+
+  useEffect(() => {
+    if (!hasUnsavedDraft) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasUnsavedDraft]);
+
+  useEffect(() => {
+    if (!hasUnsavedDraft) return;
+    const onClickCapture = (e: MouseEvent) => {
+      if (e.defaultPrevented) return;
+      const el = (e.target as HTMLElement | null)?.closest?.("a[href]");
+      if (!el) return;
+      if (el.hasAttribute("data-skip-unsaved-prompt")) return;
+      const a = el as HTMLAnchorElement;
+      const href = a.getAttribute("href");
+      if (!href || href === "#" || href.startsWith("javascript:")) return;
+      if (a.hasAttribute("download")) return;
+
+      let url: URL;
+      try {
+        url = new URL(href, window.location.href);
+      } catch {
+        return;
+      }
+
+      if (
+        url.origin === window.location.origin &&
+        url.pathname === window.location.pathname &&
+        url.search === window.location.search
+      ) {
+        return;
+      }
+
+      if (!window.confirm(LEAVE_UNSAVED_CONFIRM_FR)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    document.addEventListener("click", onClickCapture, true);
+    return () => document.removeEventListener("click", onClickCapture, true);
+  }, [hasUnsavedDraft]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const leaderPhone = (occupants[0]?.phone || "").trim();
@@ -943,7 +1062,27 @@ export default function NouvelleChambrePage() {
       });
       return;
     }
-    if (!canSubmit) return;
+    if (!canSubmit) {
+      const filesMissing =
+        occupantPassportFiles.length !== capacity ||
+        !occupantPassportFiles.every(Boolean);
+      if (filesMissing) {
+        toast({
+          title: "Passeports manquants",
+          description:
+            "Joignez un fichier passeport (PDF ou image) pour chaque personne avant de confirmer.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Formulaire incomplet",
+          description:
+            "Vérifiez le format du téléphone du leader, les numéros de passeport et le prix.",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -2241,28 +2380,13 @@ export default function NouvelleChambrePage() {
                     Les statuts s'affichent uniquement pour les services activés.
                   </p>
                 </div>
-
-                <div className="flex justify-end gap-3 pt-2">
-                  <Link href="/reservations">
-                    <Button variant="outline" type="button">
-                      Annuler
-                    </Button>
-                  </Link>
-                  <Button
-                    type="submit"
-                    disabled={!canSubmit || isSubmitting || propositionInvalid}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    {isSubmitting ? "Enregistrement..." : "Enregistrer"}
-                  </Button>
-                </div>
               </form>
             </CardContent>
           </Card>
         </div>
       </div>
 
-      {showConfirmReservationBar && (
+      {calculatePrice > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-emerald-200 shadow-2xl z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
@@ -2347,8 +2471,12 @@ export default function NouvelleChambrePage() {
               </div>
               <Button
                 type="submit"
-                disabled={!canSubmit || isSubmitting || propositionInvalid}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 text-lg"
+                disabled={
+                  !minimumIdentityForConfirm ||
+                  isSubmitting ||
+                  propositionInvalid
+                }
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 text-lg disabled:opacity-50"
                 onClick={(e) => {
                   e.preventDefault();
                   document.querySelector("form")?.requestSubmit();

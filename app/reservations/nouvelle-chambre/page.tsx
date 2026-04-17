@@ -131,6 +131,9 @@ const planThemes = {
 const LEAVE_UNSAVED_CONFIRM_FR =
   "Voulez-vous vraiment quitter ? Les informations saisies ne seront pas enregistrées.";
 
+/** Permet au bouton « Confirmer » hors du <form> de soumettre le bon formulaire (pas le 1er <form> du layout). */
+const NOUVELLE_CHAMBRE_FORM_ID = "nouvelle-chambre-reservation-form";
+
 export default function NouvelleChambrePage() {
   const { toast } = useToast();
   const router = useRouter();
@@ -1352,7 +1355,11 @@ export default function NouvelleChambrePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form
+                id={NOUVELLE_CHAMBRE_FORM_ID}
+                onSubmit={handleSubmit}
+                className="space-y-6"
+              >
                 <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-2">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
@@ -2471,16 +2478,13 @@ export default function NouvelleChambrePage() {
               </div>
               <Button
                 type="submit"
+                form={NOUVELLE_CHAMBRE_FORM_ID}
                 disabled={
                   !minimumIdentityForConfirm ||
                   isSubmitting ||
                   propositionInvalid
                 }
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 text-lg disabled:opacity-50"
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.querySelector("form")?.requestSubmit();
-                }}
               >
                 {isSubmitting ? "Enregistrement..." : "Confirmer la Réservation"}
               </Button>

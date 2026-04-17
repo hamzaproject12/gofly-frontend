@@ -873,6 +873,23 @@ export default function NouvelleChambrePage() {
     String(formData.prix || "").trim() !== "" &&
     Number(formData.prix) > 0;
 
+  /** Minimum pour afficher la barre « Confirmer la Réservation » : config → prix + leader (nom, prénom, tél.) + chaque accompagnant (nom, prénom) */
+  const minimumIdentityForConfirmBar =
+    occupants.length === capacity &&
+    capacity >= 2 &&
+    occupants.every((o, i) => {
+      const fn = (o.firstName || "").trim();
+      const ln = (o.lastName || "").trim();
+      if (i === 0) {
+        const ph = (o.phone || "").trim();
+        return fn.length > 0 && ln.length > 0 && ph.length > 0;
+      }
+      return fn.length > 0 && ln.length > 0;
+    });
+
+  const showConfirmReservationBar =
+    calculatePrice > 0 && minimumIdentityForConfirmBar;
+
   const champsIdentiteOk =
     occupants.length === capacity &&
     capacity >= 2 &&
@@ -2245,7 +2262,7 @@ export default function NouvelleChambrePage() {
         </div>
       </div>
 
-      {calculatePrice > 0 && (
+      {showConfirmReservationBar && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-emerald-200 shadow-2xl z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">

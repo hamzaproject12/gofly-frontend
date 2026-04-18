@@ -42,8 +42,6 @@ import { useRouter, useParams } from "next/navigation"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -187,57 +185,6 @@ const ROOM_CAPACITY_EDIT: Record<string, number> = {
   QUAD: 4,
   QUINT: 5,
 };
-
-const PHONE_REGEX = /^\+\d{3}\s\d{9}$/;
-const PASSPORT_REGEX = /^[A-Z]{2}\d{7}$/;
-
-function formatPhoneInput(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 12);
-  if (!digits) return "";
-  const country = digits.slice(0, 3);
-  const local = digits.slice(3, 12);
-  return local ? `+${country} ${local}` : `+${country}`;
-}
-
-function formatPassportInput(value: string): string {
-  const chars = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const letters = chars.replace(/[^A-Z]/g, "").slice(0, 2);
-  const numbers = chars.replace(/[^0-9]/g, "").slice(0, 7);
-  return `${letters}${numbers}`;
-}
-
-type OcrExtractData = {
-  first_name?: string;
-  last_name?: string;
-  passport?: string;
-  personal_id_number?: string;
-  sex?: string;
-};
-
-function mapOcrSexToGender(sex: string | undefined): "Homme" | "Femme" | null {
-  if (!sex || typeof sex !== "string") return null;
-  const u = sex.trim().toUpperCase();
-  if (u === "F" || u === "FEMALE" || u === "FÉMININ") return "Femme";
-  if (u === "M" || u === "MALE" || u === "MASCULIN") return "Homme";
-  return null;
-}
-
-type OcrValidationState =
-  | {
-      target: "leader";
-      firstName: string;
-      lastName: string;
-      passport: string;
-      sex?: string;
-    }
-  | {
-      target: "member";
-      memberId: number;
-      firstName: string;
-      lastName: string;
-      passport: string;
-      sex?: string;
-    };
 
 type FormData = {
   programme: string;
@@ -439,12 +386,6 @@ export default function EditReservation() {
   })
 
   const paymentDocuments = documents.payment;
-
-  const [ocrValidation, setOcrValidation] = useState<OcrValidationState | null>(null);
-  /** 'leader' = scan leader, number = id accompagnant */
-  const [ocrProcessingPassport, setOcrProcessingPassport] = useState<
-    "leader" | number | null
-  >(null);
 
   const parseAmount = (value: string | number | null | undefined) => {
     if (value === null || value === undefined) return 0;
@@ -655,39 +596,6 @@ export default function EditReservation() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    const isChambre = reservationData?.typeReservation === "CHAMBRE_PRIVEE";
-    if (isChambre) {
-      const tel = (formData.telephone || "").trim();
-      if (tel && !PHONE_REGEX.test(tel)) {
-        toast({
-          title: "Téléphone invalide",
-          description: "Format attendu : +XXX XXXXXXXXX (ex. +212 612345678).",
-          variant: "destructive",
-        });
-        return;
-      }
-      const leaderPass = (formData.passportNumber || "").trim();
-      if (leaderPass && !PASSPORT_REGEX.test(leaderPass)) {
-        toast({
-          title: "N° passeport invalide",
-          description: "Format attendu : 2 lettres + 7 chiffres (ex. AB1234567).",
-          variant: "destructive",
-        });
-        return;
-      }
-      for (const a of accompagnants) {
-        const p = (a.passportNumber || "").trim();
-        if (p && !PASSPORT_REGEX.test(p)) {
-          toast({
-            title: "N° passeport accompagnant invalide",
-            description: `Vérifiez le passeport pour ${a.firstName} ${a.lastName} (format AB1234567).`,
-            variant: "destructive",
-          });
-          return;
-        }
-      }
-    }
 
     if (!arePaymentsValid) {
       toast({
@@ -1052,44 +960,6 @@ export default function EditReservation() {
           }));
         };
         reader.readAsDataURL(file);
-
-        if (type === "passport") {
-          void (async () => {
-            setOcrProcessingPassport("leader");
-            try {
-              const fd = new FormData();
-              fd.append("file", file);
-              const res = await fetch("/api/passport-ocr", { method: "POST", body: fd });
-              const json = (await res.json()) as {
-                status?: string;
-                data?: OcrExtractData;
-                error?: string;
-              };
-              if (!res.ok) throw new Error(json.error || "Service OCR indisponible");
-              const raw = json.data || {};
-              setOcrValidation({
-                target: "leader",
-                firstName: String(raw.first_name ?? "").trim(),
-                lastName: String(raw.last_name ?? "").trim(),
-                passport: String(
-                  raw.passport ?? raw.personal_id_number ?? ""
-                ).trim(),
-                sex: typeof raw.sex === "string" ? raw.sex : undefined,
-              });
-            } catch (err) {
-              toast({
-                title: "Lecture automatique du passeport",
-                description:
-                  err instanceof Error
-                    ? err.message
-                    : "Impossible d’analyser l’image. Saisissez les champs manuellement.",
-                variant: "destructive",
-              });
-            } finally {
-              setOcrProcessingPassport(null);
-            }
-          })();
-        }
       } else if (file.type === 'application/pdf') {
         setPreviews(prev => ({
           ...prev,
@@ -1183,43 +1053,6 @@ export default function EditReservation() {
         }));
       };
       reader.readAsDataURL(file);
-
-      void (async () => {
-        setOcrProcessingPassport(memberId);
-        try {
-          const fd = new FormData();
-          fd.append("file", file);
-          const res = await fetch("/api/passport-ocr", { method: "POST", body: fd });
-          const json = (await res.json()) as {
-            status?: string;
-            data?: OcrExtractData;
-            error?: string;
-          };
-          if (!res.ok) throw new Error(json.error || "Service OCR indisponible");
-          const raw = json.data || {};
-          setOcrValidation({
-            target: "member",
-            memberId,
-            firstName: String(raw.first_name ?? "").trim(),
-            lastName: String(raw.last_name ?? "").trim(),
-            passport: String(
-              raw.passport ?? raw.personal_id_number ?? ""
-            ).trim(),
-            sex: typeof raw.sex === "string" ? raw.sex : undefined,
-          });
-        } catch (err) {
-          toast({
-            title: "Lecture automatique du passeport",
-            description:
-              err instanceof Error
-                ? err.message
-                : "Impossible d’analyser l’image. Saisissez les champs manuellement.",
-            variant: "destructive",
-          });
-        } finally {
-          setOcrProcessingPassport(null);
-        }
-      })();
     } else {
       setPreviews((p) => ({
         ...p,
@@ -1229,142 +1062,6 @@ export default function EditReservation() {
         },
       }));
     }
-  };
-
-  const applyOcrValidation = () => {
-    if (!ocrValidation) return;
-    const { firstName, lastName, passport, sex } = ocrValidation;
-    const formattedPass = formatPassportInput(passport);
-    if (ocrValidation.target === "leader") {
-      setFormData((prev) => ({
-        ...prev,
-        nom: lastName,
-        prenom: firstName,
-        passportNumber: formattedPass,
-      }));
-      const g = mapOcrSexToGender(sex);
-      if (g) setFormData((prev) => ({ ...prev, gender: g }));
-    } else {
-      const mid = ocrValidation.memberId;
-      setAccompagnants((prev) =>
-        prev.map((a) =>
-          a.id === mid
-            ? {
-                ...a,
-                lastName,
-                firstName,
-                passportNumber: formattedPass || null,
-              }
-            : a
-        )
-      );
-    }
-    setOcrValidation(null);
-    toast({
-      title: "Données appliquées",
-      description:
-        ocrValidation.target === "leader"
-          ? "Identité du leader mise à jour depuis le passeport."
-          : "Identité de l’accompagnant mise à jour.",
-    });
-  };
-
-  const clearPaymentModifierReceipt = (index: number) => {
-    setDocuments((prev) => {
-      const next = [...(prev.payment || [])];
-      next[index] = null;
-      return { ...prev, payment: next };
-    });
-    setPreviews((prev) => {
-      const n = { ...prev };
-      delete n[`payment_${index}`];
-      return n;
-    });
-    mettreAJourPaiement(index, "recu", null);
-  };
-
-  const canGeneratePaymentReceiptChambre = (index: number) => {
-    const paiement = paiements[index];
-    if (!paiement || paiement.id) return false;
-    const amount = parseAmount(paiement.montant);
-    return Boolean(
-      paiement.type &&
-        amount > 0 &&
-        (formData.nom || "").trim() &&
-        (formData.prenom || "").trim() &&
-        (formData.telephone || "").trim()
-    );
-  };
-
-  const handleGeneratePaymentReceiptChambre = async (index: number) => {
-    if (!canGeneratePaymentReceiptChambre(index)) return;
-    const paiement = paiements[index];
-    if (!paiement) return;
-    const amount = parseAmount(paiement.montant);
-    const canvas = document.createElement("canvas");
-    canvas.width = 1200;
-    canvas.height = 800;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      toast({
-        title: "Erreur",
-        description: "Impossible de générer le reçu.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const paymentDate = paiement.date || new Date().toISOString().slice(0, 10);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "#e5e7eb";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(30, 30, canvas.width - 60, canvas.height - 60);
-    ctx.fillStyle = "#1f2937";
-    ctx.font = "bold 42px Arial";
-    ctx.fillText("Recu de paiement", 60, 100);
-    ctx.fillStyle = "#4b5563";
-    ctx.font = "22px Arial";
-    ctx.fillText(`Date: ${paymentDate}`, 60, 150);
-    ctx.fillText(`Programme: ${formData.programme || "-"}`, 60, 190);
-    ctx.fillStyle = "#111827";
-    ctx.font = "bold 28px Arial";
-    ctx.fillText("Client", 60, 265);
-    ctx.font = "22px Arial";
-    ctx.fillText(`Nom complet: ${formData.nom} ${formData.prenom}`, 60, 310);
-    ctx.fillText(`Telephone: ${formData.telephone}`, 60, 345);
-    ctx.font = "bold 28px Arial";
-    ctx.fillText("Paiement", 60, 430);
-    ctx.font = "22px Arial";
-    ctx.fillText(`Type: ${paiement.type}`, 60, 475);
-    ctx.fillText(`Montant: ${amount.toLocaleString("fr-FR")} DH`, 60, 510);
-
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/png")
-    );
-    if (!blob) {
-      toast({
-        title: "Erreur",
-        description: "Génération du reçu échouée.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const file = new File([blob], `recu-${Date.now()}.png`, { type: "image/png" });
-    setDocuments((prev) => {
-      const next = [...(prev.payment || [])];
-      while (next.length <= index) next.push(null);
-      next[index] = file;
-      return { ...prev, payment: next };
-    });
-    mettreAJourPaiement(index, "recu", file.name);
-    setPreviews((prev) => ({
-      ...prev,
-      [`payment_${index}`]: { url: URL.createObjectURL(file), type: file.type },
-    }));
-    toast({
-      title: "Reçu généré",
-      description: "Le reçu est joint et sera enregistré avec la réservation.",
-    });
   };
 
   const mettreAJourPaiement = <K extends keyof Paiement>(index: number, field: K, value: Paiement[K]) => {
@@ -1667,6 +1364,92 @@ export default function EditReservation() {
   }, [paiements]);
   const remainingAmount = useMemo(() => Math.max(totalPrice - totalPaid, 0), [totalPrice, totalPaid]);
 
+  /** Aligné sur Nouvelle Chambre — génération PNG du reçu puis attachement au paiement index */
+  const canGeneratePaymentReceiptEdit = (index: number) => {
+    const payment = paiements[index];
+    if (!payment) return false;
+    const amount = parseAmount(payment.montant);
+    return Boolean(
+      payment.type &&
+      amount > 0 &&
+      formData.nom?.trim() &&
+      formData.prenom?.trim() &&
+      formData.telephone?.trim()
+    );
+  };
+
+  const handleGeneratePaymentReceiptEdit = async (index: number) => {
+    if (!canGeneratePaymentReceiptEdit(index)) return;
+    const payment = paiements[index];
+    const amount = parseAmount(payment.montant);
+    const paymentDate = new Date().toISOString().slice(0, 10);
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200;
+    canvas.height = 800;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de générer le reçu pour le moment.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#e5e7eb";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(30, 30, canvas.width - 60, canvas.height - 60);
+
+    ctx.fillStyle = "#1f2937";
+    ctx.font = "bold 42px Arial";
+    ctx.fillText("Recu de paiement", 60, 100);
+    ctx.fillStyle = "#4b5563";
+    ctx.font = "22px Arial";
+    ctx.fillText(`Date: ${paymentDate}`, 60, 150);
+    ctx.fillText(`Programme: ${formData.programme || "-"}`, 60, 190);
+    ctx.fillStyle = "#111827";
+    ctx.font = "bold 28px Arial";
+    ctx.fillText("Client", 60, 265);
+    ctx.font = "22px Arial";
+    ctx.fillText(`Nom complet: ${formData.nom} ${formData.prenom}`, 60, 310);
+    ctx.fillText(`Telephone: ${formData.telephone}`, 60, 345);
+    ctx.font = "bold 28px Arial";
+    ctx.fillText("Paiement", 60, 430);
+    ctx.font = "22px Arial";
+    ctx.fillText(`Type: ${payment.type}`, 60, 475);
+    ctx.fillText(`Montant: ${amount.toLocaleString("fr-FR")} DH`, 60, 510);
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/png")
+    );
+    if (!blob) {
+      toast({
+        title: "Erreur",
+        description: "Génération du reçu échouée.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const file = new File([blob], `recu-${Date.now()}.png`, { type: "image/png" });
+    setDocuments((prev) => {
+      const np = [...(prev.payment || [])];
+      while (np.length <= index) np.push(null);
+      np[index] = file;
+      return { ...prev, payment: np };
+    });
+    setPreviews((prev) => ({
+      ...prev,
+      [`payment_${index}`]: { url: URL.createObjectURL(file), type: file.type },
+    }));
+    toast({
+      title: "Reçu généré",
+      description: "Le reçu est joint à ce paiement et sera enregistré à la validation.",
+    });
+  };
+
   const section3Complete = paiements.length > 0 && arePaymentsValid
   const section4Complete = true // Les toggles sont toujours complétés
 
@@ -1693,6 +1476,13 @@ export default function EditReservation() {
     
     // Vérifier les changements dans les champs du formulaire
     const formDataChanged = 
+      formData.nom !== (initialFormData.nom || '') ||
+      formData.prenom !== (initialFormData.prenom || '') ||
+      formData.telephone !== (initialFormData.telephone || '') ||
+      formData.groupe !== (initialFormData.groupe || '') ||
+      formData.remarque !== (initialFormData.remarque || '') ||
+      formData.transport !== (initialFormData.transport || false) ||
+      formData.gender !== (initialFormData.gender || '') ||
       formData.prix !== (initialFormData.prix || '') ||
       formData.dateReservation !== (initialFormData.dateReservation || '') ||
       formData.statutVisa !== (initialFormData.statutVisa || false) ||
@@ -1701,6 +1491,20 @@ export default function EditReservation() {
       formData.passportNumber !== (initialFormData.passportNumber || '') ||
       formData.hotelMadina !== (initialFormData.hotelMadina || '') ||
       formData.hotelMakkah !== (initialFormData.hotelMakkah || '');
+
+    const accompagnantsInitial = initialReservationData.accompagnants || [];
+    const accompagnantsDirty =
+      accompagnants.length !== accompagnantsInitial.length ||
+      accompagnants.some((a) => {
+        const ini = accompagnantsInitial.find((x: { id: number }) => x.id === a.id);
+        if (!ini) return true;
+        return (
+          (a.firstName || "") !== (ini.firstName || "") ||
+          (a.lastName || "") !== (ini.lastName || "") ||
+          (a.passportNumber || "") !== (ini.passportNumber || "") ||
+          (a.phone || "") !== (ini.phone || "")
+        );
+      });
     
     // Vérifier les changements dans les paiements (nouveaux paiements ajoutés ou modifications)
     const hasNewPayments = paiements.some(p => !p.id);
@@ -1719,6 +1523,7 @@ export default function EditReservation() {
 
     return (
       formDataChanged ||
+      accompagnantsDirty ||
       hasNewDocuments ||
       passportToBeDeleted ||
       hasNewPayments ||
@@ -1733,6 +1538,7 @@ export default function EditReservation() {
     paiements,
     memberPassportFiles,
     memberPassportDelete,
+    accompagnants,
   ]);
 
   const isFormValid = useMemo(() => {
@@ -1754,9 +1560,32 @@ export default function EditReservation() {
 
   const isChambrePrivee = reservationData?.typeReservation === "CHAMBRE_PRIVEE"
 
+  const paymentSectionUi = useMemo(
+    () => ({
+      label: isChambrePrivee ? "text-orange-700" : "text-blue-700",
+      field: isChambrePrivee
+        ? "border-2 border-orange-200 focus:border-orange-500 rounded-lg"
+        : "border-2 border-blue-200 focus:border-blue-500 rounded-lg",
+      readonlyBox: isChambrePrivee
+        ? "h-10 px-3 py-2 border-2 border-orange-200 rounded-lg bg-orange-50/90 flex items-center"
+        : "h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center",
+      dateDisabled: isChambrePrivee
+        ? "h-10 border-2 border-orange-200 bg-orange-50/90 text-gray-700 rounded-lg cursor-not-allowed"
+        : "h-10 border-2 border-blue-200 bg-blue-50 text-gray-700 rounded-lg cursor-not-allowed",
+      previewBorder: isChambrePrivee ? "border-orange-200" : "border-blue-200",
+      previewText: isChambrePrivee ? "text-orange-700" : "text-blue-700",
+      previewBtn: isChambrePrivee
+        ? "text-orange-600 hover:text-orange-800 hover:bg-orange-50"
+        : "text-blue-600 hover:text-blue-800 hover:bg-blue-50",
+    }),
+    [isChambrePrivee]
+  )
+
   const renderLeaderPassportBlock = () => (
     <div className="flex flex-col flex-1 min-h-0 min-w-0 space-y-3">
-      <Label className="text-xs text-blue-700 font-medium">Passeport (obligatoire)</Label>
+      <Label className="text-xs text-blue-700 font-medium">
+        {isChambrePrivee ? "Passeport (fichier, optionnel)" : "Passeport (obligatoire)"}
+      </Label>
       {(!getDocumentUrl("passport") && !documents.passport) || passportToDelete !== null ? (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
@@ -1772,7 +1601,6 @@ export default function EditReservation() {
                 }
               }}
               accept="image/*,.pdf"
-              disabled={!!ocrProcessingPassport}
               className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
             />
             {passportToDelete !== null && (
@@ -1788,11 +1616,6 @@ export default function EditReservation() {
               </Button>
             )}
           </div>
-          {ocrProcessingPassport === "leader" && (
-            <p className="text-xs text-blue-600 animate-pulse">
-              Analyse OCR du passeport en cours…
-            </p>
-          )}
           {passportToDelete !== null && (
             <p className="text-xs text-orange-600">
               L&apos;ancien passeport sera remplacé par le nouveau fichier
@@ -1986,7 +1809,9 @@ export default function EditReservation() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Modifier la Réservation</h1>
+              <h1 className="text-3xl font-bold text-gray-900">
+                {isChambrePrivee ? "Modifier Chambre Privée / Familiale" : "Modifier la Réservation"}
+              </h1>
               <p className="text-gray-600">Mise à jour des informations de la réservation #{reservationId}</p>
             </div>
           </div>
@@ -1996,9 +1821,17 @@ export default function EditReservation() {
         <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
                 <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-20 z-40 shadow-lg">
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <CardTitle className="text-xl flex items-center gap-3">
+                    <CardTitle className="text-xl flex items-center gap-3 flex-wrap">
                       <Sparkles className="h-6 w-6" />
-                      Modifier la Réservation
+                      {isChambrePrivee ? "Modifier Chambre Privée / Familiale" : "Modifier la Réservation"}
+                      {isChambrePrivee && (
+                        <Badge
+                          variant="outline"
+                          className="border-emerald-300/80 bg-emerald-950/35 text-emerald-100 text-[10px] font-bold uppercase tracking-wide"
+                        >
+                          Chambre
+                        </Badge>
+                      )}
                     </CardTitle>
                     <div className="flex flex-wrap items-center gap-3">
                       <div
@@ -2162,6 +1995,28 @@ export default function EditReservation() {
                             {getHotelName(formData.hotelMakkah, "makkah")}
                           </span>
                         </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div className="space-y-2">
+                        <Label className="text-blue-700 font-medium text-sm">Prix total dossier (DH) *</Label>
+                        <Input
+                          value={formData.prix}
+                          onChange={(e) => setFormData({ ...formData, prix: e.target.value })}
+                          className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                          placeholder="Montant"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-blue-700 font-medium text-sm">Date de réservation *</Label>
+                        <Input
+                          type="date"
+                          value={formData.dateReservation}
+                          onChange={(e) =>
+                            setFormData({ ...formData, dateReservation: e.target.value })
+                          }
+                          className="h-10 border-2 border-blue-200 rounded-lg"
+                        />
                       </div>
                     </div>
                   </>
@@ -2473,67 +2328,58 @@ export default function EditReservation() {
                     </h3>
 
                 {isChambrePrivee ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch mb-4">
-                    <div className="space-y-4 min-w-0 flex flex-col h-full min-h-0">
-                      <div className="p-4 rounded-lg border border-blue-200 bg-white/80 flex-1 min-h-0 flex flex-col">
-                        <div className="text-xs font-semibold text-blue-700 flex items-center gap-2 mb-3">
-                          <User className="h-4 w-4" />
-                          Leader
-                        </div>
+                  <div className="space-y-4">
+                    <div className="mb-4 p-4 rounded-lg border border-blue-200 bg-white/80">
+                      <div className="text-xs font-semibold text-blue-700 flex items-center gap-2 mb-3">
+                        <User className="h-4 w-4" />
+                        Leader
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-3">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1">
                               <Label className="text-xs text-blue-700">Nom *</Label>
                               <Input
-                                value={formData.nom}
-                                onChange={(e) =>
-                                  setFormData({ ...formData, nom: e.target.value })
-                                }
                                 placeholder="Nom"
+                                value={formData.nom}
+                                onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
                                 className="h-10 border-2 border-blue-100 focus:border-blue-400"
                               />
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs text-blue-700">Prénom *</Label>
                               <Input
-                                value={formData.prenom}
-                                onChange={(e) =>
-                                  setFormData({ ...formData, prenom: e.target.value })
-                                }
                                 placeholder="Prénom"
+                                value={formData.prenom}
+                                onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
                                 className="h-10 border-2 border-blue-100 focus:border-blue-400"
                               />
                             </div>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1">
                               <Label className="text-xs text-blue-700">Téléphone *</Label>
                               <Input
-                                placeholder="+212 612345678"
+                                placeholder="Téléphone"
                                 value={formData.telephone}
                                 onChange={(e) =>
-                                  setFormData({
-                                    ...formData,
-                                    telephone: formatPhoneInput(e.target.value),
-                                  })
+                                  setFormData({ ...formData, telephone: e.target.value })
                                 }
-                                inputMode="numeric"
-                                maxLength={14}
                                 className="h-10 border-2 border-blue-100 focus:border-blue-400"
                               />
-                              <p className="text-[11px] text-blue-600">Format : +XXX XXXXXXXXX</p>
+                              <p className="text-[11px] text-blue-600">Format: +XXX XXXXXXXXX</p>
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs text-blue-700">Groupe</Label>
                               <Input
+                                placeholder="Groupe (optionnel)"
                                 value={formData.groupe}
                                 onChange={(e) => setFormData({ ...formData, groupe: e.target.value })}
-                                placeholder="Groupe (optionnel)"
                                 className="h-10 border-2 border-blue-100 focus:border-blue-400"
                               />
                             </div>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                          <div className="grid grid-cols-2 gap-3 items-end">
                             <div className="space-y-1">
                               <Label className="text-xs text-blue-700">Genre</Label>
                               <Select
@@ -2553,20 +2399,16 @@ export default function EditReservation() {
                               <Label className="text-xs text-blue-700">N° Passeport</Label>
                               <Input
                                 placeholder="AB1234567"
-                                maxLength={9}
                                 value={formData.passportNumber}
                                 onChange={(e) =>
-                                  setFormData({
-                                    ...formData,
-                                    passportNumber: formatPassportInput(e.target.value),
-                                  })
+                                  setFormData({ ...formData, passportNumber: e.target.value })
                                 }
+                                maxLength={9}
                                 className="h-10 border-2 border-blue-100 focus:border-blue-400"
                               />
-                              <p className="text-[11px] text-blue-600">Format : 2 lettres + 7 chiffres</p>
                             </div>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="grid grid-cols-2 gap-3 items-center">
                             <div className="space-y-1">
                               <Label className="text-xs text-blue-700">Transport</Label>
                               <div className="flex items-center gap-2 h-10 px-3 border-2 border-blue-100 rounded-lg bg-white">
@@ -2585,20 +2427,18 @@ export default function EditReservation() {
                             <div className="space-y-1">
                               <Label className="text-xs text-blue-700">Remarque</Label>
                               <Input
+                                placeholder="Remarque (optionnel)"
                                 value={formData.remarque}
                                 onChange={(e) =>
                                   setFormData({ ...formData, remarque: e.target.value })
                                 }
-                                placeholder="Remarque (optionnel)"
                                 className="h-10 border-2 border-blue-100 focus:border-blue-400"
                               />
                             </div>
                           </div>
                         </div>
+                        <div className="min-w-0 flex flex-col">{renderLeaderPassportBlock()}</div>
                       </div>
-                    </div>
-                    <div className="min-w-0 flex flex-col self-stretch justify-end min-h-0">
-                      {renderLeaderPassportBlock()}
                     </div>
                   </div>
                 ) : (
@@ -2738,70 +2578,34 @@ export default function EditReservation() {
                                     </div>
                                   </div>
                                   <div className="space-y-1">
-                                    <Label className="text-xs text-blue-700">Téléphone *</Label>
-                                    <Input
-                                      placeholder="+212 612345678"
-                                      value={a.phone || ""}
-                                      onChange={(e) =>
-                                        setAccompagnants((prev) =>
-                                          prev.map((item) =>
-                                            item.id === a.id
-                                              ? {
-                                                  ...item,
-                                                  phone: formatPhoneInput(e.target.value),
-                                                }
-                                              : item
-                                          )
-                                        )
-                                      }
-                                      inputMode="numeric"
-                                      maxLength={14}
-                                      className="h-10 border-2 border-blue-100 focus:border-blue-400"
-                                    />
-                                    <p className="text-[11px] text-blue-600">Format : +XXX XXXXXXXXX</p>
-                                  </div>
-                                  <div className="space-y-1">
                                     <Label className="text-xs text-blue-700">N° Passeport</Label>
                                     <Input
-                                      placeholder="AB1234567"
-                                      maxLength={9}
                                       value={a.passportNumber || ""}
                                       onChange={(e) =>
                                         setAccompagnants((prev) =>
                                           prev.map((item) =>
                                             item.id === a.id
-                                              ? {
-                                                  ...item,
-                                                  passportNumber: formatPassportInput(
-                                                    e.target.value
-                                                  ),
-                                                }
+                                              ? { ...item, passportNumber: e.target.value }
                                               : item
                                           )
                                         )
                                       }
+                                      placeholder="Numéro passeport"
                                       className="h-10 border-2 border-blue-100 focus:border-blue-400"
                                     />
-                                    <p className="text-[11px] text-blue-600">Format : 2 lettres + 7 chiffres</p>
                                   </div>
                                 </div>
                                 <div className="space-y-2 min-w-0 flex flex-col">
-                                  {ocrProcessingPassport === a.id && (
-                                    <p className="text-xs text-blue-600 animate-pulse">
-                                      Analyse OCR du passeport en cours…
-                                    </p>
-                                  )}
                                   {(!(hasPreview && !markPassportReplace && pvUrl)) && (
                                     <>
                                       <Label className="text-xs text-blue-700 font-medium">
-                                        Passeport (fichier)
+                                        {isChambrePrivee ? "Passeport (fichier, optionnel)" : "Passeport (obligatoire)"}
                                       </Label>
                                       <div className="flex items-center gap-2">
                                         <Input
                                           type="file"
                                           accept="image/*,.pdf"
                                           onChange={(e) => handleMemberPassportChange(a.id, e)}
-                                          disabled={isSubmitting || ocrProcessingPassport === a.id}
                                           className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg min-w-0 flex-1"
                                         />
                                         {memberPassportFiles[a.id] && (
@@ -3128,40 +2932,36 @@ export default function EditReservation() {
                 {!isChambrePrivee && renderLeaderPassportBlock()}
               </div>
 
-              {/* Section 3: Paiements */}
+              {/* Section 3: Paiements — thème orange pour chambre privée (aligné Nouvelle Chambre) */}
               <div
-                className={
+                className={`p-4 rounded-xl border mb-6 ${
                   isChambrePrivee
-                    ? "bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200 mb-6"
-                    : "bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6"
-                }
+                    ? "bg-gradient-to-r from-orange-50 to-orange-100 border-orange-200"
+                    : "bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200"
+                }`}
               >
                     <h3
-                      className={
-                        isChambrePrivee
-                          ? "text-lg font-semibold text-orange-800 mb-4 flex items-center gap-2"
-                          : "text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2"
-                      }
+                      className={`text-lg font-semibold mb-4 flex items-center gap-2 ${
+                        isChambrePrivee ? "text-orange-800" : "text-blue-800"
+                      }`}
                     >
                       <CreditCard className="h-5 w-5" />
                       Paiements
-                      {section2Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
+                      {section3Complete && <CheckCircle className="h-5 w-5 text-green-500" />}
                     </h3>
                     <div className="space-y-4">
                       {paiements.map((paiement, index) => (
                         <div
                           key={index}
-                          className={
-                            isChambrePrivee
-                              ? "p-4 border border-orange-200 rounded-lg bg-white/70"
-                              : "p-4 border border-blue-200 rounded-lg bg-white/60"
-                          }
+                          className={`p-4 border rounded-lg bg-white/60 ${
+                            isChambrePrivee ? "border-orange-200" : "border-blue-200"
+                          }`}
                         >
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                             <div className="md:col-span-3 space-y-2">
-                          <Label className="text-blue-700 font-medium text-sm">Mode de paiement</Label>
+                          <Label className={`${paymentSectionUi.label} font-medium text-sm`}>Mode de paiement</Label>
                           {paiement.id ? (
-                            <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                            <div className={paymentSectionUi.readonlyBox}>
                               <span className="text-gray-900 font-medium">
                                 {paiement.type === 'especes' && 'Espèces'}
                                 {paiement.type === 'virement' && 'Virement'}
@@ -3175,7 +2975,7 @@ export default function EditReservation() {
                               value={paiement.type}
                               onValueChange={(value) => mettreAJourPaiement(index, "type", value)}
                             >
-                              <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
+                              <SelectTrigger className={`h-10 ${paymentSectionUi.field}`}>
                                 <SelectValue placeholder="Sélectionner paiement" />
                               </SelectTrigger>
                               <SelectContent>
@@ -3188,9 +2988,9 @@ export default function EditReservation() {
                           )}
                             </div>
                             <div className="md:col-span-3 space-y-2">
-                          <Label className="text-blue-700 font-medium text-sm">Montant (DH)</Label>
+                          <Label className={`${paymentSectionUi.label} font-medium text-sm`}>Montant (DH)</Label>
                           {paiement.id ? (
-                            <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                            <div className={paymentSectionUi.readonlyBox}>
                               <span className="text-gray-900 font-medium">{paiement.montant} DH</span>
                             </div>
                           ) : (
@@ -3199,32 +2999,23 @@ export default function EditReservation() {
                               value={paiement.montant}
                               onChange={(e) => mettreAJourPaiement(index, "montant", e.target.value)}
                               placeholder="Montant en dirhams"
-                              className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className={`h-10 ${paymentSectionUi.field} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                             />
                           )}
                             </div>
                             <div className="md:col-span-3 space-y-2">
-                          <Label className="text-blue-700 font-medium text-sm">Date</Label>
+                          <Label className={`${paymentSectionUi.label} font-medium text-sm`}>Date</Label>
                           {paiement.id ? (
-                            <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                            <div className={paymentSectionUi.readonlyBox}>
                               <span className="text-gray-900 font-medium">{paiement.date}</span>
                             </div>
-                          ) : isChambrePrivee ? (
-                            <Input
-                              type="date"
-                              value={paiement.date}
-                              onChange={(e) =>
-                                mettreAJourPaiement(index, "date", e.target.value)
-                              }
-                              className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
-                            />
                           ) : (
                             <Input
                               type="date"
                               value={paiement.date}
                               readOnly
                               disabled
-                              className="h-10 border-2 border-blue-200 bg-blue-50 text-gray-700 rounded-lg cursor-not-allowed"
+                              className={paymentSectionUi.dateDisabled}
                             />
                           )}
                         </div>
@@ -3246,43 +3037,32 @@ export default function EditReservation() {
                       {/* Upload de reçu de paiement - Afficher seulement si pas de nouveau fichier uploadé et pas de reçu existant */}
                       {!previews[`payment_${index}`] && !paiement.recu && (
                         <div className="mt-3 space-y-2">
-                          <Label
-                            className={
-                              isChambrePrivee
-                                ? "text-orange-700 font-medium text-sm"
-                                : "text-blue-700 font-medium text-sm"
-                            }
-                          >
+                          <Label className={`${paymentSectionUi.label} font-medium text-sm`}>
                             Reçu de paiement
                           </Label>
-                          <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
                             <Input
                               type="file"
                               data-payment-index={index}
                               onChange={(e) => handlePaymentFileChange(e, index)}
                               accept="image/*,.pdf"
-                              disabled={isSubmitting}
-                              className={
-                                isChambrePrivee
-                                  ? "h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg min-w-0 flex-1"
-                                  : "h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                              }
+                              className={`h-10 rounded-lg flex-1 min-w-[200px] ${paymentSectionUi.field}`}
                             />
-                            {isChambrePrivee && !paiement.id && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleGeneratePaymentReceiptChambre(index)}
-                                disabled={
-                                  isSubmitting || !canGeneratePaymentReceiptChambre(index)
-                                }
-                                className="h-10 border-orange-300 text-orange-700 hover:bg-orange-50 whitespace-nowrap"
-                              >
-                                <Download className="h-3.5 w-3.5 mr-1.5" />
-                                Générer reçu
-                              </Button>
-                            )}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGeneratePaymentReceiptEdit(index)}
+                              disabled={isSubmitting || !canGeneratePaymentReceiptEdit(index)}
+                              className={`h-10 whitespace-nowrap shrink-0 ${
+                                isChambrePrivee
+                                  ? "border-orange-300 text-orange-700 hover:bg-orange-50"
+                                  : "border-blue-300 text-blue-700 hover:bg-blue-50"
+                              }`}
+                            >
+                              <Download className="h-3.5 w-3.5 mr-1.5" />
+                              Générer reçu
+                            </Button>
                           </div>
                         </div>
                       )}
@@ -3301,15 +3081,15 @@ export default function EditReservation() {
 
                       {/* Aperçu du nouveau reçu uploadé */}
                       {previews[`payment_${index}`] && (
-                        <div className="mt-3 p-2 border border-blue-200 rounded-lg bg-white">
+                        <div className={`mt-3 p-2 border ${paymentSectionUi.previewBorder} rounded-lg bg-white`}>
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-blue-700">
+                            <span className={`text-sm font-medium ${paymentSectionUi.previewText}`}>
                               {paiement.id && paiement.recu ? 'Nouveau reçu (remplacera l\'ancien)' : 'Aperçu du nouveau reçu'}
                             </span>
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
-                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 rounded"
+                                className={`${paymentSectionUi.previewBtn} p-1 rounded`}
                                 onClick={() => setPreviewImage({ 
                                   url: previews[`payment_${index}`].url, 
                                   title: 'Nouveau reçu paiement', 
@@ -3323,7 +3103,18 @@ export default function EditReservation() {
                                   variant="ghost"
                                   size="sm"
                                   type="button"
-                                  onClick={() => clearPaymentModifierReceipt(index)}
+                                  onClick={() => {
+                                    setPreviews(prev => {
+                                      const newPreviews = { ...prev };
+                                      delete newPreviews[`payment_${index}`];
+                                      return newPreviews;
+                                    });
+                                    setDocuments(prev => {
+                                      const newPayments = [...(prev.payment || [])];
+                                      newPayments[index] = null;
+                                      return { ...prev, payment: newPayments };
+                                    });
+                                  }}
                                   className="text-red-600 hover:text-red-800 hover:bg-red-50"
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -3331,7 +3122,7 @@ export default function EditReservation() {
                               )}
                             </div>
                           </div>
-                          <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
+                          <div className={`w-full h-[200px] overflow-hidden rounded-lg border ${paymentSectionUi.previewBorder}`}>
                             {previews[`payment_${index}`].type === 'application/pdf' ? (
                               // Pour les PDFs locaux (blob/data), utiliser embed directement
                               previews[`payment_${index}`].url.startsWith('blob:') || previews[`payment_${index}`].url.startsWith('data:') ? (
@@ -3365,13 +3156,13 @@ export default function EditReservation() {
 
                       {/* Reçu existant - Afficher seulement si pas de nouveau fichier uploadé */}
                       {paiement.id && paiement.recu && !previews[`payment_${index}`] && (
-                        <div className="mt-3 p-2 border border-blue-200 rounded-lg bg-white">
+                        <div className={`mt-3 p-2 border ${paymentSectionUi.previewBorder} rounded-lg bg-white`}>
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-blue-700">Reçu de paiement</span>
+                            <span className={`text-sm font-medium ${paymentSectionUi.previewText}`}>Reçu de paiement</span>
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
-                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 rounded"
+                                className={`${paymentSectionUi.previewBtn} p-1 rounded`}
                                 onClick={() => {
                                   const isPdf = isPdfFile(paiement.recuFileName || paiement.recu);
                                   setPreviewImage({ url: paiement.recu || '', title: 'Reçu paiement', type: isPdf ? 'application/pdf' : 'image/*' });
@@ -3398,7 +3189,7 @@ export default function EditReservation() {
                               </Button>
                             </div>
                           </div>
-                          <div className="w-full h-[200px] overflow-hidden rounded-lg border border-blue-200">
+                          <div className={`w-full h-[200px] overflow-hidden rounded-lg border ${paymentSectionUi.previewBorder}`}>
                             {isPdfFile(paiement.recuFileName || paiement.recu) ? (
                               // Utiliser Blob Proxy pour les PDFs Cloudinary
                               <PdfPreviewBox 
@@ -3424,13 +3215,15 @@ export default function EditReservation() {
                   <Button
                     type="button"
                     onClick={ajouterPaiement}
-                    className={
+                    variant="outline"
+                    size="sm"
+                    className={`mt-2 w-full border-dashed h-12 ${
                       isChambrePrivee
-                        ? "mt-2 bg-orange-600 hover:bg-orange-700 text-white"
-                        : "mt-2 bg-blue-600 hover:bg-blue-700"
-                    }
+                        ? "border-orange-300 text-orange-600 hover:bg-orange-50"
+                        : "border-blue-300 text-blue-600 hover:bg-blue-50"
+                    }`}
                   >
-                    <Plus className="h-4 w-4 mr-2" />
+                    <Plus className="h-5 w-5 mr-2" />
                     Ajouter un paiement
                   </Button>
                     </div>
@@ -3560,87 +3353,6 @@ export default function EditReservation() {
                 </CardContent>
               </Card>
             </div>
-
-      <Dialog
-        open={ocrValidation !== null}
-        onOpenChange={(open) => {
-          if (!open) setOcrValidation(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Valider les données extraites du passeport</DialogTitle>
-            <DialogDescription>
-              {ocrValidation &&
-                (ocrValidation.target === "leader"
-                  ? "Leader : vérifiez le nom, le prénom et le numéro de passeport avant de les appliquer au formulaire."
-                  : (() => {
-                      const i = accompagnants.findIndex(
-                        (a) => a.id === ocrValidation.memberId
-                      );
-                      const n = i >= 0 ? i + 1 : null;
-                      return n !== null
-                        ? `Accompagnant ${n} : vérifiez ces informations pour la bonne personne.`
-                        : "Accompagnant : vérifiez ces informations pour la bonne personne.";
-                    })())}
-            </DialogDescription>
-          </DialogHeader>
-          {ocrValidation && (
-            <div className="grid gap-3 py-2">
-              <div className="space-y-1">
-                <Label htmlFor="ocr-lastName-mod">Nom</Label>
-                <Input
-                  id="ocr-lastName-mod"
-                  value={ocrValidation.lastName}
-                  onChange={(e) =>
-                    setOcrValidation((prev) =>
-                      prev ? { ...prev, lastName: e.target.value } : null
-                    )
-                  }
-                  placeholder="Nom"
-                  className="h-10"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="ocr-firstName-mod">Prénom</Label>
-                <Input
-                  id="ocr-firstName-mod"
-                  value={ocrValidation.firstName}
-                  onChange={(e) =>
-                    setOcrValidation((prev) =>
-                      prev ? { ...prev, firstName: e.target.value } : null
-                    )
-                  }
-                  placeholder="Prénom"
-                  className="h-10"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="ocr-passport-mod">N° Passeport</Label>
-                <Input
-                  id="ocr-passport-mod"
-                  value={ocrValidation.passport}
-                  onChange={(e) =>
-                    setOcrValidation((prev) =>
-                      prev ? { ...prev, passport: e.target.value } : null
-                    )
-                  }
-                  placeholder="Numéro de passeport"
-                  className="h-10"
-                />
-              </div>
-            </div>
-          )}
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={() => setOcrValidation(null)}>
-              Ignorer
-            </Button>
-            <Button type="button" onClick={applyOcrValidation}>
-              OK — Appliquer aux champs
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={showRoomGuide} onOpenChange={setShowRoomGuide}>
         <DialogContent className="max-w-md">

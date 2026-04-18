@@ -2267,8 +2267,12 @@ export default function NouvelleChambrePage() {
                   </Link>
                   <Button
                     type="submit"
-                    disabled={!canSubmit || isSubmitting || propositionInvalid}
-                    className="bg-blue-600 hover:bg-blue-700"
+                    disabled={
+                      !minimumIdentityForConfirm ||
+                      isSubmitting ||
+                      propositionInvalid
+                    }
+                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
                   >
                     {isSubmitting ? "Enregistrement..." : "Enregistrer"}
                   </Button>

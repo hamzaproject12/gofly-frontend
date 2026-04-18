@@ -105,9 +105,6 @@ const ROOM_CAPACITY: Record<string, number> = {
   QUAD: 4,
   QUINT: 5,
 };
-const PHONE_REGEX = /^\+\d{3}\s\d{9}$/;
-const PASSPORT_REGEX = /^[A-Z]{2}\d{7}$/;
-
 function formatPhoneInput(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 12);
   if (!digits) return "";
@@ -873,8 +870,8 @@ export default function NouvelleChambrePage() {
     String(formData.prix || "").trim() !== "" &&
     Number(formData.prix) > 0;
 
-  /** Minimum pour activer « Confirmer la Réservation » : leader (nom, prénom, n° tel.) + chaque accompagnant (nom, prénom). La barre prix s’affiche dès que le prix est calculé. */
-  const minimumIdentityForConfirm =
+  /** Obligatoire pour enregistrer : chef Nom/Prénom/téléphone + chaque accompagnant Nom/Prénom (passeports / fichiers optionnels) */
+  const identitiesMinimumOk =
     occupants.length === capacity &&
     capacity >= 2 &&
     occupants.every((o, i) => {
@@ -887,20 +884,11 @@ export default function NouvelleChambrePage() {
       return fn.length > 0 && ln.length > 0;
     });
 
-  const champsIdentiteOk =
-    occupants.length === capacity &&
-    capacity >= 2 &&
-    occupants.every((o, i) => {
-      const fn = (o.firstName || "").trim();
-      const ln = (o.lastName || "").trim();
-      const pp = (o.passportNumber || "").trim();
-      if (i === 0) {
-        const ph = (o.phone || "").trim();
-        return Boolean(fn && ln && ph && PHONE_REGEX.test(ph) && PASSPORT_REGEX.test(pp));
-      }
-      return Boolean(fn && ln && PASSPORT_REGEX.test(pp));
-    });
+  const allPassportFilesProvided =
+    occupantPassportFiles.length === capacity &&
+    occupantPassportFiles.every(Boolean);
 
+  /** Configuration voyage + prix + identités minimales (sans exiger passeports ni pièces jointes) */
   const canSubmit =
     !!formData.programId &&
     !!formData.typeChambre &&
@@ -910,9 +898,7 @@ export default function NouvelleChambrePage() {
     !!roomMadinaId &&
     !!roomMakkahId &&
     prixGenere &&
-    champsIdentiteOk &&
-    occupantPassportFiles.length === capacity &&
-    occupantPassportFiles.every(Boolean);
+    identitiesMinimumOk;
   const propositionInvalid =
     prixMode === "proposition" &&
     prixPropose !== null &&
@@ -921,44 +907,21 @@ export default function NouvelleChambrePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const leaderPhone = (occupants[0]?.phone || "").trim();
-    if (!PHONE_REGEX.test(leaderPhone)) {
+    if (!leaderPhone) {
       toast({
-        title: "Téléphone invalide",
-        description: "Format attendu: +XXX XXXXXXXXX (ex: +212 123456789).",
-        variant: "destructive",
-      });
-      return;
-    }
-    const invalidPassportIndex = occupants.findIndex(
-      (o) => !PASSPORT_REGEX.test((o.passportNumber || "").trim())
-    );
-    if (invalidPassportIndex !== -1) {
-      toast({
-        title: "Passeport invalide",
-        description: `Format attendu: 2 lettres + 7 chiffres (ex: AB1234567) pour ${invalidPassportIndex === 0 ? "le leader" : `l’accompagnant ${invalidPassportIndex}`}.`,
+        title: "Téléphone du leader",
+        description: "Indiquez le numéro de téléphone du chef de dossier.",
         variant: "destructive",
       });
       return;
     }
     if (!canSubmit) {
-      const filesMissing =
-        occupantPassportFiles.length !== capacity ||
-        !occupantPassportFiles.every(Boolean);
-      if (filesMissing) {
-        toast({
-          title: "Passeports manquants",
-          description:
-            "Joignez un fichier passeport (PDF ou image) pour chaque personne avant de confirmer.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Formulaire incomplet",
-          description:
-            "Vérifiez le format du téléphone du leader, les numéros de passeport et le prix.",
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Formulaire incomplet",
+        description:
+          "Remplissez la configuration du voyage (prix calculé), les hôtels/chambres, puis le nom, prénom et téléphone du leader ainsi que le nom et prénom de chaque accompagnant.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -968,9 +931,15 @@ export default function NouvelleChambrePage() {
         (sum, p) => sum + (Number(p.amount) || 0),
         0
       );
-      const leaderOccupants = occupants.map((o, i) =>
-        i === 0 ? { ...o, gender: formData.gender } : o
-      );
+      const leaderOccupants = occupants.map((o, i) => {
+        const accPhone = (o.phone || "").trim();
+        return {
+          ...o,
+          passportNumber: (o.passportNumber || "").trim() || "",
+          phone: i === 0 ? leaderPhone : accPhone || leaderPhone,
+          gender: i === 0 ? formData.gender : o.gender,
+        };
+      });
 
       const groupRes = await api.request(
         api.url(api.endpoints.reservationGroup),
@@ -992,7 +961,7 @@ export default function NouvelleChambrePage() {
               hotelMadina: hotelNameMadina,
               hotelMakkah: hotelNameMakkah,
               status: "Incomplet",
-              statutPasseport: true,
+              statutPasseport: allPassportFilesProvided,
               statutVisa: supplierStatus.statutVisa,
               statutHotel: supplierStatus.statutHotel,
               statutVol: supplierStatus.statutVol,
@@ -1155,11 +1124,11 @@ export default function NouvelleChambrePage() {
         }
       }
 
-      // 4) Patch statuts leader
+      // 4) Patch statuts leader (passeport cohérent avec les fichiers réellement joints)
       const patchRes = await api.request(`/api/reservations/${leaderId}`, {
         method: "PATCH",
         body: JSON.stringify({
-          statutPasseport: true,
+          statutPasseport: allPassportFilesProvided,
           statutVisa: supplierStatus.statutVisa,
           statutHotel: supplierStatus.statutHotel,
           statutVol: supplierStatus.statutVol,
@@ -1172,7 +1141,9 @@ export default function NouvelleChambrePage() {
 
       toast({
         title: "Succès",
-        description: "Dossier chambre privée créé avec passeports et paiements leader.",
+        description: allPassportFilesProvided
+          ? "Dossier chambre privée créé (passeports joints)."
+          : "Dossier chambre privée créé. Vous pourrez ajouter les passeports plus tard depuis la fiche.",
       });
       router.push("/reservations");
     } catch (error) {
@@ -2267,11 +2238,7 @@ export default function NouvelleChambrePage() {
                   </Link>
                   <Button
                     type="submit"
-                    disabled={
-                      !minimumIdentityForConfirm ||
-                      isSubmitting ||
-                      propositionInvalid
-                    }
+                    disabled={!canSubmit || isSubmitting || propositionInvalid}
                     className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
                   >
                     {isSubmitting ? "Enregistrement..." : "Enregistrer"}
@@ -2368,11 +2335,7 @@ export default function NouvelleChambrePage() {
               </div>
               <Button
                 type="submit"
-                disabled={
-                  !minimumIdentityForConfirm ||
-                  isSubmitting ||
-                  propositionInvalid
-                }
+                disabled={!canSubmit || isSubmitting || propositionInvalid}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 text-lg disabled:opacity-50"
                 onClick={(e) => {
                   e.preventDefault();

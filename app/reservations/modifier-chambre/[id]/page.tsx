@@ -3067,8 +3067,7 @@ export default function EditReservation() {
                             />
                           )}
                             </div>
-                            <div className="md:col-span-6" />
-                            </div>
+                            <div className="md:col-span-6 space-y-2">
 
                       {/* Upload de reçu de paiement - Afficher seulement si pas de nouveau fichier uploadé et pas de reçu existant */}
                       {!previews[`payment_${index}`] && !paiement.recu && (
@@ -3274,6 +3273,8 @@ export default function EditReservation() {
                           </div>
                         </div>
                       )}
+                            </div>
+                          </div>
                         <div className="mt-4 flex justify-end">
                           <Button
                             type="button"

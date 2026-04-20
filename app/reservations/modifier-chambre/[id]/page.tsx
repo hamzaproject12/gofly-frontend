@@ -209,6 +209,24 @@ type FormData = {
   }>;
 };
 
+const PHONE_REGEX = /^\+\d{3}\s\d{9}$/;
+const PASSPORT_REGEX = /^[A-Z]{2}\d{7}$/;
+
+function formatPhoneInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 12);
+  if (!digits) return "";
+  const country = digits.slice(0, 3);
+  const local = digits.slice(3, 12);
+  return local ? `+${country} ${local}` : `+${country}`;
+}
+
+function formatPassportInput(value: string): string {
+  const chars = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const letters = chars.replace(/[^A-Z]/g, "").slice(0, 2);
+  const numbers = chars.replace(/[^0-9]/g, "").slice(0, 7);
+  return `${letters}${numbers}`;
+}
+
 // PDF Preview Box Component with Blob Proxy (for inline preview)
 const PdfPreviewBox = ({ url, title, onZoom }: { url: string | null; title: string; onZoom: () => void }) => {
   const { blobUrl, loading, error } = usePdfBlob(url);
@@ -596,6 +614,25 @@ export default function EditReservation() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    const telephone = (formData.telephone || "").trim();
+    const passportNumber = (formData.passportNumber || "").trim();
+    if (!PHONE_REGEX.test(telephone)) {
+      toast({
+        title: "Téléphone invalide",
+        description: "Format attendu: +XXX XXXXXXXXX (ex: +212 123456789).",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (passportNumber && !PASSPORT_REGEX.test(passportNumber)) {
+      toast({
+        title: "Passeport invalide",
+        description: "Format attendu: 2 lettres + 7 chiffres (ex: AB1234567).",
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (!arePaymentsValid) {
       toast({
@@ -1583,9 +1620,11 @@ export default function EditReservation() {
 
   const renderLeaderPassportBlock = () => (
     <div className="flex flex-col flex-1 min-h-0 min-w-0 space-y-3">
-      <Label className="text-xs text-blue-700 font-medium">
-        {isChambrePrivee ? "Passeport (fichier, optionnel)" : "Passeport (obligatoire)"}
-      </Label>
+      {((!getDocumentUrl("passport") && !documents.passport) || passportToDelete !== null) && (
+        <Label className="text-xs text-blue-700 font-medium">
+          {isChambrePrivee ? "Passeport (fichier, optionnel)" : "Passeport (obligatoire)"}
+        </Label>
+      )}
       {(!getDocumentUrl("passport") && !documents.passport) || passportToDelete !== null ? (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
@@ -1997,54 +2036,9 @@ export default function EditReservation() {
                         </div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div className="space-y-2">
-                        <Label className="text-blue-700 font-medium text-sm">Prix total dossier (DH) *</Label>
-                        <Input
-                          value={formData.prix}
-                          onChange={(e) => setFormData({ ...formData, prix: e.target.value })}
-                          className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                          placeholder="Montant"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-blue-700 font-medium text-sm">Date de réservation *</Label>
-                        <Input
-                          type="date"
-                          value={formData.dateReservation}
-                          onChange={(e) =>
-                            setFormData({ ...formData, dateReservation: e.target.value })
-                          }
-                          className="h-10 border-2 border-blue-200 rounded-lg"
-                        />
-                      </div>
-                    </div>
                   </>
                 ) : (
                   <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div className="space-y-2">
-                        <Label className="text-blue-700 font-medium text-sm">Prix total dossier (DH) *</Label>
-                        <Input
-                          value={formData.prix}
-                          onChange={(e) => setFormData({ ...formData, prix: e.target.value })}
-                          className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                          placeholder="Montant"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-blue-700 font-medium text-sm">Date de réservation *</Label>
-                        <Input
-                          type="date"
-                          value={formData.dateReservation}
-                          onChange={(e) =>
-                            setFormData({ ...formData, dateReservation: e.target.value })
-                          }
-                          className="h-10 border-2 border-blue-200 rounded-lg"
-                        />
-                      </div>
-                    </div>
-
                     {/* Hôtels & chambres — même présentation « points » que Nouvelle Réservation */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                   <div className="space-y-2">
@@ -2363,11 +2357,15 @@ export default function EditReservation() {
                                 placeholder="Téléphone"
                                 value={formData.telephone}
                                 onChange={(e) =>
-                                  setFormData({ ...formData, telephone: e.target.value })
+                                  setFormData({
+                                    ...formData,
+                                    telephone: formatPhoneInput(e.target.value),
+                                  })
                                 }
+                                inputMode="numeric"
+                                maxLength={14}
                                 className="h-10 border-2 border-blue-100 focus:border-blue-400"
                               />
-                              <p className="text-[11px] text-blue-600">Format: +XXX XXXXXXXXX</p>
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs text-blue-700">Groupe</Label>
@@ -2401,7 +2399,10 @@ export default function EditReservation() {
                                 placeholder="AB1234567"
                                 value={formData.passportNumber}
                                 onChange={(e) =>
-                                  setFormData({ ...formData, passportNumber: e.target.value })
+                                  setFormData({
+                                    ...formData,
+                                    passportNumber: formatPassportInput(e.target.value),
+                                  })
                                 }
                                 maxLength={9}
                                 className="h-10 border-2 border-blue-100 focus:border-blue-400"
@@ -2490,8 +2491,14 @@ export default function EditReservation() {
                     <Label className="text-blue-700 font-medium text-sm">N° passport</Label>
                     <Input
                       value={formData.passportNumber}
-                      onChange={(e) => setFormData({ ...formData, passportNumber: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          passportNumber: formatPassportInput(e.target.value),
+                        })
+                      }
                       placeholder="Numéro de passeport"
+                      maxLength={9}
                       className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
                     />
                       </div>

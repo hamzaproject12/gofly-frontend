@@ -102,3 +102,6 @@ Thumbs.db
 # Uploads (will be handled by backend)
 uploads/
 public/uploads/
+
+# TypeScript incremental build cache
+*.tsbuildinfo

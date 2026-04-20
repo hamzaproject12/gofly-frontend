@@ -173,7 +173,7 @@ interface FileInputs {
 }
 
 const planThemesModifier = {
-  ├ëconomique: { name: "├ëconomique", icon: Leaf },
+  "Économique": { name: "Économique", icon: Leaf },
   Normal: { name: "Normal", icon: ShieldCheck },
   VIP: { name: "VIP", icon: Crown },
 } as const;

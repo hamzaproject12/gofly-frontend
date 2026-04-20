@@ -354,7 +354,7 @@ export default function EditReservation() {
     typeChambre: "",
     nom: "",
     prenom: "",
-    telephone: "",
+    telephone: "+212",
     passportNumber: "",
     groupe: "",
     remarque: "",
@@ -450,7 +450,7 @@ export default function EditReservation() {
             typeChambre: reservationData.roomType || "",
             nom: reservationData.lastName || "",
             prenom: reservationData.firstName || "",
-            telephone: reservationData.phone || "",
+            telephone: reservationData.phone || "+212",
             passportNumber: reservationData.passportNumber || "",
             groupe: reservationData.groupe || "",
             remarque: reservationData.remarque || "",
@@ -746,6 +746,10 @@ export default function EditReservation() {
       });
       
       const body = {
+        firstName: formData.prenom?.trim() || null,
+        lastName: formData.nom?.trim() || null,
+        phone: formData.telephone?.trim() || null,
+        gender: formData.gender || null,
         price: parseFloat(formData.prix),
         reservationDate: formData.dateReservation,
         statutVisa: formData.statutVisa,
@@ -1944,7 +1948,7 @@ export default function EditReservation() {
                   </h3>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
                   <div className="space-y-2">
                     <Label className="text-blue-700 font-medium text-sm">Programme *</Label>
                     <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
@@ -1963,13 +1967,6 @@ export default function EditReservation() {
                         {formData.typeChambre === "QUINT" && "5 personnes"}
                         {!formData.typeChambre && "N/A"}
                       </span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Genre *</Label>
-                    <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
-                      <span className="text-gray-900 font-medium">{formData.gender || "N/A"}</span>
                     </div>
                   </div>
 
@@ -2353,19 +2350,24 @@ export default function EditReservation() {
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1">
                               <Label className="text-xs text-blue-700">Téléphone *</Label>
-                              <Input
-                                placeholder="Téléphone"
-                                value={formData.telephone}
-                                onChange={(e) =>
-                                  setFormData({
-                                    ...formData,
-                                    telephone: formatPhoneInput(e.target.value),
-                                  })
-                                }
-                                inputMode="numeric"
-                                maxLength={14}
-                                className="h-10 border-2 border-blue-100 focus:border-blue-400"
-                              />
+                              <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 h-6 px-2 rounded-md bg-blue-100 text-blue-800 text-xs font-semibold inline-flex items-center border border-blue-200">
+                                  +212
+                                </span>
+                                <Input
+                                  placeholder="123456789"
+                                  value={(formData.telephone || "").replace(/^\+212\s?/, "")}
+                                  onChange={(e) =>
+                                    setFormData({
+                                      ...formData,
+                                      telephone: formatPhoneInput(`+212 ${e.target.value}`),
+                                    })
+                                  }
+                                  inputMode="numeric"
+                                  maxLength={9}
+                                  className="h-10 pl-20 border-2 border-blue-100 focus:border-blue-400"
+                                />
+                              </div>
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs text-blue-700">Groupe</Label>

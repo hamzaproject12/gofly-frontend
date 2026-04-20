@@ -88,7 +88,7 @@ const usePdfBlob = (url: string | null | undefined) => {
         
         // Attempt 2: If 404 and URL doesn't already end with .pdf, try with .pdf extension
         if (!response.ok && response.status === 404 && !url.toLowerCase().endsWith('.pdf')) {
-          console.log('≡ƒöä Retrying PDF fetch with .pdf extension...');
+          console.log('🔄 Retrying PDF fetch with .pdf extension...');
           const urlWithExtension = `${url}.pdf`;
           response = await fetch(urlWithExtension);
         }
@@ -115,7 +115,7 @@ const usePdfBlob = (url: string | null | undefined) => {
         }
       } catch (err) {
         if (!isCancelled) {
-          console.error('Γ¥î Error fetching PDF blob:', err);
+          console.error('❌ Error fetching PDF blob:', err);
           setError(err instanceof Error ? err.message : 'Failed to load PDF');
           setLoading(false);
           // Fallback to original URL (let browser handle it)
@@ -156,7 +156,7 @@ interface Paiement {
   montant: string;
   date: string;
   recu: string | null;
-  recuFileName?: string; // Nom du fichier pour d├⌐tecter les PDFs
+  recuFileName?: string; // Nom du fichier pour détecter les PDFs
   id?: number; // ID optionnel pour identifier les paiements existants
 }
 
@@ -353,7 +353,7 @@ export default function EditReservation() {
     paiements: []
   })
 
-  // ├ëtat pour stocker les valeurs initiales (pour d├⌐tecter les changements)
+  // État pour stocker les valeurs initiales (pour détecter les changements)
   const [initialData, setInitialData] = useState<any>(null)
 
   const [paiements, setPaiements] = useState<Paiement[]>([])
@@ -370,7 +370,7 @@ export default function EditReservation() {
       payments?: any[];
     }>
   >([])
-  const [passportToDelete, setPassportToDelete] = useState<number | null>(null) // ID du fichier passeport ├á supprimer
+  const [passportToDelete, setPassportToDelete] = useState<number | null>(null) // ID du fichier passeport à supprimer
   const [documents, setDocuments] = useState<{
     passport: File | null;
     visa: File | null;
@@ -412,7 +412,7 @@ export default function EditReservation() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Charger la r├⌐servation existante d'abord
+        // Charger la réservation existante d'abord
         if (reservationId) {
           const reservationResponse = await fetch(api.url(`/api/reservations/${reservationId}`))
           const reservationData = await reservationResponse.json()
@@ -449,7 +449,7 @@ export default function EditReservation() {
             paiements: []
           }
           
-          console.log('≡ƒôï Donn├⌐es initiales charg├⌐es:', {
+          console.log('📋 Données initiales chargées:', {
             statutVisa: reservationData.statutVisa,
             statutVol: reservationData.statutVol,
             statutHotel: reservationData.statutHotel,
@@ -457,7 +457,7 @@ export default function EditReservation() {
           })
           
           setFormData(initialFormData)
-          // Stocker les donn├⌐es initiales compl├¿tes (formulaire + r├⌐servation)
+          // Stocker les données initiales complètes (formulaire + réservation)
           setInitialData({
             ...reservationData,
             formData: initialFormData
@@ -468,7 +468,7 @@ export default function EditReservation() {
             const recuUrl = p.fichier?.cloudinaryUrl || p.fichier?.filePath || '';
             const recuFileName = p.fichier?.fileName || '';
             
-            // Si on a un re├ºu, charger aussi dans previews pour la d├⌐tection PDF correcte
+            // Si on a un reçu, charger aussi dans previews pour la détection PDF correcte
             if (recuUrl && p.id) {
               const isPdf = isPdfFile(recuFileName || recuUrl);
               setPreviews(prev => ({
@@ -485,7 +485,7 @@ export default function EditReservation() {
               type: p.paymentMethod || '',
               date: p.paymentDate?.split('T')[0] || '',
               recu: recuUrl,
-              recuFileName: recuFileName, // Garder le fileName pour la d├⌐tection PDF
+              recuFileName: recuFileName, // Garder le fileName pour la détection PDF
               id: p.id // Garder l'ID pour identifier les paiements existants
             };
           })
@@ -498,7 +498,7 @@ export default function EditReservation() {
           // Charger les documents existants
           const docObj: any = {}
           ;(reservationData.documents || reservationData.fichiers || []).forEach((d: any) => {
-            console.log('≡ƒöì Debug - Document found:', {
+            console.log('🔍 Debug - Document found:', {
               fileType: d.fileType,
               cloudinaryUrl: d.cloudinaryUrl,
               filePath: d.filePath,
@@ -517,13 +517,13 @@ export default function EditReservation() {
             if (doc.url) {
               const isPdf = isPdfFile(doc.fileName || doc.url);
               
-              // Normaliser les types pour la coh├⌐rence 
+              // Normaliser les types pour la cohérence 
               const normalizedType = type === 'passeport' ? 'passport' : 
                                    type === 'paiement' ? 'payment' : type;
               
               // DO NOT modify the URL - use it exactly as it comes from the database
               // The usePdfBlob hook will handle the smart retry logic (try exact URL, then with .pdf if 404)
-              console.log('≡ƒöì Debug - Setting preview for:', {
+              console.log('🔍 Debug - Setting preview for:', {
                 type,
                 url: doc.url,
                 fileName: doc.fileName,
@@ -540,11 +540,11 @@ export default function EditReservation() {
             }
           })
 
-          // Charger seulement le programme de cette r├⌐servation
+          // Charger seulement le programme de cette réservation
           if (reservationData.programId) {
             const programResponse = await fetch(api.url(`/api/programs/${reservationData.programId}`))
             const programData = await programResponse.json()
-            console.log('≡ƒöì Debug - Program loaded:', {
+            console.log('🔍 Debug - Program loaded:', {
               id: programData.id,
               name: programData.name,
               hotelsMadina: programData.hotelsMadina?.length,
@@ -583,7 +583,7 @@ export default function EditReservation() {
         console.error('Erreur lors du chargement:', error)
         toast({
           title: "Erreur",
-          description: "Impossible de charger les donn├⌐es de la r├⌐servation",
+          description: "Impossible de charger les données de la réservation",
           variant: "destructive"
         })
       } finally {
@@ -600,7 +600,7 @@ export default function EditReservation() {
     if (!arePaymentsValid) {
       toast({
         title: "Paiement incomplet",
-        description: "Merci de renseigner le mode, le montant, la date et le re├ºu pour chaque paiement ajout├⌐.",
+        description: "Merci de renseigner le mode, le montant, la date et le reçu pour chaque paiement ajouté.",
         variant: "destructive",
       })
       return;
@@ -611,14 +611,14 @@ export default function EditReservation() {
     try {
       const fileUploadErrors: string[] = []
       
-      // 1. Cr├⌐er les nouveaux paiements d'abord (pour que le paidAmount soit calcul├⌐ correctement)
+      // 1. Créer les nouveaux paiements d'abord (pour que le paidAmount soit calculé correctement)
       const newPaymentIds: number[] = []
       if (reservationId) {
         for (let i = 0; i < paiements.length; i++) {
           const paiement = paiements[i];
           // Si le paiement n'a pas d'ID, c'est un nouveau paiement
           if (!paiement.id && paiement.montant && paiement.type && paiement.date) {
-            console.log(`≡ƒÆ░ Cr├⌐ation nouveau paiement ${i + 1}:`, {
+            console.log(`💰 Création nouveau paiement ${i + 1}:`, {
               montant: paiement.montant,
               type: paiement.type,
               date: paiement.date
@@ -639,18 +639,18 @@ export default function EditReservation() {
 
             if (!paymentResponse.ok) {
               const error = await paymentResponse.json()
-              console.error('Γ¥î Erreur cr├⌐ation paiement:', error)
+              console.error('❌ Erreur création paiement:', error)
               fileUploadErrors.push(`Erreur lors de l'ajout du paiement ${i + 1}`)
             } else {
               const paymentData = await paymentResponse.json()
               const newPaymentId = paymentData.id
               newPaymentIds.push(newPaymentId)
               
-              console.log('Γ£à Paiement cr├⌐├⌐ avec ID:', newPaymentId)
+              console.log('✅ Paiement créé avec ID:', newPaymentId)
               
-              // Upload le re├ºu si pr├⌐sent et le lier au paiement
+              // Upload le reçu si présent et le lier au paiement
               if (documents.payment[i]) {
-                console.log(`≡ƒôñ Upload re├ºu pour paiement ID ${newPaymentId}...`)
+                console.log(`📤 Upload reçu pour paiement ID ${newPaymentId}...`)
                 const formDataPayment = new FormData();
                 formDataPayment.append("file", documents.payment[i] as File);
                 formDataPayment.append("reservationId", reservationId.toString());
@@ -664,10 +664,10 @@ export default function EditReservation() {
                 
                 if (!receiptResponse.ok) {
                   const error = await receiptResponse.json();
-                  console.error('Γ¥î Erreur upload re├ºu:', error)
-                  fileUploadErrors.push(`Erreur lors de l'upload du re├ºu de paiement ${i + 1}: ${error.error || 'Erreur inconnue'}`);
+                  console.error('❌ Erreur upload reçu:', error)
+                  fileUploadErrors.push(`Erreur lors de l'upload du reçu de paiement ${i + 1}: ${error.error || 'Erreur inconnue'}`);
                 } else {
-                  console.log('Γ£à Re├ºu upload├⌐ et li├⌐ au paiement')
+                  console.log('✅ Reçu uploadé et lié au paiement')
                 }
               }
             }
@@ -675,19 +675,19 @@ export default function EditReservation() {
         }
       }
 
-      // 2. Maintenant mettre ├á jour les informations de la r├⌐servation (avec le paidAmount recalcul├⌐)
-      // V├⌐rifier si un nouveau passeport est upload├⌐ OU si un passeport existe d├⌐j├á (et n'est pas marqu├⌐ pour suppression)
+      // 2. Maintenant mettre à jour les informations de la réservation (avec le paidAmount recalculé)
+      // Vérifier si un nouveau passeport est uploadé OU si un passeport existe déjà (et n'est pas marqué pour suppression)
       const hasNewPassport = documents.passport !== null;
       const hasExistingPassport = getDocumentUrl('passport') !== null && passportToDelete === null;
       const shouldUpdateStatutPasseport = hasNewPassport || hasExistingPassport;
       
-      // V├⌐rifier si la r├⌐servation est compl├¿te pour mettre le statut ├á "Complet"
+      // Vérifier si la réservation est complète pour mettre le statut à "Complet"
       const isPassportAttached = shouldUpdateStatutPasseport;
       const isVisaComplete = formData.statutVisa;
       const isHotelComplete = formData.statutHotel;
       const isFlightComplete = formData.statutVol;
       
-      // Le paidAmount sera recalcul├⌐ c├┤t├⌐ backend avec tous les paiements (existants + nouveaux)
+      // Le paidAmount sera recalculé côté backend avec tous les paiements (existants + nouveaux)
       const isPaymentComplete = (reservationData.paidAmount + newPaymentIds.reduce((sum, id) => sum + parseFloat(paiements.find(p => !p.id)?.montant || '0'), 0)) >= parseFloat(formData.prix);
       
       const isReservationComplete = isPassportAttached && 
@@ -696,7 +696,7 @@ export default function EditReservation() {
                                    isFlightComplete && 
                                    isPaymentComplete;
       
-      console.log('≡ƒôè V├⌐rification statut complet:', {
+      console.log('📊 Vérification statut complet:', {
         isPassportAttached,
         isVisaComplete,
         isHotelComplete,
@@ -719,11 +719,11 @@ export default function EditReservation() {
         groupe: formData.groupe || null,
         remarque: formData.remarque || null,
         transport: formData.transport ? 'Oui' : null,
-        // Mettre ├á jour le statut global si toutes les conditions sont remplies
+        // Mettre à jour le statut global si toutes les conditions sont remplies
         ...(isReservationComplete && { status: 'Complet' })
       }
 
-      console.log('≡ƒô¥ Mise ├á jour r├⌐servation:', {
+      console.log('📝 Mise à jour réservation:', {
         reservationId,
         url: api.url(`/api/reservations/${reservationId}`),
         body,
@@ -737,7 +737,7 @@ export default function EditReservation() {
         body: JSON.stringify(body)
       })
 
-      console.log('≡ƒôÑ R├⌐ponse PUT:', {
+      console.log('📥 Réponse PUT:', {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok
@@ -745,17 +745,17 @@ export default function EditReservation() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Erreur inconnue' }))
-        console.error('Γ¥î Erreur PUT:', errorData)
-        throw new Error(`Erreur lors de la modification de la r├⌐servation: ${errorData.error || response.statusText}`)
+        console.error('❌ Erreur PUT:', errorData)
+        throw new Error(`Erreur lors de la modification de la réservation: ${errorData.error || response.statusText}`)
       }
 
       const responseData = await response.json()
-      console.log('Γ£à R├⌐ponse PUT succ├¿s:', responseData)
+      console.log('✅ Réponse PUT succès:', responseData)
 
-      // 3. Supprimer l'ancien passeport si on a un nouveau ou si on a marqu├⌐ pour suppression
+      // 3. Supprimer l'ancien passeport si on a un nouveau ou si on a marqué pour suppression
       const fileIdToDelete = passportToDelete || (documents.passport ? getPassportFileId() : null);
       if (fileIdToDelete !== null) {
-        console.log('≡ƒùæ∩╕Å Suppression de l\'ancien passeport...')
+        console.log('🗑️ Suppression de l\'ancien passeport...')
         try {
           const deleteResponse = await fetch(api.url(`${api.endpoints.uploadCloudinary}/${fileIdToDelete}`), {
             method: "DELETE",
@@ -763,20 +763,20 @@ export default function EditReservation() {
           
           if (!deleteResponse.ok) {
             const error = await deleteResponse.json().catch(() => ({ error: 'Erreur inconnue' }));
-            console.error('ΓÜá∩╕Å Erreur suppression ancien passeport:', error);
+            console.error('⚠️ Erreur suppression ancien passeport:', error);
             fileUploadErrors.push(`Erreur lors de la suppression de l'ancien passeport: ${error.error || 'Erreur inconnue'}`);
           } else {
-            console.log('Γ£à Ancien passeport supprim├⌐ avec succ├¿s');
+            console.log('✅ Ancien passeport supprimé avec succès');
           }
         } catch (error) {
-          console.error('Γ¥î Erreur lors de la suppression de l\'ancien passeport:', error);
+          console.error('❌ Erreur lors de la suppression de l\'ancien passeport:', error);
           fileUploadErrors.push('Erreur lors de la suppression de l\'ancien passeport');
         }
       }
 
-      // 4. Upload nouveau passeport si pr├⌐sent
+      // 4. Upload nouveau passeport si présent
       if (documents.passport && reservationId) {
-        console.log('≡ƒôñ Upload nouveau passeport vers Cloudinary...')
+        console.log('📤 Upload nouveau passeport vers Cloudinary...')
         const formDataPassport = new FormData();
         formDataPassport.append("file", documents.passport);
         formDataPassport.append("reservationId", reservationId.toString());
@@ -791,22 +791,22 @@ export default function EditReservation() {
           const error = await passportResponse.json();
           fileUploadErrors.push(`Erreur lors de l'upload du nouveau passeport: ${error.error || 'Erreur inconnue'}`);
         } else {
-          console.log('Γ£à Nouveau passeport upload├⌐ avec succ├¿s')
+          console.log('✅ Nouveau passeport uploadé avec succès')
         }
       }
 
-      // 5. G├⌐rer les remplacements de re├ºus pour les paiements existants
+      // 5. Gérer les remplacements de reçus pour les paiements existants
       if (reservationId) {
         for (let i = 0; i < paiements.length; i++) {
           const paiement = paiements[i];
-          // Si le paiement a un ID (existant) ET qu'un nouveau fichier a ├⌐t├⌐ upload├⌐
+          // Si le paiement a un ID (existant) ET qu'un nouveau fichier a été uploadé
           if (paiement.id && documents.payment[i]) {
-            console.log(`≡ƒôñ Remplacement du re├ºu pour paiement existant ID ${paiement.id}...`)
+            console.log(`📤 Remplacement du reçu pour paiement existant ID ${paiement.id}...`)
             
-            // R├⌐cup├⌐rer l'ancien fichier pour le supprimer
+            // Récupérer l'ancien fichier pour le supprimer
             const existingPayment = reservationData?.payments?.find((p: any) => p.id === paiement.id);
             if (existingPayment?.fichier?.id) {
-              console.log(`≡ƒùæ∩╕Å Suppression de l'ancien re├ºu (fichier ID: ${existingPayment.fichier.id})...`)
+              console.log(`🗑️ Suppression de l'ancien reçu (fichier ID: ${existingPayment.fichier.id})...`)
               try {
                 const deleteResponse = await fetch(api.url(`${api.endpoints.uploadCloudinary}/${existingPayment.fichier.id}`), {
                   method: "DELETE",
@@ -814,18 +814,18 @@ export default function EditReservation() {
                 
                 if (!deleteResponse.ok) {
                   const error = await deleteResponse.json().catch(() => ({ error: 'Erreur inconnue' }));
-                  console.error('ΓÜá∩╕Å Erreur suppression ancien re├ºu:', error);
-                  fileUploadErrors.push(`Erreur lors de la suppression de l'ancien re├ºu: ${error.error || 'Erreur inconnue'}`);
+                  console.error('⚠️ Erreur suppression ancien reçu:', error);
+                  fileUploadErrors.push(`Erreur lors de la suppression de l'ancien reçu: ${error.error || 'Erreur inconnue'}`);
                 } else {
-                  console.log('Γ£à Ancien re├ºu supprim├⌐ avec succ├¿s');
+                  console.log('✅ Ancien reçu supprimé avec succès');
                 }
               } catch (error) {
-                console.error('Γ¥î Erreur lors de la suppression de l\'ancien re├ºu:', error);
-                fileUploadErrors.push('Erreur lors de la suppression de l\'ancien re├ºu');
+                console.error('❌ Erreur lors de la suppression de l\'ancien reçu:', error);
+                fileUploadErrors.push('Erreur lors de la suppression de l\'ancien reçu');
               }
             }
             
-            // Upload le nouveau re├ºu et le lier au paiement existant
+            // Upload le nouveau reçu et le lier au paiement existant
             const formDataPayment = new FormData();
             formDataPayment.append("file", documents.payment[i] as File);
             formDataPayment.append("reservationId", reservationId.toString());
@@ -840,14 +840,14 @@ export default function EditReservation() {
               
               if (!receiptResponse.ok) {
                 const error = await receiptResponse.json();
-                console.error('Γ¥î Erreur upload nouveau re├ºu:', error)
-                fileUploadErrors.push(`Erreur lors de l'upload du nouveau re├ºu pour le paiement ${i + 1}: ${error.error || 'Erreur inconnue'}`);
+                console.error('❌ Erreur upload nouveau reçu:', error)
+                fileUploadErrors.push(`Erreur lors de l'upload du nouveau reçu pour le paiement ${i + 1}: ${error.error || 'Erreur inconnue'}`);
               } else {
-                console.log('Γ£à Nouveau re├ºu upload├⌐ et li├⌐ au paiement existant')
+                console.log('✅ Nouveau reçu uploadé et lié au paiement existant')
               }
             } catch (error) {
-              console.error('Γ¥î Erreur lors de l\'upload du nouveau re├ºu:', error);
-              fileUploadErrors.push(`Erreur lors de l'upload du nouveau re├ºu pour le paiement ${i + 1}`);
+              console.error('❌ Erreur lors de l\'upload du nouveau reçu:', error);
+              fileUploadErrors.push(`Erreur lors de l'upload du nouveau reçu pour le paiement ${i + 1}`);
             }
           }
         }
@@ -857,17 +857,17 @@ export default function EditReservation() {
       if (fileUploadErrors.length > 0) {
         toast({
           title: "Avertissement",
-          description: `R├⌐servation modifi├⌐e mais avec des erreurs: ${fileUploadErrors.join(', ')}`,
+          description: `Réservation modifiée mais avec des erreurs: ${fileUploadErrors.join(', ')}`,
           variant: "destructive"
         })
       } else {
         toast({
-          title: "Succ├¿s",
-          description: "R├⌐servation modifi├⌐e avec succ├¿s",
+          title: "Succès",
+          description: "Réservation modifiée avec succès",
         })
       }
 
-      // Si c'est un dossier leader, appliquer les mises ├á jour des accompagnants + fichiers passeport
+      // Si c'est un dossier leader, appliquer les mises à jour des accompagnants + fichiers passeport
       if (reservationData?.isLeader && accompagnants.length > 0) {
         for (const a of accompagnants) {
           const delMemberPass = memberPassportDelete[a.id];
@@ -921,7 +921,7 @@ export default function EditReservation() {
             }),
           });
           if (!memberRes.ok) {
-            console.warn(`Echec mise ├á jour accompagnant ${a.id}`);
+            console.warn(`Echec mise à jour accompagnant ${a.id}`);
           }
         }
       }
@@ -939,7 +939,7 @@ export default function EditReservation() {
     }
   }
 
-  // Fonctions de gestion des fichiers (align├⌐es avec Nouvelle R├⌐servation)
+  // Fonctions de gestion des fichiers (alignées avec Nouvelle Réservation)
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: DocumentType) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -975,13 +975,13 @@ export default function EditReservation() {
     if (!(file.type === 'application/pdf' || file.type.startsWith('image/'))) {
       toast({
         title: "Erreur",
-        description: "Format de fichier non support├⌐. Seuls les fichiers PDF et images sont accept├⌐s.",
+        description: "Format de fichier non supporté. Seuls les fichiers PDF et images sont acceptés.",
         variant: "destructive",
       });
       return;
     }
     
-    // Stocker le fichier localement pour l'aper├ºu
+    // Stocker le fichier localement pour l'aperçu
     setDocuments(prev => {
       const newPayments = [...(prev.payment || [])];
       newPayments[index] = file;
@@ -989,7 +989,7 @@ export default function EditReservation() {
     });
     mettreAJourPaiement(index, 'recu', file.name);
     
-    // Cr├⌐er l'aper├ºu local
+    // Créer l'aperçu local
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -1126,7 +1126,7 @@ export default function EditReservation() {
     })
   }
 
-  // Helper function pour v├⌐rifier si un fichier/URL est un PDF (case-insensitive)
+  // Helper function pour vérifier si un fichier/URL est un PDF (case-insensitive)
   const isPdfFile = (fileNameOrUrl: string | null | undefined): boolean => {
     if (!fileNameOrUrl || typeof fileNameOrUrl !== 'string') return false;
     const lower = fileNameOrUrl.toLowerCase();
@@ -1141,24 +1141,24 @@ export default function EditReservation() {
     // Si ce n'est pas une URL Cloudinary, retourner telle quelle
     if (!url.includes('cloudinary.com')) return url;
     
-    // V├⌐rifier si c'est un PDF (par l'URL ou le nom de fichier)
+    // Vérifier si c'est un PDF (par l'URL ou le nom de fichier)
     const isPdf = isPdfFile(fileName || url);
     
     if (!isPdf) return url;
     
-    // Si l'URL se termine d├⌐j├á par .pdf, retourner telle quelle
+    // Si l'URL se termine déjà par .pdf, retourner telle quelle
     if (url.toLowerCase().endsWith('.pdf') || url.match(/\.pdf(\?|$|#)/i)) {
       return url;
     }
     
-    // Pour les URLs Cloudinary raw/upload, ajouter .pdf ├á la fin pour forcer le Content-Type
+    // Pour les URLs Cloudinary raw/upload, ajouter .pdf à la fin pour forcer le Content-Type
     if (url.includes('/raw/upload/')) {
-      // Extraire la partie avant les param├¿tres de requ├¬te/ancre
+      // Extraire la partie avant les paramètres de requête/ancre
       const urlParts = url.split(/[?#]/);
       const baseUrl = urlParts[0];
       const queryAndHash = urlParts.slice(1).join('');
       
-      // Ajouter .pdf avant les param├¿tres de requ├¬te/ancre
+      // Ajouter .pdf avant les paramètres de requête/ancre
       return baseUrl + '.pdf' + (queryAndHash ? (url.includes('?') ? '?' : '#') + queryAndHash : '');
     }
     
@@ -1173,13 +1173,13 @@ export default function EditReservation() {
       return previews[type].url;
     }
     
-    // Si on a marqu├⌐ le passeport pour suppression, ne pas afficher l'ancien
+    // Si on a marqué le passeport pour suppression, ne pas afficher l'ancien
     if (type === 'passport' && passportToDelete !== null) {
       return null;
     }
     
-    // Ensuite v├⌐rifier dans les documents existants de la r├⌐servation
-    // G├⌐rer les variations de types (passport/passeport, payment/paiement)
+    // Ensuite vérifier dans les documents existants de la réservation
+    // Gérer les variations de types (passport/passeport, payment/paiement)
     const typeVariations = type === 'passport' ? ['passport', 'passeport'] : 
                           type === 'payment' ? ['payment', 'paiement'] : [type];
     
@@ -1191,7 +1191,7 @@ export default function EditReservation() {
       let url = existingDoc.cloudinaryUrl || existingDoc.filePath;
       
       // Pour les PDFs, garder l'URL telle quelle car Cloudinary peut servir les PDFs
-      // depuis /image/upload/ si c'est l├á qu'ils ont ├⌐t├⌐ stock├⌐s
+      // depuis /image/upload/ si c'est là qu'ils ont été stockés
       // Ne pas essayer de corriger car cela peut causer des 404
       return url;
     }
@@ -1212,13 +1212,13 @@ export default function EditReservation() {
 
   // Helper function pour obtenir le type d'un document
   const getDocumentType = (type: string) => {
-    // D'abord v├⌐rifier dans previews
+    // D'abord vérifier dans previews
     if (previews[type]) {
       return previews[type].type;
     }
     
-    // Ensuite v├⌐rifier dans les documents existants
-    // G├⌐rer les variations de types (passport/passeport, payment/paiement)
+    // Ensuite vérifier dans les documents existants
+    // Gérer les variations de types (passport/passeport, payment/paiement)
     const typeVariations = type === 'passport' ? ['passport', 'passeport'] : 
                           type === 'payment' ? ['payment', 'paiement'] : [type];
     
@@ -1233,33 +1233,33 @@ export default function EditReservation() {
     return 'image/*';
   }
 
-  // Helper function pour obtenir le nom d'un h├┤tel par son ID
+  // Helper function pour obtenir le nom d'un hôtel par son ID
   const getHotelName = (hotelId: string, city: 'madina' | 'makkah') => {
-    console.log('≡ƒöì getHotelName called:', { hotelId, city, programId: formData.programId, programsCount: programs.length });
+    console.log('🔍 getHotelName called:', { hotelId, city, programId: formData.programId, programsCount: programs.length });
     
-    if (!hotelId || hotelId === 'none') return 'Sans h├┤tel';
+    if (!hotelId || hotelId === 'none') return 'Sans hôtel';
     if (!formData.programId || programs.length === 0) {
-      console.log('ΓÜá∩╕Å No program loaded yet');
+      console.log('⚠️ No program loaded yet');
       return 'Chargement...';
     }
     
     const program = programs.find(p => p.id === parseInt(formData.programId));
-    console.log('≡ƒöì Program found:', program?.id, program?.name);
+    console.log('🔍 Program found:', program?.id, program?.name);
     
     if (!program) {
-      console.log('ΓÜá∩╕Å Program not found in programs array');
+      console.log('⚠️ Program not found in programs array');
       return 'Chargement...';
     }
     
     const hotelsList = city === 'madina' ? program.hotelsMadina : program.hotelsMakkah;
-    console.log('≡ƒöì Hotels list:', { city, count: hotelsList?.length, hotelsList });
+    console.log('🔍 Hotels list:', { city, count: hotelsList?.length, hotelsList });
     
     const hotelRelation = hotelsList?.find((ph: { hotel: Hotel }) => ph.hotel.id.toString() === hotelId);
-    console.log('≡ƒöì Hotel relation found:', hotelRelation);
+    console.log('🔍 Hotel relation found:', hotelRelation);
     
     if (!hotelRelation) {
-      console.log('ΓÜá∩╕Å Hotel not found with ID:', hotelId);
-      return `H├┤tel ID ${hotelId}`;
+      console.log('⚠️ Hotel not found with ID:', hotelId);
+      return `Hôtel ID ${hotelId}`;
     }
     
     return hotelRelation.hotel.name;
@@ -1323,13 +1323,13 @@ export default function EditReservation() {
   const getGenderIconRoom = (gender: string) => {
     switch (gender) {
       case "Homme":
-        return "≡ƒæ¿";
+        return "👨";
       case "Femme":
-        return "≡ƒæ⌐";
+        return "👩";
       case "Mixte":
-        return "≡ƒæÑ";
+        return "👥";
       default:
-        return "≡ƒæÑ";
+        return "👥";
     }
   };
 
@@ -1342,16 +1342,16 @@ export default function EditReservation() {
     }
 
     return paiements.every((paiement, index) => {
-      // Si c'est un paiement existant (avec ID), il est d├⌐j├á valide
+      // Si c'est un paiement existant (avec ID), il est déjà valide
       if (paiement.id) {
         return true;
       }
       
-      // Pour les nouveaux paiements, v├⌐rifier que tous les champs sont remplis
+      // Pour les nouveaux paiements, vérifier que tous les champs sont remplis
       const montantRempli = paiement.montant !== "" && !Number.isNaN(parseAmount(paiement.montant));
       const typeRempli = paiement.type !== "";
       const dateRemplie = paiement.date !== "";
-      // Le re├ºu n'est plus obligatoire
+      // Le reçu n'est plus obligatoire
       const recuExiste = (paiement.recu && paiement.recu.trim() !== "") || !!paymentDocuments?.[index];
 
       return montantRempli && typeRempli && dateRemplie;
@@ -1364,7 +1364,7 @@ export default function EditReservation() {
   }, [paiements]);
   const remainingAmount = useMemo(() => Math.max(totalPrice - totalPaid, 0), [totalPrice, totalPaid]);
 
-  /** Align├⌐ sur Nouvelle Chambre ΓÇö g├⌐n├⌐ration PNG du re├ºu puis attachement au paiement index */
+  /** Aligné sur Nouvelle Chambre — génération PNG du reçu puis attachement au paiement index */
   const canGeneratePaymentReceiptEdit = (index: number) => {
     const payment = paiements[index];
     if (!payment) return false;
@@ -1390,7 +1390,7 @@ export default function EditReservation() {
     if (!ctx) {
       toast({
         title: "Erreur",
-        description: "Impossible de g├⌐n├⌐rer le re├ºu pour le moment.",
+        description: "Impossible de générer le reçu pour le moment.",
         variant: "destructive",
       });
       return;
@@ -1427,7 +1427,7 @@ export default function EditReservation() {
     if (!blob) {
       toast({
         title: "Erreur",
-        description: "G├⌐n├⌐ration du re├ºu ├⌐chou├⌐e.",
+        description: "Génération du reçu échouée.",
         variant: "destructive",
       });
       return;
@@ -1445,17 +1445,17 @@ export default function EditReservation() {
       [`payment_${index}`]: { url: URL.createObjectURL(file), type: file.type },
     }));
     toast({
-      title: "Re├ºu g├⌐n├⌐r├⌐",
-      description: "Le re├ºu est joint ├á ce paiement et sera enregistr├⌐ ├á la validation.",
+      title: "Reçu généré",
+      description: "Le reçu est joint à ce paiement et sera enregistré à la validation.",
     });
   };
 
   const section3Complete = paiements.length > 0 && arePaymentsValid
-  const section4Complete = true // Les toggles sont toujours compl├⌐t├⌐s
+  const section4Complete = true // Les toggles sont toujours complétés
 
-  // D├⌐tecter les changements dans le formulaire
+  // Détecter les changements dans le formulaire
   const hasChanges = useMemo(() => {
-    // V├⌐rifier les changements dans les documents (toujours disponible)
+    // Vérifier les changements dans les documents (toujours disponible)
     const hasNewDocuments = 
       documents.passport !== null ||
       documents.visa !== null ||
@@ -1463,10 +1463,10 @@ export default function EditReservation() {
       documents.flightBooked !== null ||
       documents.payment.some(f => f !== null);
     
-    // V├⌐rifier si un passeport est marqu├⌐ pour suppression
+    // Vérifier si un passeport est marqué pour suppression
     const passportToBeDeleted = passportToDelete !== null;
     
-    // Si initialData n'est pas encore charg├⌐, v├⌐rifier seulement les documents
+    // Si initialData n'est pas encore chargé, vérifier seulement les documents
     if (!initialData || !initialData.formData) {
       return hasNewDocuments || passportToBeDeleted;
     }
@@ -1474,7 +1474,7 @@ export default function EditReservation() {
     const initialFormData = initialData.formData;
     const initialReservationData = initialData;
     
-    // V├⌐rifier les changements dans les champs du formulaire
+    // Vérifier les changements dans les champs du formulaire
     const formDataChanged = 
       formData.nom !== (initialFormData.nom || '') ||
       formData.prenom !== (initialFormData.prenom || '') ||
@@ -1506,7 +1506,7 @@ export default function EditReservation() {
         );
       });
     
-    // V├⌐rifier les changements dans les paiements (nouveaux paiements ajout├⌐s ou modifications)
+    // Vérifier les changements dans les paiements (nouveaux paiements ajoutés ou modifications)
     const hasNewPayments = paiements.some(p => !p.id);
     const paymentsChanged = paiements.length !== (initialReservationData.payments?.length || 0) ||
       paiements.some((p, index) => {
@@ -1546,12 +1546,12 @@ export default function EditReservation() {
     // 1. Les paiements sont valides (ou il n'y a pas de paiements)
     // 2. ET (il y a des changements OU le formulaire de base est valide)
     const baseFormValid = formData.prix && formData.programId && formData.typeChambre && formData.gender;
-    // Si des changements sont d├⌐tect├⌐s, activer le bouton m├¬me si certains champs ne sont pas remplis
+    // Si des changements sont détectés, activer le bouton même si certains champs ne sont pas remplis
     // (car on peut modifier juste une partie)
     if (hasChanges) {
-      return arePaymentsValid; // Juste v├⌐rifier que les paiements sont valides
+      return arePaymentsValid; // Juste vérifier que les paiements sont valides
     }
-    // Sinon, v├⌐rifier que le formulaire de base est valide
+    // Sinon, vérifier que le formulaire de base est valide
     return arePaymentsValid && baseFormValid;
   }, [arePaymentsValid, hasChanges, formData])
 
@@ -1618,7 +1618,7 @@ export default function EditReservation() {
           </div>
           {passportToDelete !== null && (
             <p className="text-xs text-orange-600">
-              L&apos;ancien passeport sera remplac├⌐ par le nouveau fichier
+              L&apos;ancien passeport sera remplacé par le nouveau fichier
             </p>
           )}
         </div>
@@ -1626,7 +1626,7 @@ export default function EditReservation() {
         <div className="mt-1 flex flex-col flex-1 min-h-0 rounded-xl border border-blue-200 bg-white p-3 shadow-sm h-full">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-2 shrink-0">
             <span className="text-sm font-semibold text-blue-800 shrink-0">
-              {documents.passport ? "Nouveau passeport" : "Aper├ºu du passeport"}
+              {documents.passport ? "Nouveau passeport" : "Aperçu du passeport"}
             </span>
             <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
               {(previews.passport || getDocumentUrl("passport")) && (
@@ -1654,7 +1654,7 @@ export default function EditReservation() {
                   className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1.5 rounded-md text-sm inline-flex items-center gap-1 border border-transparent hover:border-blue-200"
                 >
                   <Download className="h-4 w-4" />
-                  T├⌐l├⌐charger
+                  Télécharger
                 </a>
               )}
               {(previews.passport || getDocumentUrl("passport")) && !documents.passport && (
@@ -1749,7 +1749,7 @@ export default function EditReservation() {
               if (!passportUrl) {
                 return (
                   <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400 text-sm">
-                    Aucun passeport attach├⌐
+                    Aucun passeport attaché
                   </div>
                 );
               }
@@ -1790,7 +1790,7 @@ export default function EditReservation() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement de la r├⌐servation...</p>
+          <p className="text-gray-600">Chargement de la réservation...</p>
         </div>
       </div>
     )
@@ -1810,20 +1810,20 @@ export default function EditReservation() {
             </Link>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                {isChambrePrivee ? "Modifier Chambre Priv├⌐e / Familiale" : "Modifier la R├⌐servation"}
+                {isChambrePrivee ? "Modifier Chambre Privée / Familiale" : "Modifier la Réservation"}
               </h1>
-              <p className="text-gray-600">Mise ├á jour des informations de la r├⌐servation #{reservationId}</p>
+              <p className="text-gray-600">Mise à jour des informations de la réservation #{reservationId}</p>
             </div>
           </div>
         </div>
 
-        {/* Structure identique ├á Nouvelle R├⌐servation */}
+        {/* Structure identique à Nouvelle Réservation */}
         <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
                 <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-20 z-40 shadow-lg">
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <CardTitle className="text-xl flex items-center gap-3 flex-wrap">
                       <Sparkles className="h-6 w-6" />
-                      {isChambrePrivee ? "Modifier Chambre Priv├⌐e / Familiale" : "Modifier la R├⌐servation"}
+                      {isChambrePrivee ? "Modifier Chambre Privée / Familiale" : "Modifier la Réservation"}
                       {isChambrePrivee && (
                         <Badge
                           variant="outline"
@@ -1841,7 +1841,7 @@ export default function EditReservation() {
                         <div className="flex items-center gap-2">
                           <Wallet className="h-4 w-4 text-emerald-100 shrink-0" />
                           <span className="text-xs sm:text-sm text-emerald-50/95 font-semibold uppercase tracking-wide">
-                            Prix engag├⌐
+                            Prix engagé
                           </span>
                         </div>
                         <span className="text-lg font-bold text-white tabular-nums sm:ml-1">
@@ -1860,8 +1860,8 @@ export default function EditReservation() {
                         }`}
                         title={
                           remainingAmount <= 0
-                            ? "Dossier sold├⌐"
-                            : "Montant encore d├╗ sur le dossier"
+                            ? "Dossier soldé"
+                            : "Montant encore dû sur le dossier"
                         }
                       >
                         <div className="flex items-center gap-2">
@@ -1875,7 +1875,7 @@ export default function EditReservation() {
                               remainingAmount <= 0 ? "text-green-50/95" : "text-amber-50/95"
                             }`}
                           >
-                            Reste ├á payer
+                            Reste à payer
                           </span>
                         </div>
                         <span className="text-lg font-bold tabular-nums text-white sm:ml-1">
@@ -1887,7 +1887,7 @@ export default function EditReservation() {
                         </span>
                         {remainingAmount <= 0 && (
                           <span className="text-[10px] sm:text-xs font-medium text-green-100/90 sm:ml-2">
-                            Sold├⌐
+                            Soldé
                           </span>
                         )}
                       </div>
@@ -1896,7 +1896,7 @@ export default function EditReservation() {
                 </CardHeader>
                 <CardContent className="p-6 space-y-6">
             <form onSubmit={handleSubmit}>
-              {/* Section 1: Configuration du Voyage (align├⌐e Nouvelle R├⌐servation : ├ëditer + sous-bloc) */}
+              {/* Section 1: Configuration du Voyage (alignée Nouvelle Réservation : Éditer + sous-bloc) */}
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
@@ -1960,8 +1960,8 @@ export default function EditReservation() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="text-lg">≡ƒòî</span>
-                          <Label className="text-blue-700 font-medium text-sm">H├┤tel ├á Madina *</Label>
+                          <span className="text-lg">🕌</span>
+                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina *</Label>
                           <button
                             type="button"
                             onClick={() => setShowRoomGuide(true)}
@@ -1979,8 +1979,8 @@ export default function EditReservation() {
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="text-lg">≡ƒòï</span>
-                          <Label className="text-blue-700 font-medium text-sm">H├┤tel ├á Makkah *</Label>
+                          <span className="text-lg">🕋</span>
+                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah *</Label>
                           <button
                             type="button"
                             onClick={() => setShowRoomGuide(true)}
@@ -2008,7 +2008,7 @@ export default function EditReservation() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-blue-700 font-medium text-sm">Date de r├⌐servation *</Label>
+                        <Label className="text-blue-700 font-medium text-sm">Date de réservation *</Label>
                         <Input
                           type="date"
                           value={formData.dateReservation}
@@ -2033,7 +2033,7 @@ export default function EditReservation() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-blue-700 font-medium text-sm">Date de r├⌐servation *</Label>
+                        <Label className="text-blue-700 font-medium text-sm">Date de réservation *</Label>
                         <Input
                           type="date"
                           value={formData.dateReservation}
@@ -2045,12 +2045,12 @@ export default function EditReservation() {
                       </div>
                     </div>
 
-                    {/* H├┤tels & chambres ΓÇö m├¬me pr├⌐sentation ┬½ points ┬╗ que Nouvelle R├⌐servation */}
+                    {/* Hôtels & chambres — même présentation « points » que Nouvelle Réservation */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-lg">≡ƒòî</span>
-                      <Label className="text-blue-700 font-medium text-sm">H├┤tel ├á Madina *</Label>
+                      <span className="text-lg">🕌</span>
+                      <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina *</Label>
                       <button
                         type="button"
                         onClick={() => setShowRoomGuide(true)}
@@ -2073,7 +2073,7 @@ export default function EditReservation() {
                         <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
                           <div className="flex items-center gap-2 mb-2">
                             <span className="text-xs font-medium text-green-700">
-                              ≡ƒòî Chambres (aper├ºu des places)
+                              🕌 Chambres (aperçu des places)
                             </span>
                           </div>
                           <div className="grid gap-2">
@@ -2081,7 +2081,7 @@ export default function EditReservation() {
                               const hid = resolveHotelId(formData.hotelMadina, "madina");
                               if (!hid)
                                 return (
-                                  <div className="text-xs text-gray-500 py-2">ΓÇö</div>
+                                  <div className="text-xs text-gray-500 py-2">—</div>
                                 );
                               const filteredRooms = programDetail.rooms.filter(
                                 (room: any) =>
@@ -2094,7 +2094,7 @@ export default function EditReservation() {
                               if (filteredRooms.length === 0) {
                                 return (
                                   <div className="text-xs text-gray-500 text-center py-2">
-                                    Aucune chambre trouv├⌐e
+                                    Aucune chambre trouvée
                                   </div>
                                 );
                               }
@@ -2142,7 +2142,7 @@ export default function EditReservation() {
                                               let placeTitle = `Place ${placeIndex + 1}`;
                                               if (placeIndex < placesOccupees) {
                                                 placeColor = "bg-red-500";
-                                                placeTitle = `Place ${placeIndex + 1} occup├⌐e`;
+                                                placeTitle = `Place ${placeIndex + 1} occupée`;
                                               } else if (
                                                 isGroupRoom &&
                                                 take > 0 &&
@@ -2150,7 +2150,7 @@ export default function EditReservation() {
                                                 placeIndex <= y1
                                               ) {
                                                 placeColor = "bg-yellow-400";
-                                                placeTitle = `Place ${placeIndex + 1} ΓÇö dossier groupe`;
+                                                placeTitle = `Place ${placeIndex + 1} — dossier groupe`;
                                               } else {
                                                 placeColor = "bg-green-500";
                                                 placeTitle = `Place ${placeIndex + 1} libre`;
@@ -2183,8 +2183,8 @@ export default function EditReservation() {
 
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-lg">≡ƒòï</span>
-                      <Label className="text-blue-700 font-medium text-sm">H├┤tel ├á Makkah *</Label>
+                      <span className="text-lg">🕋</span>
+                      <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah *</Label>
                       <button
                         type="button"
                         onClick={() => setShowRoomGuide(true)}
@@ -2207,7 +2207,7 @@ export default function EditReservation() {
                         <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
                           <div className="flex items-center gap-2 mb-2">
                             <span className="text-xs font-medium text-green-700">
-                              ≡ƒòï Chambres (aper├ºu des places)
+                              🕋 Chambres (aperçu des places)
                             </span>
                           </div>
                           <div className="grid gap-2">
@@ -2215,7 +2215,7 @@ export default function EditReservation() {
                               const hid = resolveHotelId(formData.hotelMakkah, "makkah");
                               if (!hid)
                                 return (
-                                  <div className="text-xs text-gray-500 py-2">ΓÇö</div>
+                                  <div className="text-xs text-gray-500 py-2">—</div>
                                 );
                               const filteredRooms = programDetail.rooms.filter(
                                 (room: any) =>
@@ -2228,7 +2228,7 @@ export default function EditReservation() {
                               if (filteredRooms.length === 0) {
                                 return (
                                   <div className="text-xs text-gray-500 text-center py-2">
-                                    Aucune chambre trouv├⌐e
+                                    Aucune chambre trouvée
                                   </div>
                                 );
                               }
@@ -2276,7 +2276,7 @@ export default function EditReservation() {
                                               let placeTitle = `Place ${placeIndex + 1}`;
                                               if (placeIndex < placesOccupees) {
                                                 placeColor = "bg-red-500";
-                                                placeTitle = `Place ${placeIndex + 1} occup├⌐e`;
+                                                placeTitle = `Place ${placeIndex + 1} occupée`;
                                               } else if (
                                                 isGroupRoom &&
                                                 take > 0 &&
@@ -2284,7 +2284,7 @@ export default function EditReservation() {
                                                 placeIndex <= y1
                                               ) {
                                                 placeColor = "bg-yellow-400";
-                                                placeTitle = `Place ${placeIndex + 1} ΓÇö dossier groupe`;
+                                                placeTitle = `Place ${placeIndex + 1} — dossier groupe`;
                                               } else {
                                                 placeColor = "bg-green-500";
                                                 placeTitle = `Place ${placeIndex + 1} libre`;
@@ -2347,9 +2347,9 @@ export default function EditReservation() {
                               />
                             </div>
                             <div className="space-y-1">
-                              <Label className="text-xs text-blue-700">Pr├⌐nom *</Label>
+                              <Label className="text-xs text-blue-700">Prénom *</Label>
                               <Input
-                                placeholder="Pr├⌐nom"
+                                placeholder="Prénom"
                                 value={formData.prenom}
                                 onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
                                 className="h-10 border-2 border-blue-100 focus:border-blue-400"
@@ -2358,9 +2358,9 @@ export default function EditReservation() {
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1">
-                              <Label className="text-xs text-blue-700">T├⌐l├⌐phone *</Label>
+                              <Label className="text-xs text-blue-700">Téléphone *</Label>
                               <Input
-                                placeholder="T├⌐l├⌐phone"
+                                placeholder="Téléphone"
                                 value={formData.telephone}
                                 onChange={(e) =>
                                   setFormData({ ...formData, telephone: e.target.value })
@@ -2396,7 +2396,7 @@ export default function EditReservation() {
                               </Select>
                             </div>
                             <div className="space-y-1">
-                              <Label className="text-xs text-blue-700">N┬░ Passeport</Label>
+                              <Label className="text-xs text-blue-700">N° Passeport</Label>
                               <Input
                                 placeholder="AB1234567"
                                 value={formData.passportNumber}
@@ -2443,7 +2443,7 @@ export default function EditReservation() {
                   </div>
                 ) : (
                   <>
-                {/* Premi├¿re ligne : groupe, nom, pr├⌐nom, transport */}
+                {/* Première ligne : groupe, nom, prénom, transport */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                       <div className="space-y-2">
                     <Label className="text-blue-700 font-medium text-sm">Groupe</Label>
@@ -2463,7 +2463,7 @@ export default function EditReservation() {
                       </div>
 
                       <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">Pr├⌐nom *</Label>
+                    <Label className="text-blue-700 font-medium text-sm">Prénom *</Label>
                     <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
                       <span className="text-gray-900 font-medium">{formData.prenom || 'N/A'}</span>
                     </div>
@@ -2484,14 +2484,14 @@ export default function EditReservation() {
                       </div>
                 </div>
 
-                {/* Deuxi├¿me ligne : passport, remarque */}
+                {/* Deuxième ligne : passport, remarque */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">N┬░ passport</Label>
+                    <Label className="text-blue-700 font-medium text-sm">N° passport</Label>
                     <Input
                       value={formData.passportNumber}
                       onChange={(e) => setFormData({ ...formData, passportNumber: e.target.value })}
-                      placeholder="Num├⌐ro de passeport"
+                      placeholder="Numéro de passeport"
                       className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
                     />
                       </div>
@@ -2507,10 +2507,10 @@ export default function EditReservation() {
                       </div>
                 </div>
 
-                {/* T├⌐l├⌐phone - toujours n├⌐cessaire */}
+                {/* Téléphone - toujours nécessaire */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                       <div className="space-y-2">
-                    <Label className="text-blue-700 font-medium text-sm">T├⌐l├⌐phone *</Label>
+                    <Label className="text-blue-700 font-medium text-sm">Téléphone *</Label>
                     <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
                       <span className="text-gray-900 font-medium">{formData.telephone || 'N/A'}</span>
                       </div>
@@ -2560,7 +2560,7 @@ export default function EditReservation() {
                                       />
                                     </div>
                                     <div className="space-y-1">
-                                      <Label className="text-xs text-blue-700">Pr├⌐nom *</Label>
+                                      <Label className="text-xs text-blue-700">Prénom *</Label>
                                       <Input
                                         value={a.firstName}
                                         onChange={(e) =>
@@ -2572,13 +2572,13 @@ export default function EditReservation() {
                                             )
                                           )
                                         }
-                                        placeholder="Pr├⌐nom"
+                                        placeholder="Prénom"
                                         className="h-10 border-2 border-blue-100 focus:border-blue-400"
                                       />
                                     </div>
                                   </div>
                                   <div className="space-y-1">
-                                    <Label className="text-xs text-blue-700">N┬░ Passeport</Label>
+                                    <Label className="text-xs text-blue-700">N° Passeport</Label>
                                     <Input
                                       value={a.passportNumber || ""}
                                       onChange={(e) =>
@@ -2590,7 +2590,7 @@ export default function EditReservation() {
                                           )
                                         )
                                       }
-                                      placeholder="Num├⌐ro passeport"
+                                      placeholder="Numéro passeport"
                                       className="h-10 border-2 border-blue-100 focus:border-blue-400"
                                     />
                                   </div>
@@ -2637,7 +2637,7 @@ export default function EditReservation() {
                                     <div className="p-2 border border-blue-200 rounded-lg bg-white flex flex-col min-h-0 w-full">
                                       <div className="flex items-center justify-between mb-2 flex-wrap gap-2 shrink-0">
                                         <span className="text-sm font-medium text-blue-700">
-                                          Aper├ºu du passeport
+                                          Aperçu du passeport
                                         </span>
                                         <div className="flex items-center gap-2 flex-wrap">
                                           <button
@@ -2654,7 +2654,7 @@ export default function EditReservation() {
                                             }}
                                           >
                                             <ZoomIn className="h-3 w-3" />
-                                            Aper├ºu
+                                            Aperçu
                                           </button>
                                           <a
                                             href={pvUrl}
@@ -2664,7 +2664,7 @@ export default function EditReservation() {
                                             className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded text-sm inline-flex items-center gap-1"
                                           >
                                             <Download className="h-3 w-3" />
-                                            T├⌐l├⌐charger
+                                            Télécharger
                                           </a>
                                           {memberPassportFiles[a.id] && (
                                             <Button
@@ -2753,7 +2753,7 @@ export default function EditReservation() {
                                   )}
                                   {memberPassportFiles[a.id] && (
                                     <p className="text-xs text-emerald-700">
-                                      Nouveau fichier pr├¬t ├á ├¬tre enregistr├⌐ avec la r├⌐servation.
+                                      Nouveau fichier prêt à être enregistré avec la réservation.
                                     </p>
                                   )}
                                 </div>
@@ -2786,7 +2786,7 @@ export default function EditReservation() {
                                         )
                                       )
                                     }
-                                    placeholder="Pr├⌐nom"
+                                    placeholder="Prénom"
                                     className="h-10 border-2 border-blue-200"
                                   />
                                   <Input
@@ -2800,7 +2800,7 @@ export default function EditReservation() {
                                         )
                                       )
                                     }
-                                    placeholder="T├⌐l├⌐phone"
+                                    placeholder="Téléphone"
                                     className="h-10 border-2 border-blue-200"
                                     disabled
                                   />
@@ -2815,14 +2815,14 @@ export default function EditReservation() {
                                         )
                                       )
                                     }
-                                    placeholder="N┬░ passeport"
+                                    placeholder="N° passeport"
                                     className="h-10 border-2 border-blue-200"
                                     disabled
                                   />
                                 </div>
                                 <div className="space-y-2">
                                   <Label className="text-blue-700 font-medium text-sm">
-                                    Passeport (fichier) ΓÇö accompagnant {idx + 1}
+                                    Passeport (fichier) — accompagnant {idx + 1}
                                   </Label>
                                   {(!hasPreview || markPassportReplace) && !memberPassportFiles[a.id] ? (
                                     <Input
@@ -2852,7 +2852,7 @@ export default function EditReservation() {
                                             }}
                                           >
                                             <ZoomIn className="h-4 w-4 mr-1" />
-                                            Aper├ºu
+                                            Aperçu
                                           </Button>
                                           {fid && (
                                             <Button
@@ -2883,7 +2883,7 @@ export default function EditReservation() {
                                   )}
                                   {memberPassportFiles[a.id] && (
                                     <p className="text-xs text-emerald-700">
-                                      Nouveau fichier pr├¬t ├á ├¬tre enregistr├⌐ avec la r├⌐servation.
+                                      Nouveau fichier prêt à être enregistré avec la réservation.
                                     </p>
                                   )}
                                 </div>
@@ -2891,11 +2891,11 @@ export default function EditReservation() {
                             )}
                             {(a.payments || []).length > 0 && (
                               <div className="text-xs text-gray-700 space-y-1">
-                                <span className="font-semibold">Paiements li├⌐s ├á ce membre :</span>
+                                <span className="font-semibold">Paiements liés à ce membre :</span>
                                 {(a.payments || []).map((p: any) => (
                                   <div key={p.id} className="flex flex-wrap gap-2 items-center">
                                     <span>
-                                      {p.amount} DH ΓÇö {p.paymentMethod}
+                                      {p.amount} DH — {p.paymentMethod}
                                     </span>
                                     {(p.fichier?.cloudinaryUrl || p.fichier?.filePath) && (
                                       <Button
@@ -2907,12 +2907,12 @@ export default function EditReservation() {
                                           const pdf = isPdfFile(p.fichier?.fileName || u);
                                           setPreviewImage({
                                             url: u,
-                                            title: "Re├ºu paiement",
+                                            title: "Reçu paiement",
                                             type: pdf ? "application/pdf" : "image/*",
                                           });
                                         }}
                                       >
-                                        Voir le re├ºu
+                                        Voir le reçu
                                       </Button>
                                     )}
                                   </div>
@@ -2924,7 +2924,7 @@ export default function EditReservation() {
                       })}
                     </div>
                     <p className="mt-2 text-xs text-gray-600">
-                      Les champs structurels (programme, chambre, h├┤tels) restent verrouill├⌐s et g├⌐r├⌐s au niveau du dossier.
+                      Les champs structurels (programme, chambre, hôtels) restent verrouillés et gérés au niveau du dossier.
                     </p>
                   </div>
                 )}
@@ -2932,7 +2932,7 @@ export default function EditReservation() {
                 {!isChambrePrivee && renderLeaderPassportBlock()}
               </div>
 
-              {/* Section 3: Paiements ΓÇö th├¿me orange pour chambre priv├⌐e (align├⌐ Nouvelle Chambre) */}
+              {/* Section 3: Paiements — thème orange pour chambre privée (aligné Nouvelle Chambre) */}
               <div
                 className={`p-4 rounded-xl border mb-6 ${
                   isChambrePrivee
@@ -2963,10 +2963,10 @@ export default function EditReservation() {
                           {paiement.id ? (
                             <div className={paymentSectionUi.readonlyBox}>
                               <span className="text-gray-900 font-medium">
-                                {paiement.type === 'especes' && 'Esp├¿ces'}
+                                {paiement.type === 'especes' && 'Espèces'}
                                 {paiement.type === 'virement' && 'Virement'}
                                 {paiement.type === 'carte' && 'Carte'}
-                                {paiement.type === 'cheque' && 'Ch├¿que'}
+                                {paiement.type === 'cheque' && 'Chèque'}
                                 {!['especes', 'virement', 'carte', 'cheque'].includes(paiement.type) && paiement.type}
                               </span>
                             </div>
@@ -2976,13 +2976,13 @@ export default function EditReservation() {
                               onValueChange={(value) => mettreAJourPaiement(index, "type", value)}
                             >
                               <SelectTrigger className={`h-10 ${paymentSectionUi.field}`}>
-                                <SelectValue placeholder="S├⌐lectionner paiement" />
+                                <SelectValue placeholder="Sélectionner paiement" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="especes">Esp├¿ces</SelectItem>
+                                <SelectItem value="especes">Espèces</SelectItem>
                                 <SelectItem value="virement">Virement</SelectItem>
                                 <SelectItem value="carte">Carte</SelectItem>
-                                <SelectItem value="cheque">Ch├¿que</SelectItem>
+                                <SelectItem value="cheque">Chèque</SelectItem>
                               </SelectContent>
                             </Select>
                           )}
@@ -3034,11 +3034,11 @@ export default function EditReservation() {
                         </div>
                             </div>
 
-                      {/* Upload de re├ºu de paiement - Afficher seulement si pas de nouveau fichier upload├⌐ et pas de re├ºu existant */}
+                      {/* Upload de reçu de paiement - Afficher seulement si pas de nouveau fichier uploadé et pas de reçu existant */}
                       {!previews[`payment_${index}`] && !paiement.recu && (
                         <div className="mt-3 space-y-2">
                           <Label className={`${paymentSectionUi.label} font-medium text-sm`}>
-                            Re├ºu de paiement
+                            Reçu de paiement
                           </Label>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
                             <Input
@@ -3061,13 +3061,13 @@ export default function EditReservation() {
                               }`}
                             >
                               <Download className="h-3.5 w-3.5 mr-1.5" />
-                              G├⌐n├⌐rer re├ºu
+                              Générer reçu
                             </Button>
                           </div>
                         </div>
                       )}
                       
-                      {/* Champ d'upload cach├⌐ pour remplacer un re├ºu existant */}
+                      {/* Champ d'upload caché pour remplacer un reçu existant */}
                       {paiement.id && paiement.recu && !previews[`payment_${index}`] && (
                         <Input
                           type="file"
@@ -3079,12 +3079,12 @@ export default function EditReservation() {
                         />
                       )}
 
-                      {/* Aper├ºu du nouveau re├ºu upload├⌐ */}
+                      {/* Aperçu du nouveau reçu uploadé */}
                       {previews[`payment_${index}`] && (
                         <div className={`mt-3 p-2 border ${paymentSectionUi.previewBorder} rounded-lg bg-white`}>
                           <div className="flex items-center justify-between mb-2">
                             <span className={`text-sm font-medium ${paymentSectionUi.previewText}`}>
-                              {paiement.id && paiement.recu ? 'Nouveau re├ºu (remplacera l\'ancien)' : 'Aper├ºu du nouveau re├ºu'}
+                              {paiement.id && paiement.recu ? 'Nouveau reçu (remplacera l\'ancien)' : 'Aperçu du nouveau reçu'}
                             </span>
                             <div className="flex items-center gap-2">
                               <button
@@ -3092,7 +3092,7 @@ export default function EditReservation() {
                                 className={`${paymentSectionUi.previewBtn} p-1 rounded`}
                                 onClick={() => setPreviewImage({ 
                                   url: previews[`payment_${index}`].url, 
-                                  title: 'Nouveau re├ºu paiement', 
+                                  title: 'Nouveau reçu paiement', 
                                   type: previews[`payment_${index}`].type 
                                 })}
                               >
@@ -3135,10 +3135,10 @@ export default function EditReservation() {
                                 // Pour les URLs Cloudinary, utiliser Blob Proxy
                                 <PdfPreviewBox 
                                   url={previews[`payment_${index}`].url} 
-                                  title="Nouveau re├ºu de paiement" 
+                                  title="Nouveau reçu de paiement" 
                                   onZoom={() => setPreviewImage({ 
                                     url: previews[`payment_${index}`].url, 
-                                    title: 'Nouveau re├ºu paiement', 
+                                    title: 'Nouveau reçu paiement', 
                                     type: previews[`payment_${index}`].type 
                                   })} 
                                 />
@@ -3146,7 +3146,7 @@ export default function EditReservation() {
                             ) : (
                               <img
                                 src={previews[`payment_${index}`].url}
-                                alt="Nouveau re├ºu de paiement"
+                                alt="Nouveau reçu de paiement"
                                 className="w-full h-full object-contain"
                               />
                             )}
@@ -3154,18 +3154,18 @@ export default function EditReservation() {
                         </div>
                       )}
 
-                      {/* Re├ºu existant - Afficher seulement si pas de nouveau fichier upload├⌐ */}
+                      {/* Reçu existant - Afficher seulement si pas de nouveau fichier uploadé */}
                       {paiement.id && paiement.recu && !previews[`payment_${index}`] && (
                         <div className={`mt-3 p-2 border ${paymentSectionUi.previewBorder} rounded-lg bg-white`}>
                           <div className="flex items-center justify-between mb-2">
-                            <span className={`text-sm font-medium ${paymentSectionUi.previewText}`}>Re├ºu de paiement</span>
+                            <span className={`text-sm font-medium ${paymentSectionUi.previewText}`}>Reçu de paiement</span>
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
                                 className={`${paymentSectionUi.previewBtn} p-1 rounded`}
                                 onClick={() => {
                                   const isPdf = isPdfFile(paiement.recuFileName || paiement.recu);
-                                  setPreviewImage({ url: paiement.recu || '', title: 'Re├ºu paiement', type: isPdf ? 'application/pdf' : 'image/*' });
+                                  setPreviewImage({ url: paiement.recu || '', title: 'Reçu paiement', type: isPdf ? 'application/pdf' : 'image/*' });
                                 }}
                               >
                                 <ZoomIn className="h-4 w-4" />
@@ -3194,16 +3194,16 @@ export default function EditReservation() {
                               // Utiliser Blob Proxy pour les PDFs Cloudinary
                               <PdfPreviewBox 
                                 url={paiement.recu} 
-                                title="Re├ºu de paiement" 
+                                title="Reçu de paiement" 
                                 onZoom={() => {
                                   const isPdf = isPdfFile(paiement.recuFileName || paiement.recu);
-                                  setPreviewImage({ url: paiement.recu || '', title: 'Re├ºu paiement', type: isPdf ? 'application/pdf' : 'image/*' });
+                                  setPreviewImage({ url: paiement.recu || '', title: 'Reçu paiement', type: isPdf ? 'application/pdf' : 'image/*' });
                                 }} 
                               />
                             ) : (
                               <img
                                 src={paiement.recu}
-                                alt="Re├ºu de paiement"
+                                alt="Reçu de paiement"
                                 className="w-full h-full object-contain"
                               />
                             )}
@@ -3229,7 +3229,7 @@ export default function EditReservation() {
                     </div>
                   </div>
 
-              {/* Section 4: Documents Fournisseur - Statuts simplifi├⌐s */}
+              {/* Section 4: Documents Fournisseur - Statuts simplifiés */}
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
                     <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
                       <FileText className="h-5 w-5" />
@@ -3288,7 +3288,7 @@ export default function EditReservation() {
                         {formData.statutVol ? (
                           <div className="flex items-center gap-2 text-green-600">
                             <CheckCircle className="h-4 w-4" />
-                            Billet r├⌐serv├⌐
+                            Billet réservé
                           </div>
                         ) : (
                           <div className="flex items-center gap-2 text-orange-600">
@@ -3299,14 +3299,14 @@ export default function EditReservation() {
                         </div>
                       </div>
 
-                    {/* Statut H├┤tel */}
+                    {/* Statut Hôtel */}
                     <div className="bg-white p-4 rounded-lg border border-blue-200">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <div className="p-2 bg-blue-100 rounded-lg">
                             <Hotel className="h-4 w-4 text-blue-600" />
                           </div>
-                          <Label className="text-blue-700 font-medium">Statut H├┤tel</Label>
+                          <Label className="text-blue-700 font-medium">Statut Hôtel</Label>
                         </div>
                         <Switch
                           checked={formData.statutHotel || false}
@@ -3318,7 +3318,7 @@ export default function EditReservation() {
                         {formData.statutHotel ? (
                           <div className="flex items-center gap-2 text-green-600">
                             <CheckCircle className="h-4 w-4" />
-                            H├┤tel r├⌐serv├⌐
+                            Hôtel réservé
                         </div>
                         ) : (
                           <div className="flex items-center gap-2 text-orange-600">
@@ -3346,7 +3346,7 @@ export default function EditReservation() {
                   className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <Edit className="h-4 w-4 mr-2" />
-                      {isSubmitting ? "Modification..." : "Modifier la r├⌐servation"}
+                      {isSubmitting ? "Modification..." : "Modifier la réservation"}
                     </Button>
                   </div>
             </form>
@@ -3360,14 +3360,14 @@ export default function EditReservation() {
             <DialogTitle>Guide des chambres</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-gray-600">
-            Les pastilles rouges indiquent les places d├⌐j├á occup├⌐es, les vertes les places
-            libres, et les jaunes les places attribu├⌐es ├á ce dossier (groupe). Le cadre jaune
-            autour d&apos;une ligne correspond ├á la chambre o├╣ votre groupe est enregistr├⌐.
+            Les pastilles rouges indiquent les places déjà occupées, les vertes les places
+            libres, et les jaunes les places attribuées à ce dossier (groupe). Le cadre jaune
+            autour d&apos;une ligne correspond à la chambre où votre groupe est enregistré.
           </p>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de pr├⌐visualisation */}
+      {/* Dialog de prévisualisation */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-auto">
           <DialogHeader>

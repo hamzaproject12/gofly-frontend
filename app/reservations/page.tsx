@@ -991,7 +991,14 @@ export default function ReservationsPage() {
                                   </button>
                                 </a>
                               </Link> */}
-                              <Link href={`/reservations/modifier/${reservation.id}`} legacyBehavior>
+                              <Link
+                                href={
+                                  reservation.typeReservation === "CHAMBRE_PRIVEE"
+                                    ? `/reservations/modifier-chambre/${reservation.id}`
+                                    : `/reservations/modifier-simple/${reservation.id}`
+                                }
+                                legacyBehavior
+                              >
                                 <a title="Modifier" className="group">
                                   <button type="button" className="rounded-full p-1.5 bg-white shadow hover:bg-yellow-100 transition-all border border-yellow-200 group-hover:scale-110">
                                     <Settings className="h-4 w-4 text-yellow-600 group-hover:text-yellow-800 transition-colors" />

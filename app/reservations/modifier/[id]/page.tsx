@@ -1,61 +1,74 @@
-﻿"use client";
+﻿"use client"
 
-import { useEffect } from "react";
-import { Loader2 } from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
-import { api } from "@/lib/api";
-import { useToast } from "@/components/ui/use-toast";
+import { useEffect, useState } from "react"
+import { useParams, useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { api } from "@/lib/api"
 
-export default function ModifierReservationRouterPage() {
-  const params = useParams();
-  const router = useRouter();
-  const { toast } = useToast();
-  const reservationId = String(params?.id || "");
+type RedirectState = "loading" | "error"
+
+export default function EditReservationRedirectPage() {
+  const params = useParams()
+  const router = useRouter()
+  const reservationId = params?.id as string | undefined
+  const [state, setState] = useState<RedirectState>("loading")
 
   useEffect(() => {
-    if (!reservationId) return;
+    let cancelled = false
 
-    let active = true;
-
-    const routeToEditPage = async () => {
-      try {
-        const response = await fetch(api.url(`/api/reservations/${reservationId}`));
-        if (!response.ok) {
-          throw new Error("Impossible de charger la reservation");
-        }
-
-        const reservation = await response.json();
-        if (!active) return;
-
-        const isChambrePrivee = reservation?.typeReservation === "CHAMBRE_PRIVEE";
-        const targetPath = isChambrePrivee
-          ? `/reservations/modifier-chambre/${reservationId}`
-          : `/reservations/modifier-simple/${reservationId}`;
-
-        router.replace(targetPath);
-      } catch {
-        if (!active) return;
-        toast({
-          title: "Erreur",
-          description: "Impossible d'ouvrir la page de modification.",
-          variant: "destructive",
-        });
-        router.replace("/reservations");
+    const resolveRoute = async () => {
+      if (!reservationId) {
+        if (!cancelled) setState("error")
+        return
       }
-    };
 
-    routeToEditPage();
+      try {
+        const res = await fetch(api.url(`/api/reservations/${reservationId}`))
+        if (!res.ok) throw new Error("Impossible de charger la réservation")
+        const reservation = await res.json()
+        const targetPath =
+          reservation?.typeReservation === "CHAMBRE_PRIVEE"
+            ? `/reservations/modifier-chambre/${reservationId}`
+            : `/reservations/modifier-simple/${reservationId}`
+
+        if (!cancelled) {
+          router.replace(targetPath)
+        }
+      } catch {
+        if (!cancelled) setState("error")
+      }
+    }
+
+    resolveRoute()
     return () => {
-      active = false;
-    };
-  }, [reservationId, router, toast]);
+      cancelled = true
+    }
+  }, [reservationId, router])
+
+  if (state === "error") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center p-6">
+        <div className="bg-white rounded-xl border border-red-200 shadow-md p-6 max-w-md w-full text-center">
+          <h1 className="text-lg font-semibold text-red-700 mb-2">
+            Erreur de redirection
+          </h1>
+          <p className="text-sm text-gray-600 mb-4">
+            Impossible de déterminer la page d&apos;édition pour cette réservation.
+          </p>
+          <Button onClick={() => router.push("/reservations")}>
+            Retour aux réservations
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
       <div className="text-center">
-        <Loader2 className="h-10 w-10 text-blue-600 animate-spin mx-auto mb-3" />
-        <p className="text-gray-600">Redirection vers la bonne page de modification...</p>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
+        <p className="text-gray-600">Redirection vers la page de modification...</p>
       </div>
     </div>
-  );
+  )
 }

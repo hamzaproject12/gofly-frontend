@@ -157,6 +157,7 @@ interface Paiement {
   date: string;
   recu: string | null;
   recuFileName?: string; // Nom du fichier pour détecter les PDFs
+  receiptFileId?: number | null;
   id?: number; // ID optionnel pour identifier les paiements existants
 }
 
@@ -348,6 +349,7 @@ export default function EditReservation() {
   })
   const [memberPassportFiles, setMemberPassportFiles] = useState<Record<number, File | null>>({})
   const [memberPassportDelete, setMemberPassportDelete] = useState<Record<number, number | null>>({})
+  const [paymentReceiptsToDelete, setPaymentReceiptsToDelete] = useState<Record<number, number>>({})
   
   const [formData, setFormData] = useState<FormData & { groupe: string; remarque: string; transport: boolean }>({
     programme: "",
@@ -504,6 +506,7 @@ export default function EditReservation() {
               date: p.paymentDate?.split('T')[0] || '',
               recu: recuUrl,
               recuFileName: recuFileName, // Garder le fileName pour la détection PDF
+              receiptFileId: p.fichier?.id ?? null,
               id: p.id // Garder l'ID pour identifier les paiements existants
             };
           })
@@ -836,7 +839,28 @@ export default function EditReservation() {
         }
       }
 
-      // 5. Gérer les remplacements de reçus pour les paiements existants
+      // 5. Supprimer les reçus marqués pour suppression
+      if (reservationId) {
+        for (let i = 0; i < paiements.length; i++) {
+          const paiement = paiements[i];
+          if (!paiement.id) continue;
+          const fileIdToDelete = paymentReceiptsToDelete[paiement.id];
+          if (!fileIdToDelete || documents.payment[i]) continue;
+          try {
+            const delRes = await fetch(api.url(`${api.endpoints.uploadCloudinary}/${fileIdToDelete}`), {
+              method: "DELETE",
+            });
+            if (!delRes.ok) {
+              const error = await delRes.json().catch(() => ({ error: "Erreur inconnue" }));
+              fileUploadErrors.push(`Erreur suppression reçu paiement ${i + 1}: ${error.error || "Erreur inconnue"}`);
+            }
+          } catch {
+            fileUploadErrors.push(`Erreur suppression reçu paiement ${i + 1}`);
+          }
+        }
+      }
+
+      // 6. Gérer les remplacements de reçus pour les paiements existants
       if (reservationId) {
         for (let i = 0; i < paiements.length; i++) {
           const paiement = paiements[i];
@@ -846,10 +870,11 @@ export default function EditReservation() {
             
             // Récupérer l'ancien fichier pour le supprimer
             const existingPayment = reservationData?.payments?.find((p: any) => p.id === paiement.id);
-            if (existingPayment?.fichier?.id) {
-              console.log(`🗑️ Suppression de l'ancien reçu (fichier ID: ${existingPayment.fichier.id})...`)
+            const existingFileId = paymentReceiptsToDelete[paiement.id] || existingPayment?.fichier?.id || paiement.receiptFileId;
+            if (existingFileId) {
+              console.log(`🗑️ Suppression de l'ancien reçu (fichier ID: ${existingFileId})...`)
               try {
-                const deleteResponse = await fetch(api.url(`${api.endpoints.uploadCloudinary}/${existingPayment.fichier.id}`), {
+                const deleteResponse = await fetch(api.url(`${api.endpoints.uploadCloudinary}/${existingFileId}`), {
                   method: "DELETE",
                 });
                 
@@ -1022,6 +1047,14 @@ export default function EditReservation() {
       return;
     }
     
+    if (paiements[index]?.id) {
+      setPaymentReceiptsToDelete((prev) => {
+        const next = { ...prev };
+        delete next[paiements[index].id as number];
+        return next;
+      });
+    }
+
     // Stocker le fichier localement pour l'aperçu
     setDocuments(prev => {
       const newPayments = [...(prev.payment || [])];
@@ -2350,22 +2383,44 @@ export default function EditReservation() {
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1">
                               <Label className="text-xs text-blue-700">Téléphone *</Label>
-                              <div className="relative">
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 h-6 px-2 rounded-md bg-blue-100 text-blue-800 text-xs font-semibold inline-flex items-center border border-blue-200">
-                                  +212
-                                </span>
+                              <div className="flex items-center gap-2">
                                 <Input
-                                  placeholder="123456789"
-                                  value={(formData.telephone || "").replace(/^\+212\s?/, "")}
+                                  placeholder="+212"
+                                  value={`+${(formData.telephone || "").match(/^\+(\d{0,3})/)?.[1] || "212"}`}
                                   onChange={(e) =>
                                     setFormData({
                                       ...formData,
-                                      telephone: formatPhoneInput(`+212 ${e.target.value}`),
+                                      telephone: formatPhoneInput(
+                                        `+${
+                                          e.target.value.replace(/\D/g, "").slice(0, 3)
+                                        }${
+                                          ((formData.telephone || "").replace(/^\+\d{0,3}\s?/, ""))
+                                            .replace(/\D/g, "")
+                                            .slice(0, 9)
+                                        }`
+                                      ),
+                                    })
+                                  }
+                                  inputMode="numeric"
+                                  maxLength={4}
+                                  className="h-10 w-24 border-2 border-blue-100 focus:border-blue-400"
+                                />
+                                <Input
+                                  placeholder="123456789"
+                                  value={(formData.telephone || "").replace(/^\+\d{0,3}\s?/, "")}
+                                  onChange={(e) =>
+                                    setFormData({
+                                      ...formData,
+                                      telephone: formatPhoneInput(
+                                        `+${
+                                          (formData.telephone || "").match(/^\+(\d{0,3})/)?.[1] || "212"
+                                        }${e.target.value.replace(/\D/g, "").slice(0, 9)}`
+                                      ),
                                     })
                                   }
                                   inputMode="numeric"
                                   maxLength={9}
-                                  className="h-10 pl-20 border-2 border-blue-100 focus:border-blue-400"
+                                  className="h-10 flex-1 border-2 border-blue-100 focus:border-blue-400"
                                 />
                               </div>
                             </div>
@@ -3012,35 +3067,7 @@ export default function EditReservation() {
                             />
                           )}
                             </div>
-                            <div className="md:col-span-3 space-y-2">
-                          <Label className={`${paymentSectionUi.label} font-medium text-sm`}>Date</Label>
-                          {paiement.id ? (
-                            <div className={paymentSectionUi.readonlyBox}>
-                              <span className="text-gray-900 font-medium">{paiement.date}</span>
-                            </div>
-                          ) : (
-                            <Input
-                              type="date"
-                              value={paiement.date}
-                              readOnly
-                              disabled
-                              className={paymentSectionUi.dateDisabled}
-                            />
-                          )}
-                        </div>
-                        <div className="md:col-span-3 flex items-center justify-center">
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            onClick={() => supprimerPaiement(index)}
-                            className="flex items-center gap-2"
-                            disabled={!!paiement.id}
-                            title={paiement.id ? "Impossible de supprimer un paiement existant" : "Supprimer ce paiement"}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Supprimer
-                          </Button>
-                        </div>
+                            <div className="md:col-span-6" />
                             </div>
 
                       {/* Upload de reçu de paiement - Afficher seulement si pas de nouveau fichier uploadé et pas de reçu existant */}
@@ -3070,7 +3097,7 @@ export default function EditReservation() {
                               }`}
                             >
                               <Download className="h-3.5 w-3.5 mr-1.5" />
-                              Générer reçu
+                              Generer recu
                             </Button>
                           </div>
                         </div>
@@ -3098,7 +3125,7 @@ export default function EditReservation() {
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
-                                className={`${paymentSectionUi.previewBtn} p-1 rounded`}
+                                className={`${paymentSectionUi.previewBtn} p-1 rounded inline-flex items-center gap-1 text-sm`}
                                 onClick={() => setPreviewImage({ 
                                   url: previews[`payment_${index}`].url, 
                                   title: 'Nouveau reçu paiement', 
@@ -3106,7 +3133,16 @@ export default function EditReservation() {
                                 })}
                               >
                                 <ZoomIn className="h-4 w-4" />
+                                Zoom
                               </button>
+                              <a
+                                href={previews[`payment_${index}`].url}
+                                download={documents.payment?.[index]?.name || "recu-paiement"}
+                                className={`${paymentSectionUi.previewBtn} px-2 py-1 rounded text-sm inline-flex items-center gap-1`}
+                              >
+                                <Download className="h-4 w-4" />
+                                Télécharger
+                              </a>
                               {documents.payment?.[index] && (
                                 <Button
                                   variant="ghost"
@@ -3126,7 +3162,8 @@ export default function EditReservation() {
                                   }}
                                   className="text-red-600 hover:text-red-800 hover:bg-red-50"
                                 >
-                                  <Trash2 className="h-4 w-4" />
+                                  <Trash2 className="h-4 w-4 mr-1" />
+                                  Supprimer
                                 </Button>
                               )}
                             </div>
@@ -3171,30 +3208,48 @@ export default function EditReservation() {
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
-                                className={`${paymentSectionUi.previewBtn} p-1 rounded`}
+                                className={`${paymentSectionUi.previewBtn} p-1 rounded inline-flex items-center gap-1 text-sm`}
                                 onClick={() => {
                                   const isPdf = isPdfFile(paiement.recuFileName || paiement.recu);
                                   setPreviewImage({ url: paiement.recu || '', title: 'Reçu paiement', type: isPdf ? 'application/pdf' : 'image/*' });
                                 }}
                               >
                                 <ZoomIn className="h-4 w-4" />
+                                Zoom
                               </button>
+                              <a
+                                href={paiement.recu || ""}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download={paiement.recuFileName || "recu-paiement"}
+                                className={`${paymentSectionUi.previewBtn} px-2 py-1 rounded text-sm inline-flex items-center gap-1`}
+                              >
+                                <Download className="h-4 w-4" />
+                                Télécharger
+                              </a>
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  // Ouvrir le champ d'upload pour remplacer
-                                  const fileInput = document.getElementById(`payment-file-${index}`) as HTMLInputElement;
-                                  if (fileInput) {
-                                    fileInput.click();
+                                onClick={() => {
+                                  if (paiement.id && paiement.receiptFileId) {
+                                    setPaymentReceiptsToDelete((prev) => ({
+                                      ...prev,
+                                      [paiement.id as number]: paiement.receiptFileId as number,
+                                    }));
                                   }
+                                  setPaiements((prev) =>
+                                    prev.map((item, itemIdx) =>
+                                      itemIdx === index
+                                        ? { ...item, recu: null, recuFileName: undefined, receiptFileId: null }
+                                        : item
+                                    )
+                                  );
                                 }}
-                                className="text-orange-600 hover:text-orange-800 hover:bg-orange-50"
+                                className="text-red-600 hover:text-red-800 hover:bg-red-50"
                               >
-                                <Edit className="h-4 w-4" />
-                                Remplacer
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Supprimer
                               </Button>
                             </div>
                           </div>
@@ -3219,6 +3274,20 @@ export default function EditReservation() {
                           </div>
                         </div>
                       )}
+                        <div className="mt-4 flex justify-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => supprimerPaiement(index)}
+                            className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                            disabled={!!paiement.id}
+                            title={paiement.id ? "Impossible de supprimer un paiement existant" : "Supprimer ce paiement"}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Supprimer le paiement
+                          </Button>
+                        </div>
                         </div>
                       ))}
                   <Button

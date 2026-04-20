@@ -2645,17 +2645,21 @@ export default function EditReservation() {
                                   <div className="space-y-1">
                                     <Label className="text-xs text-blue-700">N° Passeport</Label>
                                     <Input
+                                      placeholder="AB1234567"
+                                      maxLength={9}
                                       value={a.passportNumber || ""}
                                       onChange={(e) =>
                                         setAccompagnants((prev) =>
                                           prev.map((item) =>
                                             item.id === a.id
-                                              ? { ...item, passportNumber: e.target.value }
+                                              ? {
+                                                  ...item,
+                                                  passportNumber: formatPassportInput(e.target.value),
+                                                }
                                               : item
                                           )
                                         )
                                       }
-                                      placeholder="Numéro passeport"
                                       className="h-10 border-2 border-blue-100 focus:border-blue-400"
                                     />
                                   </div>
@@ -2870,19 +2874,22 @@ export default function EditReservation() {
                                     disabled
                                   />
                                   <Input
+                                    placeholder="AB1234567"
+                                    maxLength={9}
                                     value={a.passportNumber || ""}
                                     onChange={(e) =>
                                       setAccompagnants((prev) =>
                                         prev.map((item) =>
                                           item.id === a.id
-                                            ? { ...item, passportNumber: e.target.value }
+                                            ? {
+                                                ...item,
+                                                passportNumber: formatPassportInput(e.target.value),
+                                              }
                                             : item
                                         )
                                       )
                                     }
-                                    placeholder="N° passeport"
                                     className="h-10 border-2 border-blue-200"
-                                    disabled
                                   />
                                 </div>
                                 <div className="space-y-2">

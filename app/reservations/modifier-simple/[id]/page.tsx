@@ -719,6 +719,9 @@ export default function EditReservation() {
       });
       
       const body = {
+        firstName: formData.prenom.trim(),
+        lastName: formData.nom.trim(),
+        phone: formData.telephone.trim(),
         price: parseFloat(formData.prix),
         reservationDate: formData.dateReservation,
         statutVisa: formData.statutVisa,
@@ -1125,8 +1128,13 @@ export default function EditReservation() {
             return sum + parseAmount(paiement.montant);
           }, 0);
 
+          // Sans prix dossier valide, ne pas plafonner (sinon montant forcé à 0 → saisie impossible)
+          const canCapToRemaining =
+            Number.isFinite(totalPrice) && totalPrice > 0;
           const allowedMax = Math.max(totalPrice - sumOther, 0);
-          const clamped = Math.min(numericValue, allowedMax);
+          const clamped = canCapToRemaining
+            ? Math.min(numericValue, allowedMax)
+            : numericValue;
 
           const formatted = Number.isFinite(clamped) ? clamped : 0;
           return { ...p, montant: formatted.toString() };
@@ -1447,6 +1455,9 @@ export default function EditReservation() {
     
     // Vérifier les changements dans les champs du formulaire
     const formDataChanged = 
+      formData.nom?.trim() !== (initialFormData.nom || '').trim() ||
+      formData.prenom?.trim() !== (initialFormData.prenom || '').trim() ||
+      formData.telephone?.trim() !== (initialFormData.telephone || '').trim() ||
       formData.prix !== (initialFormData.prix || '') ||
       formData.dateReservation !== (initialFormData.dateReservation || '') ||
       formData.statutVisa !== (initialFormData.statutVisa || false) ||
@@ -1970,23 +1981,38 @@ export default function EditReservation() {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label className="text-xs text-blue-700">Nom *</Label>
-                        <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
-                          <span className="text-gray-900 font-medium">{formData.nom || "N/A"}</span>
-                        </div>
+                        <Input
+                          value={formData.nom}
+                          onChange={(e) =>
+                            setFormData({ ...formData, nom: e.target.value })
+                          }
+                          placeholder="Nom"
+                          className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                        />
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-blue-700">Prénom *</Label>
-                        <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
-                          <span className="text-gray-900 font-medium">{formData.prenom || "N/A"}</span>
-                        </div>
+                        <Input
+                          value={formData.prenom}
+                          onChange={(e) =>
+                            setFormData({ ...formData, prenom: e.target.value })
+                          }
+                          placeholder="Prénom"
+                          className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                        />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label className="text-xs text-blue-700">Téléphone *</Label>
-                        <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
-                          <span className="text-gray-900 font-medium">{formData.telephone || "N/A"}</span>
-                        </div>
+                        <Input
+                          value={formData.telephone}
+                          onChange={(e) =>
+                            setFormData({ ...formData, telephone: e.target.value })
+                          }
+                          placeholder="Téléphone"
+                          className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                        />
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-blue-700">Groupe</Label>

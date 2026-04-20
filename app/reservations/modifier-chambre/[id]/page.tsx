@@ -2384,27 +2384,28 @@ export default function EditReservation() {
                             <div className="space-y-1">
                               <Label className="text-xs text-blue-700">Téléphone *</Label>
                               <div className="flex items-center gap-2">
-                                <Input
-                                  placeholder="+212"
-                                  value={`+${(formData.telephone || "").match(/^\+(\d{0,3})/)?.[1] || "212"}`}
-                                  onChange={(e) =>
-                                    setFormData({
-                                      ...formData,
-                                      telephone: formatPhoneInput(
-                                        `+${
-                                          e.target.value.replace(/\D/g, "").slice(0, 3)
-                                        }${
-                                          ((formData.telephone || "").replace(/^\+\d{0,3}\s?/, ""))
-                                            .replace(/\D/g, "")
-                                            .slice(0, 9)
-                                        }`
-                                      ),
-                                    })
-                                  }
-                                  inputMode="numeric"
-                                  maxLength={4}
-                                  className="h-10 w-24 border-2 border-blue-100 focus:border-blue-400"
-                                />
+                                <div className="relative w-24">
+                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-700 font-semibold">
+                                    +
+                                  </span>
+                                  <Input
+                                    placeholder="212"
+                                    value={(formData.telephone || "").match(/^\+(\d{0,3})/)?.[1] || ""}
+                                    onChange={(e) => {
+                                      const code = e.target.value.replace(/\D/g, "").slice(0, 3);
+                                      const local = ((formData.telephone || "").replace(/^\+\d{0,3}\s?/, ""))
+                                        .replace(/\D/g, "")
+                                        .slice(0, 9);
+                                      setFormData({
+                                        ...formData,
+                                        telephone: formatPhoneInput(code || local ? `+${code}${local}` : ""),
+                                      });
+                                    }}
+                                    inputMode="numeric"
+                                    maxLength={3}
+                                    className="h-10 pl-7 border-2 border-blue-100 focus:border-blue-400"
+                                  />
+                                </div>
                                 <Input
                                   placeholder="123456789"
                                   value={(formData.telephone || "").replace(/^\+\d{0,3}\s?/, "")}
@@ -2413,7 +2414,7 @@ export default function EditReservation() {
                                       ...formData,
                                       telephone: formatPhoneInput(
                                         `+${
-                                          (formData.telephone || "").match(/^\+(\d{0,3})/)?.[1] || "212"
+                                          (formData.telephone || "").match(/^\+(\d{0,3})/)?.[1] || ""
                                         }${e.target.value.replace(/\D/g, "").slice(0, 9)}`
                                       ),
                                     })
@@ -3147,10 +3148,15 @@ export default function EditReservation() {
                                   variant="ghost"
                                   size="sm"
                                   type="button"
-                                  onClick={() => {
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
                                     setPreviews(prev => {
                                       const newPreviews = { ...prev };
                                       delete newPreviews[`payment_${index}`];
+                                      if (paiement.id) {
+                                        delete newPreviews[`payment_existing_${paiement.id}`];
+                                      }
                                       return newPreviews;
                                     });
                                     setDocuments(prev => {
@@ -3158,6 +3164,13 @@ export default function EditReservation() {
                                       newPayments[index] = null;
                                       return { ...prev, payment: newPayments };
                                     });
+                                    setPaiements((prev) =>
+                                      prev.map((item, itemIdx) =>
+                                        itemIdx === index
+                                          ? { ...item, recu: null, recuFileName: undefined }
+                                          : item
+                                      )
+                                    );
                                   }}
                                   className="text-red-600 hover:text-red-800 hover:bg-red-50"
                                 >
@@ -3230,13 +3243,23 @@ export default function EditReservation() {
                                 variant="ghost"
                                 size="sm"
                                 type="button"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
                                   if (paiement.id && paiement.receiptFileId) {
                                     setPaymentReceiptsToDelete((prev) => ({
                                       ...prev,
                                       [paiement.id as number]: paiement.receiptFileId as number,
                                     }));
                                   }
+                                  setPreviews((prev) => {
+                                    const next = { ...prev };
+                                    delete next[`payment_${index}`];
+                                    if (paiement.id) {
+                                      delete next[`payment_existing_${paiement.id}`];
+                                    }
+                                    return next;
+                                  });
                                   setPaiements((prev) =>
                                     prev.map((item, itemIdx) =>
                                       itemIdx === index

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { api } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -34,6 +34,7 @@ import {
   Bed,
   Calculator,
   Info,
+  Download,
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -109,6 +110,14 @@ function hasRoomsWithoutPrice(hotel: { chambres: ChambresConfig }): boolean {
     if (nb > 0 && (!prixRaw || px <= 0)) return true
   }
   return false
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
 }
 
 function totalBedsByCity(hotels: { chambres: ChambresConfig }[]): number {
@@ -572,6 +581,133 @@ export default function NouveauProgramme() {
     formData.prixVisaRiyal,
     formData.hotelsMadina,
     formData.hotelsMakkah,
+  ])
+
+  const downloadSimulationReport = useCallback(() => {
+    if (!canRunSimulation) return
+    const p = simulationPreview
+    const exportedAt = new Date()
+    const dateLabel = exportedAt.toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" })
+    const fileDate = exportedAt.toISOString().slice(0, 10)
+    const slug =
+      formData.nom
+        .trim()
+        .replace(/[^\wÀ-ÿ\s-]/gu, "")
+        .replace(/\s+/g, "-")
+        .slice(0, 48) || "programme"
+
+    const hotelsMadinaList =
+      formData.hotelsMadina.map((h) => escapeHtml(h.name)).join(", ") || "—"
+    const hotelsMakkahList =
+      formData.hotelsMakkah.map((h) => escapeHtml(h.name)).join(", ") || "—"
+
+    const rowsByType =
+      p.byType.length > 0
+        ? p.byType
+            .map(
+              (row) =>
+                `<tr><td>${escapeHtml(row.label)}</td><td>${row.places}</td><td>${Math.round(row.unitDh).toLocaleString("fr-FR")}</td><td>${Math.round(row.subtotalDh).toLocaleString("fr-FR")}</td></tr>`
+            )
+            .join("")
+        : `<tr><td colspan="4">Aucune ligne</td></tr>`
+
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Simulation rentabilité — ${escapeHtml(formData.nom.trim())}</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;max-width:900px;margin:24px auto;padding:16px 20px;line-height:1.5;color:#111}
+h1{font-size:1.35rem;border-bottom:2px solid #6d28d9;padding-bottom:8px;margin-top:0}
+h2{font-size:1.05rem;margin:22px 0 10px;color:#5b21b6}
+table{border-collapse:collapse;width:100%;margin-top:8px;font-size:0.92rem}
+th,td{border:1px solid #ddd;padding:8px 10px;text-align:left}
+th{background:#f5f3ff}
+.meta{color:#555;font-size:0.9rem;margin:0 0 18px}
+.kv{display:flex;justify-content:space-between;gap:16px;padding:6px 0;border-bottom:1px solid #eee;flex-wrap:wrap}
+.kv:last-child{border-bottom:none}
+.sec{background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;padding:14px 16px;margin-bottom:14px}
+</style>
+</head>
+<body>
+<h1>Simulation de rentabilité (prévisionnel)</h1>
+<p class="meta">Exporté le ${escapeHtml(dateLabel)} · <strong>${escapeHtml(formData.nom.trim())}</strong></p>
+
+<h2>Informations programme</h2>
+<div class="sec">
+<div class="kv"><span>Change (DH / Riyal)</span><span>${escapeHtml(String(formData.exchange))}</span></div>
+<div class="kv"><span>NB jours Madina / Makkah</span><span>${escapeHtml(formData.nbJoursMadina)} / ${escapeHtml(formData.nbJoursMakkah)}</span></div>
+<div class="kv"><span>Prix avion (DH)</span><span>${escapeHtml(formData.prixAvion)}</span></div>
+<div class="kv"><span>Prix visa (Riyal)</span><span>${escapeHtml(formData.prixVisaRiyal)}</span></div>
+<div class="kv"><span>Marge / profit (DH)</span><span>${escapeHtml(formData.profit)}</span></div>
+<div class="kv"><span>Profit Économique / Normal / VIP (DH)</span><span>${escapeHtml(formData.profitEconomique)} / ${escapeHtml(formData.profitNormal)} / ${escapeHtml(formData.profitVIP)}</span></div>
+<p style="margin:12px 0 4px"><strong>Hôtels Madina :</strong> ${hotelsMadinaList}</p>
+<p style="margin:4px 0 0"><strong>Hôtels Makkah :</strong> ${hotelsMakkahList}</p>
+</div>
+
+<h2>Hypothèses de simulation</h2>
+<div class="sec">
+<div class="kv"><span>Inclure avion</span><span>${simIncludeAvion ? "Oui" : "Non"}</span></div>
+<div class="kv"><span>Inclure visa</span><span>${simIncludeVisa ? "Oui" : "Non"}</span></div>
+<div class="kv"><span>Plan tarifaire</span><span>${escapeHtml(simPlan)}</span></div>
+<div class="kv"><span>Jours Madina / Makkah (champs simulation)</span><span>${escapeHtml(simJoursMadina || "(défaut formulaire)")} / ${escapeHtml(simJoursMakkah || "(défaut formulaire)")}</span></div>
+<div class="kv"><span>Places agents</span><span>${escapeHtml(simAgentPlaces || "0")}</span></div>
+<div class="kv"><span>Charge par place agent (DH)</span><span>${escapeHtml(simAgentCostPerPlaceDH || "0")}</span></div>
+<div class="kv"><span>Autres charges fixes (DH)</span><span>${escapeHtml(simAutresChargesDH || "0")}</span></div>
+</div>
+
+<h2>Résultats</h2>
+<div class="sec">
+<div class="kv"><span>Capacité (voyageurs)</span><span>${p.totalTravelersMax}</span></div>
+<div class="kv"><span>Total paiement prévu</span><span>${Math.round(p.revenueAfterAgentsDh).toLocaleString("fr-FR")} DH</span></div>
+<div class="kv"><span>Total charges</span><span>${Math.round(p.totalChargesDh).toLocaleString("fr-FR")} DH</span></div>
+<div class="kv"><strong>Gain net prévu</strong><strong>${Math.round(p.resultatPrevDh).toLocaleString("fr-FR")} DH</strong></div>
+<div class="kv"><span>Places payantes (après agents)</span><span>${p.payingTravelers}</span></div>
+<div class="kv"><span>Places agents (non payantes)</span><span>${p.agentPlaces}</span></div>
+<div class="kv"><span>Réf. CA si capacité pleine et tous payants</span><span>${Math.round(p.revenueIfAllPayDh).toLocaleString("fr-FR")} DH</span></div>
+<div class="kv"><span>Coût agence vol (tous les voyageurs)</span><span>${Math.round(p.costVolAllTravelersDh).toLocaleString("fr-FR")} DH</span></div>
+<div class="kv"><span>Coût agence hôtel (tous les voyageurs)</span><span>${Math.round(p.costHotelsAllTravelersDh).toLocaleString("fr-FR")} DH</span></div>
+<div class="kv"><span>Coût agence visa (tous les voyageurs)</span><span>${Math.round(p.costVisaAllTravelersDh).toLocaleString("fr-FR")} DH</span></div>
+<div class="kv"><span>Charges agents (saisies)</span><span>${Math.round(p.agentChargesTotalDh).toLocaleString("fr-FR")} DH</span></div>
+<div class="kv"><span>Autres charges (saisies)</span><span>${Math.round(p.autresChargesDh).toLocaleString("fr-FR")} DH</span></div>
+<div class="kv"><span>Change utilisé · Jours Madina / Makkah (effectifs)</span><span>${p.exchange} · ${p.joursMadinaEff} / ${p.joursMakkahEff}</span></div>
+</div>
+
+<h2>Détail par type de chambre</h2>
+<table>
+<thead><tr><th>Type</th><th>Places</th><th>Prix / pers. (DH)</th><th>Sous-total (DH)</th></tr></thead>
+<tbody>${rowsByType}</tbody>
+</table>
+</body>
+</html>`
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `simulation-rentabilite-${slug}-${fileDate}.html`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    toast({
+      title: "Rapport téléchargé",
+      description: "Le fichier HTML contient le programme et la simulation.",
+    })
+  }, [
+    canRunSimulation,
+    simulationPreview,
+    formData,
+    simIncludeAvion,
+    simIncludeVisa,
+    simPlan,
+    simJoursMadina,
+    simJoursMakkah,
+    simAgentPlaces,
+    simAgentCostPerPlaceDH,
+    simAutresChargesDH,
+    toast,
   ])
 
   // Charger les hôtels disponibles
@@ -1346,15 +1482,29 @@ export default function NouveauProgramme() {
                         <Calculator className="h-5 w-5" />
                         Simulation de rentabilité (prévisionnel)
                       </h3>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="border-violet-300 text-violet-900 hover:bg-violet-100"
-                        onClick={() => setShowSimulationSection((prev) => !prev)}
-                      >
-                        {showSimulationSection ? "Masquer" : "Afficher"}
-                      </Button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="border-violet-300 text-violet-900 hover:bg-violet-100"
+                          onClick={() => setShowSimulationSection((prev) => !prev)}
+                        >
+                          {showSimulationSection ? "Masquer" : "Afficher"}
+                        </Button>
+                        {showSimulationSection && canRunSimulation && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="border-violet-300 text-violet-900 hover:bg-violet-100"
+                            onClick={downloadSimulationReport}
+                          >
+                            <Download className="h-4 w-4 mr-1.5" />
+                            Télécharger
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <p className="text-sm text-violet-800/90 mb-4 flex gap-2 items-start">
                       <Info className="h-4 w-4 shrink-0 mt-0.5" />

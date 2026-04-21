@@ -217,6 +217,16 @@ type FormData = {
   }>;
 };
 
+const PHONE_REGEX = /^\+\d{3}\s\d{9}$/;
+
+function formatPhoneInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 12);
+  if (!digits) return "";
+  const country = digits.slice(0, 3);
+  const local = digits.slice(3, 12);
+  return local ? `+${country} ${local}` : `+${country}`;
+}
+
 // PDF Preview Box Component with Blob Proxy (for inline preview)
 const PdfPreviewBox = ({ url, title, onZoom }: { url: string | null; title: string; onZoom: () => void }) => {
   const { blobUrl, loading, error } = usePdfBlob(url);
@@ -606,6 +616,16 @@ export default function EditReservation() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    const telephone = (formData.telephone || "").trim();
+    if (!PHONE_REGEX.test(telephone)) {
+      toast({
+        title: "Téléphone invalide",
+        description: "Format attendu: +XXX XXXXXXXXX (ex: +212 123456789).",
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (!arePaymentsValid) {
       toast({
@@ -2030,14 +2050,47 @@ export default function EditReservation() {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label className="text-xs text-blue-700">Téléphone *</Label>
-                        <Input
-                          value={formData.telephone}
-                          onChange={(e) =>
-                            setFormData({ ...formData, telephone: e.target.value })
-                          }
-                          placeholder="Téléphone"
-                          className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
-                        />
+                        <div className="flex items-center gap-2">
+                          <div className="relative w-24">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-700 font-semibold">
+                              +
+                            </span>
+                            <Input
+                              placeholder="212"
+                              value={(formData.telephone || "").match(/^\+(\d{0,3})/)?.[1] || ""}
+                              onChange={(e) => {
+                                const code = e.target.value.replace(/\D/g, "").slice(0, 3);
+                                const local = ((formData.telephone || "").replace(/^\+\d{0,3}\s?/, ""))
+                                  .replace(/\D/g, "")
+                                  .slice(0, 9);
+                                setFormData({
+                                  ...formData,
+                                  telephone: formatPhoneInput(code || local ? `+${code}${local}` : ""),
+                                });
+                              }}
+                              inputMode="numeric"
+                              maxLength={3}
+                              className="h-10 pl-7 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                            />
+                          </div>
+                          <Input
+                            placeholder="123456789"
+                            value={(formData.telephone || "").replace(/^\+\d{0,3}\s?/, "")}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                telephone: formatPhoneInput(
+                                  `+${
+                                    (formData.telephone || "").match(/^\+(\d{0,3})/)?.[1] || ""
+                                  }${e.target.value.replace(/\D/g, "").slice(0, 9)}`
+                                ),
+                              })
+                            }
+                            inputMode="numeric"
+                            maxLength={9}
+                            className="h-10 flex-1 border-2 border-blue-200 focus:border-blue-500 rounded-lg"
+                          />
+                        </div>
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-blue-700">Groupe</Label>

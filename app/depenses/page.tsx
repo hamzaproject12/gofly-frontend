@@ -79,7 +79,6 @@ export default function DepensesPage() {
 
       // Construire les paramètres de requête
       const params = new URLSearchParams({
-        search: searchQuery,
         program: programmeFilter,
         type: typeFilter,
         page: '1',
@@ -110,7 +109,7 @@ export default function DepensesPage() {
     } finally {
       setLoading(false)
     }
-  }, [searchQuery, programmeFilter, typeFilter])
+  }, [programmeFilter, typeFilter])
 
   // Charger les données au montage du composant
   useEffect(() => {
@@ -293,7 +292,10 @@ export default function DepensesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+    <div
+      data-skip-unsaved-dirty
+      className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100"
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* En-tête */}
         <div className="flex justify-between items-center mb-6">

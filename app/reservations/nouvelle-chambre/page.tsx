@@ -1657,15 +1657,49 @@ export default function NouvelleChambrePage() {
                             <div className="grid grid-cols-2 gap-3">
                               <div className="space-y-1">
                                 <Label className="text-xs text-blue-700">Téléphone *</Label>
-                                <Input
-                                  placeholder="Téléphone"
-                                  value={o.phone}
-                                  onChange={(e) => updateOccupant(i, "phone", e.target.value)}
-                                  inputMode="numeric"
-                                  maxLength={14}
-                                  className="h-10 border-2 border-blue-100 focus:border-blue-400"
-                                />
-                                <p className="text-[11px] text-blue-600">Format: +XXX XXXXXXXXX</p>
+                                <div className="flex items-center gap-2">
+                                  <div className="relative w-24">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-700 font-semibold">
+                                      +
+                                    </span>
+                                    <Input
+                                      placeholder="212"
+                                      value={(o.phone || "").match(/^\+(\d{0,3})/)?.[1] || ""}
+                                      onChange={(e) => {
+                                        const code = e.target.value.replace(/\D/g, "").slice(0, 3);
+                                        const local = ((o.phone || "").replace(/^\+\d{0,3}\s?/, ""))
+                                          .replace(/\D/g, "")
+                                          .slice(0, 9);
+                                        updateOccupant(
+                                          i,
+                                          "phone",
+                                          formatPhoneInput(code || local ? `+${code}${local}` : "")
+                                        );
+                                      }}
+                                      inputMode="numeric"
+                                      maxLength={3}
+                                      className="h-10 pl-7 border-2 border-blue-100 focus:border-blue-400"
+                                    />
+                                  </div>
+                                  <Input
+                                    placeholder="123456789"
+                                    value={(o.phone || "").replace(/^\+\d{0,3}\s?/, "")}
+                                    onChange={(e) =>
+                                      updateOccupant(
+                                        i,
+                                        "phone",
+                                        formatPhoneInput(
+                                          `+${
+                                            (o.phone || "").match(/^\+(\d{0,3})/)?.[1] || ""
+                                          }${e.target.value.replace(/\D/g, "").slice(0, 9)}`
+                                        )
+                                      )
+                                    }
+                                    inputMode="numeric"
+                                    maxLength={9}
+                                    className="h-10 flex-1 border-2 border-blue-100 focus:border-blue-400"
+                                  />
+                                </div>
                               </div>
                               <div className="space-y-1">
                                 <Label className="text-xs text-blue-700">Groupe</Label>

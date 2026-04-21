@@ -312,7 +312,7 @@ export default function NouvelleChambrePage() {
       Array.from({ length: capacity }, (_, i) => ({
         firstName: prev[i]?.firstName || "",
         lastName: prev[i]?.lastName || "",
-        phone: prev[i]?.phone || "",
+        phone: prev[i]?.phone || "+212",
         passportNumber: prev[i]?.passportNumber || "",
         gender:
           i === 0

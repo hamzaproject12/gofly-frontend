@@ -193,7 +193,7 @@ export default function NouvelleReservation() {
     typeChambre: "",
     nom: "",
     prenom: "",
-    telephone: "",
+    telephone: "+212",
     passportNumber: "",
     groupe: "",
     remarque: "",

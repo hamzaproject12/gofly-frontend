@@ -43,6 +43,9 @@ type Stats = {
   }
 }
 
+const normalizeText = (value: string | null | undefined) =>
+  (value || "").trim().toLowerCase()
+
 export default function DepensesPage() {
   // Hook pour gérer l'authentification
   const { isAdmin, loading: authLoading } = useAuth()
@@ -117,11 +120,13 @@ export default function DepensesPage() {
   // Filtrage des dépenses (maintenant côté client pour la recherche instantanée)
   const filteredDepenses = depenses.filter((depense) => {
     const searchMatch =
-      depense.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      depense.programme.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      depense.type.toLowerCase().includes(searchQuery.toLowerCase())
+      normalizeText(depense.description).includes(normalizeText(searchQuery)) ||
+      normalizeText(depense.programme).includes(normalizeText(searchQuery)) ||
+      normalizeText(depense.type).includes(normalizeText(searchQuery))
 
-    const programmeMatch = programmeFilter === "tous" || depense.programme === programmeFilter
+    const programmeMatch =
+      programmeFilter === "tous" ||
+      normalizeText(depense.programme) === normalizeText(programmeFilter)
     const typeMatch = typeFilter === "tous" || depense.type === typeFilter
 
     return searchMatch && programmeMatch && typeMatch
@@ -410,7 +415,16 @@ export default function DepensesPage() {
         {/* Filtres */}
         <Card className="mb-6">
           <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Rechercher description, programme, type..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
                 <Select value={programmeFilter} onValueChange={(value) => setProgrammeFilter(value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Tous les programmes" />

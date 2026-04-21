@@ -429,6 +429,9 @@ export default function NouveauProgramme() {
 
     let revenueIfAllPayDh = 0
     let costVolHotelVisaAllTravelersDh = 0
+    let costVolAllTravelersDh = 0
+    let costHotelsAllTravelersDh = 0
+    let costVisaAllTravelersDh = 0
     let totalTravelersMax = 0
 
     const labels = ["", "Simple", "Double", "Triple", "Quadruple", "Quintuple"]
@@ -459,6 +462,13 @@ export default function NouveauProgramme() {
         includeVisa: simIncludeVisa,
       })
       const subtotalDh = paired * unitDh
+      const nbPersonnes = t
+      const unitCostVolDh = simIncludeAvion ? prixAvionDH : 0
+      const unitCostVisaDh = simIncludeVisa ? prixVisaRiyal * exchange : 0
+      const unitCostHotelsDh =
+        ((pm > 0 && nbPersonnes > 0 ? (pm / nbPersonnes) * jM : 0) +
+          (pk > 0 && nbPersonnes > 0 ? (pk / nbPersonnes) * jK : 0)) *
+        exchange
       const unitCostDh = unitAgencyCostTravelerDh({
         exchange,
         prixAvionDH,
@@ -471,6 +481,9 @@ export default function NouveauProgramme() {
         includeAvion: simIncludeAvion,
         includeVisa: simIncludeVisa,
       })
+      costVolAllTravelersDh += paired * unitCostVolDh
+      costHotelsAllTravelersDh += paired * unitCostHotelsDh
+      costVisaAllTravelersDh += paired * unitCostVisaDh
       costVolHotelVisaAllTravelersDh += paired * unitCostDh
       revenueIfAllPayDh += subtotalDh
       totalTravelersMax += paired
@@ -509,6 +522,9 @@ export default function NouveauProgramme() {
       payingTravelers,
       revenueAfterAgentsDh,
       costVolHotelVisaAllTravelersDh,
+      costVolAllTravelersDh,
+      costHotelsAllTravelersDh,
+      costVisaAllTravelersDh,
       agentChargesTotalDh,
       autresChargesDh,
       totalChargesDh,
@@ -1567,10 +1583,26 @@ export default function NouveauProgramme() {
                           </span>
                         </div>
                         <div className="flex flex-wrap justify-between gap-2">
-                          <span>Coût agence vol + hôtel + visa (tous les voyageurs)</span>
+                          <span>Coût agence vol (tous les voyageurs)</span>
                           <span className="font-medium">
                             {canRunSimulation
-                              ? `${Math.round(simulationPreview.costVolHotelVisaAllTravelersDh).toLocaleString("fr-FR")} DH`
+                              ? `${Math.round(simulationPreview.costVolAllTravelersDh).toLocaleString("fr-FR")} DH`
+                              : "—"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap justify-between gap-2">
+                          <span>Coût agence hôtel (tous les voyageurs)</span>
+                          <span className="font-medium">
+                            {canRunSimulation
+                              ? `${Math.round(simulationPreview.costHotelsAllTravelersDh).toLocaleString("fr-FR")} DH`
+                              : "—"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap justify-between gap-2">
+                          <span>Coût agence visa (tous les voyageurs)</span>
+                          <span className="font-medium">
+                            {canRunSimulation
+                              ? `${Math.round(simulationPreview.costVisaAllTravelersDh).toLocaleString("fr-FR")} DH`
                               : "—"}
                           </span>
                         </div>

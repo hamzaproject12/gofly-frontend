@@ -58,6 +58,37 @@ type Program = {
   name: string
 }
 
+const normalizePaymentMethod = (method: string | null | undefined): string => {
+  if (!method) return ""
+  const normalized = method
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+
+  if (normalized === "cash" || normalized === "espece" || normalized === "especes") return "especes"
+  if (normalized === "card" || normalized === "carte") return "carte"
+  if (normalized === "wire" || normalized === "transfer" || normalized === "virement") return "virement"
+  if (normalized === "cheque" || normalized === "check") return "cheque"
+
+  return normalized
+}
+
+const getPaymentMethodLabel = (method: string): string => {
+  switch (normalizePaymentMethod(method)) {
+    case "carte":
+      return "Carte"
+    case "especes":
+      return "Espèces"
+    case "virement":
+      return "Virement"
+    case "cheque":
+      return "Chèque"
+    default:
+      return method
+  }
+}
+
 export default function PaiementsPage() {
   const [paiements, setPaiements] = useState<Payment[]>([])
   const [programmes, setProgrammes] = useState<Program[]>([])
@@ -108,30 +139,38 @@ export default function PaiementsPage() {
       paiement.reservation.phone.includes(searchTerm)
 
     const programMatch = programFilter === "tous" || 
-      paiement.reservation.program?.name === programFilter
+      paiement.reservation.program?.id.toString() === programFilter
 
     const methodMatch = methodFilter === "tous" || 
-      paiement.paymentMethod === methodFilter
+      normalizePaymentMethod(paiement.paymentMethod) === methodFilter
 
     return searchMatch && programMatch && methodMatch
   })
 
   // Calcul des statistiques
   const totalPaiements = paiements.reduce((sum, p) => sum + p.amount, 0)
-  const paiementsParCarte = paiements.filter(p => p.paymentMethod === "Carte").reduce((sum, p) => sum + p.amount, 0)
-  const paiementsParEspeces = paiements.filter(p => p.paymentMethod === "especes").reduce((sum, p) => sum + p.amount, 0)
-  const paiementsParVirement = paiements.filter(p => p.paymentMethod === "Virement").reduce((sum, p) => sum + p.amount, 0)
-  const paiementsParCheque = paiements.filter(p => p.paymentMethod === "Chèque").reduce((sum, p) => sum + p.amount, 0)
+  const paiementsParCarte = paiements
+    .filter(p => normalizePaymentMethod(p.paymentMethod) === "carte")
+    .reduce((sum, p) => sum + p.amount, 0)
+  const paiementsParEspeces = paiements
+    .filter(p => normalizePaymentMethod(p.paymentMethod) === "especes")
+    .reduce((sum, p) => sum + p.amount, 0)
+  const paiementsParVirement = paiements
+    .filter(p => normalizePaymentMethod(p.paymentMethod) === "virement")
+    .reduce((sum, p) => sum + p.amount, 0)
+  const paiementsParCheque = paiements
+    .filter(p => normalizePaymentMethod(p.paymentMethod) === "cheque")
+    .reduce((sum, p) => sum + p.amount, 0)
 
   const getMethodIcon = (method: string) => {
-    switch (method) {
-      case "Carte":
+    switch (normalizePaymentMethod(method)) {
+      case "carte":
         return <CreditCard className="h-4 w-4" />
       case "especes":
         return <DollarSign className="h-4 w-4" />
-      case "Virement":
+      case "virement":
         return <FileText className="h-4 w-4" />
-      case "Chèque":
+      case "cheque":
         return <Receipt className="h-4 w-4" />
       default:
         return <CreditCard className="h-4 w-4" />
@@ -139,14 +178,14 @@ export default function PaiementsPage() {
   }
 
   const getMethodColor = (method: string) => {
-    switch (method) {
-      case "Carte":
+    switch (normalizePaymentMethod(method)) {
+      case "carte":
         return "bg-blue-100 text-blue-800"
       case "especes":
         return "bg-green-100 text-green-800"
-      case "Virement":
+      case "virement":
         return "bg-purple-100 text-purple-800"
-      case "Chèque":
+      case "cheque":
         return "bg-orange-100 text-orange-800"
       default:
         return "bg-gray-100 text-gray-800"
@@ -186,7 +225,10 @@ export default function PaiementsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+    <div
+      data-skip-unsaved-dirty
+      className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100"
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* En-tête */}
         <div className="flex justify-between items-center mb-6">
@@ -294,7 +336,7 @@ export default function PaiementsPage() {
                   <SelectContent>
                     <SelectItem value="tous">Tous les programmes</SelectItem>
                     {programmes.map((program) => (
-                      <SelectItem key={program.id} value={program.name}>
+                      <SelectItem key={program.id} value={program.id.toString()}>
                         {program.name}
                       </SelectItem>
                     ))}
@@ -310,10 +352,10 @@ export default function PaiementsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="tous">Toutes les méthodes</SelectItem>
-                    <SelectItem value="Carte">Carte</SelectItem>
+                    <SelectItem value="carte">Carte</SelectItem>
                     <SelectItem value="especes">Espèces</SelectItem>
-                    <SelectItem value="Virement">Virement</SelectItem>
-                    <SelectItem value="Chèque">Chèque</SelectItem>
+                    <SelectItem value="virement">Virement</SelectItem>
+                    <SelectItem value="cheque">Chèque</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -380,7 +422,7 @@ export default function PaiementsPage() {
                           {paiement.amount.toLocaleString()} DH
                         </p>
                         <Badge className={`${getMethodColor(paiement.paymentMethod)} border-0`}>
-                          {paiement.paymentMethod}
+                          {getPaymentMethodLabel(paiement.paymentMethod)}
                         </Badge>
                       </div>
 

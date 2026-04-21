@@ -616,6 +616,22 @@ export default function EditReservation() {
       return;
     }
 
+    const totalPaiements = paiements.reduce(
+      (sum, paiement) => sum + parseAmount(paiement.montant),
+      0
+    );
+    const totalPrice = parseAmount(formData.prix);
+    if (Number.isFinite(totalPrice) && totalPrice > 0 && totalPaiements > totalPrice) {
+      toast({
+        title: "Montant de paiements invalide",
+        description: `Le total des paiements (${totalPaiements.toLocaleString(
+          "fr-FR"
+        )} DH) dépasse le prix suggéré (${totalPrice.toLocaleString("fr-FR")} DH).`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true)
 
     try {
@@ -1135,6 +1151,15 @@ export default function EditReservation() {
           const clamped = canCapToRemaining
             ? Math.min(numericValue, allowedMax)
             : numericValue;
+          if (canCapToRemaining && numericValue > allowedMax) {
+            toast({
+              title: "Montant dépasse le prix suggéré",
+              description: `Le total des paiements ne doit pas dépasser ${totalPrice.toLocaleString(
+                "fr-FR"
+              )} DH.`,
+              variant: "destructive",
+            });
+          }
 
           const formatted = Number.isFinite(clamped) ? clamped : 0;
           return { ...p, montant: formatted.toString() };

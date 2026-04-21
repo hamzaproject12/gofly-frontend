@@ -426,20 +426,21 @@ export default function NouvelleChambrePage() {
 
     const prixRoomMadina = roomMadina.prixRoom || 0;
     const prixRoomMakkah = roomMakkah.prixRoom || 0;
-    // prixRoom en base = tarif par lit ; chambre complète = lit × capacité (nbPersonnes)
-    const prixHotelMadina =
+    // Même logique que "Nouvelle Réservation" (coût unitaire), puis x capacité chambre
+    const prixHotelMadinaUnitaire =
       formData.hotelMadina !== "none"
-        ? prixRoomMadina * nbPersonnes * customization.joursMadina
+        ? (prixRoomMadina / nbPersonnes) * customization.joursMadina
         : 0;
-    const prixHotelMakkah =
+    const prixHotelMakkahUnitaire =
       formData.hotelMakkah !== "none"
-        ? prixRoomMakkah * nbPersonnes * customization.joursMakkah
+        ? (prixRoomMakkah / nbPersonnes) * customization.joursMakkah
         : 0;
-
-    const prixFinal =
+    const prixUnitaire =
       prixAvion +
       profit +
-      (prixVisa + prixHotelMakkah + prixHotelMadina) * programInfo.exchange;
+      (prixVisa + prixHotelMakkahUnitaire + prixHotelMadinaUnitaire) *
+        programInfo.exchange;
+    const prixFinal = prixUnitaire * nbPersonnes;
 
     return Math.round(prixFinal);
   }, [

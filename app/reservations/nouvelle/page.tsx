@@ -985,6 +985,28 @@ export default function NouvelleReservation() {
   }
 
   const mettreAJourPaiement = <K extends keyof Paiement>(index: number, field: K, value: Paiement[K]) => {
+    if (field === "montant" && typeof value === "string") {
+      const montantSaisi = Number(value);
+      const prixSuggere = Number(formData.prix) || 0;
+
+      if (value.trim() !== "" && !Number.isNaN(montantSaisi) && prixSuggere > 0) {
+        const totalHorsLigne = paiements.reduce(
+          (sum, p, i) => sum + (i === index ? 0 : Number(p.montant) || 0),
+          0
+        );
+        if (totalHorsLigne + montantSaisi > prixSuggere) {
+          toast({
+            title: "Montant dépasse le prix suggéré",
+            description: `Le total des paiements ne doit pas dépasser ${prixSuggere.toLocaleString(
+              "fr-FR"
+            )} DH.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    }
+
     setPaiements(prev => {
       const newPaiements = [...prev]
       newPaiements[index] = {
@@ -1391,6 +1413,20 @@ export default function NouvelleReservation() {
 
     // Calculer la somme des montants des paiements juste avant l'insertion
     const paidAmount = paiements.reduce((total, p) => total + (Number(p.montant) || 0), 0);
+    const suggestedPrice = Number(formData.prix) || 0;
+    if (suggestedPrice > 0 && paidAmount > suggestedPrice) {
+      toast({
+        title: "Montant de paiements invalide",
+        description: `Le total des paiements (${paidAmount.toLocaleString(
+          "fr-FR"
+        )} DH) dépasse le prix suggéré (${suggestedPrice.toLocaleString(
+          "fr-FR"
+        )} DH).`,
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
+      return;
+    }
 
     // Déterminer le statut de la réservation
     const allDocsAttached = attachmentStatus.passport && attachmentStatus.visa && attachmentStatus.flightBooked && attachmentStatus.hotelBooked;

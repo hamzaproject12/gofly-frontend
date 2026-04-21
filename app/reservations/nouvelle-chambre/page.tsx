@@ -661,6 +661,28 @@ export default function NouvelleChambrePage() {
     field: keyof PaymentRow,
     value: string | File | null
   ) => {
+    if (field === "amount" && typeof value === "string") {
+      const montantSaisi = Number(value);
+      const prixSuggere = Number(formData.prix) || 0;
+
+      if (value.trim() !== "" && !Number.isNaN(montantSaisi) && prixSuggere > 0) {
+        const totalHorsLigne = payments.reduce(
+          (sum, p, i) => sum + (i === index ? 0 : Number(p.amount) || 0),
+          0
+        );
+        if (totalHorsLigne + montantSaisi > prixSuggere) {
+          toast({
+            title: "Montant dépasse le prix suggéré",
+            description: `Le total des paiements ne doit pas dépasser ${prixSuggere.toLocaleString(
+              "fr-FR"
+            )} DH.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    }
+
     setPayments((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value } as PaymentRow;
@@ -932,6 +954,20 @@ export default function NouvelleChambrePage() {
         (sum, p) => sum + (Number(p.amount) || 0),
         0
       );
+    const suggestedPrice = Number(formData.prix) || 0;
+    if (suggestedPrice > 0 && totalPayments > suggestedPrice) {
+      toast({
+        title: "Montant de paiements invalide",
+        description: `Le total des paiements (${totalPayments.toLocaleString(
+          "fr-FR"
+        )} DH) dépasse le prix suggéré (${suggestedPrice.toLocaleString(
+          "fr-FR"
+        )} DH).`,
+        variant: "destructive",
+      });
+      return;
+    }
+
       const leaderOccupants = occupants.map((o, i) => {
         const accPhone = (o.phone || "").trim();
         return {

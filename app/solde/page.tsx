@@ -34,6 +34,7 @@ import {
   Hotel as HotelIcon,
 } from "lucide-react"
 import Link from "next/link"
+import { useToast } from "@/hooks/use-toast"
 
 // Types pour les nouveaux graphiques
 type RoomsChartData = {
@@ -240,11 +241,14 @@ const formatNumberWithDots = (num: number): string => {
 };
 
 export default function SoldeCaissePage() {
+  const { toast } = useToast()
+
   // États pour les filtres
   const [dateDebut, setDateDebut] = useState("")
   const [dateFin, setDateFin] = useState("")
   const [programmeFilter, setProgrammeFilter] = useState("tous")
   const [periodeFilter, setPeriodeFilter] = useState("mois")
+  const [exporting, setExporting] = useState(false)
 
   // États pour les données
   const [balanceData, setBalanceData] = useState<BalanceData | null>(null)
@@ -374,6 +378,139 @@ export default function SoldeCaissePage() {
   const { totalPaiements, totalDepenses, gainPrevu, soldeFinal, soldeFinalPrevu } = statistics || { totalPaiements: 0, totalDepenses: 0, gainPrevu: 0, soldeFinal: 0, soldeFinalPrevu: 0 }
   const { moisMaxBenefice } = summary || { moisMaxBenefice: { mois: "", solde: 0 } }
 
+  const getFilenameFromDisposition = (contentDisposition: string | null): string | null => {
+    if (!contentDisposition) return null;
+    const utf8Name = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+    if (utf8Name) return decodeURIComponent(utf8Name.replace(/["']/g, ""));
+    const basicName = contentDisposition.match(/filename="?([^"]+)"?/i)?.[1];
+    return basicName ? basicName.trim() : null;
+  };
+
+  const isIOSDevice = (): boolean => {
+    if (typeof navigator === "undefined") return false;
+    return /iPad|iPhone|iPod/i.test(navigator.userAgent)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  };
+
+  const downloadBlob = useCallback(
+    async (blob: Blob, fallbackFilename: string, contentDisposition?: string | null) => {
+      const filename = getFilenameFromDisposition(contentDisposition || null) || fallbackFilename;
+      const nav = window.navigator as Navigator & {
+        msSaveOrOpenBlob?: (blobToSave: Blob, defaultName?: string) => boolean;
+        canShare?: (data?: ShareData) => boolean;
+      };
+
+      if (typeof nav.msSaveOrOpenBlob === "function") {
+        nav.msSaveOrOpenBlob(blob, filename);
+        return;
+      }
+
+      if (typeof File !== "undefined" && nav.share && nav.canShare) {
+        try {
+          const file = new File([blob], filename, { type: blob.type || "text/csv;charset=utf-8;" });
+          if (nav.canShare({ files: [file] })) {
+            await nav.share({ files: [file], title: "Export Solde de Caisse" });
+            return;
+          }
+        } catch {
+          // Continue with fallback.
+        }
+      }
+
+      const url = URL.createObjectURL(blob);
+      if (isIOSDevice()) {
+        const opened = window.open(url, "_blank", "noopener,noreferrer");
+        if (!opened) window.location.href = url;
+      } else {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    },
+    []
+  );
+
+  const handleExportData = useCallback(async () => {
+    try {
+      setExporting(true);
+
+      const lines: string[] = [];
+      const toCsv = (value: string | number | null | undefined) =>
+        `"${String(value ?? "").replace(/"/g, '""')}"`;
+
+      lines.push("Section,Champ,Valeur");
+      lines.push(`"Resume","Total paiements",${toCsv(totalPaiements)}`);
+      lines.push(`"Resume","Total depenses",${toCsv(totalDepenses)}`);
+      lines.push(`"Resume","Gain prevu",${toCsv(gainPrevu)}`);
+      lines.push(`"Resume","Solde final",${toCsv(soldeFinal)}`);
+      lines.push(`"Resume","Solde final prevu",${toCsv(soldeFinalPrevu)}`);
+      lines.push(`"Resume","Mois max benefice",${toCsv(moisMaxBenefice?.mois || "")}`);
+      lines.push(`"Resume","Valeur mois max benefice",${toCsv(moisMaxBenefice?.solde || 0)}`);
+
+      lines.push("");
+      lines.push("Par mois,Mois,Paiements,Depenses,Solde");
+      (parMois || []).forEach((m) => {
+        lines.push([toCsv("Par mois"), toCsv(m.mois), toCsv(m.paiements), toCsv(m.depenses), toCsv(m.solde)].join(","));
+      });
+
+      lines.push("");
+      lines.push("Methode paiement,Methode,Total,Count");
+      (parMethodePaiement || []).forEach((item) => {
+        lines.push([toCsv("Methode paiement"), toCsv(item.methode), toCsv(item.total), toCsv(item.count)].join(","));
+      });
+
+      lines.push("");
+      lines.push("Type depense,Type,Total,Count");
+      (parTypeDepense || []).forEach((item) => {
+        lines.push([toCsv("Type depense"), toCsv(item.type), toCsv(item.total), toCsv(item.count)].join(","));
+      });
+
+      lines.push("");
+      lines.push("Par agent,Agent,Total,Count");
+      (parAgent || []).forEach((item) => {
+        lines.push([toCsv("Par agent"), toCsv(item.agentName), toCsv(item.total), toCsv(item.count)].join(","));
+      });
+
+      const csv = "\uFEFF" + lines.join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const stamp = new Date().toISOString().slice(0, 10);
+      await downloadBlob(blob, `solde-caisse-${stamp}.csv`);
+
+      toast({
+        title: "Export reussi",
+        description: "Le fichier CSV a ete telecharge.",
+      });
+    } catch (e) {
+      toast({
+        title: "Export impossible",
+        description: e instanceof Error ? e.message : "Erreur inconnue",
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(false);
+    }
+  }, [
+    downloadBlob,
+    gainPrevu,
+    moisMaxBenefice?.mois,
+    moisMaxBenefice?.solde,
+    parAgent,
+    parMethodePaiement,
+    parMois,
+    parTypeDepense,
+    soldeFinal,
+    soldeFinalPrevu,
+    toast,
+    totalDepenses,
+    totalPaiements,
+  ]);
+
 
 
   if (loading) {
@@ -422,9 +559,13 @@ export default function SoldeCaissePage() {
             <h1 className="text-2xl font-bold text-gray-900">Calcul du Solde de Caisse</h1>
             <p className="text-gray-500 mt-1">Analysez les paiements et dépenses pour calculer le solde</p>
           </div>
-          <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">
+          <Button
+            onClick={handleExportData}
+            disabled={exporting}
+            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+          >
             <Download className="mr-2 h-4 w-4" />
-            Exporter les données
+            {exporting ? "Export..." : "Exporter les donnees"}
           </Button>
         </div>
 

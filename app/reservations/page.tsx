@@ -208,6 +208,26 @@ export default function ReservationsPage() {
     setChambreFilter(value);
   };
 
+  const getFilenameFromDisposition = (contentDisposition: string | null): string | null => {
+    if (!contentDisposition) return null;
+
+    // Support RFC5987 (filename*=UTF-8'')
+    const utf8Name = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+    if (utf8Name) return decodeURIComponent(utf8Name.replace(/["']/g, ""));
+
+    // Fallback: filename="..."
+    const basicName = contentDisposition.match(/filename="?([^"]+)"?/i)?.[1];
+    if (basicName) return basicName.trim();
+
+    return null;
+  };
+
+  const isIOSDevice = (): boolean => {
+    if (typeof navigator === "undefined") return false;
+    return /iPad|iPhone|iPod/i.test(navigator.userAgent)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  };
+
   const handleExportAgency = useCallback(async () => {
     try {
       setExporting(true);
@@ -233,15 +253,75 @@ export default function ReservationsPage() {
         const err = await res.json().catch(() => ({}));
         throw new Error((err as { error?: string }).error || "Export échoué");
       }
+
       const blob = await res.blob();
+      if (!blob || blob.size === 0) {
+        throw new Error("Le fichier exporté est vide");
+      }
+
+      const fallbackFilename = `export-agence-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const filename =
+        getFilenameFromDisposition(res.headers.get("content-disposition")) || fallbackFilename;
+
+      const nav = window.navigator as Navigator & {
+        msSaveOrOpenBlob?: (blobToSave: Blob, defaultName?: string) => boolean;
+        canShare?: (data?: ShareData) => boolean;
+      };
+
+      // Legacy Edge/IE compatibility.
+      if (typeof nav.msSaveOrOpenBlob === "function") {
+        nav.msSaveOrOpenBlob(blob, filename);
+        toast({
+          title: "Export Excel",
+          description: "Le fichier a été téléchargé (une feuille par programme).",
+        });
+        return;
+      }
+
+      // Mobile-friendly fallback: native share sheet when files sharing is available.
+      if (typeof File !== "undefined" && nav.share && nav.canShare) {
+        try {
+          const file = new File([blob], filename, {
+            type:
+              blob.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          });
+          if (nav.canShare({ files: [file] })) {
+            await nav.share({
+              files: [file],
+              title: "Export Excel",
+              text: "Export des réservations",
+            });
+            toast({
+              title: "Export Excel",
+              description: "Fichier prêt à être enregistré/partagé.",
+            });
+            return;
+          }
+        } catch {
+          // Continue with anchor/blob fallback if share is cancelled or unavailable.
+        }
+      }
+
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `export-agence-${new Date().toISOString().slice(0, 10)}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+
+      if (isIOSDevice()) {
+        // iOS Safari / embedded browsers often ignore `download`.
+        const opened = window.open(url, "_blank", "noopener,noreferrer");
+        if (!opened) {
+          window.location.href = url;
+        }
+      } else {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+
+      // Avoid revoking too early on slow/mobile browsers.
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
       toast({
         title: "Export Excel",
         description: "Le fichier a été téléchargé (une feuille par programme).",

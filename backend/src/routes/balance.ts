@@ -588,7 +588,7 @@ router.get('/charts/solde', async (req, res) => {
 });
 
 
-// 📈 API pour courbe journalière cumulée (Paiements / Dépenses / Profit)
+// 📈 API pour courbe journalière (Paiements / Dépenses / Profit)
 router.get('/charts/timeline', async (req, res) => {
   try {
     const { programme, dateDebut, dateFin } = req.query;
@@ -640,21 +640,19 @@ router.get('/charts/timeline', async (req, res) => {
     });
 
     const timelineData: Array<{ day: number; label: string; paiements: number; depenses: number; profit: number }> = [];
-    let cumulativePayments = 0;
-    let cumulativeExpenses = 0;
     let current = firstDate;
     let dayIndex = 1;
 
     while (current <= lastDate) {
       const key = formatDayKey(current);
-      cumulativePayments += paymentsByDay.get(key) || 0;
-      cumulativeExpenses += expensesByDay.get(key) || 0;
+      const dailyPayments = paymentsByDay.get(key) || 0;
+      const dailyExpenses = expensesByDay.get(key) || 0;
       timelineData.push({
         day: dayIndex,
         label: key,
-        paiements: cumulativePayments,
-        depenses: cumulativeExpenses,
-        profit: cumulativePayments - cumulativeExpenses
+        paiements: dailyPayments,
+        depenses: dailyExpenses,
+        profit: dailyPayments - dailyExpenses
       });
       current = addDays(current, 1);
       dayIndex += 1;
@@ -766,7 +764,7 @@ router.get('/charts/program-comparison', async (req, res) => {
     const selectedProgram = programme && programme !== 'tous' ? (programme as string) : null;
     const dataByProgram = new Map<string, { paiements: number; depenses: number; paiementsPrevus: number }>();
 
-    const [payments, expenses, reservations] = await Promise.all([
+    const [payments, expenses, reservations, fixedChargeExpenses] = await Promise.all([
       prisma.payment.findMany({
         where: {
           ...(Object.keys(dateFilter).length > 0 && { paymentDate: dateFilter }),
@@ -796,6 +794,18 @@ router.get('/charts/program-comparison', async (req, res) => {
           price: true,
           program: { select: { name: true } }
         }
+      }),
+      prisma.expense.findMany({
+        where: {
+          ...(Object.keys(dateFilter).length > 0 && { date: dateFilter }),
+          programId: null,
+          fixedChargeOccurrence: {
+            isNot: null
+          }
+        },
+        select: {
+          amount: true
+        }
       })
     ]);
 
@@ -806,20 +816,40 @@ router.get('/charts/program-comparison', async (req, res) => {
     };
 
     payments.forEach((p) => {
-      const name = p.reservation?.program?.name || 'Programme inconnu';
+      const name = p.reservation?.program?.name;
+      if (!name) return;
       const current = ensure(name);
       current.paiements += p.amount || 0;
     });
     expenses.forEach((e) => {
-      const name = e.program?.name || 'Programme inconnu';
+      const name = e.program?.name;
+      if (!name) return;
       const current = ensure(name);
       current.depenses += e.amount || 0;
     });
     reservations.forEach((r) => {
-      const name = r.program?.name || 'Programme inconnu';
+      const name = r.program?.name;
+      if (!name) return;
       const current = ensure(name);
       current.paiementsPrevus += r.price || 0;
     });
+
+    const fixedChargesTotal = fixedChargeExpenses.reduce((sum, item) => sum + (item.amount || 0), 0);
+    if (fixedChargesTotal > 0) {
+      if (selectedProgram) {
+        const current = ensure(selectedProgram);
+        current.depenses += fixedChargesTotal;
+      } else {
+        const programNames = Array.from(dataByProgram.keys());
+        if (programNames.length > 0) {
+          const share = fixedChargesTotal / programNames.length;
+          programNames.forEach((name) => {
+            const current = ensure(name);
+            current.depenses += share;
+          });
+        }
+      }
+    }
 
     const comparison = Array.from(dataByProgram.entries())
       .map(([programName, values]) => ({ programName, ...values }))

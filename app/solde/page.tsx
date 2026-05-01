@@ -571,6 +571,10 @@ export default function SoldeCaissePage() {
   const monthlyAverageProfit = monthlyComparisonData.length > 0
     ? monthlyComparisonData.reduce((sum, item) => sum + (item.paiements - item.depenses), 0) / monthlyComparisonData.length
     : 0
+  const monthlyActualDiffTotal = monthlyComparisonData.reduce((sum, item) => sum + (item.paiements - item.depenses), 0)
+  const monthlyExpectedDiffTotal = monthlyComparisonData.reduce((sum, item) => sum + (item.paiementsPrevus - item.depenses), 0)
+  const programActualDiffTotal = programComparisonData.reduce((sum, item) => sum + (item.paiements - item.depenses), 0)
+  const programExpectedDiffTotal = programComparisonData.reduce((sum, item) => sum + (item.paiementsPrevus - item.depenses), 0)
   const topProgramByActual = programComparisonData.reduce(
     (max, item) => ((item.paiements - item.depenses) > (max.paiements - max.depenses) ? item : max),
     programComparisonData[0] || { programName: "-", paiements: 0, depenses: 0, paiementsPrevus: 0 }
@@ -625,6 +629,8 @@ export default function SoldeCaissePage() {
       paiements: chartScaleMode === "log" ? signedLog(p2[i]) : p2[i],
       depenses: chartScaleMode === "log" ? signedLog(e2[i]) : e2[i],
       paiementsPrevus: chartScaleMode === "log" ? signedLog(pp2[i]) : pp2[i],
+      ecartReel: (chartScaleMode === "log" ? signedLog(p2[i]) : p2[i]) - (chartScaleMode === "log" ? signedLog(e2[i]) : e2[i]),
+      ecartPrevu: (chartScaleMode === "log" ? signedLog(pp2[i]) : pp2[i]) - (chartScaleMode === "log" ? signedLog(e2[i]) : e2[i]),
     }))
   }, [chartScaleMode, chartViewMode, monthlyComparisonData, toIndexed])
 
@@ -642,6 +648,8 @@ export default function SoldeCaissePage() {
       paiements: chartScaleMode === "log" ? signedLog(p2[i]) : p2[i],
       depenses: chartScaleMode === "log" ? signedLog(e2[i]) : e2[i],
       paiementsPrevus: chartScaleMode === "log" ? signedLog(pp2[i]) : pp2[i],
+      ecartReel: (chartScaleMode === "log" ? signedLog(p2[i]) : p2[i]) - (chartScaleMode === "log" ? signedLog(e2[i]) : e2[i]),
+      ecartPrevu: (chartScaleMode === "log" ? signedLog(pp2[i]) : pp2[i]) - (chartScaleMode === "log" ? signedLog(e2[i]) : e2[i]),
     }))
   }, [chartScaleMode, chartViewMode, programComparisonData, toIndexed])
 
@@ -1081,63 +1089,68 @@ export default function SoldeCaissePage() {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
                 </div>
               ) : timelineData.length > 1 ? (
-                <ChartContainer config={timelineChartConfig} className="h-full w-full aspect-auto">
-                  <LineChart
-                    data={timelineDisplayData}
-                    margin={{ left: 8, right: 16, top: 8, bottom: 8 }}
-                    onClick={(state: any) => {
-                      const date = state?.activeLabel as string | undefined
-                      if (!date) return
-                      setSelectedTimelineDate(date)
-                      void loadTimelineDayDetails(date)
-                    }}
-                  >
-                    <CartesianGrid vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={8}
-                      tickFormatter={(value) => formatDateLabel(String(value))}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)}
-                    />
-                    <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
-                    <ChartTooltip
-                      cursor={false}
-                      content={
-                        <ChartTooltipContent
-                          labelFormatter={(_, payload) => {
-                            const item = payload?.[0]?.payload as TimelinePoint | undefined
-                            return item ? `${formatDateLabel(item.label)} (index J${item.day})` : ""
-                          }}
-                          formatter={(value, name) => (
-                            <div className="flex w-full items-center justify-between gap-4">
-                              <span className="text-muted-foreground">{timelineChartConfig[name as string]?.label || name}</span>
-                              <span className="font-mono font-semibold">
-                                {chartViewMode === "raw" ? formatCurrency(Number(value)) : `${Number(value).toFixed(1)} idx`}
-                              </span>
-                            </div>
-                          )}
-                        />
-                      }
-                    />
-                    <ChartLegend content={<ChartLegendContent />} />
-                    <Line type="monotone" dataKey="paiements" stroke="var(--color-paiements)" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
-                    <Line type="monotone" dataKey="depenses" stroke="var(--color-depenses)" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
-                    <Line type="monotone" dataKey="profit" stroke="var(--color-profit)" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
-                    {maxGrowth.day > 0 && (
-                      <ReferenceDot x={maxGrowth.label} y={timelineDisplayData.find((d) => d.day === maxGrowth.day)?.profit || 0} r={5} fill="#16a34a" stroke="#fff" />
-                    )}
-                    {maxDrop.day > 0 && (
-                      <ReferenceDot x={maxDrop.label} y={timelineDisplayData.find((d) => d.day === maxDrop.day)?.profit || 0} r={5} fill="#dc2626" stroke="#fff" />
-                    )}
-                    <Brush dataKey="label" tickFormatter={(value) => formatDateLabel(String(value))} height={20} stroke="#64748b" travellerWidth={10} />
-                  </LineChart>
-                </ChartContainer>
+                <div className="relative group h-full">
+                  <ChartContainer config={timelineChartConfig} className="h-full w-full aspect-auto cursor-pointer">
+                    <LineChart
+                      data={timelineDisplayData}
+                      margin={{ left: 8, right: 16, top: 8, bottom: 8 }}
+                      onClick={(state: any) => {
+                        const date = state?.activeLabel as string | undefined
+                        if (!date) return
+                        setSelectedTimelineDate(date)
+                        void loadTimelineDayDetails(date)
+                      }}
+                    >
+                      <CartesianGrid vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tickFormatter={(value) => formatDateLabel(String(value))}
+                      />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)}
+                      />
+                      <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
+                      <ChartTooltip
+                        cursor={false}
+                        content={
+                          <ChartTooltipContent
+                            labelFormatter={(_, payload) => {
+                              const item = payload?.[0]?.payload as TimelinePoint | undefined
+                              return item ? `${formatDateLabel(item.label)} (index J${item.day})` : ""
+                            }}
+                            formatter={(value, name) => (
+                              <div className="flex w-full items-center justify-between gap-4">
+                                <span className="text-muted-foreground">{timelineChartConfig[name as string]?.label || name}</span>
+                                <span className="font-mono font-semibold">
+                                  {chartViewMode === "raw" ? formatCurrency(Number(value)) : `${Number(value).toFixed(1)} idx`}
+                                </span>
+                              </div>
+                            )}
+                          />
+                        }
+                      />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Line type="monotone" dataKey="paiements" stroke="var(--color-paiements)" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
+                      <Line type="monotone" dataKey="depenses" stroke="var(--color-depenses)" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
+                      <Line type="monotone" dataKey="profit" stroke="var(--color-profit)" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
+                      {maxGrowth.day > 0 && (
+                        <ReferenceDot x={maxGrowth.label} y={timelineDisplayData.find((d) => d.day === maxGrowth.day)?.profit || 0} r={5} fill="#16a34a" stroke="#fff" />
+                      )}
+                      {maxDrop.day > 0 && (
+                        <ReferenceDot x={maxDrop.label} y={timelineDisplayData.find((d) => d.day === maxDrop.day)?.profit || 0} r={5} fill="#dc2626" stroke="#fff" />
+                      )}
+                      <Brush dataKey="label" tickFormatter={(value) => formatDateLabel(String(value))} height={20} stroke="#64748b" travellerWidth={10} />
+                    </LineChart>
+                  </ChartContainer>
+                  <div className="pointer-events-none absolute top-2 right-2 rounded-md bg-blue-600/90 text-white text-[11px] px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    Cliquez sur un jour pour voir le détail
+                  </div>
+                </div>
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-500">
                   <p>Aucune donnée disponible</p>
@@ -1180,7 +1193,12 @@ export default function SoldeCaissePage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-lg">Total Paiements vs Dépenses (par mois)</CardTitle>
+              <CardTitle className="text-lg flex items-center justify-between gap-2">
+                <span>Total Paiements vs Dépenses (par mois)</span>
+                <Badge variant={monthlyActualDiffTotal >= 0 ? "default" : "destructive"}>
+                  Écart: {formatCurrency(monthlyActualDiffTotal)}
+                </Badge>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-72 p-1">
@@ -1209,12 +1227,20 @@ export default function SoldeCaissePage() {
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
               </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Écart total (paiements - dépenses): <span className={monthlyActualDiffTotal >= 0 ? "text-green-700 font-semibold" : "text-red-700 font-semibold"}>{formatCurrency(monthlyActualDiffTotal)}</span>
+              </p>
             </CardContent>
           </Card>
 
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-lg">Total Paiements Prévus vs Dépenses (par mois)</CardTitle>
+              <CardTitle className="text-lg flex items-center justify-between gap-2">
+                <span>Total Paiements Prévus vs Dépenses (par mois)</span>
+                <Badge variant={monthlyExpectedDiffTotal >= 0 ? "default" : "destructive"}>
+                  Écart: {formatCurrency(monthlyExpectedDiffTotal)}
+                </Badge>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-72 p-1">
@@ -1243,6 +1269,9 @@ export default function SoldeCaissePage() {
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
               </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Écart total (prévus - dépenses): <span className={monthlyExpectedDiffTotal >= 0 ? "text-green-700 font-semibold" : "text-red-700 font-semibold"}>{formatCurrency(monthlyExpectedDiffTotal)}</span>
+              </p>
               <p className="text-xs text-muted-foreground mt-2">Moyenne du profit mensuel: {formatCurrency(monthlyAverageProfit)}</p>
             </CardContent>
           </Card>
@@ -1251,7 +1280,12 @@ export default function SoldeCaissePage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-lg">Total Paiements vs Dépenses (par programme)</CardTitle>
+              <CardTitle className="text-lg flex items-center justify-between gap-2">
+                <span>Total Paiements vs Dépenses (par programme)</span>
+                <Badge variant={programActualDiffTotal >= 0 ? "default" : "destructive"}>
+                  Écart: {formatCurrency(programActualDiffTotal)}
+                </Badge>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-72 p-1">
@@ -1279,12 +1313,20 @@ export default function SoldeCaissePage() {
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
               </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Écart total (paiements - dépenses): <span className={programActualDiffTotal >= 0 ? "text-green-700 font-semibold" : "text-red-700 font-semibold"}>{formatCurrency(programActualDiffTotal)}</span>
+              </p>
             </CardContent>
           </Card>
 
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-lg">Total Paiements Prévus vs Dépenses (par programme)</CardTitle>
+              <CardTitle className="text-lg flex items-center justify-between gap-2">
+                <span>Total Paiements Prévus vs Dépenses (par programme)</span>
+                <Badge variant={programExpectedDiffTotal >= 0 ? "default" : "destructive"}>
+                  Écart: {formatCurrency(programExpectedDiffTotal)}
+                </Badge>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-72 p-1">
@@ -1312,6 +1354,9 @@ export default function SoldeCaissePage() {
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
               </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Écart total (prévus - dépenses): <span className={programExpectedDiffTotal >= 0 ? "text-green-700 font-semibold" : "text-red-700 font-semibold"}>{formatCurrency(programExpectedDiffTotal)}</span>
+              </p>
               <p className="text-xs text-muted-foreground mt-2">Top programme (réel): {topProgramByActual.programName} • Profit {formatCurrency(topProgramByActual.paiements - topProgramByActual.depenses)}</p>
             </CardContent>
           </Card>

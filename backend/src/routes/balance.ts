@@ -229,6 +229,17 @@ function buildDateFilter(dateDebut?: string, dateFin?: string) {
   return filter;
 }
 
+const formatDayKey = (date: Date) => date.toISOString().slice(0, 10);
+const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+const addDays = (date: Date, days: number) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+const formatMonthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+const monthLabel = (key: string) => {
+  const [year, month] = key.split('-').map(Number);
+  const d = new Date(year, month - 1, 1);
+  const label = d.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+};
+
 // 📈 Calcul des données mensuelles optimisé avec Prisma
 async function calculateMonthlyDataOptimized(dateFilter: any, programFilter: any, periode: string) {
   const moisData: any[] = [];
@@ -571,6 +582,262 @@ router.get('/charts/solde', async (req, res) => {
     console.error('❌ Erreur Solde Chart API:', error);
     res.status(500).json({ 
       error: 'Erreur lors de la récupération des données du solde',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+
+// 📈 API pour courbe journalière cumulée (Paiements / Dépenses / Profit)
+router.get('/charts/timeline', async (req, res) => {
+  try {
+    const { programme, dateDebut, dateFin } = req.query;
+    const dateFilter = buildDateFilter(dateDebut as string, dateFin as string);
+    const programFilter = programme && programme !== 'tous' ? { name: programme as string } : undefined;
+
+    const [payments, expenses] = await Promise.all([
+      prisma.payment.findMany({
+        where: {
+          ...(Object.keys(dateFilter).length > 0 && { paymentDate: dateFilter }),
+          ...(programFilter && {
+            reservation: {
+              program: programFilter
+            }
+          })
+        },
+        select: { paymentDate: true, amount: true }
+      }),
+      prisma.expense.findMany({
+        where: {
+          ...(Object.keys(dateFilter).length > 0 && { date: dateFilter }),
+          ...(programFilter && { program: programFilter })
+        },
+        select: { date: true, amount: true }
+      })
+    ]);
+
+    if (payments.length === 0 && expenses.length === 0) {
+      return res.json({ data: [], metadata: { programme: programme || 'tous', dateDebut: dateDebut || null, dateFin: dateFin || null } });
+    }
+
+    const allDates = [
+      ...payments.map((p) => p.paymentDate),
+      ...expenses.map((e) => e.date)
+    ];
+    const firstDate = startOfDay(new Date(Math.min(...allDates.map((d) => d.getTime()))));
+    const lastDate = startOfDay(new Date(Math.max(...allDates.map((d) => d.getTime()))));
+
+    const paymentsByDay = new Map<string, number>();
+    const expensesByDay = new Map<string, number>();
+
+    payments.forEach((p) => {
+      const key = formatDayKey(startOfDay(p.paymentDate));
+      paymentsByDay.set(key, (paymentsByDay.get(key) || 0) + (p.amount || 0));
+    });
+    expenses.forEach((e) => {
+      const key = formatDayKey(startOfDay(e.date));
+      expensesByDay.set(key, (expensesByDay.get(key) || 0) + (e.amount || 0));
+    });
+
+    const timelineData: Array<{ day: number; label: string; paiements: number; depenses: number; profit: number }> = [];
+    let cumulativePayments = 0;
+    let cumulativeExpenses = 0;
+    let current = firstDate;
+    let dayIndex = 1;
+
+    while (current <= lastDate) {
+      const key = formatDayKey(current);
+      cumulativePayments += paymentsByDay.get(key) || 0;
+      cumulativeExpenses += expensesByDay.get(key) || 0;
+      timelineData.push({
+        day: dayIndex,
+        label: key,
+        paiements: cumulativePayments,
+        depenses: cumulativeExpenses,
+        profit: cumulativePayments - cumulativeExpenses
+      });
+      current = addDays(current, 1);
+      dayIndex += 1;
+    }
+
+    res.json({
+      data: timelineData,
+      metadata: {
+        programme: programme || 'tous',
+        generatedAt: new Date().toISOString(),
+        dateDebut: dateDebut || null,
+        dateFin: dateFin || null
+      }
+    });
+  } catch (error) {
+    console.error('❌ Erreur Timeline Chart API:', error);
+    res.status(500).json({
+      error: 'Erreur lors de la récupération de la courbe journalière',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// 📊 API comparatif mensuel (Paiements/Paiements prévus vs Dépenses)
+router.get('/charts/monthly-comparison', async (req, res) => {
+  try {
+    const { programme, dateDebut, dateFin } = req.query;
+    const dateFilter = buildDateFilter(dateDebut as string, dateFin as string);
+    const programFilter = programme && programme !== 'tous' ? { name: programme as string } : undefined;
+
+    const [payments, expenses, reservations] = await Promise.all([
+      prisma.payment.findMany({
+        where: {
+          ...(Object.keys(dateFilter).length > 0 && { paymentDate: dateFilter }),
+          ...(programFilter && { reservation: { program: programFilter } })
+        },
+        select: { paymentDate: true, amount: true }
+      }),
+      prisma.expense.findMany({
+        where: {
+          ...(Object.keys(dateFilter).length > 0 && { date: dateFilter }),
+          ...(programFilter && { program: programFilter })
+        },
+        select: { date: true, amount: true }
+      }),
+      prisma.reservation.findMany({
+        where: {
+          ...(Object.keys(dateFilter).length > 0 && { reservationDate: dateFilter }),
+          ...(programFilter && { program: programFilter })
+        },
+        select: { reservationDate: true, price: true }
+      })
+    ]);
+
+    const monthMap = new Map<string, { paiements: number; depenses: number; paiementsPrevus: number }>();
+
+    payments.forEach((p) => {
+      const key = formatMonthKey(p.paymentDate);
+      const current = monthMap.get(key) || { paiements: 0, depenses: 0, paiementsPrevus: 0 };
+      current.paiements += p.amount || 0;
+      monthMap.set(key, current);
+    });
+    expenses.forEach((e) => {
+      const key = formatMonthKey(e.date);
+      const current = monthMap.get(key) || { paiements: 0, depenses: 0, paiementsPrevus: 0 };
+      current.depenses += e.amount || 0;
+      monthMap.set(key, current);
+    });
+    reservations.forEach((r) => {
+      const key = formatMonthKey(r.reservationDate);
+      const current = monthMap.get(key) || { paiements: 0, depenses: 0, paiementsPrevus: 0 };
+      current.paiementsPrevus += r.price || 0;
+      monthMap.set(key, current);
+    });
+
+    const monthlyData = Array.from(monthMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, val]) => ({
+        month: key,
+        label: monthLabel(key),
+        paiements: val.paiements,
+        depenses: val.depenses,
+        paiementsPrevus: val.paiementsPrevus
+      }));
+
+    res.json({
+      data: monthlyData,
+      metadata: {
+        programme: programme || 'tous',
+        generatedAt: new Date().toISOString(),
+        dateDebut: dateDebut || null,
+        dateFin: dateFin || null
+      }
+    });
+  } catch (error) {
+    console.error('❌ Erreur Monthly Comparison API:', error);
+    res.status(500).json({
+      error: 'Erreur lors de la récupération du comparatif mensuel',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// 🏢 API comparatif par programme (Paiements/Paiements prévus vs Dépenses)
+router.get('/charts/program-comparison', async (req, res) => {
+  try {
+    const { programme, dateDebut, dateFin } = req.query;
+    const dateFilter = buildDateFilter(dateDebut as string, dateFin as string);
+    const selectedProgram = programme && programme !== 'tous' ? (programme as string) : null;
+    const dataByProgram = new Map<string, { paiements: number; depenses: number; paiementsPrevus: number }>();
+
+    const [payments, expenses, reservations] = await Promise.all([
+      prisma.payment.findMany({
+        where: {
+          ...(Object.keys(dateFilter).length > 0 && { paymentDate: dateFilter }),
+          ...(selectedProgram && { reservation: { program: { name: selectedProgram } } })
+        },
+        select: {
+          amount: true,
+          reservation: { select: { program: { select: { name: true } } } }
+        }
+      }),
+      prisma.expense.findMany({
+        where: {
+          ...(Object.keys(dateFilter).length > 0 && { date: dateFilter }),
+          ...(selectedProgram && { program: { name: selectedProgram } })
+        },
+        select: {
+          amount: true,
+          program: { select: { name: true } }
+        }
+      }),
+      prisma.reservation.findMany({
+        where: {
+          ...(Object.keys(dateFilter).length > 0 && { reservationDate: dateFilter }),
+          ...(selectedProgram && { program: { name: selectedProgram } })
+        },
+        select: {
+          price: true,
+          program: { select: { name: true } }
+        }
+      })
+    ]);
+
+    const ensure = (name: string) => {
+      const current = dataByProgram.get(name) || { paiements: 0, depenses: 0, paiementsPrevus: 0 };
+      dataByProgram.set(name, current);
+      return current;
+    };
+
+    payments.forEach((p) => {
+      const name = p.reservation?.program?.name || 'Programme inconnu';
+      const current = ensure(name);
+      current.paiements += p.amount || 0;
+    });
+    expenses.forEach((e) => {
+      const name = e.program?.name || 'Programme inconnu';
+      const current = ensure(name);
+      current.depenses += e.amount || 0;
+    });
+    reservations.forEach((r) => {
+      const name = r.program?.name || 'Programme inconnu';
+      const current = ensure(name);
+      current.paiementsPrevus += r.price || 0;
+    });
+
+    const comparison = Array.from(dataByProgram.entries())
+      .map(([programName, values]) => ({ programName, ...values }))
+      .sort((a, b) => (b.paiements + b.paiementsPrevus) - (a.paiements + a.paiementsPrevus));
+
+    res.json({
+      data: comparison,
+      metadata: {
+        programme: selectedProgram || 'tous',
+        generatedAt: new Date().toISOString(),
+        dateDebut: dateDebut || null,
+        dateFin: dateFin || null
+      }
+    });
+  } catch (error) {
+    console.error('❌ Erreur Program Comparison API:', error);
+    res.status(500).json({
+      error: 'Erreur lors de la récupération du comparatif par programme',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }

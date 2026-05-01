@@ -59,6 +59,29 @@ type SoldeChartData = {
   montant: number
 }
 
+type TimelinePoint = {
+  day: number
+  label: string
+  paiements: number
+  depenses: number
+  profit: number
+}
+
+type MonthlyComparisonData = {
+  month: string
+  label: string
+  paiements: number
+  depenses: number
+  paiementsPrevus: number
+}
+
+type ProgramComparisonData = {
+  programName: string
+  paiements: number
+  depenses: number
+  paiementsPrevus: number
+}
+
 type BalanceData = {
   // 📊 Statistiques principales
   statistics: {
@@ -262,6 +285,9 @@ export default function SoldeCaissePage() {
   const [hotelsData, setHotelsData] = useState<HotelsChartData[]>([])
   const [genderData, setGenderData] = useState<GenderChartData[]>([])
   const [soldeData, setSoldeData] = useState<SoldeChartData[]>([])
+  const [timelineData, setTimelineData] = useState<TimelinePoint[]>([])
+  const [monthlyComparisonData, setMonthlyComparisonData] = useState<MonthlyComparisonData[]>([])
+  const [programComparisonData, setProgramComparisonData] = useState<ProgramComparisonData[]>([])
   const [chartsLoading, setChartsLoading] = useState(false)
 
   // 🎯 Fonction optimisée pour récupérer les données via l'API Balance
@@ -316,39 +342,79 @@ export default function SoldeCaissePage() {
   const fetchChartsData = useCallback(async () => {
     try {
       setChartsLoading(true)
+      const params = new URLSearchParams()
+      params.append('programme', programmeFilter || 'tous')
+      if (dateDebut) params.append('dateDebut', dateDebut)
+      if (dateFin) params.append('dateFin', dateFin)
       
       // Récupérer toutes les données des graphiques en parallèle
-      const [roomsRes, hotelsRes, genderRes, soldeRes] = await Promise.all([
-        fetch(api.url(`/api/balance/charts/rooms?programme=${programmeFilter}`)),
-        fetch(api.url(`/api/balance/charts/hotels?programme=${programmeFilter}`)),
-        fetch(api.url(`/api/balance/charts/gender?programme=${programmeFilter}`)),
-        fetch(api.url(`/api/balance/charts/solde?programme=${programmeFilter}`))
+      const [
+        roomsRes,
+        hotelsRes,
+        genderRes,
+        soldeRes,
+        timelineRes,
+        monthlyRes,
+        programRes
+      ] = await Promise.all([
+        fetch(api.url(`/api/balance/charts/rooms?${params.toString()}`)),
+        fetch(api.url(`/api/balance/charts/hotels?${params.toString()}`)),
+        fetch(api.url(`/api/balance/charts/gender?${params.toString()}`)),
+        fetch(api.url(`/api/balance/charts/solde?${params.toString()}`)),
+        fetch(api.url(`/api/balance/charts/timeline?${params.toString()}`)),
+        fetch(api.url(`/api/balance/charts/monthly-comparison?${params.toString()}`)),
+        fetch(api.url(`/api/balance/charts/program-comparison?${params.toString()}`))
       ])
 
-      const [roomsData, hotelsData, genderData, soldeData] = await Promise.all([
+      const allResponses = [roomsRes, hotelsRes, genderRes, soldeRes, timelineRes, monthlyRes, programRes]
+      if (allResponses.some((res) => !res.ok)) {
+        throw new Error('Erreur lors du chargement des données des graphiques')
+      }
+
+      const [roomsData, hotelsData, genderData, soldeData, timelineChartData, monthlyChartData, programChartData] = await Promise.all([
         roomsRes.json(),
         hotelsRes.json(),
         genderRes.json(),
-        soldeRes.json()
+        soldeRes.json(),
+        timelineRes.json(),
+        monthlyRes.json(),
+        programRes.json()
       ])
 
       setRoomsData(roomsData.data || [])
       setHotelsData(hotelsData.data || [])
       setGenderData(genderData.data || [])
       setSoldeData(soldeData.data || [])
+      setTimelineData(timelineChartData.data || [])
+      setMonthlyComparisonData(monthlyChartData.data || [])
+      setProgramComparisonData(programChartData.data || [])
 
       console.log('✅ Graphiques chargés:', {
         rooms: roomsData.data?.length || 0,
         hotels: hotelsData.data?.length || 0,
         gender: genderData.data?.length || 0,
-        solde: soldeData.data?.length || 0
+        solde: soldeData.data?.length || 0,
+        timeline: timelineChartData.data?.length || 0,
+        monthly: monthlyChartData.data?.length || 0,
+        program: programChartData.data?.length || 0
       })
     } catch (err) {
       console.error('❌ Erreur fetchChartsData:', err)
     } finally {
       setChartsLoading(false)
     }
-  }, [programmeFilter])
+  }, [programmeFilter, dateDebut, dateFin])
+
+  const buildLinePoints = (values: number[], width: number, height: number, maxValue: number) => {
+    if (values.length === 0) return ''
+    return values
+      .map((value, index) => {
+        const x = values.length === 1 ? width / 2 : (index / (values.length - 1)) * width
+        const y = height - (maxValue > 0 ? (value / maxValue) * height : 0)
+        return `${x},${y}`
+      })
+      .join(' ')
+  }
 
   // Charger les données au montage et quand les filtres changent
   useEffect(() => {
@@ -716,6 +782,199 @@ export default function SoldeCaissePage() {
               Données en temps réel
             </Badge>
           </div>
+        </div>
+
+        <Card className="border-0 shadow-lg mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-indigo-500" />
+              Paiements vs Dépenses vs Profit (jours depuis premier mouvement)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80 p-4">
+              {chartsLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                </div>
+              ) : timelineData.length > 1 ? (
+                <div className="h-full w-full flex flex-col justify-between">
+                  <svg viewBox="0 0 900 300" className="w-full h-full">
+                    <line x1="0" y1="280" x2="900" y2="280" stroke="#94a3b8" strokeWidth="1" />
+                    <line x1="0" y1="0" x2="0" y2="280" stroke="#94a3b8" strokeWidth="1" />
+                    {(() => {
+                      const maxValue = Math.max(
+                        ...timelineData.map((d) => Math.max(d.paiements, d.depenses, d.profit)),
+                        1
+                      )
+                      const paymentsPoints = buildLinePoints(timelineData.map((d) => d.paiements), 900, 280, maxValue)
+                      const expensesPoints = buildLinePoints(timelineData.map((d) => d.depenses), 900, 280, maxValue)
+                      const profitPoints = buildLinePoints(timelineData.map((d) => d.profit), 900, 280, maxValue)
+                      return (
+                        <>
+                          <polyline fill="none" stroke="#16a34a" strokeWidth="3" points={paymentsPoints} />
+                          <polyline fill="none" stroke="#dc2626" strokeWidth="3" points={expensesPoints} />
+                          <polyline fill="none" stroke="#2563eb" strokeWidth="3" points={profitPoints} />
+                        </>
+                      )
+                    })()}
+                    <text x="10" y="20" className="fill-slate-500 text-xs">Y: Montant (DH)</text>
+                    <text x="740" y="296" className="fill-slate-500 text-xs">X: Jours</text>
+                  </svg>
+                  <div className="flex items-center gap-4 text-xs text-gray-700 mt-2">
+                    <span><span className="inline-block w-4 h-1 bg-green-600 mr-1 align-middle"></span>Paiements</span>
+                    <span><span className="inline-block w-4 h-1 bg-red-600 mr-1 align-middle"></span>Dépenses</span>
+                    <span><span className="inline-block w-4 h-1 bg-blue-600 mr-1 align-middle"></span>Profit</span>
+                    <span className="ml-auto text-gray-500">Du jour 1 au jour {timelineData[timelineData.length - 1]?.day || 1}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  <p>Aucune donnée disponible</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-lg">Total Paiements vs Dépenses (par mois)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-72 p-3">
+                {chartsLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                  </div>
+                ) : monthlyComparisonData.length > 0 ? (
+                  <div className="flex items-end gap-2 h-full">
+                    {monthlyComparisonData.map((item, index) => {
+                      const maxValue = Math.max(...monthlyComparisonData.map((m) => Math.max(m.paiements, m.depenses)), 1)
+                      const payHeight = (item.paiements / maxValue) * 180
+                      const expHeight = (item.depenses / maxValue) * 180
+                      return (
+                        <div key={index} className="flex-1 flex flex-col items-center gap-2">
+                          <div className="w-full flex items-end justify-center gap-1">
+                            <div className="w-1/2 bg-green-500 rounded-t-sm" style={{ height: `${payHeight}px`, minHeight: '4px' }} title={`${item.paiements.toLocaleString()} DH`}></div>
+                            <div className="w-1/2 bg-red-500 rounded-t-sm" style={{ height: `${expHeight}px`, minHeight: '4px' }} title={`${item.depenses.toLocaleString()} DH`}></div>
+                          </div>
+                          <span className="text-xs text-gray-600">{item.label}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-lg">Total Paiements Prévus vs Dépenses (par mois)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-72 p-3">
+                {chartsLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
+                  </div>
+                ) : monthlyComparisonData.length > 0 ? (
+                  <div className="flex items-end gap-2 h-full">
+                    {monthlyComparisonData.map((item, index) => {
+                      const maxValue = Math.max(...monthlyComparisonData.map((m) => Math.max(m.paiementsPrevus, m.depenses)), 1)
+                      const expectedHeight = (item.paiementsPrevus / maxValue) * 180
+                      const expHeight = (item.depenses / maxValue) * 180
+                      return (
+                        <div key={index} className="flex-1 flex flex-col items-center gap-2">
+                          <div className="w-full flex items-end justify-center gap-1">
+                            <div className="w-1/2 bg-yellow-500 rounded-t-sm" style={{ height: `${expectedHeight}px`, minHeight: '4px' }} title={`${item.paiementsPrevus.toLocaleString()} DH`}></div>
+                            <div className="w-1/2 bg-red-500 rounded-t-sm" style={{ height: `${expHeight}px`, minHeight: '4px' }} title={`${item.depenses.toLocaleString()} DH`}></div>
+                          </div>
+                          <span className="text-xs text-gray-600">{item.label}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-lg">Total Paiements vs Dépenses (par programme)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-72 p-3">
+                {chartsLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : programComparisonData.length > 0 ? (
+                  <div className="flex items-end gap-2 h-full">
+                    {programComparisonData.slice(0, 8).map((item, index) => {
+                      const maxValue = Math.max(...programComparisonData.map((m) => Math.max(m.paiements, m.depenses)), 1)
+                      const payHeight = (item.paiements / maxValue) * 180
+                      const expHeight = (item.depenses / maxValue) * 180
+                      return (
+                        <div key={index} className="flex-1 flex flex-col items-center gap-2">
+                          <div className="w-full flex items-end justify-center gap-1">
+                            <div className="w-1/2 bg-green-500 rounded-t-sm" style={{ height: `${payHeight}px`, minHeight: '4px' }}></div>
+                            <div className="w-1/2 bg-red-500 rounded-t-sm" style={{ height: `${expHeight}px`, minHeight: '4px' }}></div>
+                          </div>
+                          <span className="text-[10px] text-gray-600 text-center">{item.programName}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-lg">Total Paiements Prévus vs Dépenses (par programme)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-72 p-3">
+                {chartsLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+                  </div>
+                ) : programComparisonData.length > 0 ? (
+                  <div className="flex items-end gap-2 h-full">
+                    {programComparisonData.slice(0, 8).map((item, index) => {
+                      const maxValue = Math.max(...programComparisonData.map((m) => Math.max(m.paiementsPrevus, m.depenses)), 1)
+                      const expectedHeight = (item.paiementsPrevus / maxValue) * 180
+                      const expHeight = (item.depenses / maxValue) * 180
+                      return (
+                        <div key={index} className="flex-1 flex flex-col items-center gap-2">
+                          <div className="w-full flex items-end justify-center gap-1">
+                            <div className="w-1/2 bg-yellow-500 rounded-t-sm" style={{ height: `${expectedHeight}px`, minHeight: '4px' }}></div>
+                            <div className="w-1/2 bg-red-500 rounded-t-sm" style={{ height: `${expHeight}px`, minHeight: '4px' }}></div>
+                          </div>
+                          <span className="text-[10px] text-gray-600 text-center">{item.programName}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">

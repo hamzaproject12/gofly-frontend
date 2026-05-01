@@ -5,7 +5,6 @@ import { api } from "@/lib/api"
 import RoleProtectedRoute from "../components/RoleProtectedRoute"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -970,31 +969,7 @@ export default function SoldeCaissePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
-              <div className="space-y-3">
-                <Label htmlFor="dateDebut" className="text-sm font-semibold text-gray-700">
-                  📅 Date début
-                </Label>
-                <Input
-                  id="dateDebut"
-                  type="date"
-                  value={dateDebut}
-                  onChange={(e) => setDateDebut(e.target.value)}
-                  className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-11"
-                />
-              </div>
-              <div className="space-y-3">
-                <Label htmlFor="dateFin" className="text-sm font-semibold text-gray-700">
-                  📅 Date fin
-                </Label>
-                <Input
-                  id="dateFin"
-                  type="date"
-                  value={dateFin}
-                  onChange={(e) => setDateFin(e.target.value)}
-                  className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-11"
-                />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
               <div className="space-y-3">
                 <Label htmlFor="programme" className="text-sm font-semibold text-gray-700">
                   🏢 Programme
@@ -1212,26 +1187,7 @@ export default function SoldeCaissePage() {
                   <ChartContainer config={monthlyActualConfig} className="h-full w-full aspect-auto">
                     <BarChart data={monthlyDisplayData} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
                       <CartesianGrid vertical={false} />
-                      <XAxis
-                        dataKey="label"
-                        tickLine={false}
-                        axisLine={false}
-                        tickMargin={8}
-                        tick={(props: any) => {
-                          const { x, y, payload } = props
-                          const label = String(payload?.value || "")
-                          const diff = monthlyActualDiffByLabel.get(label) || 0
-                          return (
-                            <g transform={`translate(${x},${y})`}>
-                              <text x={0} y={0} dy={10} textAnchor="middle" fill="#64748b" fontSize={11}>{label}</text>
-                              <text x={0} y={0} dy={24} textAnchor="middle" fill={diff >= 0 ? "#16a34a" : "#dc2626"} fontSize={10}>
-                                {formatSignedCurrency(diff)}
-                              </text>
-                            </g>
-                          )
-                        }}
-                        height={36}
-                      />
+                      <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
                       <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip
@@ -1248,7 +1204,21 @@ export default function SoldeCaissePage() {
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-2">La différence (paiements - dépenses) est affichée sous chaque mois.</p>
+              {monthlyComparisonData.length > 0 && (
+                <div className="mt-2 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
+                  {monthlyComparisonData.map((item) => {
+                    const diff = monthlyActualDiffByLabel.get(item.label) || 0
+                    return (
+                      <div key={`monthly-actual-${item.label}`} className="rounded-md border bg-muted/20 p-2">
+                        <p className="text-[11px] text-muted-foreground">{item.label}</p>
+                        <p className={`text-xs font-semibold ${diff >= 0 ? "text-green-700" : "text-red-700"}`}>
+                          {formatSignedCurrency(diff)}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -1266,26 +1236,7 @@ export default function SoldeCaissePage() {
                   <ChartContainer config={monthlyExpectedConfig} className="h-full w-full aspect-auto">
                     <BarChart data={monthlyDisplayData} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
                       <CartesianGrid vertical={false} />
-                      <XAxis
-                        dataKey="label"
-                        tickLine={false}
-                        axisLine={false}
-                        tickMargin={8}
-                        tick={(props: any) => {
-                          const { x, y, payload } = props
-                          const label = String(payload?.value || "")
-                          const diff = monthlyExpectedDiffByLabel.get(label) || 0
-                          return (
-                            <g transform={`translate(${x},${y})`}>
-                              <text x={0} y={0} dy={10} textAnchor="middle" fill="#64748b" fontSize={11}>{label}</text>
-                              <text x={0} y={0} dy={24} textAnchor="middle" fill={diff >= 0 ? "#16a34a" : "#dc2626"} fontSize={10}>
-                                {formatSignedCurrency(diff)}
-                              </text>
-                            </g>
-                          )
-                        }}
-                        height={36}
-                      />
+                      <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
                       <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip
@@ -1302,7 +1253,21 @@ export default function SoldeCaissePage() {
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-2">La différence (prévus - dépenses) est affichée sous chaque mois.</p>
+              {monthlyComparisonData.length > 0 && (
+                <div className="mt-2 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
+                  {monthlyComparisonData.map((item) => {
+                    const diff = monthlyExpectedDiffByLabel.get(item.label) || 0
+                    return (
+                      <div key={`monthly-expected-${item.label}`} className="rounded-md border bg-muted/20 p-2">
+                        <p className="text-[11px] text-muted-foreground">{item.label}</p>
+                        <p className={`text-xs font-semibold ${diff >= 0 ? "text-green-700" : "text-red-700"}`}>
+                          {formatSignedCurrency(diff)}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
               <p className="text-xs text-muted-foreground mt-2">Moyenne du profit mensuel: {formatCurrency(monthlyAverageProfit)}</p>
             </CardContent>
           </Card>
@@ -1323,7 +1288,32 @@ export default function SoldeCaissePage() {
                   <ChartContainer config={monthlyActualConfig} className="h-full w-full aspect-auto">
                     <BarChart data={programDisplayData.slice(0, 10)} margin={{ left: 8, right: 8, top: 8, bottom: 24 }}>
                       <CartesianGrid vertical={false} />
-                      <XAxis dataKey="programName" tickLine={false} axisLine={false} tickMargin={8} angle={-20} textAnchor="end" interval={0} height={52} />
+                      <XAxis
+                        dataKey="programName"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        angle={-20}
+                        textAnchor="end"
+                        interval={0}
+                        height={68}
+                        tick={(props: any) => {
+                          const { x, y, payload } = props
+                          const name = String(payload?.value || "")
+                          const item = programComparisonData.find((p) => p.programName === name)
+                          const diff = item ? item.paiements - item.depenses : 0
+                          return (
+                            <g transform={`translate(${x},${y})`}>
+                              <text x={0} y={0} dy={10} textAnchor="end" transform="rotate(-20)" fill="#64748b" fontSize={10}>
+                                {name}
+                              </text>
+                              <text x={0} y={0} dy={30} textAnchor="middle" fill={diff >= 0 ? "#16a34a" : "#dc2626"} fontSize={9}>
+                                {formatSignedCurrency(diff)}
+                              </text>
+                            </g>
+                          )
+                        }}
+                      />
                       <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip
@@ -1339,21 +1329,6 @@ export default function SoldeCaissePage() {
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
               </div>
-              {programComparisonData.length > 0 && (
-                <div className="mt-2 max-h-28 overflow-y-auto space-y-1 pr-1">
-                  {programComparisonData.slice(0, 10).map((item) => {
-                    const diff = item.paiements - item.depenses
-                    return (
-                      <div key={`actual-${item.programName}`} className="text-[11px] text-muted-foreground flex items-center justify-between">
-                        <span className="truncate max-w-[60%]">{item.programName}</span>
-                        <span className={diff >= 0 ? "text-green-700 font-medium" : "text-red-700 font-medium"}>
-                          {formatSignedCurrency(diff)}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -1371,7 +1346,32 @@ export default function SoldeCaissePage() {
                   <ChartContainer config={monthlyExpectedConfig} className="h-full w-full aspect-auto">
                     <BarChart data={programDisplayData.slice(0, 10)} margin={{ left: 8, right: 8, top: 8, bottom: 24 }}>
                       <CartesianGrid vertical={false} />
-                      <XAxis dataKey="programName" tickLine={false} axisLine={false} tickMargin={8} angle={-20} textAnchor="end" interval={0} height={52} />
+                      <XAxis
+                        dataKey="programName"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        angle={-20}
+                        textAnchor="end"
+                        interval={0}
+                        height={68}
+                        tick={(props: any) => {
+                          const { x, y, payload } = props
+                          const name = String(payload?.value || "")
+                          const item = programComparisonData.find((p) => p.programName === name)
+                          const diff = item ? item.paiementsPrevus - item.depenses : 0
+                          return (
+                            <g transform={`translate(${x},${y})`}>
+                              <text x={0} y={0} dy={10} textAnchor="end" transform="rotate(-20)" fill="#64748b" fontSize={10}>
+                                {name}
+                              </text>
+                              <text x={0} y={0} dy={30} textAnchor="middle" fill={diff >= 0 ? "#16a34a" : "#dc2626"} fontSize={9}>
+                                {formatSignedCurrency(diff)}
+                              </text>
+                            </g>
+                          )
+                        }}
+                      />
                       <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip
@@ -1387,21 +1387,6 @@ export default function SoldeCaissePage() {
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
               </div>
-              {programComparisonData.length > 0 && (
-                <div className="mt-2 max-h-28 overflow-y-auto space-y-1 pr-1">
-                  {programComparisonData.slice(0, 10).map((item) => {
-                    const diff = item.paiementsPrevus - item.depenses
-                    return (
-                      <div key={`expected-${item.programName}`} className="text-[11px] text-muted-foreground flex items-center justify-between">
-                        <span className="truncate max-w-[60%]">{item.programName}</span>
-                        <span className={diff >= 0 ? "text-green-700 font-medium" : "text-red-700 font-medium"}>
-                          {formatSignedCurrency(diff)}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
               <p className="text-xs text-muted-foreground mt-2">Top programme (réel): {topProgramByActual.programName} • Profit {formatCurrency(topProgramByActual.paiements - topProgramByActual.depenses)}</p>
             </CardContent>
           </Card>

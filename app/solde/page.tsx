@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { api } from "@/lib/api"
 import RoleProtectedRoute from "../components/RoleProtectedRoute"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -35,6 +35,31 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart"
+import {
+  Bar,
+  BarChart,
+  Brush,
+  CartesianGrid,
+  Cell,
+  ComposedChart,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ReferenceDot,
+  ReferenceLine,
+  XAxis,
+  YAxis,
+} from "recharts"
 
 // Types pour les nouveaux graphiques
 type RoomsChartData = {
@@ -263,14 +288,41 @@ const formatNumberWithDots = (num: number): string => {
   return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 };
 
+const formatCurrency = (num: number) => `${formatNumberWithDots(num)} DH`
+const signedLog = (value: number) => {
+  if (value === 0) return 0
+  return Math.sign(value) * Math.log10(Math.abs(value) + 1)
+}
+const formatAxisTick = (value: number, mode: "raw" | "indexed") =>
+  mode === "raw" ? `${Math.round(value / 1000)}k` : `${Math.round(value)}`
+
+const timelineChartConfig: ChartConfig = {
+  paiements: { label: "Paiements", color: "#16a34a" },
+  depenses: { label: "Dépenses", color: "#dc2626" },
+  profit: { label: "Profit", color: "#2563eb" },
+}
+
+const monthlyActualConfig: ChartConfig = {
+  paiements: { label: "Paiements", color: "#16a34a" },
+  depenses: { label: "Dépenses", color: "#dc2626" },
+}
+
+const monthlyExpectedConfig: ChartConfig = {
+  paiementsPrevus: { label: "Paiements prévus", color: "#eab308" },
+  depenses: { label: "Dépenses", color: "#dc2626" },
+}
+
 export default function SoldeCaissePage() {
   const { toast } = useToast()
+  const chartPrefsStorageKey = "solde-caisse-chart-prefs-v1"
 
   // États pour les filtres
   const [dateDebut, setDateDebut] = useState("")
   const [dateFin, setDateFin] = useState("")
   const [programmeFilter, setProgrammeFilter] = useState("tous")
   const [periodeFilter, setPeriodeFilter] = useState("mois")
+  const [chartScaleMode, setChartScaleMode] = useState<"linear" | "log">("linear")
+  const [chartViewMode, setChartViewMode] = useState<"raw" | "indexed">("raw")
   const [exporting, setExporting] = useState(false)
 
   // États pour les données
@@ -405,22 +457,47 @@ export default function SoldeCaissePage() {
     }
   }, [programmeFilter, dateDebut, dateFin])
 
-  const buildLinePoints = (values: number[], width: number, height: number, maxValue: number) => {
-    if (values.length === 0) return ''
-    return values
-      .map((value, index) => {
-        const x = values.length === 1 ? width / 2 : (index / (values.length - 1)) * width
-        const y = height - (maxValue > 0 ? (value / maxValue) * height : 0)
-        return `${x},${y}`
-      })
-      .join(' ')
-  }
-
   // Charger les données au montage et quand les filtres changent
   useEffect(() => {
     fetchData()
     fetchChartsData()
   }, [fetchData, fetchChartsData])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const raw = window.localStorage.getItem(chartPrefsStorageKey)
+    if (!raw) return
+    try {
+      const parsed = JSON.parse(raw) as {
+        scaleMode?: "linear" | "log"
+        viewMode?: "raw" | "indexed"
+      }
+      if (parsed.scaleMode === "linear" || parsed.scaleMode === "log") {
+        setChartScaleMode(parsed.scaleMode)
+      }
+      if (parsed.viewMode === "raw" || parsed.viewMode === "indexed") {
+        setChartViewMode(parsed.viewMode)
+      }
+    } catch {
+      // Ignore corrupted local preference values.
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(
+      chartPrefsStorageKey,
+      JSON.stringify({ scaleMode: chartScaleMode, viewMode: chartViewMode })
+    )
+  }, [chartPrefsStorageKey, chartScaleMode, chartViewMode])
+
+  const resetChartView = () => {
+    setChartScaleMode("linear")
+    setChartViewMode("raw")
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(chartPrefsStorageKey)
+    }
+  }
 
   // Données par défaut si pas encore chargées
   const data = balanceData || {
@@ -443,6 +520,102 @@ export default function SoldeCaissePage() {
   const { statistics, parMois, summary, parMethodePaiement, parTypeDepense, parAgent } = data
   const { totalPaiements, totalDepenses, gainPrevu, soldeFinal, soldeFinalPrevu } = statistics || { totalPaiements: 0, totalDepenses: 0, gainPrevu: 0, soldeFinal: 0, soldeFinalPrevu: 0 }
   const { moisMaxBenefice } = summary || { moisMaxBenefice: { mois: "", solde: 0 } }
+  const peakTimelinePayment = timelineData.reduce((max, item) => (item.paiements > max.paiements ? item : max), timelineData[0] || { day: 0, paiements: 0, depenses: 0, profit: 0, label: "" })
+  const peakTimelineExpense = timelineData.reduce((max, item) => (item.depenses > max.depenses ? item : max), timelineData[0] || { day: 0, paiements: 0, depenses: 0, profit: 0, label: "" })
+  const bestTimelineProfit = timelineData.reduce((max, item) => (item.profit > max.profit ? item : max), timelineData[0] || { day: 0, paiements: 0, depenses: 0, profit: 0, label: "" })
+  const monthlyAverageProfit = monthlyComparisonData.length > 0
+    ? monthlyComparisonData.reduce((sum, item) => sum + (item.paiements - item.depenses), 0) / monthlyComparisonData.length
+    : 0
+  const topProgramByActual = programComparisonData.reduce(
+    (max, item) => ((item.paiements - item.depenses) > (max.paiements - max.depenses) ? item : max),
+    programComparisonData[0] || { programName: "-", paiements: 0, depenses: 0, paiementsPrevus: 0 }
+  )
+  const profitDiffs = timelineData.slice(1).map((item, idx) => ({
+    day: item.day,
+    label: item.label,
+    diff: item.profit - timelineData[idx].profit,
+  }))
+  const maxGrowth = profitDiffs.reduce(
+    (max, item) => (item.diff > max.diff ? item : max),
+    profitDiffs[0] || { day: 0, label: "", diff: 0 }
+  )
+  const maxDrop = profitDiffs.reduce(
+    (min, item) => (item.diff < min.diff ? item : min),
+    profitDiffs[0] || { day: 0, label: "", diff: 0 }
+  )
+
+  const toIndexed = useCallback((values: number[]) => {
+    const maxAbs = Math.max(...values.map((v) => Math.abs(v)), 1)
+    return values.map((v) => (v / maxAbs) * 100)
+  }, [])
+
+  const timelineDisplayData = useMemo(() => {
+    if (chartViewMode === "raw" && chartScaleMode === "linear") return timelineData
+    const p = timelineData.map((d) => d.paiements)
+    const e = timelineData.map((d) => d.depenses)
+    const r = timelineData.map((d) => d.profit)
+    const [p2, e2, r2] =
+      chartViewMode === "indexed"
+        ? [toIndexed(p), toIndexed(e), toIndexed(r)]
+        : [p, e, r]
+    return timelineData.map((d, i) => ({
+      ...d,
+      paiements: chartScaleMode === "log" ? signedLog(p2[i]) : p2[i],
+      depenses: chartScaleMode === "log" ? signedLog(e2[i]) : e2[i],
+      profit: chartScaleMode === "log" ? signedLog(r2[i]) : r2[i],
+    }))
+  }, [chartScaleMode, chartViewMode, timelineData, toIndexed])
+
+  const monthlyDisplayData = useMemo(() => {
+    if (chartViewMode === "raw" && chartScaleMode === "linear") return monthlyComparisonData
+    const p = monthlyComparisonData.map((d) => d.paiements)
+    const e = monthlyComparisonData.map((d) => d.depenses)
+    const pp = monthlyComparisonData.map((d) => d.paiementsPrevus)
+    const [p2, e2, pp2] =
+      chartViewMode === "indexed"
+        ? [toIndexed(p), toIndexed(e), toIndexed(pp)]
+        : [p, e, pp]
+    return monthlyComparisonData.map((d, i) => ({
+      ...d,
+      paiements: chartScaleMode === "log" ? signedLog(p2[i]) : p2[i],
+      depenses: chartScaleMode === "log" ? signedLog(e2[i]) : e2[i],
+      paiementsPrevus: chartScaleMode === "log" ? signedLog(pp2[i]) : pp2[i],
+    }))
+  }, [chartScaleMode, chartViewMode, monthlyComparisonData, toIndexed])
+
+  const programDisplayData = useMemo(() => {
+    if (chartViewMode === "raw" && chartScaleMode === "linear") return programComparisonData
+    const p = programComparisonData.map((d) => d.paiements)
+    const e = programComparisonData.map((d) => d.depenses)
+    const pp = programComparisonData.map((d) => d.paiementsPrevus)
+    const [p2, e2, pp2] =
+      chartViewMode === "indexed"
+        ? [toIndexed(p), toIndexed(e), toIndexed(pp)]
+        : [p, e, pp]
+    return programComparisonData.map((d, i) => ({
+      ...d,
+      paiements: chartScaleMode === "log" ? signedLog(p2[i]) : p2[i],
+      depenses: chartScaleMode === "log" ? signedLog(e2[i]) : e2[i],
+      paiementsPrevus: chartScaleMode === "log" ? signedLog(pp2[i]) : pp2[i],
+    }))
+  }, [chartScaleMode, chartViewMode, programComparisonData, toIndexed])
+
+  const parMoisDisplayData = useMemo(() => {
+    if (chartViewMode === "raw" && chartScaleMode === "linear") return parMois
+    const p = parMois.map((d) => d.paiements)
+    const e = parMois.map((d) => d.depenses)
+    const s = parMois.map((d) => d.solde)
+    const [p2, e2, s2] =
+      chartViewMode === "indexed"
+        ? [toIndexed(p), toIndexed(e), toIndexed(s)]
+        : [p, e, s]
+    return parMois.map((d, i) => ({
+      ...d,
+      paiements: chartScaleMode === "log" ? signedLog(p2[i]) : p2[i],
+      depenses: chartScaleMode === "log" ? signedLog(e2[i]) : e2[i],
+      solde: chartScaleMode === "log" ? signedLog(s2[i]) : s2[i],
+    }))
+  }, [chartScaleMode, chartViewMode, parMois, toIndexed])
 
   const getFilenameFromDisposition = (contentDisposition: string | null): string | null => {
     if (!contentDisposition) return null;
@@ -711,7 +884,7 @@ export default function SoldeCaissePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
               <div className="space-y-3">
                 <Label htmlFor="dateDebut" className="text-sm font-semibold text-gray-700">
                   📅 Date début
@@ -769,6 +942,45 @@ export default function SoldeCaissePage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-3">
+                <Label htmlFor="chartScale" className="text-sm font-semibold text-gray-700">
+                  ⚙️ Échelle graphe
+                </Label>
+                <Select value={chartScaleMode} onValueChange={(value: "linear" | "log") => setChartScaleMode(value)}>
+                  <SelectTrigger id="chartScale" className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="linear">Linéaire</SelectItem>
+                    <SelectItem value="log">Log signée</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-3">
+                <Label htmlFor="chartViewMode" className="text-sm font-semibold text-gray-700">
+                  🎯 Mode de vue
+                </Label>
+                <Select value={chartViewMode} onValueChange={(value: "raw" | "indexed") => setChartViewMode(value)}>
+                  <SelectTrigger id="chartViewMode" className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="raw">Valeurs brutes</SelectItem>
+                    <SelectItem value="indexed">Indice (base 100)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold text-gray-700">🧹 Réinitialiser</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-11 border-2"
+                  onClick={resetChartView}
+                >
+                  Reset vue graphe
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -792,47 +1004,87 @@ export default function SoldeCaissePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-80 p-4">
+            <div className="h-80 p-2">
               {chartsLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
                 </div>
               ) : timelineData.length > 1 ? (
-                <div className="h-full w-full flex flex-col justify-between">
-                  <svg viewBox="0 0 900 300" className="w-full h-full">
-                    <line x1="0" y1="280" x2="900" y2="280" stroke="#94a3b8" strokeWidth="1" />
-                    <line x1="0" y1="0" x2="0" y2="280" stroke="#94a3b8" strokeWidth="1" />
-                    {(() => {
-                      const maxValue = Math.max(
-                        ...timelineData.map((d) => Math.max(d.paiements, d.depenses, d.profit)),
-                        1
-                      )
-                      const paymentsPoints = buildLinePoints(timelineData.map((d) => d.paiements), 900, 280, maxValue)
-                      const expensesPoints = buildLinePoints(timelineData.map((d) => d.depenses), 900, 280, maxValue)
-                      const profitPoints = buildLinePoints(timelineData.map((d) => d.profit), 900, 280, maxValue)
-                      return (
-                        <>
-                          <polyline fill="none" stroke="#16a34a" strokeWidth="3" points={paymentsPoints} />
-                          <polyline fill="none" stroke="#dc2626" strokeWidth="3" points={expensesPoints} />
-                          <polyline fill="none" stroke="#2563eb" strokeWidth="3" points={profitPoints} />
-                        </>
-                      )
-                    })()}
-                    <text x="10" y="20" className="fill-slate-500 text-xs">Y: Montant (DH)</text>
-                    <text x="740" y="296" className="fill-slate-500 text-xs">X: Jours</text>
-                  </svg>
-                  <div className="flex items-center gap-4 text-xs text-gray-700 mt-2">
-                    <span><span className="inline-block w-4 h-1 bg-green-600 mr-1 align-middle"></span>Paiements</span>
-                    <span><span className="inline-block w-4 h-1 bg-red-600 mr-1 align-middle"></span>Dépenses</span>
-                    <span><span className="inline-block w-4 h-1 bg-blue-600 mr-1 align-middle"></span>Profit</span>
-                    <span className="ml-auto text-gray-500">Du jour 1 au jour {timelineData[timelineData.length - 1]?.day || 1}</span>
-                  </div>
-                </div>
+                <ChartContainer config={timelineChartConfig} className="h-full w-full aspect-auto">
+                  <LineChart data={timelineDisplayData} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+                    <CartesianGrid vertical={false} />
+                    <XAxis
+                      dataKey="day"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      tickFormatter={(value) => `J${value}`}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)}
+                    />
+                    <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
+                    <ChartTooltip
+                      cursor={false}
+                      content={
+                        <ChartTooltipContent
+                          labelFormatter={(_, payload) => {
+                            const item = payload?.[0]?.payload as TimelinePoint | undefined
+                            return item ? `Jour ${item.day} - ${item.label}` : ""
+                          }}
+                          formatter={(value, name) => (
+                            <div className="flex w-full items-center justify-between gap-4">
+                              <span className="text-muted-foreground">{timelineChartConfig[name as string]?.label || name}</span>
+                              <span className="font-mono font-semibold">
+                                {chartViewMode === "raw" ? formatCurrency(Number(value)) : `${Number(value).toFixed(1)} idx`}
+                              </span>
+                            </div>
+                          )}
+                        />
+                      }
+                    />
+                    <ChartLegend content={<ChartLegendContent />} />
+                    <Line type="monotone" dataKey="paiements" stroke="var(--color-paiements)" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
+                    <Line type="monotone" dataKey="depenses" stroke="var(--color-depenses)" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
+                    <Line type="monotone" dataKey="profit" stroke="var(--color-profit)" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
+                    {maxGrowth.day > 0 && (
+                      <ReferenceDot x={maxGrowth.day} y={timelineDisplayData.find((d) => d.day === maxGrowth.day)?.profit || 0} r={5} fill="#16a34a" stroke="#fff" />
+                    )}
+                    {maxDrop.day > 0 && (
+                      <ReferenceDot x={maxDrop.day} y={timelineDisplayData.find((d) => d.day === maxDrop.day)?.profit || 0} r={5} fill="#dc2626" stroke="#fff" />
+                    )}
+                    <Brush dataKey="day" height={20} stroke="#64748b" travellerWidth={10} />
+                  </LineChart>
+                </ChartContainer>
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-500">
                   <p>Aucune donnée disponible</p>
                 </div>
               )}
+            </div>
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+              <div className="rounded-md bg-green-50 p-2">
+                <span className="text-green-800 font-medium">Pic Paiements</span>
+                <div className="text-green-700">Jour {peakTimelinePayment.day} • {formatCurrency(peakTimelinePayment.paiements)}</div>
+              </div>
+              <div className="rounded-md bg-red-50 p-2">
+                <span className="text-red-800 font-medium">Pic Dépenses</span>
+                <div className="text-red-700">Jour {peakTimelineExpense.day} • {formatCurrency(peakTimelineExpense.depenses)}</div>
+              </div>
+              <div className="rounded-md bg-blue-50 p-2">
+                <span className="text-blue-800 font-medium">Meilleur Profit</span>
+                <div className="text-blue-700">Jour {bestTimelineProfit.day} • {formatCurrency(bestTimelineProfit.profit)}</div>
+              </div>
+            </div>
+            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+              <div className="rounded-md bg-emerald-50 p-2 text-emerald-800">
+                Croissance max du profit: Jour {maxGrowth.day} • {formatCurrency(maxGrowth.diff)}
+              </div>
+              <div className="rounded-md bg-rose-50 p-2 text-rose-800">
+                Chute max du profit: Jour {maxDrop.day} • {formatCurrency(maxDrop.diff)}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -843,28 +1095,28 @@ export default function SoldeCaissePage() {
               <CardTitle className="text-lg">Total Paiements vs Dépenses (par mois)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-72 p-3">
+              <div className="h-72 p-1">
                 {chartsLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
                   </div>
                 ) : monthlyComparisonData.length > 0 ? (
-                  <div className="flex items-end gap-2 h-full">
-                    {monthlyComparisonData.map((item, index) => {
-                      const maxValue = Math.max(...monthlyComparisonData.map((m) => Math.max(m.paiements, m.depenses)), 1)
-                      const payHeight = (item.paiements / maxValue) * 180
-                      const expHeight = (item.depenses / maxValue) * 180
-                      return (
-                        <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                          <div className="w-full flex items-end justify-center gap-1">
-                            <div className="w-1/2 bg-green-500 rounded-t-sm" style={{ height: `${payHeight}px`, minHeight: '4px' }} title={`${item.paiements.toLocaleString()} DH`}></div>
-                            <div className="w-1/2 bg-red-500 rounded-t-sm" style={{ height: `${expHeight}px`, minHeight: '4px' }} title={`${item.depenses.toLocaleString()} DH`}></div>
-                          </div>
-                          <span className="text-xs text-gray-600">{item.label}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  <ChartContainer config={monthlyActualConfig} className="h-full w-full aspect-auto">
+                    <BarChart data={monthlyDisplayData} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
+                      <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
+                      <ChartTooltip
+                        cursor={false}
+                        content={<ChartTooltipContent formatter={(value) => chartViewMode === "raw" ? formatCurrency(Number(value)) : `${Number(value).toFixed(1)} idx`} />}
+                      />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Bar dataKey="paiements" fill="var(--color-paiements)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="depenses" fill="var(--color-depenses)" radius={[4, 4, 0, 0]} />
+                      <Brush dataKey="label" height={18} stroke="#64748b" travellerWidth={10} />
+                    </BarChart>
+                  </ChartContainer>
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
@@ -877,32 +1129,33 @@ export default function SoldeCaissePage() {
               <CardTitle className="text-lg">Total Paiements Prévus vs Dépenses (par mois)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-72 p-3">
+              <div className="h-72 p-1">
                 {chartsLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
                   </div>
                 ) : monthlyComparisonData.length > 0 ? (
-                  <div className="flex items-end gap-2 h-full">
-                    {monthlyComparisonData.map((item, index) => {
-                      const maxValue = Math.max(...monthlyComparisonData.map((m) => Math.max(m.paiementsPrevus, m.depenses)), 1)
-                      const expectedHeight = (item.paiementsPrevus / maxValue) * 180
-                      const expHeight = (item.depenses / maxValue) * 180
-                      return (
-                        <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                          <div className="w-full flex items-end justify-center gap-1">
-                            <div className="w-1/2 bg-yellow-500 rounded-t-sm" style={{ height: `${expectedHeight}px`, minHeight: '4px' }} title={`${item.paiementsPrevus.toLocaleString()} DH`}></div>
-                            <div className="w-1/2 bg-red-500 rounded-t-sm" style={{ height: `${expHeight}px`, minHeight: '4px' }} title={`${item.depenses.toLocaleString()} DH`}></div>
-                          </div>
-                          <span className="text-xs text-gray-600">{item.label}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  <ChartContainer config={monthlyExpectedConfig} className="h-full w-full aspect-auto">
+                    <BarChart data={monthlyDisplayData} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
+                      <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
+                      <ChartTooltip
+                        cursor={false}
+                        content={<ChartTooltipContent formatter={(value) => chartViewMode === "raw" ? formatCurrency(Number(value)) : `${Number(value).toFixed(1)} idx`} />}
+                      />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Bar dataKey="paiementsPrevus" fill="var(--color-paiementsPrevus)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="depenses" fill="var(--color-depenses)" radius={[4, 4, 0, 0]} />
+                      <Brush dataKey="label" height={18} stroke="#64748b" travellerWidth={10} />
+                    </BarChart>
+                  </ChartContainer>
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
               </div>
+              <p className="text-xs text-muted-foreground mt-2">Moyenne du profit mensuel: {formatCurrency(monthlyAverageProfit)}</p>
             </CardContent>
           </Card>
         </div>
@@ -913,28 +1166,27 @@ export default function SoldeCaissePage() {
               <CardTitle className="text-lg">Total Paiements vs Dépenses (par programme)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-72 p-3">
+              <div className="h-72 p-1">
                 {chartsLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   </div>
                 ) : programComparisonData.length > 0 ? (
-                  <div className="flex items-end gap-2 h-full">
-                    {programComparisonData.slice(0, 8).map((item, index) => {
-                      const maxValue = Math.max(...programComparisonData.map((m) => Math.max(m.paiements, m.depenses)), 1)
-                      const payHeight = (item.paiements / maxValue) * 180
-                      const expHeight = (item.depenses / maxValue) * 180
-                      return (
-                        <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                          <div className="w-full flex items-end justify-center gap-1">
-                            <div className="w-1/2 bg-green-500 rounded-t-sm" style={{ height: `${payHeight}px`, minHeight: '4px' }}></div>
-                            <div className="w-1/2 bg-red-500 rounded-t-sm" style={{ height: `${expHeight}px`, minHeight: '4px' }}></div>
-                          </div>
-                          <span className="text-[10px] text-gray-600 text-center">{item.programName}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  <ChartContainer config={monthlyActualConfig} className="h-full w-full aspect-auto">
+                    <BarChart data={programDisplayData.slice(0, 10)} margin={{ left: 8, right: 8, top: 8, bottom: 24 }}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis dataKey="programName" tickLine={false} axisLine={false} tickMargin={8} angle={-20} textAnchor="end" interval={0} height={52} />
+                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
+                      <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
+                      <ChartTooltip
+                        cursor={false}
+                        content={<ChartTooltipContent formatter={(value) => chartViewMode === "raw" ? formatCurrency(Number(value)) : `${Number(value).toFixed(1)} idx`} />}
+                      />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Bar dataKey="paiements" fill="var(--color-paiements)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="depenses" fill="var(--color-depenses)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ChartContainer>
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
@@ -947,32 +1199,32 @@ export default function SoldeCaissePage() {
               <CardTitle className="text-lg">Total Paiements Prévus vs Dépenses (par programme)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-72 p-3">
+              <div className="h-72 p-1">
                 {chartsLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
                   </div>
                 ) : programComparisonData.length > 0 ? (
-                  <div className="flex items-end gap-2 h-full">
-                    {programComparisonData.slice(0, 8).map((item, index) => {
-                      const maxValue = Math.max(...programComparisonData.map((m) => Math.max(m.paiementsPrevus, m.depenses)), 1)
-                      const expectedHeight = (item.paiementsPrevus / maxValue) * 180
-                      const expHeight = (item.depenses / maxValue) * 180
-                      return (
-                        <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                          <div className="w-full flex items-end justify-center gap-1">
-                            <div className="w-1/2 bg-yellow-500 rounded-t-sm" style={{ height: `${expectedHeight}px`, minHeight: '4px' }}></div>
-                            <div className="w-1/2 bg-red-500 rounded-t-sm" style={{ height: `${expHeight}px`, minHeight: '4px' }}></div>
-                          </div>
-                          <span className="text-[10px] text-gray-600 text-center">{item.programName}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  <ChartContainer config={monthlyExpectedConfig} className="h-full w-full aspect-auto">
+                    <BarChart data={programDisplayData.slice(0, 10)} margin={{ left: 8, right: 8, top: 8, bottom: 24 }}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis dataKey="programName" tickLine={false} axisLine={false} tickMargin={8} angle={-20} textAnchor="end" interval={0} height={52} />
+                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
+                      <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
+                      <ChartTooltip
+                        cursor={false}
+                        content={<ChartTooltipContent formatter={(value) => chartViewMode === "raw" ? formatCurrency(Number(value)) : `${Number(value).toFixed(1)} idx`} />}
+                      />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Bar dataKey="paiementsPrevus" fill="var(--color-paiementsPrevus)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="depenses" fill="var(--color-depenses)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ChartContainer>
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
               </div>
+              <p className="text-xs text-muted-foreground mt-2">Top programme (réel): {topProgramByActual.programName} • Profit {formatCurrency(topProgramByActual.paiements - topProgramByActual.depenses)}</p>
             </CardContent>
           </Card>
         </div>
@@ -988,41 +1240,20 @@ export default function SoldeCaissePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-80 p-4">
+                <div className="h-80 p-1">
                   {(parMois || []).length > 0 ? (
-                    <div className="flex items-end justify-center gap-2 h-full">
-                      {(parMois || []).map((item, index) => {
-                        const maxValue = Math.max(...(parMois || []).map(m => Math.max(m.paiements, m.depenses)))
-                        const paiementsHeight = maxValue > 0 ? (item.paiements / maxValue) * 200 : 0
-                        const depensesHeight = maxValue > 0 ? (item.depenses / maxValue) * 200 : 0
-                        
-                        return (
-                          <div key={index} className="flex flex-col items-center gap-2 flex-1">
-                            <div className="flex flex-col items-center gap-1 w-full">
-                              {/* Barre Paiements */}
-                              <div 
-                                className="w-full bg-green-500 rounded-t-sm" 
-                                style={{ height: `${paiementsHeight}px`, minHeight: '4px' }}
-                                title={`Paiements: ${item.paiements.toLocaleString()} DH`}
-                              ></div>
-                              {/* Barre Dépenses */}
-                              <div 
-                                className="w-full bg-red-500 rounded-b-sm" 
-                                style={{ height: `${depensesHeight}px`, minHeight: '4px' }}
-                                title={`Dépenses: ${item.depenses.toLocaleString()} DH`}
-                              ></div>
-                            </div>
-                            <span className="text-xs text-gray-600 font-medium">
-                              {item.mois.substring(0, 3)}
-                            </span>
-                            <div className="text-xs text-center">
-                              <div className="text-green-600">{item.paiements.toLocaleString()} DH</div>
-                              <div className="text-red-600">{item.depenses.toLocaleString()} DH</div>
-                          </div>
-                        </div>
-                        )
-                      })}
-                        </div>
+                    <ChartContainer config={timelineChartConfig} className="h-full w-full aspect-auto">
+                      <ComposedChart data={parMoisDisplayData} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
+                        <CartesianGrid vertical={false} />
+                        <XAxis dataKey="mois" tickLine={false} axisLine={false} tickMargin={8} />
+                        <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
+                        <ChartTooltip content={<ChartTooltipContent formatter={(value) => chartViewMode === "raw" ? formatCurrency(Number(value)) : `${Number(value).toFixed(1)} idx`} />} />
+                        <ChartLegend content={<ChartLegendContent />} />
+                        <Bar dataKey="paiements" fill="var(--color-paiements)" name="Paiements" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="depenses" fill="var(--color-depenses)" name="Dépenses" radius={[4, 4, 0, 0]} />
+                        <Line type="monotone" dataKey="solde" stroke="var(--color-profit)" strokeWidth={2.5} dot={{ r: 3 }} name="Solde" />
+                      </ComposedChart>
+                    </ChartContainer>
                   ) : (
                     <div className="flex items-center justify-center h-full text-gray-500">
                       <p>Aucune donnée disponible pour cette période</p>
@@ -1044,35 +1275,34 @@ export default function SoldeCaissePage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {/* Pie Chart */}
-                  <div className="h-64 p-4">
+                  <div className="h-64 p-1">
                     {(parTypeDepense || []).length > 0 ? (
-                      <div className="space-y-3">
-                        {(parTypeDepense || []).map((item, index) => {
-                          const totalDepenses = (parTypeDepense || []).reduce((sum, d) => sum + d.total, 0)
-                          const percentage = totalDepenses > 0 ? (item.total / totalDepenses) * 100 : 0
-                          const colors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500', 'bg-blue-500']
-                          
-                          return (
-                            <div key={index} className="space-y-1">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium">{item.type}</span>
-                                <span className="text-sm font-bold">{item.total.toLocaleString()} DH</span>
-                              </div>
-                              <div className="w-full bg-gray-200 rounded-full h-3">
-                                <div 
-                                  className={`h-3 rounded-full ${colors[index % colors.length]}`}
-                                  style={{ width: `${percentage}%` }}
-                                  title={`${percentage.toFixed(1)}%`}
-                              ></div>
-                            </div>
-                              <div className="text-xs text-gray-600 text-center">
-                                {percentage.toFixed(1)}% ({item.total.toLocaleString()} DH)
-                          </div>
-                        </div>
-                          )
-                        })}
-                      </div>
+                      <ChartContainer
+                        config={{
+                          total: { label: "Montant", color: "#dc2626" },
+                        }}
+                        className="h-full w-full aspect-auto"
+                      >
+                        <PieChart>
+                          <Pie
+                            data={parTypeDepense}
+                            dataKey="total"
+                            nameKey="type"
+                            innerRadius={40}
+                            outerRadius={95}
+                            paddingAngle={3}
+                          >
+                            {parTypeDepense.map((_, index) => {
+                              const palette = ["#dc2626", "#ea580c", "#eab308", "#16a34a", "#2563eb", "#7c3aed"]
+                              return <Cell key={`cell-${index}`} fill={palette[index % palette.length]} />
+                            })}
+                          </Pie>
+                          <ChartTooltip
+                            content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />}
+                          />
+                          <Legend verticalAlign="bottom" height={36} />
+                        </PieChart>
+                      </ChartContainer>
                     ) : (
                       <div className="flex items-center justify-center h-full text-gray-500">
                         <p className="text-sm">Aucune donnée disponible</p>
@@ -1157,41 +1387,29 @@ export default function SoldeCaissePage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-80 p-4">
+              <div className="h-80 p-1">
                 {chartsLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   </div>
                 ) : roomsData.length > 0 ? (
-                  <div className="flex items-end justify-center gap-2 h-full">
-                    {roomsData.map((item, index) => {
-                      const maxValue = Math.max(...roomsData.map(r => Math.max(r.nbRoomsReserver, r.nbRoomsRestant)))
-                      const reservedHeight = maxValue > 0 ? (item.nbRoomsReserver / maxValue) * 200 : 0
-                      const availableHeight = maxValue > 0 ? (item.nbRoomsRestant / maxValue) * 200 : 0
-                      
-                      return (
-                        <div key={index} className="flex flex-col items-center gap-2 flex-1">
-                          <div className="flex flex-col items-center gap-1 w-full">
-                            <div 
-                              className="w-full bg-red-500 rounded-t-sm" 
-                              style={{ height: `${reservedHeight}px`, minHeight: '4px' }}
-                              title={`Réservées: ${item.nbRoomsReserver}`}
-                            ></div>
-                            <div 
-                              className="w-full bg-green-500 rounded-b-sm" 
-                              style={{ height: `${availableHeight}px`, minHeight: '4px' }}
-                              title={`Disponibles: ${item.nbRoomsRestant}`}
-                            ></div>
-                          </div>
-                          <span className="text-xs text-gray-600 font-medium">{item.roomType}</span>
-                          <div className="text-xs text-center">
-                            <div className="text-red-600">{item.nbRoomsReserver} réservées</div>
-                            <div className="text-green-600">{item.nbRoomsRestant} libres</div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  <ChartContainer
+                    config={{
+                      nbRoomsReserver: { label: "Réservées", color: "#dc2626" },
+                      nbRoomsRestant: { label: "Disponibles", color: "#16a34a" },
+                    }}
+                    className="h-full w-full aspect-auto"
+                  >
+                    <BarChart data={roomsData}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis dataKey="roomType" tickLine={false} axisLine={false} tickMargin={8} />
+                      <YAxis tickLine={false} axisLine={false} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Bar dataKey="nbRoomsReserver" fill="var(--color-nbRoomsReserver)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="nbRoomsRestant" fill="var(--color-nbRoomsRestant)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ChartContainer>
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-500">
                     <p>Aucune donnée disponible</p>
@@ -1210,33 +1428,24 @@ export default function SoldeCaissePage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-80 p-4">
+              <div className="h-80 p-1">
                 {chartsLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
                   </div>
                 ) : hotelsData.length > 0 ? (
-                  <div className="flex items-end justify-center gap-2 h-full">
-                    {hotelsData.map((item, index) => {
-                      const maxValue = Math.max(...hotelsData.map(h => h.nbPersonnes))
-                      const height = maxValue > 0 ? (item.nbPersonnes / maxValue) * 200 : 0
-                      const colors = ['bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-red-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-orange-500']
-                      
-                      return (
-                        <div key={index} className="flex flex-col items-center gap-2 flex-1">
-                          <div 
-                            className={`w-full ${colors[index % colors.length]} rounded-sm`}
-                            style={{ height: `${height}px`, minHeight: '4px' }}
-                            title={`${item.nbPersonnes} personnes`}
-                          ></div>
-                          <span className="text-xs text-gray-600 font-medium text-center">{item.hotelName}</span>
-                          <div className="text-xs text-center text-gray-700 font-semibold">
-                            {item.nbPersonnes} personnes
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  <ChartContainer
+                    config={{ nbPersonnes: { label: "Personnes", color: "#16a34a" } }}
+                    className="h-full w-full aspect-auto"
+                  >
+                    <BarChart data={hotelsData.slice(0, 10)} margin={{ bottom: 24 }}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis dataKey="hotelName" tickLine={false} axisLine={false} angle={-20} textAnchor="end" interval={0} height={52} />
+                      <YAxis tickLine={false} axisLine={false} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar dataKey="nbPersonnes" fill="var(--color-nbPersonnes)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ChartContainer>
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-500">
                     <p>Aucune donnée disponible</p>
@@ -1255,35 +1464,24 @@ export default function SoldeCaissePage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-80 p-4">
+              <div className="h-80 p-1">
                 {chartsLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
                   </div>
                 ) : genderData.length > 0 ? (
-                  <div className="flex items-end justify-center gap-8 h-full">
-                    {genderData.map((item, index) => {
-                      const maxValue = Math.max(...genderData.map(g => g.nbReservations))
-                      const height = maxValue > 0 ? (item.nbReservations / maxValue) * 200 : 0
-                      const colors = ['bg-blue-500', 'bg-pink-500']
-                      const icons = ['👨', '👩']
-                      
-                      return (
-                        <div key={index} className="flex flex-col items-center gap-2 flex-1">
-                          <div className="text-3xl mb-2">{icons[index] || '👤'}</div>
-                          <div 
-                            className={`w-16 ${colors[index % colors.length]} rounded-sm`}
-                            style={{ height: `${height}px`, minHeight: '4px' }}
-                            title={`${item.nbReservations} réservations`}
-                          ></div>
-                          <span className="text-sm text-gray-600 font-medium">{item.gender}</span>
-                          <div className="text-sm text-center text-gray-700 font-semibold">
-                            {item.nbReservations} réservations
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  <ChartContainer
+                    config={{ nbReservations: { label: "Réservations", color: "#7c3aed" } }}
+                    className="h-full w-full aspect-auto"
+                  >
+                    <BarChart data={genderData}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis dataKey="gender" tickLine={false} axisLine={false} tickMargin={8} />
+                      <YAxis tickLine={false} axisLine={false} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar dataKey="nbReservations" fill="var(--color-nbReservations)" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ChartContainer>
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-500">
                     <p>Aucune donnée disponible</p>
@@ -1302,35 +1500,24 @@ export default function SoldeCaissePage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-80 p-4">
+              <div className="h-80 p-1">
                 {chartsLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
                   </div>
                 ) : soldeData.length > 0 ? (
-                  <div className="flex items-end justify-center gap-4 h-full">
-                    {soldeData.map((item, index) => {
-                      const maxValue = Math.max(...soldeData.map(s => s.montant))
-                      const height = maxValue > 0 ? (item.montant / maxValue) * 200 : 0
-                      const colors = ['bg-blue-500', 'bg-green-500', 'bg-red-500']
-                      const icons = ['💰', '💳', '💸']
-                      
-                      return (
-                        <div key={index} className="flex flex-col items-center gap-2 flex-1">
-                          <div className="text-2xl mb-2">{icons[index] || '💼'}</div>
-                          <div 
-                            className={`w-20 ${colors[index % colors.length]} rounded-sm`}
-                            style={{ height: `${height}px`, minHeight: '4px' }}
-                            title={`${item.montant.toLocaleString()} DH`}
-                          ></div>
-                          <span className="text-xs text-gray-600 font-medium text-center">{item.type}</span>
-                          <div className="text-xs text-center text-gray-700 font-semibold">
-                            {item.montant.toLocaleString()} DH
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  <ChartContainer
+                    config={{ montant: { label: "Montant", color: "#eab308" } }}
+                    className="h-full w-full aspect-auto"
+                  >
+                    <BarChart data={soldeData}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis dataKey="type" tickLine={false} axisLine={false} tickMargin={8} />
+                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
+                      <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
+                      <Bar dataKey="montant" fill="var(--color-montant)" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ChartContainer>
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-500">
                     <p>Aucune donnée disponible</p>

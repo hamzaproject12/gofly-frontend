@@ -1187,7 +1187,28 @@ export default function SoldeCaissePage() {
                   <ChartContainer config={monthlyActualConfig} className="h-full w-full aspect-auto">
                     <BarChart data={monthlyDisplayData} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
                       <CartesianGrid vertical={false} />
-                      <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tick={(props: any) => {
+                          const { x, y, payload } = props
+                          const label = String(payload?.value || "")
+                          const diff = monthlyActualDiffByLabel.get(label) || 0
+                          return (
+                            <g transform={`translate(${x},${y})`}>
+                              <text x={0} y={0} dy={10} textAnchor="middle" fill="#64748b" fontSize={11}>
+                                {label}
+                              </text>
+                              <text x={0} y={0} dy={25} textAnchor="middle" fill={diff >= 0 ? "#16a34a" : "#dc2626"} fontSize={12} fontWeight={700}>
+                                {formatSignedCurrency(diff)}
+                              </text>
+                            </g>
+                          )
+                        }}
+                        height={44}
+                      />
                       <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip
@@ -1204,21 +1225,6 @@ export default function SoldeCaissePage() {
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
               </div>
-              {monthlyComparisonData.length > 0 && (
-                <div className="mt-2 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
-                  {monthlyComparisonData.map((item) => {
-                    const diff = monthlyActualDiffByLabel.get(item.label) || 0
-                    return (
-                      <div key={`monthly-actual-${item.label}`} className="rounded-md border bg-muted/20 p-2">
-                        <p className="text-[11px] text-muted-foreground">{item.label}</p>
-                        <p className={`text-xs font-semibold ${diff >= 0 ? "text-green-700" : "text-red-700"}`}>
-                          {formatSignedCurrency(diff)}
-                        </p>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -1236,7 +1242,28 @@ export default function SoldeCaissePage() {
                   <ChartContainer config={monthlyExpectedConfig} className="h-full w-full aspect-auto">
                     <BarChart data={monthlyDisplayData} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
                       <CartesianGrid vertical={false} />
-                      <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tick={(props: any) => {
+                          const { x, y, payload } = props
+                          const label = String(payload?.value || "")
+                          const diff = monthlyExpectedDiffByLabel.get(label) || 0
+                          return (
+                            <g transform={`translate(${x},${y})`}>
+                              <text x={0} y={0} dy={10} textAnchor="middle" fill="#64748b" fontSize={11}>
+                                {label}
+                              </text>
+                              <text x={0} y={0} dy={25} textAnchor="middle" fill={diff >= 0 ? "#16a34a" : "#dc2626"} fontSize={12} fontWeight={700}>
+                                {formatSignedCurrency(diff)}
+                              </text>
+                            </g>
+                          )
+                        }}
+                        height={44}
+                      />
                       <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip
@@ -1253,21 +1280,6 @@ export default function SoldeCaissePage() {
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
               </div>
-              {monthlyComparisonData.length > 0 && (
-                <div className="mt-2 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
-                  {monthlyComparisonData.map((item) => {
-                    const diff = monthlyExpectedDiffByLabel.get(item.label) || 0
-                    return (
-                      <div key={`monthly-expected-${item.label}`} className="rounded-md border bg-muted/20 p-2">
-                        <p className="text-[11px] text-muted-foreground">{item.label}</p>
-                        <p className={`text-xs font-semibold ${diff >= 0 ? "text-green-700" : "text-red-700"}`}>
-                          {formatSignedCurrency(diff)}
-                        </p>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
               <p className="text-xs text-muted-foreground mt-2">Moyenne du profit mensuel: {formatCurrency(monthlyAverageProfit)}</p>
             </CardContent>
           </Card>
@@ -1296,7 +1308,7 @@ export default function SoldeCaissePage() {
                         angle={-20}
                         textAnchor="end"
                         interval={0}
-                        height={68}
+                        height={74}
                         tick={(props: any) => {
                           const { x, y, payload } = props
                           const name = String(payload?.value || "")
@@ -1307,7 +1319,7 @@ export default function SoldeCaissePage() {
                               <text x={0} y={0} dy={10} textAnchor="end" transform="rotate(-20)" fill="#64748b" fontSize={10}>
                                 {name}
                               </text>
-                              <text x={0} y={0} dy={30} textAnchor="middle" fill={diff >= 0 ? "#16a34a" : "#dc2626"} fontSize={9}>
+                              <text x={0} y={0} dy={32} textAnchor="middle" fill={diff >= 0 ? "#16a34a" : "#dc2626"} fontSize={11} fontWeight={700}>
                                 {formatSignedCurrency(diff)}
                               </text>
                             </g>
@@ -1354,7 +1366,7 @@ export default function SoldeCaissePage() {
                         angle={-20}
                         textAnchor="end"
                         interval={0}
-                        height={68}
+                        height={74}
                         tick={(props: any) => {
                           const { x, y, payload } = props
                           const name = String(payload?.value || "")
@@ -1365,7 +1377,7 @@ export default function SoldeCaissePage() {
                               <text x={0} y={0} dy={10} textAnchor="end" transform="rotate(-20)" fill="#64748b" fontSize={10}>
                                 {name}
                               </text>
-                              <text x={0} y={0} dy={30} textAnchor="middle" fill={diff >= 0 ? "#16a34a" : "#dc2626"} fontSize={9}>
+                              <text x={0} y={0} dy={32} textAnchor="middle" fill={diff >= 0 ? "#16a34a" : "#dc2626"} fontSize={11} fontWeight={700}>
                                 {formatSignedCurrency(diff)}
                               </text>
                             </g>

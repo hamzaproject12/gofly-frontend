@@ -31,10 +31,31 @@ export const api = {
     console.log(`🚀 API Request to: ${url}`);
     console.log(`🔑 Token available: ${!!token}`);
     
+    const method = (options.method || 'GET').toUpperCase();
+    const hasBody = options.body != null;
+    const bodyIsFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+    const bodyIsBlob = typeof Blob !== 'undefined' && options.body instanceof Blob;
+    const bodyIsUrlEncoded =
+      typeof URLSearchParams !== 'undefined' && options.body instanceof URLSearchParams;
+
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...options.headers,
+      ...options.headers as Record<string, string>,
     };
+
+    // Éviter d'imposer Content-Type sur GET/HEAD (important pour les exports fichiers).
+    // Pour les requêtes JSON classiques, garder l'en-tête par défaut.
+    if (
+      !headers['Content-Type'] &&
+      !headers['content-type'] &&
+      hasBody &&
+      method !== 'GET' &&
+      method !== 'HEAD' &&
+      !bodyIsFormData &&
+      !bodyIsBlob &&
+      !bodyIsUrlEncoded
+    ) {
+      headers['Content-Type'] = 'application/json';
+    }
     
     // Ajouter le token dans l'Authorization header si disponible
     if (token) {

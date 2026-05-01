@@ -354,6 +354,14 @@ const monthlyExpectedConfig: ChartConfig = {
   depenses: { label: "Dépenses", color: "#dc2626" },
 }
 
+const agentsAmountConfig: ChartConfig = {
+  totalAmount: { label: "Montant encaissé", color: "#2563eb" },
+}
+
+const agentsCountConfig: ChartConfig = {
+  countPayments: { label: "Transactions", color: "#7c3aed" },
+}
+
 export default function SoldeCaissePage() {
   const { toast } = useToast()
   const chartPrefsStorageKey = "solde-caisse-chart-prefs-v1"
@@ -666,6 +674,16 @@ export default function SoldeCaissePage() {
       solde: chartScaleMode === "log" ? signedLog(s2[i]) : s2[i],
     }))
   }, [chartScaleMode, chartViewMode, parMois, toIndexed])
+
+  const agentIndicativeData = useMemo(() => {
+    const details = analyticsData?.agentRanking?.details || []
+    return details.slice(0, 8).map((agent) => ({
+      agentName: agent.agentName,
+      totalAmount: agent.totalAmount || 0,
+      countPayments: agent.countPayments || 0,
+      avgAmount: agent.avgAmount || 0,
+    }))
+  }, [analyticsData])
 
   const monthlyActualDiffByLabel = useMemo(
     () => new Map(monthlyComparisonData.map((item) => [item.label, item.paiements - item.depenses])),
@@ -1797,6 +1815,89 @@ export default function SoldeCaissePage() {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+
+            {/* 👥 Indicateurs Agents */}
+            <div className="mb-8">
+              <div className="flex items-center gap-3 mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">👥 Indicateurs Agents</h2>
+                <Badge variant="outline" className="text-blue-600 border-blue-200">
+                  Graphes indicatifs
+                </Badge>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-base">Encaissement par agent</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-64">
+                      {agentIndicativeData.length > 0 ? (
+                        <ChartContainer config={agentsAmountConfig} className="h-full w-full aspect-auto">
+                          <BarChart data={agentIndicativeData} margin={{ left: 8, right: 8, top: 8, bottom: 24 }}>
+                            <CartesianGrid vertical={false} />
+                            <XAxis dataKey="agentName" tickLine={false} axisLine={false} angle={-20} textAnchor="end" interval={0} height={52} />
+                            <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
+                            <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
+                            <Bar dataKey="totalAmount" fill="var(--color-totalAmount)" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ChartContainer>
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Aucune donnée agent</div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-base">Transactions par agent</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-64">
+                      {agentIndicativeData.length > 0 ? (
+                        <ChartContainer config={agentsCountConfig} className="h-full w-full aspect-auto">
+                          <BarChart data={agentIndicativeData} margin={{ left: 8, right: 8, top: 8, bottom: 24 }}>
+                            <CartesianGrid vertical={false} />
+                            <XAxis dataKey="agentName" tickLine={false} axisLine={false} angle={-20} textAnchor="end" interval={0} height={52} />
+                            <YAxis tickLine={false} axisLine={false} />
+                            <ChartTooltip content={<ChartTooltipContent />} />
+                            <Bar dataKey="countPayments" fill="var(--color-countPayments)" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ChartContainer>
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Aucune donnée agent</div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-base">Répartition encaissement agents</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-64">
+                      {agentIndicativeData.length > 0 ? (
+                        <ChartContainer config={{ totalAmount: { label: "Encaissement", color: "#2563eb" } }} className="h-full w-full aspect-auto">
+                          <PieChart>
+                            <Pie data={agentIndicativeData} dataKey="totalAmount" nameKey="agentName" innerRadius={38} outerRadius={90} paddingAngle={2}>
+                              {agentIndicativeData.map((_, index) => {
+                                const palette = ["#2563eb", "#7c3aed", "#0ea5e9", "#14b8a6", "#22c55e", "#f59e0b", "#ef4444", "#e11d48"]
+                                return <Cell key={`agent-pie-${index}`} fill={palette[index % palette.length]} />
+                              })}
+                            </Pie>
+                            <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
+                            <Legend verticalAlign="bottom" height={36} />
+                          </PieChart>
+                        </ChartContainer>
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Aucune donnée agent</div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
 
             {/* 📈 Tendances et Cashflow */}

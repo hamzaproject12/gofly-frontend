@@ -120,6 +120,15 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;")
 }
 
+function escapeXml(s: string): string {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;")
+}
+
 function totalBedsByCity(hotels: { chambres: ChambresConfig }[]): number {
   let total = 0
   for (const hotel of hotels) {
@@ -596,104 +605,138 @@ export default function NouveauProgramme() {
         .replace(/\s+/g, "-")
         .slice(0, 48) || "programme"
 
-    const hotelsMadinaList =
-      formData.hotelsMadina.map((h) => escapeHtml(h.name)).join(", ") || "—"
-    const hotelsMakkahList =
-      formData.hotelsMakkah.map((h) => escapeHtml(h.name)).join(", ") || "—"
+    const rawHotelsRows: Array<(string | number)[]> = []
+    const pushHotelRows = (
+      city: "Madina" | "Makkah",
+      hotels: Array<{ name: string; chambres: ChambresConfig }>
+    ) => {
+      for (const hotel of hotels) {
+        for (let t = 1; t <= 5; t++) {
+          const nbChambres = parseInt(hotel.chambres[t]?.nb || "0", 10) || 0
+          const prixRoomRiyal = parseNum(hotel.chambres[t]?.prix, 0)
+          if (nbChambres <= 0 && prixRoomRiyal <= 0) continue
+          rawHotelsRows.push([
+            city,
+            hotel.name,
+            t,
+            t === 1 ? "Simple" : t === 2 ? "Double" : t === 3 ? "Triple" : t === 4 ? "Quadruple" : "Quintuple",
+            nbChambres,
+            prixRoomRiyal,
+            nbChambres * t,
+          ])
+        }
+      }
+    }
+    pushHotelRows("Madina", formData.hotelsMadina)
+    pushHotelRows("Makkah", formData.hotelsMakkah)
 
-    const rowsByType =
-      p.byType.length > 0
-        ? p.byType
-            .map(
-              (row) =>
-                `<tr><td>${escapeHtml(row.label)}</td><td>${row.places}</td><td>${Math.round(row.unitDh).toLocaleString("fr-FR")}</td><td>${Math.round(row.subtotalDh).toLocaleString("fr-FR")}</td></tr>`
-            )
-            .join("")
-        : `<tr><td colspan="4">Aucune ligne</td></tr>`
+    const detailByTypeRows: Array<(string | number)[]> = p.byType.map((row) => [
+      row.typeKey,
+      row.label,
+      row.places,
+      Math.round(row.unitDh),
+      Math.round(row.subtotalDh),
+    ])
 
-    const html = `<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Simulation rentabilité — ${escapeHtml(formData.nom.trim())}</title>
-<style>
-body{font-family:system-ui,-apple-system,sans-serif;max-width:900px;margin:24px auto;padding:16px 20px;line-height:1.5;color:#111}
-h1{font-size:1.35rem;border-bottom:2px solid #6d28d9;padding-bottom:8px;margin-top:0}
-h2{font-size:1.05rem;margin:22px 0 10px;color:#5b21b6}
-table{border-collapse:collapse;width:100%;margin-top:8px;font-size:0.92rem}
-th,td{border:1px solid #ddd;padding:8px 10px;text-align:left}
-th{background:#f5f3ff}
-.meta{color:#555;font-size:0.9rem;margin:0 0 18px}
-.kv{display:flex;justify-content:space-between;gap:16px;padding:6px 0;border-bottom:1px solid #eee;flex-wrap:wrap}
-.kv:last-child{border-bottom:none}
-.sec{background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;padding:14px 16px;margin-bottom:14px}
-</style>
-</head>
-<body>
-<h1>Simulation de rentabilité (prévisionnel)</h1>
-<p class="meta">Exporté le ${escapeHtml(dateLabel)} · <strong>${escapeHtml(formData.nom.trim())}</strong></p>
+    const isNumeric = (v: string | number) => typeof v === "number" && Number.isFinite(v)
+    const xmlCell = (v: string | number) =>
+      isNumeric(v)
+        ? `<Cell><Data ss:Type="Number">${v}</Data></Cell>`
+        : `<Cell><Data ss:Type="String">${escapeXml(String(v))}</Data></Cell>`
 
-<h2>Informations programme</h2>
-<div class="sec">
-<div class="kv"><span>Change (DH / Riyal)</span><span>${escapeHtml(String(formData.exchange))}</span></div>
-<div class="kv"><span>NB jours Madina / Makkah</span><span>${escapeHtml(formData.nbJoursMadina)} / ${escapeHtml(formData.nbJoursMakkah)}</span></div>
-<div class="kv"><span>Prix avion (DH)</span><span>${escapeHtml(formData.prixAvion)}</span></div>
-<div class="kv"><span>Prix visa (Riyal)</span><span>${escapeHtml(formData.prixVisaRiyal)}</span></div>
-<div class="kv"><span>Marge / profit (DH)</span><span>${escapeHtml(formData.profit)}</span></div>
-<div class="kv"><span>Profit Économique / Normal / VIP (DH)</span><span>${escapeHtml(formData.profitEconomique)} / ${escapeHtml(formData.profitNormal)} / ${escapeHtml(formData.profitVIP)}</span></div>
-<p style="margin:12px 0 4px"><strong>Hôtels Madina :</strong> ${hotelsMadinaList}</p>
-<p style="margin:4px 0 0"><strong>Hôtels Makkah :</strong> ${hotelsMakkahList}</p>
-</div>
+    const xmlRows = (rows: Array<Array<string | number>>) =>
+      rows.map((row) => `<Row>${row.map((c) => xmlCell(c)).join("")}</Row>`).join("")
 
-<h2>Hypothèses de simulation</h2>
-<div class="sec">
-<div class="kv"><span>Inclure avion</span><span>${simIncludeAvion ? "Oui" : "Non"}</span></div>
-<div class="kv"><span>Inclure visa</span><span>${simIncludeVisa ? "Oui" : "Non"}</span></div>
-<div class="kv"><span>Plan tarifaire</span><span>${escapeHtml(simPlan)}</span></div>
-<div class="kv"><span>Jours Madina / Makkah (champs simulation)</span><span>${escapeHtml(simJoursMadina || "(défaut formulaire)")} / ${escapeHtml(simJoursMakkah || "(défaut formulaire)")}</span></div>
-<div class="kv"><span>Places agents</span><span>${escapeHtml(simAgentPlaces || "0")}</span></div>
-<div class="kv"><span>Charge par place agent (DH)</span><span>${escapeHtml(simAgentCostPerPlaceDH || "0")}</span></div>
-<div class="kv"><span>Autres charges fixes (DH)</span><span>${escapeHtml(simAutresChargesDH || "0")}</span></div>
-</div>
+    const resumeRows: Array<(string | number)[]> = [
+      ["Simulation de rentabilité (prévisionnel)", ""],
+      ["Exporté le", dateLabel],
+      ["Nom programme", formData.nom.trim() || "—"],
+      ["", ""],
+      ["Informations programme", ""],
+      ["Change (DH / Riyal)", parseNum(formData.exchange, 0)],
+      ["NB jours Madina", parseNum(formData.nbJoursMadina, 0)],
+      ["NB jours Makkah", parseNum(formData.nbJoursMakkah, 0)],
+      ["Prix avion (DH)", parseNum(formData.prixAvion, 0)],
+      ["Prix visa (Riyal)", parseNum(formData.prixVisaRiyal, 0)],
+      ["Profit générique (DH)", parseNum(formData.profit, 0)],
+      ["Profit Économique (DH)", parseNum(formData.profitEconomique, 0)],
+      ["Profit Normal (DH)", parseNum(formData.profitNormal, 0)],
+      ["Profit VIP (DH)", parseNum(formData.profitVIP, 0)],
+      ["", ""],
+      ["Hypothèses simulation", ""],
+      ["Inclure avion", simIncludeAvion ? "Oui" : "Non"],
+      ["Inclure visa", simIncludeVisa ? "Oui" : "Non"],
+      ["Plan tarifaire", simPlan],
+      ["Jours Madina simulation", simJoursMadina || "(défaut formulaire)"],
+      ["Jours Makkah simulation", simJoursMakkah || "(défaut formulaire)"],
+      ["Places agents", parseInt(simAgentPlaces || "0", 10) || 0],
+      ["Charge par place agent (DH)", parseNum(simAgentCostPerPlaceDH, 0)],
+      ["Autres charges fixes (DH)", parseNum(simAutresChargesDH, 0)],
+      ["", ""],
+      ["Résultats simulation", ""],
+      ["Capacité (voyageurs)", p.totalTravelersMax],
+      ["Places payantes (après agents)", p.payingTravelers],
+      ["Places agents (non payantes)", p.agentPlaces],
+      ["Réf. CA si capacité pleine et tous payants (DH)", Math.round(p.revenueIfAllPayDh)],
+      ["Total paiement prévu (DH)", Math.round(p.revenueAfterAgentsDh)],
+      ["Coût agence vol (DH)", Math.round(p.costVolAllTravelersDh)],
+      ["Coût agence hôtel (DH)", Math.round(p.costHotelsAllTravelersDh)],
+      ["Coût agence visa (DH)", Math.round(p.costVisaAllTravelersDh)],
+      ["Charges agents (DH)", Math.round(p.agentChargesTotalDh)],
+      ["Autres charges (DH)", Math.round(p.autresChargesDh)],
+      ["Total charges (DH)", Math.round(p.totalChargesDh)],
+      ["Gain net prévu (DH)", Math.round(p.resultatPrevDh)],
+      ["Change utilisé", p.exchange],
+      ["Jours Madina effectifs", p.joursMadinaEff],
+      ["Jours Makkah effectifs", p.joursMakkahEff],
+    ]
 
-<h2>Résultats</h2>
-<div class="sec">
-<div class="kv"><span>Capacité (voyageurs)</span><span>${p.totalTravelersMax}</span></div>
-<div class="kv"><span>Total paiement prévu</span><span>${Math.round(p.revenueAfterAgentsDh).toLocaleString("fr-FR")} DH</span></div>
-<div class="kv"><span>Total charges</span><span>${Math.round(p.totalChargesDh).toLocaleString("fr-FR")} DH</span></div>
-<div class="kv"><strong>Gain net prévu</strong><strong>${Math.round(p.resultatPrevDh).toLocaleString("fr-FR")} DH</strong></div>
-<div class="kv"><span>Places payantes (après agents)</span><span>${p.payingTravelers}</span></div>
-<div class="kv"><span>Places agents (non payantes)</span><span>${p.agentPlaces}</span></div>
-<div class="kv"><span>Réf. CA si capacité pleine et tous payants</span><span>${Math.round(p.revenueIfAllPayDh).toLocaleString("fr-FR")} DH</span></div>
-<div class="kv"><span>Coût agence vol (tous les voyageurs)</span><span>${Math.round(p.costVolAllTravelersDh).toLocaleString("fr-FR")} DH</span></div>
-<div class="kv"><span>Coût agence hôtel (tous les voyageurs)</span><span>${Math.round(p.costHotelsAllTravelersDh).toLocaleString("fr-FR")} DH</span></div>
-<div class="kv"><span>Coût agence visa (tous les voyageurs)</span><span>${Math.round(p.costVisaAllTravelersDh).toLocaleString("fr-FR")} DH</span></div>
-<div class="kv"><span>Charges agents (saisies)</span><span>${Math.round(p.agentChargesTotalDh).toLocaleString("fr-FR")} DH</span></div>
-<div class="kv"><span>Autres charges (saisies)</span><span>${Math.round(p.autresChargesDh).toLocaleString("fr-FR")} DH</span></div>
-<div class="kv"><span>Change utilisé · Jours Madina / Makkah (effectifs)</span><span>${p.exchange} · ${p.joursMadinaEff} / ${p.joursMakkahEff}</span></div>
-</div>
+    const hotelRows: Array<(string | number)[]> = [
+      ["Ville", "Hôtel", "Type chambre (nb pers)", "Libellé", "Nb chambres", "Prix chambre (Riyal)", "Places"],
+      ...rawHotelsRows,
+    ]
 
-<h2>Détail par type de chambre</h2>
-<table>
-<thead><tr><th>Type</th><th>Places</th><th>Prix / pers. (DH)</th><th>Sous-total (DH)</th></tr></thead>
-<tbody>${rowsByType}</tbody>
-</table>
-</body>
-</html>`
+    const simulationTypeRows: Array<(string | number)[]> = [
+      ["Type clé", "Type", "Places", "Prix / pers. (DH)", "Sous-total (DH)"],
+      ...detailByTypeRows,
+    ]
 
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" })
+    const xml = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+  <Worksheet ss:Name="Résumé">
+    <Table>
+      ${xmlRows(resumeRows)}
+    </Table>
+  </Worksheet>
+  <Worksheet ss:Name="Détail Simulation">
+    <Table>
+      ${xmlRows(simulationTypeRows)}
+    </Table>
+  </Worksheet>
+  <Worksheet ss:Name="Hôtels Chambres">
+    <Table>
+      ${xmlRows(hotelRows)}
+    </Table>
+  </Worksheet>
+</Workbook>`
+
+    const blob = new Blob([xml], { type: "application/vnd.ms-excel;charset=utf-8" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `simulation-rentabilite-${slug}-${fileDate}.html`
+    a.download = `simulation-rentabilite-${slug}-${fileDate}.xls`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
     toast({
       title: "Rapport téléchargé",
-      description: "Le fichier HTML contient le programme et la simulation.",
+      description: "Le fichier Excel contient le programme, la simulation et le détail des hôtels/chambres.",
     })
   }, [
     canRunSimulation,

@@ -66,33 +66,74 @@ router.get('/dashboard', async (req, res) => {
     )
 
     // 👥 2. CLASSEMENT PAR AGENT (qui encaisse le plus)
-    const agentRanking = await prisma.payment.groupBy({
-      by: ['agentId'],
+    // Fallback important: si payment.agentId est null, utiliser reservation.agentId.
+    const paymentsForAgentRanking = await prisma.payment.findMany({
       where: {
-        ...dateFilter,
+        ...(dateDebut && dateFin
+          ? {
+              paymentDate: {
+                gte: new Date(dateDebut as string),
+                lte: new Date(dateFin as string),
+              },
+            }
+          : {}),
         reservation: programFilter,
-        agentId: { not: null }
       },
-      _sum: { amount: true },
-      _count: { id: true },
-      orderBy: { _sum: { amount: 'desc' } }
+      select: {
+        amount: true,
+        agentId: true,
+        reservation: {
+          select: {
+            agentId: true,
+            agent: {
+              select: {
+                id: true,
+                nom: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
     })
 
-    const agentRankingDetailed = await Promise.all(
-      agentRanking.map(async (item) => {
-        const agent = await prisma.agent.findUnique({
-          where: { id: item.agentId! }
-        })
-        return {
-          agentId: item.agentId,
-          agentName: agent?.nom || 'Agent inconnu',
-          agentEmail: agent?.email || '',
-          totalAmount: item._sum?.amount || 0,
-          countPayments: item._count?.id || 0,
-          avgAmount: (item._count?.id || 0) > 0 ? (item._sum?.amount || 0) / (item._count?.id || 1) : 0
-        }
-      })
-    )
+    const agentAggregation = new Map<
+      number,
+      {
+        agentId: number
+        agentName: string
+        agentEmail: string
+        totalAmount: number
+        countPayments: number
+      }
+    >()
+
+    paymentsForAgentRanking.forEach((payment) => {
+      const resolvedAgentId = payment.agentId ?? payment.reservation?.agentId ?? null
+      const resolvedAgent = payment.reservation?.agent || null
+      if (!resolvedAgentId) return
+
+      const current = agentAggregation.get(resolvedAgentId) || {
+        agentId: resolvedAgentId,
+        agentName: resolvedAgent?.nom || 'Agent inconnu',
+        agentEmail: resolvedAgent?.email || '',
+        totalAmount: 0,
+        countPayments: 0,
+      }
+
+      current.totalAmount += payment.amount || 0
+      current.countPayments += 1
+      if (resolvedAgent?.nom) current.agentName = resolvedAgent.nom
+      if (resolvedAgent?.email) current.agentEmail = resolvedAgent.email
+      agentAggregation.set(resolvedAgentId, current)
+    })
+
+    const agentRankingDetailed = Array.from(agentAggregation.values())
+      .map((agent) => ({
+        ...agent,
+        avgAmount: agent.countPayments > 0 ? agent.totalAmount / agent.countPayments : 0,
+      }))
+      .sort((a, b) => b.totalAmount - a.totalAmount)
 
     // 📅 3. MOUVEMENTS PAR PÉRIODE (tendances)
     const getTrendData = async (period: string) => {
@@ -201,8 +242,8 @@ router.get('/dashboard', async (req, res) => {
         agentRanking: {
           summary: {
             totalAgents: agentRankingDetailed.length,
-            totalCollected: agentRanking.reduce((sum, agent) => sum + (agent._sum?.amount || 0), 0),
-            totalTransactions: agentRanking.reduce((sum, agent) => sum + (agent._count?.id || 0), 0)
+            totalCollected: agentRankingDetailed.reduce((sum, agent) => sum + (agent.totalAmount || 0), 0),
+            totalTransactions: agentRankingDetailed.reduce((sum, agent) => sum + (agent.countPayments || 0), 0)
           },
           details: agentRankingDetailed
         },

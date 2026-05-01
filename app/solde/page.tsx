@@ -295,6 +295,12 @@ const signedLog = (value: number) => {
 }
 const formatAxisTick = (value: number, mode: "raw" | "indexed") =>
   mode === "raw" ? `${Math.round(value / 1000)}k` : `${Math.round(value)}`
+const formatDateLabel = (isoDate?: string) => {
+  if (!isoDate) return ""
+  const [y, m, d] = isoDate.split("-")
+  if (!y || !m || !d) return isoDate
+  return `${d}/${m}/${y}`
+}
 
 const timelineChartConfig: ChartConfig = {
   paiements: { label: "Paiements", color: "#16a34a" },
@@ -1000,7 +1006,7 @@ export default function SoldeCaissePage() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-indigo-500" />
-              Paiements vs Dépenses vs Profit (jours depuis premier mouvement)
+              Paiements vs Dépenses vs Profit (du premier au dernier mouvement)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1014,11 +1020,11 @@ export default function SoldeCaissePage() {
                   <LineChart data={timelineDisplayData} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
                     <CartesianGrid vertical={false} />
                     <XAxis
-                      dataKey="day"
+                      dataKey="label"
                       tickLine={false}
                       axisLine={false}
                       tickMargin={8}
-                      tickFormatter={(value) => `J${value}`}
+                      tickFormatter={(value) => formatDateLabel(String(value))}
                     />
                     <YAxis
                       tickLine={false}
@@ -1032,7 +1038,7 @@ export default function SoldeCaissePage() {
                         <ChartTooltipContent
                           labelFormatter={(_, payload) => {
                             const item = payload?.[0]?.payload as TimelinePoint | undefined
-                            return item ? `Jour ${item.day} - ${item.label}` : ""
+                            return item ? `${formatDateLabel(item.label)} (index J${item.day})` : ""
                           }}
                           formatter={(value, name) => (
                             <div className="flex w-full items-center justify-between gap-4">
@@ -1050,12 +1056,12 @@ export default function SoldeCaissePage() {
                     <Line type="monotone" dataKey="depenses" stroke="var(--color-depenses)" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
                     <Line type="monotone" dataKey="profit" stroke="var(--color-profit)" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
                     {maxGrowth.day > 0 && (
-                      <ReferenceDot x={maxGrowth.day} y={timelineDisplayData.find((d) => d.day === maxGrowth.day)?.profit || 0} r={5} fill="#16a34a" stroke="#fff" />
+                      <ReferenceDot x={maxGrowth.label} y={timelineDisplayData.find((d) => d.day === maxGrowth.day)?.profit || 0} r={5} fill="#16a34a" stroke="#fff" />
                     )}
                     {maxDrop.day > 0 && (
-                      <ReferenceDot x={maxDrop.day} y={timelineDisplayData.find((d) => d.day === maxDrop.day)?.profit || 0} r={5} fill="#dc2626" stroke="#fff" />
+                      <ReferenceDot x={maxDrop.label} y={timelineDisplayData.find((d) => d.day === maxDrop.day)?.profit || 0} r={5} fill="#dc2626" stroke="#fff" />
                     )}
-                    <Brush dataKey="day" height={20} stroke="#64748b" travellerWidth={10} />
+                    <Brush dataKey="label" tickFormatter={(value) => formatDateLabel(String(value))} height={20} stroke="#64748b" travellerWidth={10} />
                   </LineChart>
                 </ChartContainer>
               ) : (
@@ -1067,25 +1073,30 @@ export default function SoldeCaissePage() {
             <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
               <div className="rounded-md bg-green-50 p-2">
                 <span className="text-green-800 font-medium">Pic Paiements</span>
-                <div className="text-green-700">Jour {peakTimelinePayment.day} • {formatCurrency(peakTimelinePayment.paiements)}</div>
+                <div className="text-green-700">{formatDateLabel(peakTimelinePayment.label)} • {formatCurrency(peakTimelinePayment.paiements)}</div>
               </div>
               <div className="rounded-md bg-red-50 p-2">
                 <span className="text-red-800 font-medium">Pic Dépenses</span>
-                <div className="text-red-700">Jour {peakTimelineExpense.day} • {formatCurrency(peakTimelineExpense.depenses)}</div>
+                <div className="text-red-700">{formatDateLabel(peakTimelineExpense.label)} • {formatCurrency(peakTimelineExpense.depenses)}</div>
               </div>
               <div className="rounded-md bg-blue-50 p-2">
                 <span className="text-blue-800 font-medium">Meilleur Profit</span>
-                <div className="text-blue-700">Jour {bestTimelineProfit.day} • {formatCurrency(bestTimelineProfit.profit)}</div>
+                <div className="text-blue-700">{formatDateLabel(bestTimelineProfit.label)} • {formatCurrency(bestTimelineProfit.profit)}</div>
               </div>
             </div>
             <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
               <div className="rounded-md bg-emerald-50 p-2 text-emerald-800">
-                Croissance max du profit: Jour {maxGrowth.day} • {formatCurrency(maxGrowth.diff)}
+                Croissance max du profit: {formatDateLabel(maxGrowth.label)} • {formatCurrency(maxGrowth.diff)}
               </div>
               <div className="rounded-md bg-rose-50 p-2 text-rose-800">
-                Chute max du profit: Jour {maxDrop.day} • {formatCurrency(maxDrop.diff)}
+                Chute max du profit: {formatDateLabel(maxDrop.label)} • {formatCurrency(maxDrop.diff)}
               </div>
             </div>
+            {timelineData.length > 0 && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Période affichée: {formatDateLabel(timelineData[0]?.label)} → {formatDateLabel(timelineData[timelineData.length - 1]?.label)}
+              </p>
+            )}
           </CardContent>
         </Card>
 

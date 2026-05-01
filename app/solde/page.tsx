@@ -324,6 +324,8 @@ const formatNumberWithDots = (num: number): string => {
 };
 
 const formatCurrency = (num: number) => `${formatNumberWithDots(num)} DH`
+const formatSignedCurrency = (num: number) =>
+  `${num >= 0 ? "+" : "-"}${formatNumberWithDots(Math.abs(num))} DH`
 const signedLog = (value: number) => {
   if (value === 0) return 0
   return Math.sign(value) * Math.log10(Math.abs(value) + 1)
@@ -571,10 +573,6 @@ export default function SoldeCaissePage() {
   const monthlyAverageProfit = monthlyComparisonData.length > 0
     ? monthlyComparisonData.reduce((sum, item) => sum + (item.paiements - item.depenses), 0) / monthlyComparisonData.length
     : 0
-  const monthlyActualDiffTotal = monthlyComparisonData.reduce((sum, item) => sum + (item.paiements - item.depenses), 0)
-  const monthlyExpectedDiffTotal = monthlyComparisonData.reduce((sum, item) => sum + (item.paiementsPrevus - item.depenses), 0)
-  const programActualDiffTotal = programComparisonData.reduce((sum, item) => sum + (item.paiements - item.depenses), 0)
-  const programExpectedDiffTotal = programComparisonData.reduce((sum, item) => sum + (item.paiementsPrevus - item.depenses), 0)
   const topProgramByActual = programComparisonData.reduce(
     (max, item) => ((item.paiements - item.depenses) > (max.paiements - max.depenses) ? item : max),
     programComparisonData[0] || { programName: "-", paiements: 0, depenses: 0, paiementsPrevus: 0 }
@@ -669,6 +667,15 @@ export default function SoldeCaissePage() {
       solde: chartScaleMode === "log" ? signedLog(s2[i]) : s2[i],
     }))
   }, [chartScaleMode, chartViewMode, parMois, toIndexed])
+
+  const monthlyActualDiffByLabel = useMemo(
+    () => new Map(monthlyComparisonData.map((item) => [item.label, item.paiements - item.depenses])),
+    [monthlyComparisonData]
+  )
+  const monthlyExpectedDiffByLabel = useMemo(
+    () => new Map(monthlyComparisonData.map((item) => [item.label, item.paiementsPrevus - item.depenses])),
+    [monthlyComparisonData]
+  )
 
   const loadTimelineDayDetails = useCallback(async (date: string) => {
     try {
@@ -1193,12 +1200,7 @@ export default function SoldeCaissePage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-lg flex items-center justify-between gap-2">
-                <span>Total Paiements vs Dépenses (par mois)</span>
-                <Badge variant={monthlyActualDiffTotal >= 0 ? "default" : "destructive"}>
-                  Écart: {formatCurrency(monthlyActualDiffTotal)}
-                </Badge>
-              </CardTitle>
+              <CardTitle className="text-lg">Total Paiements vs Dépenses (par mois)</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-72 p-1">
@@ -1210,7 +1212,26 @@ export default function SoldeCaissePage() {
                   <ChartContainer config={monthlyActualConfig} className="h-full w-full aspect-auto">
                     <BarChart data={monthlyDisplayData} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
                       <CartesianGrid vertical={false} />
-                      <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tick={(props: any) => {
+                          const { x, y, payload } = props
+                          const label = String(payload?.value || "")
+                          const diff = monthlyActualDiffByLabel.get(label) || 0
+                          return (
+                            <g transform={`translate(${x},${y})`}>
+                              <text x={0} y={0} dy={10} textAnchor="middle" fill="#64748b" fontSize={11}>{label}</text>
+                              <text x={0} y={0} dy={24} textAnchor="middle" fill={diff >= 0 ? "#16a34a" : "#dc2626"} fontSize={10}>
+                                {formatSignedCurrency(diff)}
+                              </text>
+                            </g>
+                          )
+                        }}
+                        height={36}
+                      />
                       <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip
@@ -1227,20 +1248,13 @@ export default function SoldeCaissePage() {
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Écart total (paiements - dépenses): <span className={monthlyActualDiffTotal >= 0 ? "text-green-700 font-semibold" : "text-red-700 font-semibold"}>{formatCurrency(monthlyActualDiffTotal)}</span>
-              </p>
+              <p className="text-xs text-muted-foreground mt-2">La différence (paiements - dépenses) est affichée sous chaque mois.</p>
             </CardContent>
           </Card>
 
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-lg flex items-center justify-between gap-2">
-                <span>Total Paiements Prévus vs Dépenses (par mois)</span>
-                <Badge variant={monthlyExpectedDiffTotal >= 0 ? "default" : "destructive"}>
-                  Écart: {formatCurrency(monthlyExpectedDiffTotal)}
-                </Badge>
-              </CardTitle>
+              <CardTitle className="text-lg">Total Paiements Prévus vs Dépenses (par mois)</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-72 p-1">
@@ -1252,7 +1266,26 @@ export default function SoldeCaissePage() {
                   <ChartContainer config={monthlyExpectedConfig} className="h-full w-full aspect-auto">
                     <BarChart data={monthlyDisplayData} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
                       <CartesianGrid vertical={false} />
-                      <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tick={(props: any) => {
+                          const { x, y, payload } = props
+                          const label = String(payload?.value || "")
+                          const diff = monthlyExpectedDiffByLabel.get(label) || 0
+                          return (
+                            <g transform={`translate(${x},${y})`}>
+                              <text x={0} y={0} dy={10} textAnchor="middle" fill="#64748b" fontSize={11}>{label}</text>
+                              <text x={0} y={0} dy={24} textAnchor="middle" fill={diff >= 0 ? "#16a34a" : "#dc2626"} fontSize={10}>
+                                {formatSignedCurrency(diff)}
+                              </text>
+                            </g>
+                          )
+                        }}
+                        height={36}
+                      />
                       <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip
@@ -1269,9 +1302,7 @@ export default function SoldeCaissePage() {
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Écart total (prévus - dépenses): <span className={monthlyExpectedDiffTotal >= 0 ? "text-green-700 font-semibold" : "text-red-700 font-semibold"}>{formatCurrency(monthlyExpectedDiffTotal)}</span>
-              </p>
+              <p className="text-xs text-muted-foreground mt-2">La différence (prévus - dépenses) est affichée sous chaque mois.</p>
               <p className="text-xs text-muted-foreground mt-2">Moyenne du profit mensuel: {formatCurrency(monthlyAverageProfit)}</p>
             </CardContent>
           </Card>
@@ -1280,12 +1311,7 @@ export default function SoldeCaissePage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-lg flex items-center justify-between gap-2">
-                <span>Total Paiements vs Dépenses (par programme)</span>
-                <Badge variant={programActualDiffTotal >= 0 ? "default" : "destructive"}>
-                  Écart: {formatCurrency(programActualDiffTotal)}
-                </Badge>
-              </CardTitle>
+              <CardTitle className="text-lg">Total Paiements vs Dépenses (par programme)</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-72 p-1">
@@ -1313,20 +1339,27 @@ export default function SoldeCaissePage() {
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Écart total (paiements - dépenses): <span className={programActualDiffTotal >= 0 ? "text-green-700 font-semibold" : "text-red-700 font-semibold"}>{formatCurrency(programActualDiffTotal)}</span>
-              </p>
+              {programComparisonData.length > 0 && (
+                <div className="mt-2 max-h-28 overflow-y-auto space-y-1 pr-1">
+                  {programComparisonData.slice(0, 10).map((item) => {
+                    const diff = item.paiements - item.depenses
+                    return (
+                      <div key={`actual-${item.programName}`} className="text-[11px] text-muted-foreground flex items-center justify-between">
+                        <span className="truncate max-w-[60%]">{item.programName}</span>
+                        <span className={diff >= 0 ? "text-green-700 font-medium" : "text-red-700 font-medium"}>
+                          {formatSignedCurrency(diff)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
 
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-lg flex items-center justify-between gap-2">
-                <span>Total Paiements Prévus vs Dépenses (par programme)</span>
-                <Badge variant={programExpectedDiffTotal >= 0 ? "default" : "destructive"}>
-                  Écart: {formatCurrency(programExpectedDiffTotal)}
-                </Badge>
-              </CardTitle>
+              <CardTitle className="text-lg">Total Paiements Prévus vs Dépenses (par programme)</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-72 p-1">
@@ -1354,9 +1387,21 @@ export default function SoldeCaissePage() {
                   <div className="flex items-center justify-center h-full text-gray-500"><p>Aucune donnée disponible</p></div>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Écart total (prévus - dépenses): <span className={programExpectedDiffTotal >= 0 ? "text-green-700 font-semibold" : "text-red-700 font-semibold"}>{formatCurrency(programExpectedDiffTotal)}</span>
-              </p>
+              {programComparisonData.length > 0 && (
+                <div className="mt-2 max-h-28 overflow-y-auto space-y-1 pr-1">
+                  {programComparisonData.slice(0, 10).map((item) => {
+                    const diff = item.paiementsPrevus - item.depenses
+                    return (
+                      <div key={`expected-${item.programName}`} className="text-[11px] text-muted-foreground flex items-center justify-between">
+                        <span className="truncate max-w-[60%]">{item.programName}</span>
+                        <span className={diff >= 0 ? "text-green-700 font-medium" : "text-red-700 font-medium"}>
+                          {formatSignedCurrency(diff)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
               <p className="text-xs text-muted-foreground mt-2">Top programme (réel): {topProgramByActual.programName} • Profit {formatCurrency(topProgramByActual.paiements - topProgramByActual.depenses)}</p>
             </CardContent>
           </Card>

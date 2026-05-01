@@ -10,6 +10,13 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   Calendar,
   Users,
   FileText,
@@ -105,6 +112,34 @@ type ProgramComparisonData = {
   paiements: number
   depenses: number
   paiementsPrevus: number
+}
+
+type TimelineDayDetails = {
+  date: string
+  paiements: Array<{
+    id: number
+    amount: number
+    paymentMethod: string
+    paymentDate: string
+    reservation: { id: number; clientName: string; programName: string | null } | null
+    agent: { id: number; nom: string } | null
+  }>
+  depenses: Array<{
+    id: number
+    amount: number
+    type: string
+    description: string
+    expenseDate: string
+    program: { id: number; name: string } | null
+    reservation: { id: number; clientName: string } | null
+  }>
+  summary: {
+    totalPaiements: number
+    totalDepenses: number
+    profit: number
+    countPaiements: number
+    countDepenses: number
+  }
 }
 
 type BalanceData = {
@@ -347,6 +382,10 @@ export default function SoldeCaissePage() {
   const [monthlyComparisonData, setMonthlyComparisonData] = useState<MonthlyComparisonData[]>([])
   const [programComparisonData, setProgramComparisonData] = useState<ProgramComparisonData[]>([])
   const [chartsLoading, setChartsLoading] = useState(false)
+  const [selectedTimelineDate, setSelectedTimelineDate] = useState<string | null>(null)
+  const [timelineDetailsOpen, setTimelineDetailsOpen] = useState(false)
+  const [timelineDetailsLoading, setTimelineDetailsLoading] = useState(false)
+  const [timelineDayDetails, setTimelineDayDetails] = useState<TimelineDayDetails | null>(null)
 
   // 🎯 Fonction optimisée pour récupérer les données via l'API Balance
   const fetchData = useCallback(async () => {
@@ -622,6 +661,32 @@ export default function SoldeCaissePage() {
       solde: chartScaleMode === "log" ? signedLog(s2[i]) : s2[i],
     }))
   }, [chartScaleMode, chartViewMode, parMois, toIndexed])
+
+  const loadTimelineDayDetails = useCallback(async (date: string) => {
+    try {
+      setTimelineDetailsLoading(true)
+      const params = new URLSearchParams()
+      params.append("date", date)
+      if (programmeFilter && programmeFilter !== "tous") {
+        params.append("programme", programmeFilter)
+      }
+      const res = await fetch(api.url(`/api/balance/charts/timeline/details?${params.toString()}`))
+      if (!res.ok) {
+        throw new Error("Erreur lors du chargement du détail journalier")
+      }
+      const data = await res.json()
+      setTimelineDayDetails(data.data || null)
+      setTimelineDetailsOpen(true)
+    } catch (error) {
+      toast({
+        title: "Chargement impossible",
+        description: error instanceof Error ? error.message : "Erreur inconnue",
+        variant: "destructive",
+      })
+    } finally {
+      setTimelineDetailsLoading(false)
+    }
+  }, [programmeFilter, toast])
 
   const getFilenameFromDisposition = (contentDisposition: string | null): string | null => {
     if (!contentDisposition) return null;
@@ -1017,7 +1082,16 @@ export default function SoldeCaissePage() {
                 </div>
               ) : timelineData.length > 1 ? (
                 <ChartContainer config={timelineChartConfig} className="h-full w-full aspect-auto">
-                  <LineChart data={timelineDisplayData} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+                  <LineChart
+                    data={timelineDisplayData}
+                    margin={{ left: 8, right: 16, top: 8, bottom: 8 }}
+                    onClick={(state: any) => {
+                      const date = state?.activeLabel as string | undefined
+                      if (!date) return
+                      setSelectedTimelineDate(date)
+                      void loadTimelineDayDetails(date)
+                    }}
+                  >
                     <CartesianGrid vertical={false} />
                     <XAxis
                       dataKey="label"
@@ -1097,6 +1171,9 @@ export default function SoldeCaissePage() {
                 Période affichée: {formatDateLabel(timelineData[0]?.label)} → {formatDateLabel(timelineData[timelineData.length - 1]?.label)}
               </p>
             )}
+            <p className="mt-1 text-xs text-muted-foreground">
+              Clique sur un point/jour pour afficher le détail des paiements et dépenses de cette date.
+            </p>
           </CardContent>
         </Card>
 
@@ -1767,6 +1844,98 @@ export default function SoldeCaissePage() {
             </div>
           </>
         )}
+
+        <Dialog open={timelineDetailsOpen} onOpenChange={setTimelineDetailsOpen}>
+          <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Détail journalier — {formatDateLabel(selectedTimelineDate || timelineDayDetails?.date || "")}</DialogTitle>
+              <DialogDescription>
+                Historique détaillé des paiements et dépenses du jour sélectionné.
+              </DialogDescription>
+            </DialogHeader>
+
+            {timelineDetailsLoading ? (
+              <div className="py-8 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+              </div>
+            ) : timelineDayDetails ? (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="rounded-lg bg-green-50 p-3">
+                    <p className="text-xs text-green-800">Total paiements</p>
+                    <p className="text-lg font-bold text-green-700">{formatCurrency(timelineDayDetails.summary.totalPaiements)}</p>
+                    <p className="text-xs text-green-700">{timelineDayDetails.summary.countPaiements} opérations</p>
+                  </div>
+                  <div className="rounded-lg bg-red-50 p-3">
+                    <p className="text-xs text-red-800">Total dépenses</p>
+                    <p className="text-lg font-bold text-red-700">{formatCurrency(timelineDayDetails.summary.totalDepenses)}</p>
+                    <p className="text-xs text-red-700">{timelineDayDetails.summary.countDepenses} opérations</p>
+                  </div>
+                  <div className="rounded-lg bg-blue-50 p-3">
+                    <p className="text-xs text-blue-800">Profit du jour</p>
+                    <p className={`text-lg font-bold ${timelineDayDetails.summary.profit >= 0 ? "text-green-700" : "text-red-700"}`}>
+                      {formatCurrency(timelineDayDetails.summary.profit)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Paiements ({timelineDayDetails.paiements.length})</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {timelineDayDetails.paiements.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Aucun paiement ce jour.</p>
+                      ) : (
+                        <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                          {timelineDayDetails.paiements.map((p) => (
+                            <div key={p.id} className="rounded-md border p-2 text-sm">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-green-700">{formatCurrency(p.amount)}</span>
+                                <span className="text-xs text-muted-foreground">{new Date(p.paymentDate).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span>
+                              </div>
+                              <p className="text-xs text-muted-foreground">Méthode: {p.paymentMethod}</p>
+                              <p className="text-xs">Client: {p.reservation?.clientName || "N/A"}</p>
+                              <p className="text-xs text-muted-foreground">Programme: {p.reservation?.programName || "N/A"} • Agent: {p.agent?.nom || "N/A"}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Dépenses ({timelineDayDetails.depenses.length})</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {timelineDayDetails.depenses.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Aucune dépense ce jour.</p>
+                      ) : (
+                        <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                          {timelineDayDetails.depenses.map((d) => (
+                            <div key={d.id} className="rounded-md border p-2 text-sm">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-red-700">{formatCurrency(d.amount)}</span>
+                                <span className="text-xs text-muted-foreground">{new Date(d.expenseDate).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span>
+                              </div>
+                              <p className="text-xs">Type: {d.type}</p>
+                              <p className="text-xs text-muted-foreground">{d.description}</p>
+                              <p className="text-xs text-muted-foreground">Programme: {d.program?.name || "N/A"} • Réservation: {d.reservation?.clientName || "N/A"}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground py-4">Aucun détail trouvé pour ce jour.</p>
+            )}
+          </DialogContent>
+        </Dialog>
 
       </div>
     </div>

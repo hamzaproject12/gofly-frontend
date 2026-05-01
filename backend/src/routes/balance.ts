@@ -873,4 +873,118 @@ router.get('/charts/program-comparison', async (req, res) => {
   }
 });
 
+// 🔎 Détail journalier pour drill-down du graphique timeline
+router.get('/charts/timeline/details', async (req, res) => {
+  try {
+    const { date, programme } = req.query;
+    if (!date || typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({
+        error: 'Le paramètre date est requis au format YYYY-MM-DD'
+      });
+    }
+
+    const dayStart = new Date(`${date}T00:00:00.000Z`);
+    const dayEnd = new Date(`${date}T23:59:59.999Z`);
+    const programFilter = programme && programme !== 'tous' ? { name: programme as string } : undefined;
+
+    const [payments, expenses] = await Promise.all([
+      prisma.payment.findMany({
+        where: {
+          paymentDate: { gte: dayStart, lte: dayEnd },
+          ...(programFilter && {
+            reservation: {
+              program: programFilter
+            }
+          })
+        },
+        include: {
+          reservation: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              program: { select: { name: true } }
+            }
+          },
+          agent: { select: { id: true, nom: true } }
+        },
+        orderBy: { paymentDate: 'asc' }
+      }),
+      prisma.expense.findMany({
+        where: {
+          date: { gte: dayStart, lte: dayEnd },
+          ...(programFilter && {
+            program: programFilter
+          })
+        },
+        include: {
+          program: { select: { id: true, name: true } },
+          reservation: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true
+            }
+          }
+        },
+        orderBy: { date: 'asc' }
+      })
+    ]);
+
+    const totalPaiements = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const totalDepenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+
+    res.json({
+      data: {
+        date,
+        paiements: payments.map((p) => ({
+          id: p.id,
+          amount: p.amount,
+          paymentMethod: p.paymentMethod,
+          paymentDate: p.paymentDate,
+          reservation: p.reservation
+            ? {
+                id: p.reservation.id,
+                clientName: `${p.reservation.firstName} ${p.reservation.lastName}`,
+                programName: p.reservation.program?.name || null
+              }
+            : null,
+          agent: p.agent ? { id: p.agent.id, nom: p.agent.nom } : null
+        })),
+        depenses: expenses.map((e) => ({
+          id: e.id,
+          amount: e.amount,
+          type: e.type,
+          description: e.description,
+          expenseDate: e.date,
+          program: e.program ? { id: e.program.id, name: e.program.name } : null,
+          reservation: e.reservation
+            ? {
+                id: e.reservation.id,
+                clientName: `${e.reservation.firstName} ${e.reservation.lastName}`
+              }
+            : null
+        })),
+        summary: {
+          totalPaiements,
+          totalDepenses,
+          profit: totalPaiements - totalDepenses,
+          countPaiements: payments.length,
+          countDepenses: expenses.length
+        }
+      },
+      metadata: {
+        programme: programme || 'tous',
+        generatedAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('❌ Erreur Timeline Details API:', error);
+    res.status(500).json({
+      error: 'Erreur lors de la récupération du détail journalier',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router;

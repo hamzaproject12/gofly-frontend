@@ -729,7 +729,8 @@ export default function NouveauProgramme() {
       ...detailByTypeRows,
     ]
 
-    const xml = `<?xml version="1.0"?>
+    // SpreadsheetML : extension .xml = cohérent avec le contenu (évite l’avertissement Excel des fichiers .xls/XML).
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <?mso-application progid="Excel.Sheet"?>
 <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
  xmlns:o="urn:schemas-microsoft-com:office:office"
@@ -754,12 +755,12 @@ export default function NouveauProgramme() {
 </Workbook>`
 
     const blob = new Blob([xml], {
-      type: "application/vnd.ms-excel;charset=utf-8",
+      type: "application/vnd.ms-excel",
     })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    const filename = `simulation-rentabilite-${slug}-${fileDate}.xls`
+    const filename = `simulation-rentabilite-${slug}-${fileDate}.xml`
     a.setAttribute("download", filename)
     a.rel = "noopener"
     document.body.appendChild(a)
@@ -768,7 +769,8 @@ export default function NouveauProgramme() {
     window.setTimeout(() => URL.revokeObjectURL(url), 500)
     toast({
       title: "Rapport téléchargé",
-      description: "Le fichier Excel contient le programme, la simulation et le détail des hôtels/chambres.",
+      description:
+        "Fichier tableur Excel XML (.xml) : ouvrez-le avec Excel (résumé, simulation, hôtels).",
     })
   }, [
     canRunSimulation,

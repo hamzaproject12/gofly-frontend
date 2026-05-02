@@ -353,6 +353,8 @@ export default function NouveauProgramme() {
       if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
       const href = link.getAttribute("href")
       if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return
+      // Export fichier (blob) ou download programmatique : pas une navigation hors page
+      if (href.startsWith("blob:") || href.startsWith("data:") || link.hasAttribute("download")) return
 
       try {
         const url = new URL(link.href, window.location.origin)
@@ -663,6 +665,32 @@ export default function NouveauProgramme() {
       ["Profit Normal (DH)", parseNum(formData.profitNormal, 0)],
       ["Profit VIP (DH)", parseNum(formData.profitVIP, 0)],
       ["", ""],
+      ["Dates limites (formulaire)", ""],
+      [
+        "Date limite passeport",
+        formData.datesLimites.passport
+          ? format(formData.datesLimites.passport, "dd/MM/yyyy", { locale: fr })
+          : "—",
+      ],
+      [
+        "Date limite visa",
+        formData.datesLimites.visa
+          ? format(formData.datesLimites.visa, "dd/MM/yyyy", { locale: fr })
+          : "—",
+      ],
+      [
+        "Date limite billets",
+        formData.datesLimites.billets
+          ? format(formData.datesLimites.billets, "dd/MM/yyyy", { locale: fr })
+          : "—",
+      ],
+      [
+        "Date limite hôtels",
+        formData.datesLimites.hotels
+          ? format(formData.datesLimites.hotels, "dd/MM/yyyy", { locale: fr })
+          : "—",
+      ],
+      ["", ""],
       ["Hypothèses simulation", ""],
       ["Inclure avion", simIncludeAvion ? "Oui" : "Non"],
       ["Inclure visa", simIncludeVisa ? "Oui" : "Non"],
@@ -725,15 +753,19 @@ export default function NouveauProgramme() {
   </Worksheet>
 </Workbook>`
 
-    const blob = new Blob([xml], { type: "application/vnd.ms-excel;charset=utf-8" })
+    const blob = new Blob([xml], {
+      type: "application/vnd.ms-excel;charset=utf-8",
+    })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `simulation-rentabilite-${slug}-${fileDate}.xls`
+    const filename = `simulation-rentabilite-${slug}-${fileDate}.xls`
+    a.setAttribute("download", filename)
+    a.rel = "noopener"
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    window.setTimeout(() => URL.revokeObjectURL(url), 500)
     toast({
       title: "Rapport téléchargé",
       description: "Le fichier Excel contient le programme, la simulation et le détail des hôtels/chambres.",

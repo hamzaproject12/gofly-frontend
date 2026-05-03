@@ -12,6 +12,7 @@ import {
   Calendar,
   MapPin,
   Users,
+  User,
   FileText,
   CreditCard,
   Bell,
@@ -117,6 +118,8 @@ type TransformedReservation = {
   urgentDate?: Date
   groupSize: number
   typeReservation?: "LIT" | "CHAMBRE_PRIVEE"
+  /** Agent assigné au dossier (affiché sous Hôtel Makkah) */
+  agentNom: string | null
 }
 
 type Stats = {
@@ -432,6 +435,7 @@ export default function ReservationsPage() {
             urgentDate: undefined,
             groupSize,
             typeReservation: reservation.typeReservation,
+            agentNom: reservation.agent?.nom ?? null,
           };
         }
         // Nouvelle logique d'urgence : on teste dans l'ordre Passeport, Visa, Hôtel, Vol
@@ -505,6 +509,7 @@ export default function ReservationsPage() {
           urgentDate,
           groupSize,
           typeReservation: reservation.typeReservation,
+          agentNom: reservation.agent?.nom ?? null,
         };
       });
 
@@ -1001,6 +1006,11 @@ export default function ReservationsPage() {
                                 <span className="text-blue-700 text-lg"><span role='img' aria-label='makkah'>🕋</span></span>
                                 <span className="font-semibold text-gray-900">{hotels.find(h => h.id.toString() === reservation.hotelMakkah)?.name || reservation.hotelMakkah}</span>
                               </div>
+                              <div className="text-xs text-slate-600 font-semibold mt-2 mb-0.5">Agent</div>
+                              <div className="flex items-center gap-1.5 text-sm text-gray-800">
+                                <User className="h-3.5 w-3.5 text-slate-500 shrink-0" aria-hidden />
+                                <span className="font-medium">{reservation.agentNom ?? "—"}</span>
+                              </div>
                             </div>
                           </div>
                           {/* Colonne 2 : Statuts documents */}
@@ -1130,8 +1140,6 @@ export default function ReservationsPage() {
                           </div>
                         </div>
                       </div>
-                      {/* Troisième niveau : numéro de téléphone discret */}
-                      <div className="px-3 pb-2 pt-1 text-xs text-gray-400 font-mono">{reservation.telephone}</div>
                     </div>
                   </div>
                 )

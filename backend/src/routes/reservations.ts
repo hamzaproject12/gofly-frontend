@@ -134,6 +134,7 @@ router.get('/', async (req, res) => {
     const reservations = await prisma.reservation.findMany({
       where,
       include: {
+        agent: { select: { id: true, nom: true } },
         program: {
           select: {
             id: true,

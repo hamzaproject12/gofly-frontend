@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import RoleProtectedRoute from '../../components/RoleProtectedRoute';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   Dialog,
@@ -12,7 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { ScrollText, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import { ScrollText, ChevronLeft, ChevronRight, Eye, Calendar, X } from 'lucide-react';
 
 interface JournalActor {
   id: number;
@@ -34,6 +36,30 @@ interface JournalEntry {
   actor: JournalActor | null;
 }
 
+interface DayExpense {
+  id: number;
+  date: string;
+  amount: number;
+  type: string;
+  description: string;
+  program: { id: number; name: string } | null;
+  reservation: { id: number; firstName: string; lastName: string } | null;
+}
+
+interface DayPayment {
+  id: number;
+  amount: number;
+  paymentMethod: string;
+  paymentDate: string;
+  reservation: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    program: { id: number; name: string } | null;
+  };
+  agent: { id: number; nom: string } | null;
+}
+
 const ACTION_LABELS: Record<string, string> = {
   RESERVATION_DELETED: 'Réservation supprimée',
   RESERVATION_UPDATED: 'Réservation modifiée',
@@ -53,65 +79,227 @@ export default function JournalSuppressionsPage() {
   const [loading, setLoading] = useState(true);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selected, setSelected] = useState<JournalEntry | null>(null);
+  const [filterDay, setFilterDay] = useState<string>('');
+  const [expensesOfDay, setExpensesOfDay] = useState<DayExpense[]>([]);
+  const [paymentsOfDay, setPaymentsOfDay] = useState<DayPayment[]>([]);
+  const [expensesTotal, setExpensesTotal] = useState(0);
+  const [paymentsTotal, setPaymentsTotal] = useState(0);
+  const [activeDayLabel, setActiveDayLabel] = useState<string | null>(null);
 
-  const fetchPage = useCallback(async (p: number) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ page: String(p), limit: String(limit) });
-      const res = await api.request(`/api/journal-suppressions?${params.toString()}`);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Erreur ${res.status}`);
+  const fetchPage = useCallback(
+    async (p: number, day: string) => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({ page: String(p), limit: String(limit) });
+        if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
+          params.set('day', day);
+        }
+        const res = await api.request(`/api/journal-suppressions?${params.toString()}`);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `Erreur ${res.status}`);
+        }
+        const data = await res.json();
+        setItems(data.items || []);
+        setTotal(data.total ?? 0);
+        setPage(data.page ?? p);
+        setExpensesOfDay(Array.isArray(data.expensesOfDay) ? data.expensesOfDay : []);
+        setPaymentsOfDay(Array.isArray(data.paymentsOfDay) ? data.paymentsOfDay : []);
+        setExpensesTotal(typeof data.expensesTotal === 'number' ? data.expensesTotal : 0);
+        setPaymentsTotal(typeof data.paymentsTotal === 'number' ? data.paymentsTotal : 0);
+        setActiveDayLabel(data.day ?? null);
+      } catch (e) {
+        console.error(e);
+        setItems([]);
+        setTotal(0);
+        setExpensesOfDay([]);
+        setPaymentsOfDay([]);
+        setExpensesTotal(0);
+        setPaymentsTotal(0);
+        setActiveDayLabel(null);
+      } finally {
+        setLoading(false);
       }
-      const data = await res.json();
-      setItems(data.items || []);
-      setTotal(data.total ?? 0);
-      setPage(data.page ?? p);
-    } catch (e) {
-      console.error(e);
-      setItems([]);
-      setTotal(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [limit]);
+    },
+    [limit]
+  );
 
   useEffect(() => {
-    fetchPage(1);
-  }, [fetchPage]);
+    fetchPage(1, filterDay);
+  }, [fetchPage, filterDay]);
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
+
+  const formatMoney = (n: number) =>
+    n.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' DH';
 
   return (
     <RoleProtectedRoute allowedRoles={['ADMIN']}>
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white pt-24 pb-16 px-4">
         <div className="max-w-6xl mx-auto">
-          <div className="flex items-center gap-3 mb-8">
+          <div className="flex items-center gap-3 mb-6">
             <div className="p-3 rounded-2xl bg-amber-100 text-amber-800">
               <ScrollText className="h-8 w-8" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Journal d&apos;activité</h1>
               <p className="text-gray-600 text-sm mt-1">
-                Suppressions, modifications (réservations, programmes / chambres), charges fixes et
-                désactivations d&apos;agents — consultation admin uniquement.
+                Filtrez par jour pour voir les actions du journal, les dépenses et les paiements de
+                cette date (référence UTC pour le paramètre date).
               </p>
             </div>
           </div>
 
+          <Card className="border border-slate-200 shadow-sm mb-6">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-slate-600" />
+                Filtrer par jour
+              </CardTitle>
+              <CardDescription>
+                Choisissez une date : la liste du journal, les totaux et les tableaux dépenses /
+                paiements correspondent à ce jour.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-end gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="journal-day">Date</Label>
+                <Input
+                  id="journal-day"
+                  type="date"
+                  value={filterDay}
+                  onChange={(e) => {
+                    setFilterDay(e.target.value);
+                    setPage(1);
+                  }}
+                  className="w-[200px]"
+                />
+              </div>
+              {filterDay && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  onClick={() => {
+                    setFilterDay('');
+                    setPage(1);
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                  Toutes les dates
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          {activeDayLabel && (
+            <div className="grid md:grid-cols-2 gap-4 mb-6">
+              <Card className="border border-red-100 bg-red-50/40">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base text-red-900">
+                    Dépenses du {new Date(activeDayLabel + 'T12:00:00Z').toLocaleDateString('fr-FR')}
+                  </CardTitle>
+                  <CardDescription>
+                    Total : <span className="font-semibold text-red-800">{formatMoney(expensesTotal)}</span>{' '}
+                    · {expensesOfDay.length} ligne(s)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {expensesOfDay.length === 0 ? (
+                    <p className="text-sm text-gray-500">Aucune dépense ce jour-là.</p>
+                  ) : (
+                    <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-left text-gray-600 border-b">
+                            <th className="pb-1 pr-2">Type</th>
+                            <th className="pb-1 pr-2">Description</th>
+                            <th className="pb-1 pr-2">Programme</th>
+                            <th className="pb-1 pr-2">Montant</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {expensesOfDay.map((e) => (
+                            <tr key={e.id} className="border-b border-red-100/80">
+                              <td className="py-1 pr-2 whitespace-nowrap">{e.type}</td>
+                              <td className="py-1 pr-2 max-w-[200px] truncate" title={e.description}>
+                                {e.description}
+                              </td>
+                              <td className="py-1 pr-2">{e.program?.name ?? '—'}</td>
+                              <td className="py-1 pr-2 whitespace-nowrap">{formatMoney(e.amount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border border-emerald-100 bg-emerald-50/40">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base text-emerald-900">
+                    Paiements du {new Date(activeDayLabel + 'T12:00:00Z').toLocaleDateString('fr-FR')}
+                  </CardTitle>
+                  <CardDescription>
+                    Total :{' '}
+                    <span className="font-semibold text-emerald-800">{formatMoney(paymentsTotal)}</span>{' '}
+                    · {paymentsOfDay.length} ligne(s)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {paymentsOfDay.length === 0 ? (
+                    <p className="text-sm text-gray-500">Aucun paiement ce jour-là.</p>
+                  ) : (
+                    <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-left text-gray-600 border-b">
+                            <th className="pb-1 pr-2">Réservation</th>
+                            <th className="pb-1 pr-2">Programme</th>
+                            <th className="pb-1 pr-2">Méthode</th>
+                            <th className="pb-1 pr-2">Agent</th>
+                            <th className="pb-1 pr-2">Montant</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paymentsOfDay.map((p) => (
+                            <tr key={p.id} className="border-b border-emerald-100/80">
+                              <td className="py-1 pr-2 whitespace-nowrap">
+                                {p.reservation.firstName} {p.reservation.lastName}
+                              </td>
+                              <td className="py-1 pr-2">{p.reservation.program?.name ?? '—'}</td>
+                              <td className="py-1 pr-2">{p.paymentMethod}</td>
+                              <td className="py-1 pr-2">{p.agent?.nom ?? '—'}</td>
+                              <td className="py-1 pr-2 whitespace-nowrap">{formatMoney(p.amount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           <Card className="border border-slate-200 shadow-sm">
             <CardHeader>
-              <CardTitle>Entrées récentes</CardTitle>
+              <CardTitle>Journal (actions enregistrées)</CardTitle>
               <CardDescription>
-                {total} événement(s) enregistré(s). Les détails complets sont disponibles pour chaque
-                ligne.
+                {activeDayLabel
+                  ? `Jour sélectionné : ${new Date(activeDayLabel + 'T12:00:00Z').toLocaleDateString('fr-FR')} — ${total} événement(s) sur cette date.`
+                  : `${total} événement(s) (toutes dates) — utilisez le filtre ci-dessus pour une journée précise.`}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (
                 <p className="text-gray-500 py-8 text-center">Chargement…</p>
               ) : items.length === 0 ? (
-                <p className="text-gray-500 py-8 text-center">Aucune entrée pour le moment.</p>
+                <p className="text-gray-500 py-8 text-center">
+                  Aucune entrée de journal {activeDayLabel ? 'pour ce jour' : 'pour le moment'}.
+                </p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -189,7 +377,7 @@ export default function JournalSuppressionsPage() {
                       variant="outline"
                       size="sm"
                       disabled={page <= 1}
-                      onClick={() => fetchPage(page - 1)}
+                      onClick={() => fetchPage(page - 1, filterDay)}
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
@@ -198,7 +386,7 @@ export default function JournalSuppressionsPage() {
                       variant="outline"
                       size="sm"
                       disabled={page >= totalPages}
-                      onClick={() => fetchPage(page + 1)}
+                      onClick={() => fetchPage(page + 1, filterDay)}
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>

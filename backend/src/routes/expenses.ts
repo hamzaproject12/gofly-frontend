@@ -1,8 +1,24 @@
 import express from 'express';
+import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+function extractActorAgentIdFromToken(req: express.Request): number | null {
+  try {
+    const authHeader = req.headers['authorization'];
+    let token = authHeader && authHeader.split(' ')[1];
+    if (!token) token = req.cookies?.authToken;
+    if (!token) return null;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as {
+      agentId?: number;
+    };
+    return decoded?.agentId != null ? Number(decoded.agentId) : null;
+  } catch {
+    return null;
+  }
+}
 
 // Get all expenses with filters and pagination
 router.get('/', async (req, res) => {
@@ -239,6 +255,18 @@ router.post('/', async (req, res) => {
   try {
     console.log('POST /api/expenses - body:', req.body);
     const { description, amount, date, type, fichierId, programId, reservationId } = req.body;
+
+    let reservationAgentId: number | null = null;
+    if (reservationId) {
+      const r = await prisma.reservation.findUnique({
+        where: { id: Number(reservationId) },
+        select: { agentId: true },
+      });
+      reservationAgentId = r?.agentId ?? null;
+    }
+    const actorAgentId = extractActorAgentIdFromToken(req);
+    const resolvedAgentId = reservationAgentId ?? actorAgentId ?? undefined;
+
     const prismaData = {
       description,
       amount: parseFloat(amount),
@@ -247,6 +275,7 @@ router.post('/', async (req, res) => {
       fichierId: fichierId ? Number(fichierId) : undefined,
       programId: programId ? Number(programId) : undefined,
       reservationId: reservationId ? Number(reservationId) : undefined,
+      ...(resolvedAgentId != null ? { agentId: resolvedAgentId } : {}),
     };
     console.log('Data envoyée à Prisma:', prismaData);
     const expense = await prisma.expense.create({ data: prismaData });

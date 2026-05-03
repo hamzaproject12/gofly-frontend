@@ -1,8 +1,25 @@
 import express from 'express';
+import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+/** Agent qui effectue la saisie (JWT), utilisé si pas d’agent sur la réservation ou paiement hors dossier */
+function extractActorAgentIdFromToken(req: express.Request): number | null {
+  try {
+    const authHeader = req.headers['authorization'];
+    let token = authHeader && authHeader.split(' ')[1];
+    if (!token) token = req.cookies?.authToken;
+    if (!token) return null;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as {
+      agentId?: number;
+    };
+    return decoded?.agentId != null ? Number(decoded.agentId) : null;
+  } catch {
+    return null;
+  }
+}
 
 // Créer un paiement
 router.post('/', async (req, res) => {
@@ -76,6 +93,10 @@ router.post('/', async (req, res) => {
         : reservation.programId
       : programIdParsed;
 
+    const actorAgentId = extractActorAgentIdFromToken(req);
+    /** Agent du dossier en priorité, sinon l’utilisateur connecté qui enregistre le paiement */
+    const resolvedAgentId = reservation?.agentId ?? actorAgentId ?? undefined;
+
     const payment = await prisma.payment.create({
       data: {
         amount: amountNum,
@@ -85,7 +106,7 @@ router.post('/', async (req, res) => {
         reservationId: reservationIdNum,
         programId: resolvedProgramId,
         ...(fichierId ? { fichierId: parseInt(String(fichierId), 10) } : {}),
-        ...(reservation?.agentId ? { agentId: reservation.agentId } : {}),
+        ...(resolvedAgentId != null ? { agentId: resolvedAgentId } : {}),
       },
     });
     console.log('Paiement inséré en base:', payment);

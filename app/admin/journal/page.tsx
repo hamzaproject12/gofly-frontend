@@ -41,6 +41,7 @@ interface DayExpense {
   amount: number;
   type: string;
   program: { id: number; name: string } | null;
+  agent?: { id: number; nom: string } | null;
   reservation: {
     id: number;
     firstName: string;
@@ -86,7 +87,16 @@ function paymentReservationLabel(p: DayPayment): string {
 }
 
 function expenseAgentLabel(e: DayExpense): string {
-  return e.reservation?.agent?.nom ?? '—';
+  return e.agent?.nom ?? e.reservation?.agent?.nom ?? '—';
+}
+
+/** Jour civil local (YYYY-MM-DD) pour le champ date et le paramètre API `day` (UTC). */
+function localTodayISO(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const da = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${da}`;
 }
 
 const ACTION_LABELS: Record<string, string> = {
@@ -108,7 +118,7 @@ export default function JournalSuppressionsPage() {
   const [loading, setLoading] = useState(true);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selected, setSelected] = useState<JournalEntry | null>(null);
-  const [filterDay, setFilterDay] = useState<string>('');
+  const [filterDay, setFilterDay] = useState<string>(localTodayISO);
   const [expensesOfDay, setExpensesOfDay] = useState<DayExpense[]>([]);
   const [paymentsOfDay, setPaymentsOfDay] = useState<DayPayment[]>([]);
   const [expensesTotal, setExpensesTotal] = useState(0);

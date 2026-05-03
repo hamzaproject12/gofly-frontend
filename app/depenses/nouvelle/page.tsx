@@ -55,11 +55,8 @@ export default function NouvelleDepensePage() {
     setLoading(true)
 
     try {
-      const response = await fetch(api.url('/api/expenses'), {
+      const response = await api.request('/api/expenses', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           ...formData,
           amount: parseFloat(formData.amount),

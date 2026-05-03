@@ -27,6 +27,7 @@ model Agent {
   createdAt         DateTime             @default(now()) @map("created_at")
   updatedAt         DateTime             @updatedAt @map("updated_at")
   payments          Payment[]
+  expenses          Expense[]
   reservations      Reservation[]
   fixedCharges      FixedCharge[]
   journalActions    JournalSuppression[]
@@ -250,6 +251,8 @@ model Expense {
   type                  String
   fichierId             Int?
   reservationId         Int?
+  agentId               Int?
+  agent                 Agent?                 @relation(fields: [agentId], references: [id], onDelete: SetNull)
   fichier               Fichier?               @relation(fields: [fichierId], references: [id])
   program               Program?               @relation(fields: [programId], references: [id])
   reservation           Reservation?           @relation(fields: [reservationId], references: [id])

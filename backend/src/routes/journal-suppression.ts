@@ -67,7 +67,14 @@ router.get('/', async (req, res) => {
           where: { date: { gte: dayBounds.start, lte: dayBounds.end } },
           include: {
             program: { select: { id: true, name: true } },
-            reservation: { select: { id: true, firstName: true, lastName: true } },
+            reservation: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                agent: { select: { id: true, nom: true } },
+              },
+            },
           },
           orderBy: { date: 'desc' },
         }),
@@ -80,6 +87,7 @@ router.get('/', async (req, res) => {
                 firstName: true,
                 lastName: true,
                 program: { select: { id: true, name: true } },
+                agent: { select: { id: true, nom: true } },
               },
             },
             agent: { select: { id: true, nom: true } },

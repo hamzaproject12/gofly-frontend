@@ -8,6 +8,74 @@ const router = Router();
 
 type AuthUser = { agentId?: number; role?: string };
 
+/** Aligné sur la page Gestion des Réservations (app/reservations/page.tsx) */
+const DAYS_URGENCY_WINDOW = 18;
+
+type LeaderForUrgency = {
+  status: string;
+  statutPasseport: boolean;
+  statutVisa: boolean;
+  statutHotel: boolean;
+  statutVol: boolean;
+  program: {
+    passportDeadline: Date | null;
+    visaDeadline: Date | null;
+    hotelDeadline: Date | null;
+    flightDeadline: Date | null;
+  } | null;
+  accompagnants?: {
+    statutPasseport: boolean;
+    statutVisa: boolean;
+    statutHotel: boolean;
+    statutVol: boolean;
+  }[];
+};
+
+function isLeaderUrgentForExport(leader: LeaderForUrgency): boolean {
+  if (leader.status === 'Complet') return false;
+  const members = [leader, ...(leader.accompagnants || [])];
+  const passportGroupOk = members.every((m) => Boolean(m.statutPasseport));
+  const visaGroupOk = members.every((m) => Boolean(m.statutVisa));
+  const hotelGroupOk = members.every((m) => Boolean(m.statutHotel));
+  const flightGroupOk = members.every((m) => Boolean(m.statutVol));
+  const prog = leader.program;
+  if (!prog) return false;
+  const now = new Date();
+
+  /** Urgent si le groupe n’a pas validé l’étape ET l’échéance est dans la fenêtre (comme le front). */
+  const deadlineUrgent = (groupOk: boolean, deadline: Date | null | undefined): boolean => {
+    if (groupOk || !deadline) return false;
+    const diff = (new Date(deadline).getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+    return diff >= 0 && diff <= DAYS_URGENCY_WINDOW;
+  };
+
+  if (deadlineUrgent(passportGroupOk, prog.passportDeadline)) return true;
+  if (deadlineUrgent(visaGroupOk, prog.visaDeadline)) return true;
+  if (deadlineUrgent(hotelGroupOk, prog.hotelDeadline)) return true;
+  if (deadlineUrgent(flightGroupOk, prog.flightDeadline)) return true;
+  return false;
+}
+
+/** Date locale YYYY-MM-DD → début de journée */
+function parseDateStartLocal(dateStr: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  return new Date(y, mo - 1, d, 0, 0, 0, 0);
+}
+
+/** Date locale YYYY-MM-DD → fin de journée (inclusif) */
+function parseDateEndInclusiveLocal(dateStr: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  return new Date(y, mo - 1, d, 23, 59, 59, 999);
+}
+
 function applyRoomTypeQuery(where: Record<string, unknown>, roomType: unknown) {
   const rt = typeof roomType === 'string' ? roomType : '';
   if (!rt || rt === 'toutes') return;
@@ -170,27 +238,39 @@ function buildExportWhere(
     where.program = { name: program };
   }
 
-  if (status && status !== 'all') {
-    if (status !== 'Urgent') {
-      where.status = status;
-    } else {
-      where.status = { not: 'Complet' };
-    }
+  /**
+   * Statut affiché : « Urgent » et « Incomplet » sont affinés après requête (comme sur le front).
+   * Ici on ne filtre en SQL que ce qui est stocké en base.
+   */
+  if (status && status !== 'all' && status !== 'Urgent' && status !== 'Incomplet') {
+    where.status = status;
+  } else if (status === 'Urgent') {
+    where.status = { not: 'Complet' };
+  } else if (status === 'Incomplet') {
+    where.status = 'Incomplet';
   }
 
   applyRoomTypeQuery(where as Record<string, unknown>, roomType);
 
   if (dateFrom || dateTo) {
     where.reservationDate = {};
-    if (dateFrom) where.reservationDate.gte = new Date(dateFrom);
-    if (dateTo) where.reservationDate.lte = new Date(dateTo);
+    if (dateFrom) {
+      const start = parseDateStartLocal(String(dateFrom));
+      where.reservationDate.gte = start ?? new Date(dateFrom as string);
+    }
+    if (dateTo) {
+      const end = parseDateEndInclusiveLocal(String(dateTo));
+      where.reservationDate.lte = end ?? new Date(dateTo as string);
+    }
   }
 
-  if (search) {
+  const searchTrim = typeof search === 'string' ? search.trim() : '';
+  if (searchTrim) {
     where.OR = [
-      { firstName: { contains: search, mode: 'insensitive' } },
-      { lastName: { contains: search, mode: 'insensitive' } },
-      { phone: { contains: search, mode: 'insensitive' } },
+      { firstName: { contains: searchTrim, mode: 'insensitive' } },
+      { lastName: { contains: searchTrim, mode: 'insensitive' } },
+      { phone: { contains: searchTrim, mode: 'insensitive' } },
+      { program: { name: { contains: searchTrim, mode: 'insensitive' } } },
     ];
   }
 
@@ -207,12 +287,23 @@ router.get(
   async (req: any, res: Response) => {
     try {
       const user = req.user as AuthUser;
-      const where = buildExportWhere(req.query as Record<string, string | undefined>, user);
+      const query = req.query as Record<string, string | undefined>;
+      const where = buildExportWhere(query, user);
+      const statusFilter = (query.status || 'all').trim();
 
-      const leaders = await prisma.reservation.findMany({
+      const leadersRaw = await prisma.reservation.findMany({
         where,
         include: {
-          program: { select: { id: true, name: true } },
+          program: {
+            select: {
+              id: true,
+              name: true,
+              visaDeadline: true,
+              hotelDeadline: true,
+              flightDeadline: true,
+              passportDeadline: true,
+            },
+          },
           documents: true,
           payments: {
             include: { fichier: true },
@@ -231,6 +322,13 @@ router.get(
         },
         orderBy: [{ programId: 'asc' }, { reservationDate: 'asc' }, { id: 'asc' }],
       });
+
+      let leaders = leadersRaw;
+      if (statusFilter === 'Urgent') {
+        leaders = leadersRaw.filter((r) => isLeaderUrgentForExport(r as LeaderForUrgency));
+      } else if (statusFilter === 'Incomplet') {
+        leaders = leadersRaw.filter((r) => !isLeaderUrgentForExport(r as LeaderForUrgency));
+      }
 
       const workbook = new ExcelJS.Workbook();
       workbook.creator = 'Omra Travel';

@@ -6,6 +6,7 @@ import {
   logRoomsDeletedFromSnapshot,
   buildProgramDeletionDetail,
   buildProgramHardDeleteExtra,
+  buildProgramUpdateDetail,
   JOURNAL_ACTION,
   RoomJournalRow,
 } from '../services/journalSuppressionService';
@@ -300,6 +301,13 @@ router.post('/', async (req, res) => {
 // Update program
 router.put('/:id', async (req, res) => {
   try {
+    const programIdNum = parseInt(req.params.id);
+    const programBeforeUpdate = await prisma.program.findUnique({ where: { id: programIdNum } });
+    if (!programBeforeUpdate) {
+      return res.status(404).json({ error: 'Programme non trouvé' });
+    }
+    const roomsCountBeforePut = await prisma.room.count({ where: { programId: programIdNum } });
+
     console.log(`\n🔵 === PUT /api/programs/${req.params.id} - REÇU ===`);
     console.log(`Body:`, JSON.stringify(req.body, null, 2));
     
@@ -327,7 +335,7 @@ router.put('/:id', async (req, res) => {
     console.log(`  hotelsMakkah:`, hotelsMakkah?.length || 0, 'hôtel(s)');
 
     const program = await prisma.program.update({
-      where: { id: parseInt(req.params.id) },
+      where: { id: programIdNum },
       data: {
         name,
         nbJoursMadina: nbJoursMadina !== undefined ? Number(nbJoursMadina) : undefined,
@@ -841,6 +849,24 @@ router.put('/:id', async (req, res) => {
       where: { id: program.id },
       include: { hotelsMadina: { include: { hotel: true } }, hotelsMakkah: { include: { hotel: true } }, rooms: { include: { hotel: true } } }
     });
+
+    const roomsCountAfterPut = await prisma.room.count({ where: { programId: program.id } });
+    const programAfterScalars = await prisma.program.findUnique({ where: { id: program.id } });
+    if (programBeforeUpdate && programAfterScalars) {
+      const { summary: progUpSummary, detailText: progUpDetail } = buildProgramUpdateDetail(
+        programBeforeUpdate,
+        programAfterScalars,
+        roomsCountBeforePut,
+        roomsCountAfterPut
+      );
+      await logJournalSuppression(prisma, req, {
+        action: JOURNAL_ACTION.PROGRAM_UPDATED,
+        entityType: 'Program',
+        entityId: program.id,
+        summary: progUpSummary,
+        detailText: progUpDetail,
+      });
+    }
 
     res.json(updated);
   } catch (error) {

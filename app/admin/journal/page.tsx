@@ -30,14 +30,17 @@ interface JournalEntry {
   entityId: number | null;
   summary: string | null;
   detailText: string;
+  parDisplay: string | null;
   actor: JournalActor | null;
 }
 
 const ACTION_LABELS: Record<string, string> = {
   RESERVATION_DELETED: 'Réservation supprimée',
+  RESERVATION_UPDATED: 'Réservation modifiée',
   ROOM_DELETED: 'Chambre(s) supprimée(s)',
   PROGRAM_SOFT_DELETED: 'Programme masqué (soft)',
   PROGRAM_HARD_DELETED: 'Programme supprimé définitivement',
+  PROGRAM_UPDATED: 'Programme / chambres modifiés',
   FIXED_CHARGE_DELETED: 'Charge fixe supprimée',
   AGENT_DEACTIVATED: 'Agent désactivé',
 };
@@ -88,10 +91,10 @@ export default function JournalSuppressionsPage() {
               <ScrollText className="h-8 w-8" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Journal des suppressions</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Journal d&apos;activité</h1>
               <p className="text-gray-600 text-sm mt-1">
-                Historique des réservations, chambres, programmes, charges fixes et désactivations
-                d&apos;agents (consultation admin uniquement).
+                Suppressions, modifications (réservations, programmes / chambres), charges fixes et
+                désactivations d&apos;agents — consultation admin uniquement.
               </p>
             </div>
           </div>
@@ -116,7 +119,6 @@ export default function JournalSuppressionsPage() {
                       <tr className="border-b border-gray-200 text-left text-gray-600">
                         <th className="pb-2 pr-4 font-medium">Date</th>
                         <th className="pb-2 pr-4 font-medium">Action</th>
-                        <th className="pb-2 pr-4 font-medium">Entité</th>
                         <th className="pb-2 pr-4 font-medium">Résumé</th>
                         <th className="pb-2 pr-4 font-medium">Par</th>
                         <th className="pb-2 font-medium w-24"></th>
@@ -133,18 +135,26 @@ export default function JournalSuppressionsPage() {
                               {ACTION_LABELS[row.action] || row.action}
                             </Badge>
                           </td>
-                          <td className="py-3 pr-4 text-gray-700">
-                            {row.entityType}
-                            {row.entityId != null ? ` #${row.entityId}` : ''}
-                          </td>
                           <td className="py-3 pr-4 text-gray-600 max-w-md truncate" title={row.summary || ''}>
                             {row.summary || '—'}
                           </td>
                           <td className="py-3 pr-4 text-gray-700">
-                            {row.actor ? row.actor.nom : <span className="text-gray-400">—</span>}
-                            <span className="text-xs text-gray-400 ml-1">
-                              ({row.actorRoleSnapshot})
-                            </span>
+                            {(() => {
+                              const label = row.parDisplay || row.actor?.nom;
+                              const role =
+                                row.actorRoleSnapshot &&
+                                row.actorRoleSnapshot !== 'UNKNOWN'
+                                  ? row.actorRoleSnapshot
+                                  : null;
+                              return (
+                                <>
+                                  {label ?? <span className="text-gray-400">—</span>}
+                                  {role && label === row.actor?.nom && (
+                                    <span className="text-xs text-gray-400 ml-1">({role})</span>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </td>
                           <td className="py-3">
                             <Button

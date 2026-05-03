@@ -206,6 +206,7 @@ router.delete('/:id', async (req, res) => {
       entityId: id,
       summary,
       detailText,
+      parDisplay: existing.agent?.nom ?? undefined,
     });
     res.json({ message: 'Supprimée' });
   } catch (e) {

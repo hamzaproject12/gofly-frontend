@@ -4,9 +4,11 @@ import { PrismaClient, Reservation, Room, Program, FixedCharge, Agent, Hotel } f
 
 export const JOURNAL_ACTION = {
   RESERVATION_DELETED: 'RESERVATION_DELETED',
+  RESERVATION_UPDATED: 'RESERVATION_UPDATED',
   ROOM_DELETED: 'ROOM_DELETED',
   PROGRAM_SOFT_DELETED: 'PROGRAM_SOFT_DELETED',
   PROGRAM_HARD_DELETED: 'PROGRAM_HARD_DELETED',
+  PROGRAM_UPDATED: 'PROGRAM_UPDATED',
   FIXED_CHARGE_DELETED: 'FIXED_CHARGE_DELETED',
   AGENT_DEACTIVATED: 'AGENT_DEACTIVATED',
 } as const;
@@ -34,28 +36,56 @@ export function getJournalActorFromRequest(req: Request): {
   }
 }
 
+/** Complète rôle + nom depuis la table Agent (JWT peut ne pas contenir le rôle). */
+export async function resolveJournalActor(
+  prisma: PrismaClient,
+  req: Request
+): Promise<{ actorId: number | null; actorRoleSnapshot: string; actorNom: string | null }> {
+  const jwtActor = getJournalActorFromRequest(req);
+  if (!jwtActor.actorId) {
+    return { actorId: null, actorRoleSnapshot: jwtActor.actorRoleSnapshot, actorNom: null };
+  }
+  const agent = await prisma.agent.findUnique({
+    where: { id: jwtActor.actorId },
+    select: { nom: true, role: true },
+  });
+  return {
+    actorId: jwtActor.actorId,
+    actorRoleSnapshot: agent?.role ?? jwtActor.actorRoleSnapshot,
+    actorNom: agent?.nom ?? null,
+  };
+}
+
 export async function logJournalSuppression(
   prisma: PrismaClient,
   req: Request,
   params: {
-    action: JournalActionCode;
+    action: string;
     entityType: string;
     entityId: number | null;
     summary: string;
     detailText: string;
+    /** Affichage colonne « Par » ; sinon nom de l’agent connecté (session). */
+    parDisplay?: string | null;
   }
 ): Promise<void> {
-  const { actorId, actorRoleSnapshot } = getJournalActorFromRequest(req);
+  const resolved = await resolveJournalActor(prisma, req);
+  const parDisplayFinal =
+    params.parDisplay !== undefined && params.parDisplay !== null && params.parDisplay !== ''
+      ? params.parDisplay
+      : resolved.actorNom ?? undefined;
+
   try {
     await prisma.journalSuppression.create({
       data: {
-        actorId: actorId ?? undefined,
-        actorRoleSnapshot,
+        actorId: resolved.actorId ?? undefined,
+        actorRoleSnapshot: resolved.actorRoleSnapshot,
         action: params.action,
         entityType: params.entityType,
         entityId: params.entityId ?? undefined,
         summary: params.summary.slice(0, 500),
         detailText: params.detailText,
+        parDisplay: parDisplayFinal ?? undefined,
       },
     });
   } catch (e) {
@@ -63,10 +93,51 @@ export async function logJournalSuppression(
   }
 }
 
-type ReservationJournalRow = Reservation & {
+export type ReservationJournalRow = Reservation & {
   program: { id: number; name: string };
   agent: { id: number; nom: string } | null;
 };
+
+/** Nom affiché dans « Par » pour les événements liés à une réservation (agent assigné). */
+export function getAssignedAgentNomFromReservationRows(rows: ReservationJournalRow[]): string | null {
+  const leader = rows.find((r) => r.isLeader);
+  return leader?.agent?.nom ?? rows[0]?.agent?.nom ?? null;
+}
+
+export function describeReservationSnapshot(r: ReservationJournalRow): string {
+  let text = '';
+  text += `ID #${r.id} — ${r.firstName} ${r.lastName}\n`;
+  text += `Téléphone: ${r.phone}\n`;
+  text += `Programme: ${r.program.name} (id=${r.program.id})\n`;
+  text += `Type chambre: ${r.roomType} | Genre: ${r.gender}\n`;
+  text += `Plan: ${r.plan} | Type réservation: ${r.typeReservation}\n`;
+  text += `Prix: ${r.price} DH | Payé: ${r.paidAmount} DH | Réduction: ${r.reduction}\n`;
+  text += `Statut: ${r.status}\n`;
+  text += `Date réservation: ${r.reservationDate.toISOString()}\n`;
+  text += `Hôtels Madina/Makkah: ${r.hotelMadina ?? '—'} / ${r.hotelMakkah ?? '—'}\n`;
+  text += `Statuts: passeport=${r.statutPasseport} visa=${r.statutVisa} hôtel=${r.statutHotel} vol=${r.statutVol}\n`;
+  text += `Agent assigné: ${r.agent ? `${r.agent.nom} (id=${r.agent.id})` : '—'}\n`;
+  text += `Remarque: ${r.remarque ?? '—'}\n`;
+  return text;
+}
+
+export function buildReservationUpdateDetail(
+  before: ReservationJournalRow,
+  after: ReservationJournalRow,
+  source: 'PUT' | 'PATCH'
+): { summary: string; detailText: string } {
+  const summary = `Modification réservation #${after.id} — ${after.firstName} ${after.lastName}`;
+  let text = '=== MODIFICATION RÉSERVATION ===\n';
+  text += `Origine: API ${source} /api/reservations/:id\n`;
+  text += `Agent assigné (référence métier): ${after.agent ? `${after.agent.nom} (id=${after.agent.id})` : before.agent ? `${before.agent.nom} (id=${before.agent.id})` : '—'}\n\n`;
+  text += '--- AVANT ---\n';
+  text += describeReservationSnapshot(before);
+  text += '\n--- APRÈS ---\n';
+  text += describeReservationSnapshot(after);
+  text +=
+    '\nNote: en PUT, paiements et pièces peuvent avoir été remplacés si fournis dans la requête.\n';
+  return { summary, detailText: text };
+}
 
 export function buildReservationDeletionDetail(rows: ReservationJournalRow[]): {
   summary: string;
@@ -143,7 +214,8 @@ export async function logRoomsDeletedFromSnapshot(
   prisma: PrismaClient,
   req: Request,
   rooms: RoomJournalRow[],
-  context: string
+  context: string,
+  parDisplay?: string | null
 ): Promise<void> {
   if (!rooms.length) return;
   const { summary, detailText } = buildRoomDeletionDetail(rooms, context);
@@ -153,6 +225,7 @@ export async function logRoomsDeletedFromSnapshot(
     entityId: rooms[0].id,
     summary,
     detailText,
+    parDisplay: parDisplay ?? undefined,
   });
 }
 
@@ -167,6 +240,25 @@ export function buildProgramDeletionDetail(program: Program): { summary: string;
   text += `Exchange: ${program.exchange} | Jours Madina: ${program.nbJoursMadina} | Jours Makkah: ${program.nbJoursMakkah}\n`;
   text += `Prix avion DH: ${program.prixAvionDH} | Prix visa riyal: ${program.prixVisaRiyal}\n`;
   text += `Profits — global: ${program.profit} | éco: ${program.profitEconomique} | normal: ${program.profitNormal} | VIP: ${program.profitVIP}\n`;
+  return { summary, detailText: text };
+}
+
+export function buildProgramUpdateDetail(
+  before: Program,
+  after: Program,
+  roomsCountBefore: number,
+  roomsCountAfter: number
+): { summary: string; detailText: string } {
+  const summary = `Modification programme « ${after.name} » (id=${after.id})`;
+  let text = '=== MODIFICATION PROGRAMME (champs + configuration chambres via même enregistrement) ===\n';
+  text += `Origine: API PUT /api/programs/:id\n`;
+  text += `Stock chambres (lignes Room) — avant: ${roomsCountBefore} | après: ${roomsCountAfter}\n\n`;
+  text += '--- AVANT ---\n';
+  text += buildProgramDeletionDetail(before).detailText;
+  text += '\n--- APRÈS ---\n';
+  text += buildProgramDeletionDetail(after).detailText;
+  text +=
+    '\n(Les chambres peuvent avoir été recréées, prix mis à jour ou lignes libres supprimées selon la config hôtels.)\n';
   return { summary, detailText: text };
 }
 

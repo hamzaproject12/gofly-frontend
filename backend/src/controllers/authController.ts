@@ -556,6 +556,7 @@ export const deleteAgent = async (req: Request, res: Response) => {
       entityId: agentId,
       summary,
       detailText,
+      parDisplay: existingAgent.nom,
     });
 
     res.json({ message: 'Agent désactivé avec succès' });

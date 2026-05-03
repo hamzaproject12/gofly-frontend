@@ -43,6 +43,8 @@ model JournalSuppression {
   entityId          Int?
   summary           String?  @db.VarChar(500)
   detailText        String   @db.Text
+  /// Libellé affiché dans la colonne « Par » (ex. agent assigné à la réservation, ou agent métier)
+  parDisplay        String?  @db.VarChar(200) @map("par_display")
   actor             Agent?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])

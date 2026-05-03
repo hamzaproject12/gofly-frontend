@@ -6,7 +6,10 @@ import jwt from 'jsonwebtoken';
 import {
   logJournalSuppression,
   buildReservationDeletionDetail,
+  buildReservationUpdateDetail,
+  getAssignedAgentNomFromReservationRows,
   JOURNAL_ACTION,
+  type ReservationJournalRow,
 } from '../services/journalSuppressionService';
 
 const router = express.Router();
@@ -645,6 +648,11 @@ router.post('/', async (req, res) => {
   }
 });
 
+const reservationJournalInclude = {
+  program: { select: { id: true, name: true } },
+  agent: { select: { id: true, nom: true } },
+} as const;
+
 // Update reservation
 router.put('/:id', async (req, res) => {
   try {
@@ -683,11 +691,21 @@ router.put('/:id', async (req, res) => {
     });
 
     const reservationId = parseInt(req.params.id);
-    const currentReservation: any = await prisma.reservation.findUnique({
+    const beforeSnapshot = await prisma.reservation.findUnique({
       where: { id: reservationId },
-      select: { parentId: true, paidAmount: true, isLeader: true, groupId: true } as any
-    } as any);
-    const isAccompagnant = Boolean(currentReservation?.parentId);
+      include: reservationJournalInclude,
+    });
+    if (!beforeSnapshot) {
+      return res.status(404).json({ error: 'Réservation non trouvée' });
+    }
+
+    const currentReservation: any = {
+      parentId: beforeSnapshot.parentId,
+      paidAmount: beforeSnapshot.paidAmount,
+      isLeader: beforeSnapshot.isLeader,
+      groupId: beforeSnapshot.groupId,
+    };
+    const isAccompagnant = Boolean(beforeSnapshot.parentId);
 
     // Calculer le paidAmount à partir de tous les paiements de cette réservation
     const existingPayments = await prisma.payment.findMany({
@@ -839,6 +857,30 @@ router.put('/:id', async (req, res) => {
       }
     }
 
+    const afterSnapshot = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      include: reservationJournalInclude,
+    });
+    if (afterSnapshot && beforeSnapshot) {
+      const { summary: updSummary, detailText: updDetail } = buildReservationUpdateDetail(
+        beforeSnapshot as ReservationJournalRow,
+        afterSnapshot as ReservationJournalRow,
+        'PUT'
+      );
+      await logJournalSuppression(prisma, req, {
+        action: JOURNAL_ACTION.RESERVATION_UPDATED,
+        entityType: 'Reservation',
+        entityId: reservationId,
+        summary: updSummary,
+        detailText: updDetail,
+        parDisplay:
+          afterSnapshot.agent?.nom ??
+          beforeSnapshot.agent?.nom ??
+          getAssignedAgentNomFromReservationRows([afterSnapshot as ReservationJournalRow]) ??
+          undefined,
+      });
+    }
+
     res.json(reservation);
   } catch (error) {
     console.error('Erreur lors de la mise à jour de la réservation:', error);
@@ -859,11 +901,14 @@ router.patch('/:id', async (req, res) => {
     } = req.body;
 
     const reservationId = parseInt(req.params.id);
-    const existingReservation: any = await prisma.reservation.findUnique({
+    const beforeSnapshotPatch = await prisma.reservation.findUnique({
       where: { id: reservationId },
-      select: { parentId: true, isLeader: true, groupId: true } as any
-    } as any);
-    const isAccompagnant = Boolean(existingReservation?.parentId);
+      include: reservationJournalInclude,
+    });
+    if (!beforeSnapshotPatch) {
+      return res.status(404).json({ error: 'Réservation non trouvée' });
+    }
+    const isAccompagnant = Boolean(beforeSnapshotPatch.parentId);
 
     // Mettre à jour la réservation avec les statuts
     const reservation = await prisma.reservation.update({
@@ -878,7 +923,7 @@ router.patch('/:id', async (req, res) => {
     });
 
     // Même propagation pour PATCH depuis un leader
-    if (!isAccompagnant && existingReservation?.isLeader && existingReservation?.groupId) {
+    if (!isAccompagnant && beforeSnapshotPatch.isLeader && beforeSnapshotPatch.groupId) {
       const sharedUpdateData: any = {};
       if (status !== undefined) sharedUpdateData.status = status;
       if (statutVisa !== undefined) sharedUpdateData.statutVisa = statutVisa;
@@ -917,6 +962,30 @@ router.patch('/:id', async (req, res) => {
           });
         }
       }
+    }
+
+    const afterSnapshotPatch = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      include: reservationJournalInclude,
+    });
+    if (afterSnapshotPatch) {
+      const { summary: pSummary, detailText: pDetail } = buildReservationUpdateDetail(
+        beforeSnapshotPatch as ReservationJournalRow,
+        afterSnapshotPatch as ReservationJournalRow,
+        'PATCH'
+      );
+      await logJournalSuppression(prisma, req, {
+        action: JOURNAL_ACTION.RESERVATION_UPDATED,
+        entityType: 'Reservation',
+        entityId: reservationId,
+        summary: pSummary,
+        detailText: pDetail,
+        parDisplay:
+          afterSnapshotPatch.agent?.nom ??
+          beforeSnapshotPatch.agent?.nom ??
+          getAssignedAgentNomFromReservationRows([afterSnapshotPatch as ReservationJournalRow]) ??
+          undefined,
+      });
     }
 
     res.json(reservation);
@@ -1049,6 +1118,8 @@ router.delete('/:id', async (req, res) => {
         entityId: fullRows[0].id,
         summary: journalSummary,
         detailText: journalDetail,
+        parDisplay:
+          getAssignedAgentNomFromReservationRows(fullRows as ReservationJournalRow[]) ?? undefined,
       });
     }
 

@@ -65,7 +65,11 @@ export async function logJournalSuppression(
     entityId: number | null;
     summary: string;
     detailText: string;
-    /** Affichage colonne « Par » ; sinon nom de l’agent connecté (session). */
+    /**
+     * Libellé facultatif stocké en plus de actorId. Pour la traçabilité « qui a agi »,
+     * ne pas y mettre l’agent commercial du dossier : préférer laisser vide pour utiliser
+     * le nom résolu depuis la session (JWT → Agent).
+     */
     parDisplay?: string | null;
   }
 ): Promise<void> {

@@ -7,7 +7,6 @@ import {
   logJournalSuppression,
   buildReservationDeletionDetail,
   buildReservationUpdateDetail,
-  getAssignedAgentNomFromReservationRows,
   JOURNAL_ACTION,
   type ReservationJournalRow,
 } from '../services/journalSuppressionService';
@@ -154,7 +153,7 @@ router.get('/', async (req, res) => {
         accompagnants: true
       } as any,
       orderBy: {
-        created_at: 'desc'
+        updated_at: 'desc'
       },
       skip,
       take: limitNumber
@@ -874,11 +873,6 @@ router.put('/:id', async (req, res) => {
         entityId: reservationId,
         summary: updSummary,
         detailText: updDetail,
-        parDisplay:
-          afterSnapshot.agent?.nom ??
-          beforeSnapshot.agent?.nom ??
-          getAssignedAgentNomFromReservationRows([afterSnapshot as ReservationJournalRow]) ??
-          undefined,
       });
     }
 
@@ -981,11 +975,6 @@ router.patch('/:id', async (req, res) => {
         entityId: reservationId,
         summary: pSummary,
         detailText: pDetail,
-        parDisplay:
-          afterSnapshotPatch.agent?.nom ??
-          beforeSnapshotPatch.agent?.nom ??
-          getAssignedAgentNomFromReservationRows([afterSnapshotPatch as ReservationJournalRow]) ??
-          undefined,
       });
     }
 
@@ -1119,8 +1108,6 @@ router.delete('/:id', async (req, res) => {
         entityId: fullRows[0].id,
         summary: journalSummary,
         detailText: journalDetail,
-        parDisplay:
-          getAssignedAgentNomFromReservationRows(fullRows as ReservationJournalRow[]) ?? undefined,
       });
     }
 

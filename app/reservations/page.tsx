@@ -120,6 +120,8 @@ type TransformedReservation = {
   typeReservation?: "LIT" | "CHAMBRE_PRIVEE"
   /** Agent assigné au dossier (affiché sous Hôtel Makkah) */
   agentNom: string | null
+  /** Pour tri par dernière modification */
+  updatedAt: string
 }
 
 type Stats = {
@@ -436,6 +438,10 @@ export default function ReservationsPage() {
             groupSize,
             typeReservation: reservation.typeReservation,
             agentNom: reservation.agent?.nom ?? null,
+            updatedAt:
+              typeof reservation.updated_at === 'string'
+                ? reservation.updated_at
+                : new Date(reservation.updated_at).toISOString(),
           };
         }
         // Nouvelle logique d'urgence : on teste dans l'ordre Passeport, Visa, Hôtel, Vol
@@ -510,6 +516,10 @@ export default function ReservationsPage() {
           groupSize,
           typeReservation: reservation.typeReservation,
           agentNom: reservation.agent?.nom ?? null,
+          updatedAt:
+            typeof reservation.updated_at === 'string'
+              ? reservation.updated_at
+              : new Date(reservation.updated_at).toISOString(),
         };
       });
 
@@ -655,11 +665,13 @@ export default function ReservationsPage() {
     }
   }
 
-  // Avant le map sur filteredReservations, on trie pour mettre les urgentes en haut
+  // Urgent en premier, puis par dernière modification (aligné sur l’API orderBy updated_at)
   const sortedReservations = [...filteredReservations].sort((a, b) => {
     if (a.statut === "Urgent" && b.statut !== "Urgent") return -1;
     if (a.statut !== "Urgent" && b.statut === "Urgent") return 1;
-    return 0;
+    const ta = new Date(a.updatedAt).getTime();
+    const tb = new Date(b.updatedAt).getTime();
+    return tb - ta;
   });
 
   if (!mounted) {

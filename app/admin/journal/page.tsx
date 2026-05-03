@@ -13,7 +13,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { ScrollText, ChevronLeft, ChevronRight, Eye, Calendar, X } from 'lucide-react';
+import {
+  ScrollText,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  Calendar,
+  X,
+} from 'lucide-react';
 
 interface JournalActor {
   id: number;
@@ -124,6 +133,7 @@ export default function JournalSuppressionsPage() {
   const [expensesTotal, setExpensesTotal] = useState(0);
   const [paymentsTotal, setPaymentsTotal] = useState(0);
   const [activeDayLabel, setActiveDayLabel] = useState<string | null>(null);
+  const [journalExpanded, setJournalExpanded] = useState(true);
 
   const fetchPage = useCallback(
     async (p: number, day: string) => {
@@ -186,7 +196,9 @@ export default function JournalSuppressionsPage() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Journal d&apos;activité</h1>
               <p className="text-gray-600 text-sm mt-1">
-                Filtre jour (UTC) : journal + dépenses et paiements alignés sur la même date.
+                Traçabilité des actions (qui les a enregistrées). L&apos;agent assigné au dossier est indiqué dans{' '}
+                <span className="font-medium text-gray-700">Gestion des Réservations</span>. Filtre jour (UTC) :
+                dépenses et paiements alignés sur la même date.
               </p>
             </div>
           </div>
@@ -222,14 +234,35 @@ export default function JournalSuppressionsPage() {
           </div>
 
           <Card className="border border-slate-200 shadow-sm mb-6">
-            <CardHeader>
-              <CardTitle>Journal (actions enregistrées)</CardTitle>
-              <CardDescription>
-                {activeDayLabel
-                  ? `Jour sélectionné : ${new Date(activeDayLabel + 'T12:00:00Z').toLocaleDateString('fr-FR')} — ${total} événement(s) sur cette date.`
-                  : `${total} événement(s) (toutes dates) — utilisez le filtre ci-dessus pour une journée précise.`}
-              </CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0 pb-2">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <CardTitle>Journal (actions enregistrées)</CardTitle>
+                <CardDescription>
+                  {activeDayLabel
+                    ? `Jour sélectionné : ${new Date(activeDayLabel + 'T12:00:00Z').toLocaleDateString('fr-FR')} — ${total} événement(s) sur cette date.`
+                    : `${total} événement(s) (toutes dates) — utilisez le filtre ci-dessus pour une journée précise.`}
+                </CardDescription>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="shrink-0 h-9 w-9"
+                onClick={() => setJournalExpanded((v) => !v)}
+                aria-expanded={journalExpanded}
+                aria-label={
+                  journalExpanded ? 'Masquer la liste du journal' : 'Afficher la liste du journal'
+                }
+                title={journalExpanded ? 'Masquer la liste' : 'Afficher la liste'}
+              >
+                {journalExpanded ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
             </CardHeader>
+            {journalExpanded ? (
             <CardContent>
               {loading ? (
                 <p className="text-gray-500 py-8 text-center">Chargement…</p>
@@ -245,7 +278,12 @@ export default function JournalSuppressionsPage() {
                         <th className="pb-2 pr-4 font-medium">Date</th>
                         <th className="pb-2 pr-4 font-medium">Action</th>
                         <th className="pb-2 pr-4 font-medium">Résumé</th>
-                        <th className="pb-2 pr-4 font-medium">Par</th>
+                        <th
+                          className="pb-2 pr-4 font-medium"
+                          title="Compte ayant enregistré l’événement (pas l’agent commercial du dossier)"
+                        >
+                          Action par
+                        </th>
                         <th className="pb-2 font-medium w-24"></th>
                       </tr>
                     </thead>
@@ -265,7 +303,8 @@ export default function JournalSuppressionsPage() {
                           </td>
                           <td className="py-3 pr-4 text-gray-700">
                             {(() => {
-                              const label = row.parDisplay || row.actor?.nom;
+                              /** Toujours privilégier l’acteur lié à la session (celui qui a agi), pas parDisplay historique. */
+                              const label = row.actor?.nom ?? row.parDisplay;
                               const role =
                                 row.actorRoleSnapshot &&
                                 row.actorRoleSnapshot !== 'UNKNOWN'
@@ -274,7 +313,7 @@ export default function JournalSuppressionsPage() {
                               return (
                                 <>
                                   {label ?? <span className="text-gray-400">—</span>}
-                                  {role && label === row.actor?.nom && (
+                                  {role && row.actor?.nom && (
                                     <span className="text-xs text-gray-400 ml-1">({role})</span>
                                   )}
                                 </>
@@ -331,6 +370,7 @@ export default function JournalSuppressionsPage() {
                 </div>
               )}
             </CardContent>
+            ) : null}
           </Card>
 
           {activeDayLabel && (
@@ -434,9 +474,22 @@ export default function JournalSuppressionsPage() {
                   <Badge>{ACTION_LABELS[selected.action] || selected.action}</Badge>
                   <span>{new Date(selected.createdAt).toLocaleString('fr-FR')}</span>
                 </div>
-                <div className="text-sm">
-                  <span className="font-medium text-gray-800">Résumé : </span>
-                  {selected.summary || '—'}
+                <div className="text-sm space-y-1">
+                  <div>
+                    <span className="font-medium text-gray-800">Action par : </span>
+                    {selected.actor?.nom ?? selected.parDisplay ?? '—'}
+                    {selected.actorRoleSnapshot &&
+                      selected.actorRoleSnapshot !== 'UNKNOWN' &&
+                      selected.actor?.nom && (
+                        <span className="text-xs text-gray-500 ml-1">
+                          ({selected.actorRoleSnapshot})
+                        </span>
+                      )}
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-800">Résumé : </span>
+                    {selected.summary || '—'}
+                  </div>
                 </div>
                 <pre className="text-xs bg-slate-900 text-slate-100 p-4 rounded-lg overflow-auto flex-1 whitespace-pre-wrap font-mono leading-relaxed max-h-[60vh]">
                   {selected.detailText}

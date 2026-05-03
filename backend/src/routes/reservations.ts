@@ -8,6 +8,8 @@ import {
   buildReservationCreationDetail,
   buildReservationDeletionDetail,
   buildReservationUpdateDetail,
+  getChangedReservationScalarKeys,
+  shouldSilencePostCreateStatutPatchJournal,
   JOURNAL_ACTION,
   type ReservationJournalRow,
 } from '../services/journalSuppressionService';
@@ -907,19 +909,35 @@ router.put('/:id', async (req, res) => {
       where: { id: reservationId },
       include: reservationJournalInclude,
     });
+    const bodyHadDocs =
+      documents != null &&
+      typeof documents === 'object' &&
+      Object.keys(documents).length > 0 &&
+      Object.values(documents).some((v) => v != null && v !== '');
+    const bodyHadPayments = Array.isArray(paiements) && paiements.length > 0;
+
     if (afterSnapshot && beforeSnapshot) {
-      const { summary: updSummary, detailText: updDetail } = buildReservationUpdateDetail(
-        beforeSnapshot as ReservationJournalRow,
-        afterSnapshot as ReservationJournalRow,
-        'PUT'
-      );
-      await logJournalSuppression(prisma, req, {
-        action: JOURNAL_ACTION.RESERVATION_UPDATED,
-        entityType: 'Reservation',
-        entityId: reservationId,
-        summary: updSummary,
-        detailText: updDetail,
-      });
+      const changed = getChangedReservationScalarKeys(beforeSnapshot, afterSnapshot);
+      if (changed.length > 0 || bodyHadDocs || bodyHadPayments) {
+        const { summary: updSummary, detailText: updDetail } = buildReservationUpdateDetail(
+          beforeSnapshot as ReservationJournalRow,
+          afterSnapshot as ReservationJournalRow,
+          'PUT',
+          {
+            extraNote:
+              bodyHadDocs || bodyHadPayments
+                ? 'Fichiers ou liste paiements fournis dans la requête (effet possible hors lignes « champs modifiés »).'
+                : undefined,
+          }
+        );
+        await logJournalSuppression(prisma, req, {
+          action: JOURNAL_ACTION.RESERVATION_UPDATED,
+          entityType: 'Reservation',
+          entityId: reservationId,
+          summary: updSummary,
+          detailText: updDetail,
+        });
+      }
     }
 
     res.json(reservation);
@@ -940,6 +958,12 @@ router.patch('/:id', async (req, res) => {
       statutHotel,
       statutVol
     } = req.body;
+
+    const hasDocumentsPayload =
+      documents != null &&
+      typeof documents === 'object' &&
+      Object.keys(documents).length > 0 &&
+      Object.values(documents).some((v) => v != null && v !== '');
 
     const reservationId = parseInt(req.params.id);
     const beforeSnapshotPatch = await prisma.reservation.findUnique({
@@ -1010,18 +1034,28 @@ router.patch('/:id', async (req, res) => {
       include: reservationJournalInclude,
     });
     if (afterSnapshotPatch) {
-      const { summary: pSummary, detailText: pDetail } = buildReservationUpdateDetail(
-        beforeSnapshotPatch as ReservationJournalRow,
-        afterSnapshotPatch as ReservationJournalRow,
-        'PATCH'
-      );
-      await logJournalSuppression(prisma, req, {
-        action: JOURNAL_ACTION.RESERVATION_UPDATED,
-        entityType: 'Reservation',
-        entityId: reservationId,
-        summary: pSummary,
-        detailText: pDetail,
-      });
+      const changed = getChangedReservationScalarKeys(beforeSnapshotPatch, afterSnapshotPatch);
+      const silencePostCreate =
+        changed.length > 0 &&
+        shouldSilencePostCreateStatutPatchJournal(
+          beforeSnapshotPatch as ReservationJournalRow,
+          afterSnapshotPatch as ReservationJournalRow,
+          hasDocumentsPayload
+        );
+      if (changed.length > 0 && !silencePostCreate) {
+        const { summary: pSummary, detailText: pDetail } = buildReservationUpdateDetail(
+          beforeSnapshotPatch as ReservationJournalRow,
+          afterSnapshotPatch as ReservationJournalRow,
+          'PATCH'
+        );
+        await logJournalSuppression(prisma, req, {
+          action: JOURNAL_ACTION.RESERVATION_UPDATED,
+          entityType: 'Reservation',
+          entityId: reservationId,
+          summary: pSummary,
+          detailText: pDetail,
+        });
+      }
     }
 
     res.json(reservation);

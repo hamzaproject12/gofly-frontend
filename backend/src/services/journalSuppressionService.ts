@@ -120,27 +120,219 @@ export type ReservationJournalRow = Reservation & {
   agent: { id: number; nom: string } | null;
 };
 
+function fmtJournalVal(v: unknown): string {
+  if (v === null || v === undefined) return '—';
+  if (v instanceof Date) return v.toISOString();
+  if (typeof v === 'boolean') return v ? 'oui' : 'non';
+  return String(v);
+}
+
+const RESERVATION_SCALAR_KEYS: (keyof Reservation)[] = [
+  'firstName',
+  'lastName',
+  'phone',
+  'programId',
+  'roomType',
+  'hotelMadina',
+  'hotelMakkah',
+  'price',
+  'paidAmount',
+  'status',
+  'statutPasseport',
+  'statutVisa',
+  'statutHotel',
+  'statutVol',
+  'reservationDate',
+  'gender',
+  'agentId',
+  'reduction',
+  'plan',
+  'passportNumber',
+  'transport',
+  'remarque',
+  'groupe',
+  'typeReservation',
+  'isLeader',
+  'parentId',
+  'groupId',
+  'familyMixed',
+  'roomSlot',
+];
+
+function reservationScalarEqual(k: keyof Reservation, b: Reservation, a: Reservation): boolean {
+  const bv = b[k];
+  const av = a[k];
+  if (bv instanceof Date && av instanceof Date) return bv.getTime() === av.getTime();
+  return bv === av;
+}
+
+export function getChangedReservationScalarKeys(b: Reservation, a: Reservation): (keyof Reservation)[] {
+  const out: (keyof Reservation)[] = [];
+  for (const k of RESERVATION_SCALAR_KEYS) {
+    if (!reservationScalarEqual(k, b, a)) out.push(k);
+  }
+  return out;
+}
+
+const RESERVATION_STATUS_KEYS = new Set<keyof Reservation>([
+  'status',
+  'statutPasseport',
+  'statutVisa',
+  'statutHotel',
+  'statutVol',
+]);
+
+/**
+ * PATCH juste après création (wizard) : éviter la double ligne « créée » + « modifiée »
+ * lorsque seuls statut / statuts pièces changent, sans payload documents.
+ */
+export function shouldSilencePostCreateStatutPatchJournal(
+  before: ReservationJournalRow,
+  after: ReservationJournalRow,
+  hasDocumentsPayload: boolean,
+  silenceMs = 180_000
+): boolean {
+  if (hasDocumentsPayload) return false;
+  const created = before.created_at;
+  if (!created || Date.now() - new Date(created).getTime() > silenceMs) return false;
+  const changed = getChangedReservationScalarKeys(before, after);
+  return changed.length > 0 && changed.every((k) => RESERVATION_STATUS_KEYS.has(k));
+}
+
+const RES_FIELD_FR: Partial<Record<keyof Reservation, string>> = {
+  firstName: 'Prénom',
+  lastName: 'Nom',
+  phone: 'Téléphone',
+  programId: 'Programme (id)',
+  roomType: 'Type chambre',
+  hotelMadina: 'Hôtel Madina',
+  hotelMakkah: 'Hôtel Makkah',
+  price: 'Prix (DH)',
+  paidAmount: 'Montant payé (DH)',
+  status: 'Statut dossier',
+  statutPasseport: 'Statut passeport',
+  statutVisa: 'Statut visa',
+  statutHotel: 'Statut hôtel',
+  statutVol: 'Statut vol',
+  reservationDate: 'Date réservation',
+  gender: 'Genre',
+  agentId: 'Agent assigné',
+  reduction: 'Réduction',
+  plan: 'Plan',
+  passportNumber: 'N° passeport',
+  transport: 'Transport',
+  remarque: 'Remarque',
+  groupe: 'Groupe',
+  typeReservation: 'Type réservation',
+  isLeader: 'Leader',
+  parentId: 'parentId',
+  groupId: 'groupId',
+  familyMixed: 'Famille mixte',
+  roomSlot: 'roomSlot',
+};
+
+export function diffReservationJournalRows(before: ReservationJournalRow, after: ReservationJournalRow): string {
+  const changed = getChangedReservationScalarKeys(before, after);
+  if (!changed.length) return '';
+
+  const lines: string[] = ['--- Champs modifiés ---'];
+  for (const k of changed) {
+    if (k === 'programId') {
+      lines.push(
+        `Programme: « ${before.program.name} » (id ${before.program.id}) → « ${after.program.name} » (id ${after.program.id})`
+      );
+      continue;
+    }
+    if (k === 'agentId') {
+      const bNom = before.agent?.nom ?? '—';
+      const aNom = after.agent?.nom ?? '—';
+      lines.push(
+        `${RES_FIELD_FR.agentId}: ${bNom} (id ${fmtJournalVal(before.agentId)}) → ${aNom} (id ${fmtJournalVal(after.agentId)})`
+      );
+      continue;
+    }
+    const label = RES_FIELD_FR[k] ?? String(k);
+    lines.push(`${label}: ${fmtJournalVal(before[k])} → ${fmtJournalVal(after[k])}`);
+  }
+  return lines.join('\n');
+}
+
+export function compactReservationSnapshot(r: ReservationJournalRow): string {
+  return [
+    `ID #${r.id} — ${r.firstName} ${r.lastName} | ${r.phone}`,
+    `Programme: ${r.program.name} (id=${r.program.id}) | ${r.roomType} | ${r.status} | ${r.price} DH`,
+    `Hôtels: ${r.hotelMadina ?? '—'} / ${r.hotelMakkah ?? '—'} | Statuts P/V/H/Vol: ${r.statutPasseport}/${r.statutVisa}/${r.statutHotel}/${r.statutVol}`,
+  ].join('\n');
+}
+
+const PROGRAM_SCALAR_KEYS: (keyof Program)[] = [
+  'name',
+  'nbJoursMadina',
+  'nbJoursMakkah',
+  'exchange',
+  'prixAvionDH',
+  'prixVisaRiyal',
+  'profit',
+  'profitEconomique',
+  'profitNormal',
+  'profitVIP',
+  'visaDeadline',
+  'hotelDeadline',
+  'flightDeadline',
+  'passportDeadline',
+  'isDeleted',
+  'deletedAt',
+];
+
+const PROG_FIELD_FR: Partial<Record<keyof Program, string>> = {
+  name: 'Nom',
+  nbJoursMadina: 'Jours Madina',
+  nbJoursMakkah: 'Jours Makkah',
+  exchange: 'Change',
+  prixAvionDH: 'Prix avion (DH)',
+  prixVisaRiyal: 'Prix visa (riyal)',
+  profit: 'Profit global',
+  profitEconomique: 'Profit éco',
+  profitNormal: 'Profit normal',
+  profitVIP: 'Profit VIP',
+  visaDeadline: 'Deadline visa',
+  hotelDeadline: 'Deadline hôtel',
+  flightDeadline: 'Deadline vol',
+  passportDeadline: 'Deadline passeport',
+  isDeleted: 'Masqué (soft delete)',
+  deletedAt: 'Date suppression',
+};
+
+function programScalarEqual(k: keyof Program, b: Program, a: Program): boolean {
+  const bv = b[k];
+  const av = a[k];
+  if (bv instanceof Date && av instanceof Date) return bv.getTime() === av.getTime();
+  return bv === av;
+}
+
+export function getChangedProgramScalarKeys(b: Program, a: Program): (keyof Program)[] {
+  const out: (keyof Program)[] = [];
+  for (const k of PROGRAM_SCALAR_KEYS) {
+    if (!programScalarEqual(k, b, a)) out.push(k);
+  }
+  return out;
+}
+
+export function diffProgramScalars(before: Program, after: Program): string {
+  const changed = getChangedProgramScalarKeys(before, after);
+  if (!changed.length) return '';
+  const lines: string[] = ['--- Champs programme modifiés ---'];
+  for (const k of changed) {
+    const label = PROG_FIELD_FR[k] ?? String(k);
+    lines.push(`${label}: ${fmtJournalVal(before[k])} → ${fmtJournalVal(after[k])}`);
+  }
+  return lines.join('\n');
+}
+
 /** Nom affiché dans « Par » pour les événements liés à une réservation (agent assigné). */
 export function getAssignedAgentNomFromReservationRows(rows: ReservationJournalRow[]): string | null {
   const leader = rows.find((r) => r.isLeader);
   return leader?.agent?.nom ?? rows[0]?.agent?.nom ?? null;
-}
-
-export function describeReservationSnapshot(r: ReservationJournalRow): string {
-  let text = '';
-  text += `ID #${r.id} — ${r.firstName} ${r.lastName}\n`;
-  text += `Téléphone: ${r.phone}\n`;
-  text += `Programme: ${r.program.name} (id=${r.program.id})\n`;
-  text += `Type chambre: ${r.roomType} | Genre: ${r.gender}\n`;
-  text += `Plan: ${r.plan} | Type réservation: ${r.typeReservation}\n`;
-  text += `Prix: ${r.price} DH | Payé: ${r.paidAmount} DH | Réduction: ${r.reduction}\n`;
-  text += `Statut: ${r.status}\n`;
-  text += `Date réservation: ${r.reservationDate.toISOString()}\n`;
-  text += `Hôtels Madina/Makkah: ${r.hotelMadina ?? '—'} / ${r.hotelMakkah ?? '—'}\n`;
-  text += `Statuts: passeport=${r.statutPasseport} visa=${r.statutVisa} hôtel=${r.statutHotel} vol=${r.statutVol}\n`;
-  text += `Agent assigné: ${r.agent ? `${r.agent.nom} (id=${r.agent.id})` : '—'}\n`;
-  text += `Remarque: ${r.remarque ?? '—'}\n`;
-  return text;
 }
 
 export function buildReservationCreationDetail(snapshot: ReservationJournalRow): {
@@ -150,25 +342,25 @@ export function buildReservationCreationDetail(snapshot: ReservationJournalRow):
   const summary = `Création réservation #${snapshot.id} — ${snapshot.firstName} ${snapshot.lastName}`;
   let text = '=== CRÉATION RÉSERVATION ===\n';
   text += 'Origine: API POST (création réservation ou groupe chambre privée).\n';
-  text += describeReservationSnapshot(snapshot);
+  text += compactReservationSnapshot(snapshot);
   return { summary, detailText: text };
 }
 
 export function buildReservationUpdateDetail(
   before: ReservationJournalRow,
   after: ReservationJournalRow,
-  source: 'PUT' | 'PATCH'
+  source: 'PUT' | 'PATCH',
+  options?: { extraNote?: string }
 ): { summary: string; detailText: string } {
   const summary = `Modification réservation #${after.id} — ${after.firstName} ${after.lastName}`;
   let text = '=== MODIFICATION RÉSERVATION ===\n';
   text += `Origine: API ${source} /api/reservations/:id\n`;
-  text += `Agent assigné (référence métier): ${after.agent ? `${after.agent.nom} (id=${after.agent.id})` : before.agent ? `${before.agent.nom} (id=${before.agent.id})` : '—'}\n\n`;
-  text += '--- AVANT ---\n';
-  text += describeReservationSnapshot(before);
-  text += '\n--- APRÈS ---\n';
-  text += describeReservationSnapshot(after);
-  text +=
-    '\nNote: en PUT, paiements et pièces peuvent avoir été remplacés si fournis dans la requête.\n';
+  const diff = diffReservationJournalRows(before, after);
+  text += diff || '(Aucun champ métier modifié sur la ligne réservation.)\n';
+  if (options?.extraNote) text += `\n${options.extraNote}\n`;
+  if (source === 'PUT') {
+    text += '\nNote: en PUT, paiements et pièces peuvent avoir été remplacés si fournis dans la requête.\n';
+  }
   return { summary, detailText: text };
 }
 
@@ -188,23 +380,8 @@ export function buildReservationDeletionDetail(rows: ReservationJournalRow[]): {
   text += `Origine: API DELETE /api/reservations/:id\n\n`;
 
   for (const r of sorted) {
-    const role = r.isLeader ? 'Leader' : 'Accompagnant / membre';
-    text += `--- ${role} — ID réservation #${r.id} ---\n`;
-    text += `Nom: ${r.firstName} ${r.lastName}\n`;
-    text += `Téléphone: ${r.phone}\n`;
-    text += `Programme: ${r.program.name} (id=${r.program.id})\n`;
-    text += `Type chambre: ${r.roomType} | Genre: ${r.gender}\n`;
-    text += `Plan: ${r.plan} | Type réservation: ${r.typeReservation}\n`;
-    text += `Prix: ${r.price} DH | Payé: ${r.paidAmount} DH | Réduction: ${r.reduction}\n`;
-    text += `Statut: ${r.status}\n`;
-    text += `Date réservation: ${r.reservationDate.toISOString()}\n`;
-    text += `Hôtel Madina: ${r.hotelMadina ?? '—'} | Hôtel Makkah: ${r.hotelMakkah ?? '—'}\n`;
-    text += `Passeport: ${r.passportNumber ?? '—'} | Transport: ${r.transport ?? '—'}\n`;
-    text += `Groupe: ${r.groupe ?? '—'} | groupId: ${r.groupId ?? '—'} | parentId: ${r.parentId ?? '—'}\n`;
-    text += `Leader: ${r.isLeader} | roomSlot: ${r.roomSlot ?? '—'}\n`;
-    text += `Statuts: passeport=${r.statutPasseport} visa=${r.statutVisa} hôtel=${r.statutHotel} vol=${r.statutVol}\n`;
-    text += `Agent assigné: ${r.agent ? `${r.agent.nom} (id=${r.agent.id})` : '—'}\n`;
-    text += `Remarque: ${r.remarque ?? '—'}\n\n`;
+    const role = r.isLeader ? 'Leader' : 'Accompagnant';
+    text += `#${r.id} (${role}) — ${r.firstName} ${r.lastName} | ${r.phone} | ${r.program.name} | ${r.price} DH payé ${r.paidAmount} DH | statut ${r.status}\n`;
   }
 
   return { summary, detailText: text };
@@ -230,13 +407,7 @@ export function buildRoomDeletionDetail(rooms: RoomJournalRow[], context: string
   text += `Nombre de chambres: ${rooms.length}\n\n`;
 
   for (const room of rooms) {
-    text += `--- Chambre ID #${room.id} ---\n`;
-    text += `Programme: ${room.program.name} (id=${room.program.id})\n`;
-    text += `Hôtel: ${room.hotel.name} (${room.hotel.city})\n`;
-    text += `Type: ${room.roomType} | Genre: ${room.gender}\n`;
-    text += `Places totales: ${room.nbrPlaceTotal} | Restantes: ${room.nbrPlaceRestantes}\n`;
-    text += `Prix chambre: ${room.prixRoom} DH\n`;
-    text += `IDs réservations liées (listeIdsReservation): ${JSON.stringify(room.listeIdsReservation)}\n\n`;
+    text += `#${room.id} — ${room.hotel.name} (${room.hotel.city}) | ${room.roomType} ${room.gender} | places ${room.nbrPlaceRestantes}/${room.nbrPlaceTotal} | ${room.prixRoom} DH | résa: ${JSON.stringify(room.listeIdsReservation)}\n`;
   }
 
   return { summary, detailText: text };
@@ -264,15 +435,11 @@ export async function logRoomsDeletedFromSnapshot(
 
 export function buildProgramDeletionDetail(program: Program): { summary: string; detailText: string } {
   const summary = `Programme « ${program.name} » (id=${program.id})`;
-  let text = '=== PROGRAMME (instantané avant suppression / masquage) ===\n';
-  text += `ID: ${program.id}\n`;
-  text += `Nom: ${program.name}\n`;
-  text += `Créé le: ${program.created_at.toISOString()}\n`;
+  let text = '=== PROGRAMME (instantané) ===\n';
+  text += `ID ${program.id} — ${program.name}\n`;
+  text += `Jours Mdn/Mkk: ${program.nbJoursMadina}/${program.nbJoursMakkah} | change ${program.exchange} | avion ${program.prixAvionDH} DH | visa ${program.prixVisaRiyal} riyal\n`;
+  text += `Profits g/éco/n/VIP: ${program.profit} / ${program.profitEconomique} / ${program.profitNormal} / ${program.profitVIP}\n`;
   text += `isDeleted: ${program.isDeleted} | deletedAt: ${program.deletedAt?.toISOString() ?? '—'}\n`;
-  text += `Deadlines — visa: ${program.visaDeadline?.toISOString() ?? '—'} | hôtel: ${program.hotelDeadline?.toISOString() ?? '—'} | vol: ${program.flightDeadline?.toISOString() ?? '—'} | passeport: ${program.passportDeadline?.toISOString() ?? '—'}\n`;
-  text += `Exchange: ${program.exchange} | Jours Madina: ${program.nbJoursMadina} | Jours Makkah: ${program.nbJoursMakkah}\n`;
-  text += `Prix avion DH: ${program.prixAvionDH} | Prix visa riyal: ${program.prixVisaRiyal}\n`;
-  text += `Profits — global: ${program.profit} | éco: ${program.profitEconomique} | normal: ${program.profitNormal} | VIP: ${program.profitVIP}\n`;
   return { summary, detailText: text };
 }
 
@@ -283,15 +450,20 @@ export function buildProgramUpdateDetail(
   roomsCountAfter: number
 ): { summary: string; detailText: string } {
   const summary = `Modification programme « ${after.name} » (id=${after.id})`;
-  let text = '=== MODIFICATION PROGRAMME (champs + configuration chambres via même enregistrement) ===\n';
+  let text = '=== MODIFICATION PROGRAMME ===\n';
   text += `Origine: API PUT /api/programs/:id\n`;
-  text += `Stock chambres (lignes Room) — avant: ${roomsCountBefore} | après: ${roomsCountAfter}\n\n`;
-  text += '--- AVANT ---\n';
-  text += buildProgramDeletionDetail(before).detailText;
-  text += '\n--- APRÈS ---\n';
-  text += buildProgramDeletionDetail(after).detailText;
-  text +=
-    '\n(Les chambres peuvent avoir été recréées, prix mis à jour ou lignes libres supprimées selon la config hôtels.)\n';
+  const progDiff = diffProgramScalars(before, after);
+  text += progDiff ? `${progDiff}\n` : '';
+  if (roomsCountBefore !== roomsCountAfter) {
+    text += `--- Stock chambres (lignes Room) ---\n${roomsCountBefore} → ${roomsCountAfter}\n`;
+  }
+  if (!progDiff && roomsCountBefore === roomsCountAfter) {
+    text +=
+      '(Aucune différence sur les champs programme suivis ; la configuration hôtels / chambres peut être identique en compteur.)\n';
+  } else {
+    text +=
+      '\n(Les liaisons hôtels et le détail des chambres peuvent aussi avoir changé sans toucher aux champs ci-dessus.)\n';
+  }
   return { summary, detailText: text };
 }
 
@@ -309,13 +481,8 @@ export function buildFixedChargeDeletionDetail(fc: FixedCharge & { agent?: { id:
 } {
   const summary = `Charge fixe « ${fc.label} » (id=${fc.id})`;
   let text = '=== SUPPRESSION CHARGE FIXE ===\n';
-  text += `ID: ${fc.id}\n`;
-  text += `Libellé: ${fc.label}\n`;
-  text += `Montant: ${fc.amount} DH\n`;
-  text += `Catégorie: ${fc.category}\n`;
-  text += `Active: ${fc.isActive}\n`;
-  text += `Agent lié: ${fc.agent ? `${fc.agent.nom} (id=${fc.agent.id}, ${fc.agent.email ?? ''})` : '—'}\n`;
-  text += `Créée: ${fc.createdAt.toISOString()} | MAJ: ${fc.updatedAt.toISOString()}\n`;
+  text += `#${fc.id} — ${fc.label} | ${fc.amount} DH | ${fc.category} | active: ${fc.isActive}\n`;
+  text += `Agent lié: ${fc.agent ? `${fc.agent.nom} (id=${fc.agent.id})` : '—'}\n`;
   return { summary, detailText: text };
 }
 
@@ -325,12 +492,7 @@ export function buildAgentDeactivationDetail(
 ): { summary: string; detailText: string } {
   const summary = `Désactivation agent « ${target.nom} » (id=${target.id})`;
   let text = '=== DÉSACTIVATION AGENT ===\n';
-  text += `Agent concerné — ID: ${target.id}\n`;
-  text += `Nom: ${target.nom}\n`;
-  text += `Email: ${target.email ?? '—'}\n`;
-  text += `Rôle: ${target.role}\n`;
-  text += `État avant action (actif): ${target.isActive}\n`;
-  text += `Action réalisée par (session): ${actorLabel}\n`;
-  text += `Compte rendu: isActive passé à false (soft delete).\n`;
+  text += `Cible: #${target.id} ${target.nom} (${target.role}) | actif avant: ${target.isActive}\n`;
+  text += `Par (session): ${actorLabel} → isActive: false\n`;
   return { summary, detailText: text };
 }

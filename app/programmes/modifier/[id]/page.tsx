@@ -350,9 +350,8 @@ export default function ModifierProgrammePage() {
       console.log(`URL: PUT /api/programs/${id}`)
       console.log(`Payload:`, JSON.stringify(payload, null, 2))
 
-      const res = await fetch(api.url(`/api/programs/${id}`), {
+      const res = await api.request(`/api/programs/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       })
       if (!res.ok) {

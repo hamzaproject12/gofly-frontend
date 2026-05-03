@@ -3,6 +3,11 @@ import { PrismaClient } from '@prisma/client';
 import path from 'path';
 import fs from 'fs';
 import jwt from 'jsonwebtoken';
+import {
+  logJournalSuppression,
+  buildReservationDeletionDetail,
+  JOURNAL_ACTION,
+} from '../services/journalSuppressionService';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -965,6 +970,16 @@ router.delete('/:id', async (req, res) => {
 
     const idsSet = new Set(reservationIdsToRemove);
 
+    const fullRows = await prisma.reservation.findMany({
+      where: { id: { in: reservationIdsToRemove } },
+      include: {
+        program: { select: { id: true, name: true } },
+        agent: { select: { id: true, nom: true } },
+      },
+    });
+    const { summary: journalSummary, detailText: journalDetail } =
+      buildReservationDeletionDetail(fullRows);
+
     // 1. Récupérer tous les fichiers liés à chaque réservation concernée
     const fichiers = await prisma.fichier.findMany({
       where: { reservationId: { in: reservationIdsToRemove } },
@@ -1026,6 +1041,16 @@ router.delete('/:id', async (req, res) => {
         },
       });
     });
+
+    if (fullRows.length > 0) {
+      await logJournalSuppression(prisma, req, {
+        action: JOURNAL_ACTION.RESERVATION_DELETED,
+        entityType: 'Reservation',
+        entityId: fullRows[0].id,
+        summary: journalSummary,
+        detailText: journalDetail,
+      });
+    }
 
     res.json({ message: 'Réservation supprimée avec succès' });
   } catch (error) {

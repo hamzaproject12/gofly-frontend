@@ -18,17 +18,38 @@ enum ReservationType {
 }
 
 model Agent {
-  id           Int           @id @default(autoincrement())
-  nom          String        @db.VarChar(100)
-  email        String?       @unique
-  motDePasse   String        @db.VarChar(255)
-  role         Role          @default(AGENT)
-  isActive     Boolean       @default(true)
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
-  payments     Payment[]
-  reservations Reservation[]
-  fixedCharges FixedCharge[]
+  id                Int                  @id @default(autoincrement())
+  nom               String               @db.VarChar(100)
+  email             String?              @unique
+  motDePasse        String               @db.VarChar(255)
+  role              Role                 @default(AGENT)
+  isActive          Boolean              @default(true)
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+  payments          Payment[]
+  reservations      Reservation[]
+  fixedCharges      FixedCharge[]
+  journalActions    JournalSuppression[]
+}
+
+/// Journal append-only des suppressions et désactivations (traçabilité admin).
+model JournalSuppression {
+  id                Int      @id @default(autoincrement())
+  createdAt         DateTime @default(now()) @map("created_at")
+  actorId           Int?
+  actorRoleSnapshot String   @db.VarChar(20)
+  action            String   @db.VarChar(80)
+  entityType        String   @db.VarChar(40)
+  entityId          Int?
+  summary           String?  @db.VarChar(500)
+  detailText        String   @db.Text
+  actor             Agent?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@map("JournalSuppression")
 }
 
 enum FixedChargeCategory {

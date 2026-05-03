@@ -19,6 +19,7 @@ import authRoutes from './routes/auth';
 import adminRoutes from './routes/admin';
 import exportRoutes from './routes/export';
 import fixedChargesRoutes from './routes/fixed-charges';
+import journalSuppressionRoutes from './routes/journal-suppression';
 import cron from 'node-cron';
 import { generateFixedChargesForYearMonth, formatYearMonth } from './services/fixedChargeGenerator';
 
@@ -97,6 +98,7 @@ app.use('/api/upload-cloudinary', uploadCloudinaryRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/room-availability', roomAvailabilityRouter);
 app.use('/api/fixed-charges', fixedChargesRoutes);
+app.use('/api/journal-suppressions', journalSuppressionRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

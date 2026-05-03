@@ -3,6 +3,11 @@ import { PrismaClient, FixedChargeCategory } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import { requireAdmin } from '../controllers/authController';
 import { generateFixedChargesForYearMonth, formatYearMonth } from '../services/fixedChargeGenerator';
+import {
+  logJournalSuppression,
+  buildFixedChargeDeletionDetail,
+  JOURNAL_ACTION,
+} from '../services/journalSuppressionService';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -171,7 +176,10 @@ router.delete('/:id', async (req, res) => {
     }
     const existing = await prisma.fixedCharge.findUnique({
       where: { id },
-      include: { _count: { select: { occurrences: true } } },
+      include: {
+        _count: { select: { occurrences: true } },
+        agent: { select: { id: true, nom: true, email: true } },
+      },
     });
     if (!existing) {
       return res.status(404).json({ error: 'Charge fixe introuvable' });
@@ -190,7 +198,15 @@ router.delete('/:id', async (req, res) => {
         fixedCharge: row,
       });
     }
+    const { summary, detailText } = buildFixedChargeDeletionDetail(existing);
     await prisma.fixedCharge.delete({ where: { id } });
+    await logJournalSuppression(prisma, req, {
+      action: JOURNAL_ACTION.FIXED_CHARGE_DELETED,
+      entityType: 'FixedCharge',
+      entityId: id,
+      summary,
+      detailText,
+    });
     res.json({ message: 'Supprimée' });
   } catch (e) {
     console.error('DELETE /fixed-charges/:id', e);

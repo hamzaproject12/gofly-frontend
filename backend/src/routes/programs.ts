@@ -1,6 +1,14 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { ProgramOverviewController } from '../controllers/programOverviewController';
+import {
+  logJournalSuppression,
+  logRoomsDeletedFromSnapshot,
+  buildProgramDeletionDetail,
+  buildProgramHardDeleteExtra,
+  JOURNAL_ACTION,
+  RoomJournalRow,
+} from '../services/journalSuppressionService';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -167,16 +175,27 @@ router.post('/', async (req, res) => {
             const nb = config?.nb ? Number(config.nb) : 0;
             const prix = config?.prix ? parseFloat(config.prix) : 0;
             if (nb > 0 && prix > 0) {
-              // Supprimer les anciennes rooms de ce type pour ce programme et hôtel
-              await prisma.room.deleteMany({
+              const roomsSnapMadina = await prisma.room.findMany({
                 where: {
                   programId: program.id,
                   hotelId: hotel.id,
                   roomType,
                   gender: 'Mixte',
-                }
+                },
+                include: { hotel: true, program: { select: { id: true, name: true } } },
               });
-              
+              if (roomsSnapMadina.length > 0) {
+                await prisma.room.deleteMany({
+                  where: { id: { in: roomsSnapMadina.map((r) => r.id) } },
+                });
+                await logRoomsDeletedFromSnapshot(
+                  prisma,
+                  req,
+                  roomsSnapMadina as RoomJournalRow[],
+                  'CRÉATION_PROGRAMME — remplacement chambres Madina (type configuré)'
+                );
+              }
+
               // Créer le nombre exact de rooms demandé
               for (let i = 0; i < nb; i++) {
                 await prisma.room.create({
@@ -219,16 +238,27 @@ router.post('/', async (req, res) => {
             const nb = config?.nb ? Number(config.nb) : 0;
             const prix = config?.prix ? parseFloat(config.prix) : 0;
             if (nb > 0 && prix > 0) {
-              // Supprimer les anciennes rooms de ce type pour ce programme et hôtel
-              await prisma.room.deleteMany({
+              const roomsSnapMakkah = await prisma.room.findMany({
                 where: {
                   programId: program.id,
                   hotelId: hotel.id,
                   roomType,
                   gender: 'Mixte',
-                }
+                },
+                include: { hotel: true, program: { select: { id: true, name: true } } },
               });
-              
+              if (roomsSnapMakkah.length > 0) {
+                await prisma.room.deleteMany({
+                  where: { id: { in: roomsSnapMakkah.map((r) => r.id) } },
+                });
+                await logRoomsDeletedFromSnapshot(
+                  prisma,
+                  req,
+                  roomsSnapMakkah as RoomJournalRow[],
+                  'CRÉATION_PROGRAMME — remplacement chambres Makkah (type configuré)'
+                );
+              }
+
               // Créer le nombre exact de rooms demandé
               for (let i = 0; i < nb; i++) {
                 await prisma.room.create({
@@ -417,14 +447,25 @@ router.put('/:id', async (req, res) => {
           // Si desiredCount est 0, supprimer toutes les chambres libres de ce type
           if (desiredCount <= 0) {
             if (freeRooms.length > 0) {
+              const idsZero = freeRooms.map((r) => r.id);
+              const snapZero = await prisma.room.findMany({
+                where: { id: { in: idsZero } },
+                include: { hotel: true, program: { select: { id: true, name: true } } },
+              });
               await prisma.room.deleteMany({
                 where: {
                   programId: program.id,
                   hotelId: hotel.id,
                   roomType,
-                  id: { in: freeRooms.map(r => r.id) }
-                }
+                  id: { in: idsZero },
+                },
               });
+              await logRoomsDeletedFromSnapshot(
+                prisma,
+                req,
+                snapZero as RoomJournalRow[],
+                'MISE_À_JOUR_PROGRAMME — stock chambre ramené à 0 (hors transaction)'
+              );
               console.log(`[Room Update] Deleted ${freeRooms.length} free rooms (desiredCount = 0)`);
             }
             continue;
@@ -490,7 +531,18 @@ router.put('/:id', async (req, res) => {
             console.log(`[Room Update] Need to remove ${toRemove} rooms (available free: ${freeRooms.length})`);
             if (toRemove > 0 && freeRooms.length > 0) {
               const deletable = freeRooms.slice(0, Math.min(toRemove, freeRooms.length));
-              await prisma.room.deleteMany({ where: { id: { in: deletable.map(r => r.id) } } });
+              const idsDel = deletable.map((r) => r.id);
+              const snapDel = await prisma.room.findMany({
+                where: { id: { in: idsDel } },
+                include: { hotel: true, program: { select: { id: true, name: true } } },
+              });
+              await prisma.room.deleteMany({ where: { id: { in: idsDel } } });
+              await logRoomsDeletedFromSnapshot(
+                prisma,
+                req,
+                snapDel as RoomJournalRow[],
+                'MISE_À_JOUR_PROGRAMME — réduction du nombre de chambres libres (hors transaction)'
+              );
               console.log(`[Room Update] Deleted ${deletable.length} free rooms`);
             }
           } else {
@@ -504,6 +556,7 @@ router.put('/:id', async (req, res) => {
     // Utiliser le client de transaction explicitement (tx) pour garantir l'isolation
     // et éviter les problèmes de synchronisation qui causaient la création de rooms en double
     try {
+      const pendingRoomLogs: { rooms: RoomJournalRow[]; context: string }[] = [];
       await prisma.$transaction(async (tx) => {
         // Fonction helper pour trouver ou créer un hôtel dans la transaction
         async function findOrCreateHotelInTx(city: 'Madina' | 'Makkah', name: string) {
@@ -647,13 +700,22 @@ router.put('/:id', async (req, res) => {
 
                 if (desiredCount <= 0) {
                   if (freeRooms.length > 0) {
+                    const idsTx0 = freeRooms.map((r) => r.id);
+                    const snapTx0 = await tx.room.findMany({
+                      where: { id: { in: idsTx0 } },
+                      include: { hotel: true, program: { select: { id: true, name: true } } },
+                    });
                     await tx.room.deleteMany({
                       where: {
                         programId: program.id,
                         hotelId: hotel.id,
                         roomType: roomType,
-                        id: { in: freeRooms.map(r => r.id) },
+                        id: { in: idsTx0 },
                       },
+                    });
+                    pendingRoomLogs.push({
+                      rooms: snapTx0 as RoomJournalRow[],
+                      context: 'MISE_À_JOUR_PROGRAMME (transaction) — stock chambre ramené à 0',
                     });
                     console.log(`[Room Update] [TX] Deleted ${freeRooms.length} free rooms (desiredCount = 0)`);
                   }
@@ -714,13 +776,23 @@ router.put('/:id', async (req, res) => {
                     // Ne supprimer QUE les rooms libres, jamais les occupées
                     if (freeRooms.length > 0) {
                       const deletable = freeRooms.slice(0, Math.min(toRemove, freeRooms.length));
-                      await tx.room.deleteMany({ 
-                        where: { 
+                      const idsTxR = deletable.map((r) => r.id);
+                      const snapTxR = await tx.room.findMany({
+                        where: { id: { in: idsTxR } },
+                        include: { hotel: true, program: { select: { id: true, name: true } } },
+                      });
+                      await tx.room.deleteMany({
+                        where: {
                           programId: program.id,
                           hotelId: hotel.id,
                           roomType: roomType,
-                          id: { in: deletable.map(r => r.id) } 
-                        } 
+                          id: { in: idsTxR },
+                        },
+                      });
+                      pendingRoomLogs.push({
+                        rooms: snapTxR as RoomJournalRow[],
+                        context:
+                          'MISE_À_JOUR_PROGRAMME (transaction) — réduction du nombre de chambres libres',
                       });
                       console.log(`[Room Update] [TX] Deleted ${deletable.length} free rooms (requested: ${toRemove})`);
 
@@ -757,6 +829,9 @@ router.put('/:id', async (req, res) => {
       }, {
         timeout: 30000, // Timeout de 30 secondes pour les transactions longues
       });
+      for (const p of pendingRoomLogs) {
+        await logRoomsDeletedFromSnapshot(prisma, req, p.rooms, p.context);
+      }
     } catch (transactionError) {
       console.error('❌ Transaction error:', transactionError);
       throw transactionError; // Re-throw pour être capturé par le catch externe
@@ -787,7 +862,6 @@ router.delete('/:id', async (req, res) => {
     // Vérifier que le programme existe et n'est pas déjà supprimé
     const program = await prisma.program.findUnique({
       where: { id: programId },
-      select: { id: true, name: true, isDeleted: true }
     });
 
     if (!program) {
@@ -805,6 +879,15 @@ router.delete('/:id', async (req, res) => {
         isDeleted: true,
         deletedAt: new Date()
       }
+    });
+
+    const { summary: softSummary, detailText: softDetail } = buildProgramDeletionDetail(program);
+    await logJournalSuppression(prisma, req, {
+      action: JOURNAL_ACTION.PROGRAM_SOFT_DELETED,
+      entityType: 'Program',
+      entityId: programId,
+      summary: `Masquage (soft delete) — ${softSummary}`,
+      detailText: softDetail,
     });
 
     res.json({ 
@@ -829,16 +912,21 @@ router.delete('/:id/hard', async (req, res) => {
     // Vérifier que le programme existe
     const program = await prisma.program.findUnique({
       where: { id: programId },
-      select: { 
-        id: true, 
-        name: true,
-        isDeleted: true
-      }
     });
 
     if (!program) {
       return res.status(404).json({ error: 'Programme non trouvé' });
     }
+
+    const [reservationCount, roomCount, expenseCount, allRooms] = await Promise.all([
+      prisma.reservation.count({ where: { programId } }),
+      prisma.room.count({ where: { programId } }),
+      prisma.expense.count({ where: { programId } }),
+      prisma.room.findMany({
+        where: { programId },
+        include: { hotel: true, program: { select: { id: true, name: true } } },
+      }),
+    ]);
 
     // Note: Toutes les réservations liées au programme seront supprimées définitivement
     // peu importe leur statut, comme les autres dépendances
@@ -878,6 +966,26 @@ router.delete('/:id/hard', async (req, res) => {
       await tx.program.delete({
         where: { id: programId }
       });
+    });
+
+    if (allRooms.length > 0) {
+      await logRoomsDeletedFromSnapshot(
+        prisma,
+        req,
+        allRooms as RoomJournalRow[],
+        'SUPPRESSION_DÉFINITIVE_PROGRAMME — toutes les chambres du programme',
+      );
+    }
+    const progDet = buildProgramDeletionDetail(program);
+    const hardDetailText =
+      progDet.detailText +
+      buildProgramHardDeleteExtra({ reservationCount, roomCount, expenseCount });
+    await logJournalSuppression(prisma, req, {
+      action: JOURNAL_ACTION.PROGRAM_HARD_DELETED,
+      entityType: 'Program',
+      entityId: programId,
+      summary: `Suppression définitive — ${program.name} (id=${programId})`,
+      detailText: hardDetailText,
     });
 
     res.json({ 

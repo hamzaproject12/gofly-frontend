@@ -2,6 +2,11 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
+import {
+  logJournalSuppression,
+  buildAgentDeactivationDetail,
+  JOURNAL_ACTION,
+} from '../services/journalSuppressionService';
 
 const prisma = new PrismaClient();
 
@@ -538,6 +543,19 @@ export const deleteAgent = async (req: Request, res: Response) => {
     await prisma.agent.update({
       where: { id: agentId },
       data: { isActive: false }
+    });
+
+    const authUser = (req as AuthRequest).user as { agentId?: number; nom?: string; email?: string } | undefined;
+    const actorLabel =
+      [authUser?.nom, authUser?.email].filter(Boolean).join(' — ') ||
+      (authUser?.agentId != null ? `agent id=${authUser.agentId}` : 'session inconnue');
+    const { summary, detailText } = buildAgentDeactivationDetail(existingAgent, actorLabel);
+    await logJournalSuppression(prisma, req, {
+      action: JOURNAL_ACTION.AGENT_DEACTIVATED,
+      entityType: 'Agent',
+      entityId: agentId,
+      summary,
+      detailText,
     });
 
     res.json({ message: 'Agent désactivé avec succès' });

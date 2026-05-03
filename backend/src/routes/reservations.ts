@@ -5,6 +5,7 @@ import fs from 'fs';
 import jwt from 'jsonwebtoken';
 import {
   logJournalSuppression,
+  buildReservationCreationDetail,
   buildReservationDeletionDetail,
   buildReservationUpdateDetail,
   JOURNAL_ACTION,
@@ -13,6 +14,11 @@ import {
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+const reservationJournalInclude = {
+  program: { select: { id: true, name: true } },
+  agent: { select: { id: true, nom: true } },
+} as const;
 
 /** Filtre liste / stats : roomType Prisma ou "FAMILLE" = chambres privées (famille) */
 function applyRoomTypeQuery(where: Record<string, unknown>, roomType: unknown) {
@@ -423,6 +429,31 @@ router.post('/group', async (req, res) => {
       return { leaderId, reservations: createdReservations, groupId: normalizedGroupId };
     });
 
+    if (result.leaderId != null) {
+      try {
+        const leader = await prisma.reservation.findUnique({
+          where: { id: result.leaderId },
+          include: reservationJournalInclude,
+        });
+        if (leader) {
+          const row = leader as ReservationJournalRow;
+          const { detailText: baseDetail } = buildReservationCreationDetail(row);
+          const detailText = `${baseDetail}\n--- Groupe (chambre privée) ---\nNombre de membres: ${result.reservations.length}\nIdentifiant groupe: ${result.groupId}\n`;
+          const summary = `Création groupe (${result.reservations.length} pers.) — ${leader.firstName} ${leader.lastName} (#${result.leaderId})`;
+          await logJournalSuppression(prisma, req, {
+            action: JOURNAL_ACTION.RESERVATION_CREATED,
+            entityType: 'Reservation',
+            entityId: result.leaderId,
+            summary,
+            detailText,
+            actorIdFallback: leader.agentId ?? null,
+          });
+        }
+      } catch (journalErr) {
+        console.error('[Journal] Échec log création groupe réservation:', journalErr);
+      }
+    }
+
     res.status(201).json(result);
   } catch (error) {
     console.error('Erreur création groupe réservation:', error);
@@ -640,18 +671,33 @@ router.post('/', async (req, res) => {
       console.error('❌ Erreur lors de la mise à jour des chambres:', roomUpdateError);
       // Ne pas faire échouer la création de la réservation si la mise à jour des chambres échoue
     }
-    
+
+    try {
+      const snap = await prisma.reservation.findUnique({
+        where: { id: reservation.id },
+        include: reservationJournalInclude,
+      });
+      if (snap) {
+        const { summary, detailText } = buildReservationCreationDetail(snap as ReservationJournalRow);
+        await logJournalSuppression(prisma, req, {
+          action: JOURNAL_ACTION.RESERVATION_CREATED,
+          entityType: 'Reservation',
+          entityId: reservation.id,
+          summary,
+          detailText,
+          actorIdFallback: reservation.agentId ?? null,
+        });
+      }
+    } catch (journalErr) {
+      console.error('[Journal] Échec log création réservation:', journalErr);
+    }
+
     res.status(201).json(reservation);
   } catch (error) {
     console.error('Erreur création réservation:', error);
     res.status(500).json({ error: 'Erreur lors de la création de la réservation' });
   }
 });
-
-const reservationJournalInclude = {
-  program: { select: { id: true, name: true } },
-  agent: { select: { id: true, nom: true } },
-} as const;
 
 // Update reservation
 router.put('/:id', async (req, res) => {

@@ -780,10 +780,9 @@ export default function EditReservation() {
         bodyJSON: JSON.stringify(body)
       })
 
-      const response = await fetch(api.url(`/api/reservations/${reservationId}`), {
+      const response = await api.request(`/api/reservations/${reservationId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
       })
 
       console.log('📥 Réponse PUT:', {
@@ -979,9 +978,8 @@ export default function EditReservation() {
           );
           const statutPasseportMember =
             (!!existingPassDoc && delMemberPass == null) || !!newPassFile;
-          const memberRes = await fetch(api.url(`/api/reservations/${a.id}`), {
+          const memberRes = await api.request(`/api/reservations/${a.id}`, {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               firstName: a.firstName,
               lastName: a.lastName,

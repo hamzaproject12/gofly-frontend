@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { PrismaClient, Reservation, Room, Program, FixedCharge, Agent, Hotel } from '@prisma/client';
 
 export const JOURNAL_ACTION = {
+  RESERVATION_CREATED: 'RESERVATION_CREATED',
   RESERVATION_DELETED: 'RESERVATION_DELETED',
   RESERVATION_UPDATED: 'RESERVATION_UPDATED',
   ROOM_DELETED: 'ROOM_DELETED',
@@ -71,9 +72,26 @@ export async function logJournalSuppression(
      * le nom résolu depuis la session (JWT → Agent).
      */
     parDisplay?: string | null;
+    /**
+     * Si la session JWT est absente, tracer cet agent (ex. agentId enregistré sur la réservation à la création).
+     */
+    actorIdFallback?: number | null;
   }
 ): Promise<void> {
-  const resolved = await resolveJournalActor(prisma, req);
+  let resolved = await resolveJournalActor(prisma, req);
+  const fb = params.actorIdFallback;
+  if (resolved.actorId == null && fb != null && fb > 0) {
+    const agentFb = await prisma.agent.findUnique({
+      where: { id: fb },
+      select: { id: true, nom: true, role: true },
+    });
+    if (agentFb) {
+      const roleSnap =
+        agentFb.role === 'ADMIN' || agentFb.role === 'AGENT' ? agentFb.role : 'UNKNOWN';
+      resolved = { actorId: agentFb.id, actorRoleSnapshot: roleSnap, actorNom: agentFb.nom };
+    }
+  }
+
   const parDisplayFinal =
     params.parDisplay !== undefined && params.parDisplay !== null && params.parDisplay !== ''
       ? params.parDisplay
@@ -123,6 +141,17 @@ export function describeReservationSnapshot(r: ReservationJournalRow): string {
   text += `Agent assigné: ${r.agent ? `${r.agent.nom} (id=${r.agent.id})` : '—'}\n`;
   text += `Remarque: ${r.remarque ?? '—'}\n`;
   return text;
+}
+
+export function buildReservationCreationDetail(snapshot: ReservationJournalRow): {
+  summary: string;
+  detailText: string;
+} {
+  const summary = `Création réservation #${snapshot.id} — ${snapshot.firstName} ${snapshot.lastName}`;
+  let text = '=== CRÉATION RÉSERVATION ===\n';
+  text += 'Origine: API POST (création réservation ou groupe chambre privée).\n';
+  text += describeReservationSnapshot(snapshot);
+  return { summary, detailText: text };
 }
 
 export function buildReservationUpdateDetail(

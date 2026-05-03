@@ -109,6 +109,7 @@ function localTodayISO(): string {
 }
 
 const ACTION_LABELS: Record<string, string> = {
+  RESERVATION_CREATED: 'Réservation créée',
   RESERVATION_DELETED: 'Réservation supprimée',
   RESERVATION_UPDATED: 'Réservation modifiée',
   ROOM_DELETED: 'Chambre(s) supprimée(s)',

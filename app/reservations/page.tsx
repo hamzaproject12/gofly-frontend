@@ -538,7 +538,7 @@ export default function ReservationsPage() {
       setLoading(true);
       setDeleteDialogOpen(false);
 
-      const response = await fetch(api.url(`/api/reservations/${id}`), {
+      const response = await api.request(`/api/reservations/${id}`, {
         method: "DELETE",
       });
 
@@ -1018,8 +1018,7 @@ export default function ReservationsPage() {
                                 <span className="text-blue-700 text-lg"><span role='img' aria-label='makkah'>🕋</span></span>
                                 <span className="font-semibold text-gray-900">{hotels.find(h => h.id.toString() === reservation.hotelMakkah)?.name || reservation.hotelMakkah}</span>
                               </div>
-                              <div className="text-xs text-slate-600 font-semibold mt-2 mb-0.5">Agent</div>
-                              <div className="flex items-center gap-1.5 text-sm text-gray-800">
+                              <div className="flex items-center gap-1.5 text-sm text-gray-800 mt-2">
                                 <User className="h-3.5 w-3.5 text-slate-500 shrink-0" aria-hidden />
                                 <span className="font-medium">{reservation.agentNom ?? "—"}</span>
                               </div>

@@ -1806,9 +1806,8 @@ export default function NouvelleReservation() {
       }
 
       // PATCH la réservation pour mettre à jour les statuts
-      await fetch(api.url(`/api/reservations/${reservationId}`), {
+      await api.request(`/api/reservations/${reservationId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           statutPasseport: newUploadedStatus.passport,
           statutVisa: customization.includeVisa ? formData.statutVisa : false,

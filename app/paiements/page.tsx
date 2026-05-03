@@ -28,9 +28,11 @@ type Payment = {
   amount: number
   paymentMethod: string
   paymentDate: string
-  reservationId: number
-  programId?: number
+  description?: string | null
+  reservationId: number | null
+  programId?: number | null
   agent?: { id: number; nom: string } | null
+  program?: { id: number; name: string } | null
   fichier?: {
     id: number
     fileName: string
@@ -49,11 +51,26 @@ type Payment = {
       name: string
     }
     agent?: { id: number; nom: string } | null
-  }
+  } | null
 }
 
 function paymentRowAgentLabel(p: Payment): string {
   return p.agent?.nom ?? p.reservation?.agent?.nom ?? "—"
+}
+
+function paymentProgramLabel(p: Payment): string {
+  return p.program?.name ?? p.reservation?.program?.name ?? "—"
+}
+
+function paymentClientLabel(p: Payment): string {
+  if (p.reservation) {
+    return `${p.reservation.firstName} ${p.reservation.lastName}`
+  }
+  if (p.description?.trim()) {
+    const t = p.description.trim()
+    return t.length > 48 ? `${t.slice(0, 48)}…` : t
+  }
+  return "—"
 }
 
 type Program = {
@@ -140,16 +157,22 @@ export default function PaiementsPage() {
 
   // Filtrage des paiements
   const filteredPaiements = paiements.filter((paiement) => {
-    const searchMatch = !searchTerm || 
-      paiement.reservation.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      paiement.reservation.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      paiement.reservation.phone.includes(searchTerm)
+    const q = searchTerm.toLowerCase().trim()
+    const searchMatch =
+      !q ||
+      (paiement.reservation &&
+        (paiement.reservation.firstName.toLowerCase().includes(q) ||
+          paiement.reservation.lastName.toLowerCase().includes(q) ||
+          paiement.reservation.phone.includes(searchTerm))) ||
+      (paiement.description && paiement.description.toLowerCase().includes(q))
 
-    const programMatch = programFilter === "tous" || 
-      paiement.reservation.program?.id.toString() === programFilter
+    const programMatch =
+      programFilter === "tous" ||
+      paiement.program?.id?.toString() === programFilter ||
+      paiement.reservation?.program?.id?.toString() === programFilter
 
-    const methodMatch = methodFilter === "tous" || 
-      normalizePaymentMethod(paiement.paymentMethod) === methodFilter
+    const methodMatch =
+      methodFilter === "tous" || normalizePaymentMethod(paiement.paymentMethod) === methodFilter
 
     return searchMatch && programMatch && methodMatch
   })
@@ -427,12 +450,18 @@ export default function PaiementsPage() {
                       })}
                     </span>
                     <span className="hidden sm:inline text-gray-300">|</span>
-                    <span className="font-medium text-gray-900 whitespace-nowrap">
-                      {paiement.reservation.firstName} {paiement.reservation.lastName}
+                    <span
+                      className="font-medium text-gray-900 truncate max-w-[min(200px,40vw)] sm:max-w-[260px]"
+                      title={paiement.description ?? paymentClientLabel(paiement)}
+                    >
+                      {paymentClientLabel(paiement)}
                     </span>
-                    <span className="text-gray-500 whitespace-nowrap">{paiement.reservation.phone}</span>
-                    <span className="text-gray-600 truncate max-w-[140px] sm:max-w-[200px]" title={paiement.reservation.program.name}>
-                      {paiement.reservation.program.name}
+                    <span className="text-gray-500 whitespace-nowrap">{paiement.reservation?.phone ?? "—"}</span>
+                    <span
+                      className="text-gray-600 truncate max-w-[140px] sm:max-w-[200px]"
+                      title={paymentProgramLabel(paiement)}
+                    >
+                      {paymentProgramLabel(paiement)}
                     </span>
                     <Badge className={`${getMethodColor(paiement.paymentMethod)} border-0 shrink-0 text-xs`}>
                       <span className="inline-flex items-center gap-1">

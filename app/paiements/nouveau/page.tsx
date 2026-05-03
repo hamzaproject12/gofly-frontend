@@ -6,19 +6,25 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, ArrowLeft, CreditCard, Calendar, DollarSign, AlertCircle } from "lucide-react"
+import {
+  Plus,
+  ArrowLeft,
+  CreditCard,
+  Calendar,
+  DollarSign,
+  AlertCircle,
+  Receipt,
+} from "lucide-react"
 import Link from "next/link"
 import { api } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/hooks/useAuth"
 
-type ReservationOption = {
+type Program = {
   id: number
-  firstName: string
-  lastName: string
-  phone: string
-  program: { id: number; name: string }
+  name: string
 }
 
 export default function NouveauPaiementPage() {
@@ -26,25 +32,25 @@ export default function NouveauPaiementPage() {
   const { toast } = useToast()
   const { isAdmin, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(false)
-  const [reservations, setReservations] = useState<ReservationOption[]>([])
+  const [programmes, setProgrammes] = useState<Program[]>([])
 
   const [formData, setFormData] = useState({
-    reservationId: "",
+    description: "",
     amount: "",
     type: "especes",
-    paymentDate: new Date().toISOString().split("T")[0],
+    programId: "none",
   })
 
   useEffect(() => {
     const load = async () => {
       try {
-        const response = await fetch(api.url("/api/reservations?limit=500&page=1"))
-        if (!response.ok) return
-        const data = await response.json()
-        const list = Array.isArray(data.reservations) ? data.reservations : []
-        setReservations(list)
+        const response = await fetch(api.url(api.endpoints.programs))
+        if (response.ok) {
+          const data = await response.json()
+          setProgrammes(Array.isArray(data) ? data : [])
+        }
       } catch (e) {
-        console.error("Error fetching reservations:", e)
+        console.error("Error fetching programs:", e)
       }
     }
     load()
@@ -52,27 +58,24 @@ export default function NouveauPaiementPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.reservationId) {
+    if (!formData.description.trim()) {
       toast({
         title: "Erreur",
-        description: "Sélectionnez une réservation.",
+        description: "Indiquez une description du paiement.",
         variant: "destructive",
       })
       return
     }
     setLoading(true)
     try {
-      const paymentDateIso = formData.paymentDate
-        ? `${formData.paymentDate}T12:00:00.000Z`
-        : undefined
       const response = await fetch(api.url("/api/payments"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          reservationId: parseInt(formData.reservationId, 10),
+          description: formData.description.trim(),
           amount: parseFloat(formData.amount),
           type: formData.type,
-          ...(paymentDateIso ? { paymentDate: paymentDateIso } : {}),
+          programId: formData.programId !== "none" ? formData.programId : undefined,
         }),
       })
 
@@ -150,7 +153,9 @@ export default function NouveauPaiementPage() {
               </Link>
               <div>
                 <h1 className="text-3xl font-bold text-white mb-2">Nouveau paiement</h1>
-                <p className="text-indigo-100 text-lg">Enregistrer un paiement pour une réservation</p>
+                <p className="text-indigo-100 text-lg">
+                  La date du paiement est celle du jour d&apos;enregistrement
+                </p>
               </div>
             </div>
             <div className="hidden md:block">
@@ -184,27 +189,23 @@ export default function NouveauPaiementPage() {
             <form onSubmit={handleSubmit} className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="md:col-span-2 space-y-3">
-                  <Label htmlFor="reservationId" className="text-base font-bold text-gray-800 flex items-center gap-3">
-                    <div className="bg-indigo-100 p-2 rounded-lg">
-                      <CreditCard className="h-5 w-5 text-indigo-600" />
-                    </div>
-                    Réservation (client leader)
-                  </Label>
-                  <Select
-                    value={formData.reservationId}
-                    onValueChange={(value) => setFormData({ ...formData, reservationId: value })}
+                  <Label
+                    htmlFor="description"
+                    className="text-base font-bold text-gray-800 flex items-center gap-3"
                   >
-                    <SelectTrigger className="h-14 text-base border-2 border-gray-200 rounded-2xl">
-                      <SelectValue placeholder="Choisir une réservation" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {reservations.map((r) => (
-                        <SelectItem key={r.id} value={r.id.toString()}>
-                          #{r.id} — {r.firstName} {r.lastName} · {r.phone} · {r.program?.name ?? "—"}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <div className="bg-indigo-100 p-2 rounded-lg">
+                      <Receipt className="h-5 w-5 text-indigo-600" />
+                    </div>
+                    Description du paiement
+                  </Label>
+                  <Textarea
+                    id="description"
+                    required
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="min-h-[120px] text-base border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-300 shadow-lg hover:shadow-xl bg-white"
+                    placeholder="Ex : Acompte groupe X, encaissement agence, versement client…"
+                  />
                 </div>
 
                 <div className="space-y-3">
@@ -222,7 +223,7 @@ export default function NouveauPaiementPage() {
                     min="0.01"
                     value={formData.amount}
                     onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                    className="h-14 text-lg font-semibold border-2 border-gray-200 rounded-2xl"
+                    className="h-14 text-lg font-semibold border-2 border-gray-200 rounded-2xl focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-300 shadow-lg hover:shadow-xl bg-white"
                     placeholder="0.00"
                   />
                 </div>
@@ -232,13 +233,13 @@ export default function NouveauPaiementPage() {
                     <div className="bg-purple-100 p-2 rounded-lg">
                       <CreditCard className="h-5 w-5 text-purple-600" />
                     </div>
-                    Mode de paiement
+                    Type de paiement
                   </Label>
                   <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
-                    <SelectTrigger className="h-14 text-base border-2 border-gray-200 rounded-2xl">
-                      <SelectValue />
+                    <SelectTrigger className="h-14 text-base font-medium border-2 border-gray-200 rounded-2xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-300 shadow-lg hover:shadow-xl bg-white">
+                      <SelectValue placeholder="Sélectionner un mode" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="rounded-2xl border-2 shadow-xl">
                       <SelectItem value="especes">Espèces</SelectItem>
                       <SelectItem value="carte">Carte</SelectItem>
                       <SelectItem value="virement">Virement</SelectItem>
@@ -248,44 +249,80 @@ export default function NouveauPaiementPage() {
                 </div>
 
                 <div className="space-y-3 md:col-span-2">
-                  <Label htmlFor="paymentDate" className="text-base font-bold text-gray-800 flex items-center gap-3">
-                    <div className="bg-cyan-100 p-2 rounded-lg">
-                      <Calendar className="h-5 w-5 text-cyan-600" />
+                  <Label htmlFor="program" className="text-base font-bold text-gray-800 flex items-center gap-3">
+                    <div className="bg-blue-100 p-2 rounded-lg">
+                      <Calendar className="h-5 w-5 text-blue-600" />
                     </div>
-                    Date du paiement
+                    Programme (optionnel)
                   </Label>
-                  <Input
-                    id="paymentDate"
-                    type="date"
-                    required
-                    value={formData.paymentDate}
-                    onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
-                    className="h-14 text-base border-2 border-gray-200 rounded-2xl max-w-xs"
-                  />
+                  <Select
+                    value={formData.programId}
+                    onValueChange={(value) => setFormData({ ...formData, programId: value })}
+                  >
+                    <SelectTrigger className="h-14 text-base font-medium border-2 border-gray-200 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-300 shadow-lg hover:shadow-xl bg-white">
+                      <SelectValue placeholder="Sélectionner un programme" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl border-2 shadow-xl">
+                      <SelectItem value="none">
+                        <div className="flex items-center gap-3 py-2">
+                          <div className="bg-gray-100 p-1 rounded-lg">
+                            <Calendar className="h-4 w-4 text-gray-600" />
+                          </div>
+                          <span className="font-medium">Aucun programme</span>
+                        </div>
+                      </SelectItem>
+                      {programmes.map((program) => (
+                        <SelectItem key={program.id} value={program.id.toString()}>
+                          <div className="flex items-center gap-3 py-2">
+                            <div className="bg-blue-100 p-1 rounded-lg">
+                              <Calendar className="h-4 w-4 text-blue-600" />
+                            </div>
+                            <span className="font-medium">{program.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
               <div className="flex justify-between items-center pt-8 border-t-2 border-gray-100">
-                <Link href="/paiements">
-                  <Button type="button" variant="outline" className="h-12 px-8 rounded-2xl">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Annuler
+                <div className="flex items-center gap-3 text-gray-600">
+                  <div className="bg-gray-100 p-2 rounded-lg">
+                    <Receipt className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">Enregistrement immédiat</p>
+                    <p className="text-sm text-gray-500">Date et heure du serveur au moment de la validation</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <Link href="/paiements">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-12 px-8 border-2 border-gray-300 rounded-2xl font-semibold"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Annuler
+                    </Button>
+                  </Link>
+                  <Button
+                    type="submit"
+                    disabled={loading}
+                    className="h-12 px-8 bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 text-white rounded-2xl font-semibold shadow-xl disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <>Enregistrement…</>
+                    ) : (
+                      <>
+                        <Plus className="h-5 w-5 mr-3 inline" />
+                        Enregistrer le paiement
+                      </>
+                    )}
                   </Button>
-                </Link>
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="h-12 px-8 bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 text-white rounded-2xl"
-                >
-                  {loading ? (
-                    <>Enregistrement…</>
-                  ) : (
-                    <>
-                      <Plus className="h-5 w-5 mr-3 inline" />
-                      Enregistrer le paiement
-                    </>
-                  )}
-                </Button>
+                </div>
               </div>
             </form>
           </CardContent>

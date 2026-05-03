@@ -54,18 +54,35 @@ interface DayPayment {
   amount: number;
   paymentMethod: string;
   paymentDate: string;
+  description?: string | null;
+  program?: { id: number; name: string } | null;
   reservation: {
     id: number;
     firstName: string;
     lastName: string;
     program: { id: number; name: string } | null;
     agent: { id: number; nom: string } | null;
-  };
+  } | null;
   agent: { id: number; nom: string } | null;
 }
 
 function paymentAgentLabel(p: DayPayment): string {
   return p.agent?.nom ?? p.reservation?.agent?.nom ?? '—';
+}
+
+function paymentProgramLabel(p: DayPayment): string {
+  return p.program?.name ?? p.reservation?.program?.name ?? '—';
+}
+
+function paymentReservationLabel(p: DayPayment): string {
+  if (p.reservation) {
+    return `${p.reservation.firstName} ${p.reservation.lastName}`;
+  }
+  if (p.description) {
+    const short = p.description.length > 48 ? `${p.description.slice(0, 48)}…` : p.description;
+    return short;
+  }
+  return '—';
 }
 
 function expenseAgentLabel(e: DayExpense): string {
@@ -377,10 +394,10 @@ export default function JournalSuppressionsPage() {
                         <tbody>
                           {paymentsOfDay.map((p) => (
                             <tr key={p.id} className="border-b border-emerald-100/80">
-                              <td className="py-1 pr-2 whitespace-nowrap">
-                                {p.reservation.firstName} {p.reservation.lastName}
+                              <td className="py-1 pr-2 max-w-[180px]" title={p.description ?? undefined}>
+                                {paymentReservationLabel(p)}
                               </td>
-                              <td className="py-1 pr-2">{p.reservation.program?.name ?? '—'}</td>
+                              <td className="py-1 pr-2">{paymentProgramLabel(p)}</td>
                               <td className="py-1 pr-2">{p.paymentMethod}</td>
                               <td className="py-1 pr-2">{paymentAgentLabel(p)}</td>
                               <td className="py-1 pr-2 whitespace-nowrap">{formatMoney(p.amount)}</td>

@@ -9,40 +9,89 @@ router.post('/', async (req, res) => {
   console.log('POST /api/payments appelé');
   console.log('Body reçu:', req.body);
   try {
-    const { amount, type, reservationId, fichierId, programId, paymentDate: paymentDateRaw } = req.body;
-    if (!amount || !type || !reservationId) {
-      return res.status(400).json({ error: 'amount, type, reservationId sont requis' });
-    }
-    const reservationIdNum = parseInt(reservationId, 10);
-    const reservation = await prisma.reservation.findUnique({
-      where: { id: reservationIdNum },
-      select: { programId: true, agentId: true, parentId: true },
-    });
-    if (!reservation) {
-      return res.status(404).json({ error: 'Réservation introuvable' });
+    const {
+      amount,
+      type,
+      reservationId,
+      fichierId,
+      programId: programIdRaw,
+      paymentDate: paymentDateRaw,
+      description: descriptionRaw,
+    } = req.body;
+
+    if (amount === undefined || amount === null || !type) {
+      return res.status(400).json({ error: 'amount et type (mode de paiement) sont requis' });
     }
 
-    let paymentDate: Date | undefined;
+    const amountNum = parseFloat(amount);
+    if (Number.isNaN(amountNum)) {
+      return res.status(400).json({ error: 'Montant invalide' });
+    }
+
+    const description =
+      typeof descriptionRaw === 'string' && descriptionRaw.trim() ? descriptionRaw.trim() : null;
+
+    let reservationIdNum: number | null =
+      reservationId !== undefined && reservationId !== null && reservationId !== ''
+        ? parseInt(String(reservationId), 10)
+        : null;
+    if (reservationIdNum !== null && Number.isNaN(reservationIdNum)) {
+      return res.status(400).json({ error: 'reservationId invalide' });
+    }
+
+    const programIdParsed =
+      programIdRaw !== undefined && programIdRaw !== null && programIdRaw !== '' && programIdRaw !== 'none'
+        ? parseInt(String(programIdRaw), 10)
+        : null;
+    if (programIdParsed !== null && Number.isNaN(programIdParsed)) {
+      return res.status(400).json({ error: 'programId invalide' });
+    }
+
+    let reservation: {
+      programId: number;
+      agentId: number | null;
+      parentId: number | null;
+    } | null = null;
+
+    if (reservationIdNum !== null) {
+      reservation = await prisma.reservation.findUnique({
+        where: { id: reservationIdNum },
+        select: { programId: true, agentId: true, parentId: true },
+      });
+      if (!reservation) {
+        return res.status(404).json({ error: 'Réservation introuvable' });
+      }
+    }
+
+    /** Sans dossier : date du jour à l’enregistrement (sauf si l’appel fournit encore paymentDate, ex. écrans réservation) */
+    let paymentDate = new Date();
     if (paymentDateRaw) {
       const d = new Date(paymentDateRaw);
       if (!Number.isNaN(d.getTime())) paymentDate = d;
     }
 
+    const resolvedProgramId = reservation
+      ? programIdParsed !== null
+        ? programIdParsed
+        : reservation.programId
+      : programIdParsed;
+
     const payment = await prisma.payment.create({
       data: {
-        amount: parseFloat(amount),
+        amount: amountNum,
         paymentMethod: type,
+        paymentDate,
+        description,
         reservationId: reservationIdNum,
-        ...(paymentDate ? { paymentDate } : {}),
-        ...(fichierId ? { fichierId: parseInt(fichierId, 10) } : {}),
-        programId: programId ? parseInt(programId, 10) : reservation.programId,
-        ...(reservation.agentId ? { agentId: reservation.agentId } : {}),
+        programId: resolvedProgramId,
+        ...(fichierId ? { fichierId: parseInt(String(fichierId), 10) } : {}),
+        ...(reservation?.agentId ? { agentId: reservation.agentId } : {}),
       },
     });
     console.log('Paiement inséré en base:', payment);
 
     // Aligner paidAmount du dossier leader avec la somme des paiements
-    if (!reservation.parentId) {
+    if (reservationIdNum !== null && reservation && !reservation.parentId) {
       const sumPay = await prisma.payment.aggregate({
         where: { reservationId: reservationIdNum },
         _sum: { amount: true },
@@ -54,14 +103,14 @@ router.post('/', async (req, res) => {
     }
 
     // Supprimer les doublons sans fichierId pour ce paiement (si un reçu vient d'être ajouté)
-    if (fichierId) {
+    if (fichierId && reservationIdNum !== null) {
       const deleted = await prisma.payment.deleteMany({
         where: {
           reservationId: reservationIdNum,
-          amount: parseFloat(amount),
+          amount: amountNum,
           paymentMethod: type,
-          fichierId: null
-        }
+          fichierId: null,
+        },
       });
       console.log('Paiements supprimés (doublons sans fichierId):', deleted);
     }
@@ -81,6 +130,7 @@ router.get('/', async (req, res) => {
       include: {
         fichier: true,
         agent: { select: { id: true, nom: true } },
+        program: { select: { id: true, name: true } },
         reservation: {
           include: {
             program: true,

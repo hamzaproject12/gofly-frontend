@@ -81,6 +81,7 @@ router.get('/', async (req, res) => {
         prisma.payment.findMany({
           where: { paymentDate: { gte: dayBounds.start, lte: dayBounds.end } },
           include: {
+            program: { select: { id: true, name: true } },
             reservation: {
               select: {
                 id: true,

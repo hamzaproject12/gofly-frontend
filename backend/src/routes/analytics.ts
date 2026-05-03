@@ -51,16 +51,25 @@ router.get('/dashboard', async (req, res) => {
 
     const programRankingDetailed = await Promise.all(
       programDetails.map(async (item) => {
+        if (item.reservationId == null) {
+          return {
+            programId: null as number | null,
+            programName: 'Paiement sans réservation',
+            totalAmount: item._sum.amount || 0,
+            countPayments: item._count.id,
+            avgAmount: item._count.id > 0 ? (item._sum.amount || 0) / item._count.id : 0,
+          }
+        }
         const reservation = await prisma.reservation.findUnique({
           where: { id: item.reservationId },
-          include: { program: true }
+          include: { program: true },
         })
         return {
           programId: reservation?.programId,
           programName: reservation?.program?.name || 'Programme inconnu',
           totalAmount: item._sum.amount || 0,
           countPayments: item._count.id,
-          avgAmount: item._count.id > 0 ? (item._sum.amount || 0) / item._count.id : 0
+          avgAmount: item._count.id > 0 ? (item._sum.amount || 0) / item._count.id : 0,
         }
       })
     )

@@ -115,7 +115,9 @@ router.get('/', async (req, res) => {
     });
 
     // Récupérer les noms des agents
-    const agentIds = paiementsParAgent.map(p => p.reservationId);
+    const agentIds = paiementsParAgent
+      .map((p) => p.reservationId)
+      .filter((id): id is number => id != null);
     const reservations = await prisma.reservation.findMany({
       where: { id: { in: agentIds } },
       select: { id: true, firstName: true, lastName: true }

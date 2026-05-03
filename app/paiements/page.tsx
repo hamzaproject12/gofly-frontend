@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { api } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,13 +12,10 @@ import {
   CreditCard,
   DollarSign,
   Calendar,
-  User,
   Search,
   Filter,
   Plus,
   FileText,
-  Building,
-  Plane,
   Receipt,
   Download,
   Eye,
@@ -33,6 +30,7 @@ type Payment = {
   paymentDate: string
   reservationId: number
   programId?: number
+  agent?: { id: number; nom: string } | null
   fichier?: {
     id: number
     fileName: string
@@ -50,7 +48,12 @@ type Payment = {
       id: number
       name: string
     }
+    agent?: { id: number; nom: string } | null
   }
+}
+
+function paymentRowAgentLabel(p: Payment): string {
+  return p.agent?.nom ?? p.reservation?.agent?.nom ?? "—"
 }
 
 type Program = {
@@ -118,7 +121,11 @@ export default function PaiementsPage() {
         programsResponse.json()
       ])
 
-      setPaiements(paymentsData)
+      const sorted = [...paymentsData].sort(
+        (a: Payment, b: Payment) =>
+          new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
+      )
+      setPaiements(sorted)
       setProgrammes(programsData)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue')
@@ -146,6 +153,14 @@ export default function PaiementsPage() {
 
     return searchMatch && programMatch && methodMatch
   })
+
+  const sortedFilteredPaiements = useMemo(
+    () =>
+      [...filteredPaiements].sort(
+        (a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
+      ),
+    [filteredPaiements]
+  )
 
   // Calcul des statistiques
   const totalPaiements = paiements.reduce((sum, p) => sum + p.amount, 0)
@@ -233,12 +248,12 @@ export default function PaiementsPage() {
         {/* En-tête */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Gestion des Paiements</h1>
-          <Link href="/paiements/nouveau">
-            <Button>
+          <Button asChild>
+            <Link href="/paiements/nouveau">
               <Plus className="mr-2 h-4 w-4" />
               Nouveau Paiement
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
 
         {/* Statistiques */}
@@ -368,11 +383,11 @@ export default function PaiementsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-gray-800">
               <CreditCard className="h-5 w-5" />
-              Liste des Paiements ({filteredPaiements.length})
+              Liste des Paiements ({sortedFilteredPaiements.length}) — plus récents en haut
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {filteredPaiements.length === 0 ? (
+            {sortedFilteredPaiements.length === 0 ? (
               <div className="text-center py-12">
                 <CreditCard className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun paiement trouvé</h3>
@@ -395,86 +410,82 @@ export default function PaiementsPage() {
                 )}
               </div>
             ) : (
-              <div className="space-y-4">
-                {filteredPaiements.map((paiement) => (
+              <div className="space-y-2">
+                {sortedFilteredPaiements.map((paiement) => (
                   <div
                     key={paiement.id}
-                    className="flex items-center justify-between p-6 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all text-sm"
                   >
-                    <div className="flex items-center space-x-4">
-                      <div className="bg-blue-100 p-3 rounded-xl">
+                    <span className="text-gray-500 whitespace-nowrap shrink-0 tabular-nums" title="Date du paiement">
+                      <Calendar className="h-3.5 w-3.5 inline mr-1 -mt-0.5 opacity-70" />
+                      {new Date(paiement.paymentDate).toLocaleString("fr-FR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                    <span className="hidden sm:inline text-gray-300">|</span>
+                    <span className="font-medium text-gray-900 whitespace-nowrap">
+                      {paiement.reservation.firstName} {paiement.reservation.lastName}
+                    </span>
+                    <span className="text-gray-500 whitespace-nowrap">{paiement.reservation.phone}</span>
+                    <span className="text-gray-600 truncate max-w-[140px] sm:max-w-[200px]" title={paiement.reservation.program.name}>
+                      {paiement.reservation.program.name}
+                    </span>
+                    <Badge className={`${getMethodColor(paiement.paymentMethod)} border-0 shrink-0 text-xs`}>
+                      <span className="inline-flex items-center gap-1">
                         {getMethodIcon(paiement.paymentMethod)}
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">
-                          {paiement.reservation.firstName} {paiement.reservation.lastName}
-                        </h3>
-                        <p className="text-sm text-gray-600">{paiement.reservation.phone}</p>
-                        <p className="text-sm text-gray-500">
-                          {paiement.reservation.program.name}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-gray-900">
-                          {paiement.amount.toLocaleString()} DH
-                        </p>
-                        <Badge className={`${getMethodColor(paiement.paymentMethod)} border-0`}>
-                          {getPaymentMethodLabel(paiement.paymentMethod)}
-                        </Badge>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        {paiement.fichier && (
+                        {getPaymentMethodLabel(paiement.paymentMethod)}
+                      </span>
+                    </Badge>
+                    <span className="text-gray-500 truncate max-w-[100px] sm:max-w-none" title={paymentRowAgentLabel(paiement)}>
+                      Agent: {paymentRowAgentLabel(paiement)}
+                    </span>
+                    <span className="font-semibold text-gray-900 whitespace-nowrap ml-auto sm:ml-0">
+                      {paiement.amount.toLocaleString("fr-FR")} DH
+                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0 w-full sm:w-auto sm:ml-auto justify-end">
+                      {paiement.fichier && (
+                        <>
                           <Button
                             variant="outline"
                             size="sm"
-                            className="border-green-200 text-green-700 hover:bg-green-50"
+                            className="h-8 border-green-200 text-green-700 hover:bg-green-50 px-2"
                             onClick={() => {
-                              // Utiliser l'URL Cloudinary si disponible, sinon l'ancienne URL locale
-                              const fileUrl = paiement.fichier?.cloudinaryUrl || 
-                                             `http://localhost:5000/uploads/${paiement.fichier?.filePath}`;
-                              window.open(fileUrl, '_blank');
+                              const fileUrl =
+                                paiement.fichier?.cloudinaryUrl ||
+                                `http://localhost:5000/uploads/${paiement.fichier?.filePath}`;
+                              window.open(fileUrl, "_blank");
                             }}
                           >
-                            <Download className="h-4 w-4 mr-1" />
+                            <Download className="h-3.5 w-3.5 mr-1" />
                             Reçu
                           </Button>
-                        )}
-                        {paiement.fichier && (
                           <Button
                             variant="outline"
                             size="sm"
-                            className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                            className="h-8 border-blue-200 text-blue-700 hover:bg-blue-50 px-2"
                             onClick={() => {
-                              // Utiliser l'URL Cloudinary si disponible, sinon l'ancienne URL locale
-                              const fileUrl = paiement.fichier?.cloudinaryUrl || 
-                                             `http://localhost:5000/uploads/${paiement.fichier?.filePath}`;
-                              const fileType = paiement.fichier?.fileType || 'image';
-                              const fileName = paiement.fichier?.fileName || 'Reçu de paiement';
-                              
-                              // Déterminer le type MIME basé sur l'extension
-                              const extension = fileName.split('.').pop()?.toLowerCase();
-                              let mimeType = 'image/jpeg'; // par défaut
-                              if (extension === 'pdf') mimeType = 'application/pdf';
-                              else if (extension === 'png') mimeType = 'image/png';
-                              else if (extension === 'gif') mimeType = 'image/gif';
-                              else if (extension === 'webp') mimeType = 'image/webp';
-                              
-                              setPreviewImage({
-                                url: fileUrl,
-                                title: fileName,
-                                type: mimeType
-                              });
+                              const fileUrl =
+                                paiement.fichier?.cloudinaryUrl ||
+                                `http://localhost:5000/uploads/${paiement.fichier?.filePath}`;
+                              const fileName = paiement.fichier?.fileName || "Reçu de paiement";
+                              const extension = fileName.split(".").pop()?.toLowerCase();
+                              let mimeType = "image/jpeg";
+                              if (extension === "pdf") mimeType = "application/pdf";
+                              else if (extension === "png") mimeType = "image/png";
+                              else if (extension === "gif") mimeType = "image/gif";
+                              else if (extension === "webp") mimeType = "image/webp";
+                              setPreviewImage({ url: fileUrl, title: fileName, type: mimeType });
                             }}
                           >
-                            <Eye className="h-4 w-4 mr-1" />
+                            <Eye className="h-3.5 w-3.5 mr-1" />
                             Voir
                           </Button>
-                        )}
-                      </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}

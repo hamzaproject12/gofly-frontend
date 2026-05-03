@@ -147,7 +147,10 @@ export default function JournalSuppressionsPage() {
 
   return (
     <RoleProtectedRoute allowedRoles={['ADMIN']}>
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white pt-24 pb-16 px-4">
+      <div
+        className="min-h-screen bg-gradient-to-b from-slate-50 to-white pt-24 pb-16 px-4"
+        data-skip-unsaved-dirty
+      >
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center gap-3 mb-5">
             <div className="p-3 rounded-2xl bg-amber-100 text-amber-800">

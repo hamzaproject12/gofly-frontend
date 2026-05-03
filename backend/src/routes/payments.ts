@@ -1,9 +1,21 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
+import {
+  logJournalSuppression,
+  buildReservationUpdateDetail,
+  getChangedReservationScalarKeys,
+  JOURNAL_ACTION,
+  type ReservationJournalRow,
+} from '../services/journalSuppressionService';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+const reservationJournalInclude = {
+  program: { select: { id: true, name: true } },
+  agent: { select: { id: true, nom: true } },
+} as const;
 
 /** Agent qui effectue la saisie (JWT), utilisé si pas d’agent sur la réservation ou paiement hors dossier */
 function extractActorAgentIdFromToken(req: express.Request): number | null {
@@ -70,14 +82,22 @@ router.post('/', async (req, res) => {
       parentId: number | null;
     } | null = null;
 
+    let journalBefore: ReservationJournalRow | null = null;
+
     if (reservationIdNum !== null) {
-      reservation = await prisma.reservation.findUnique({
+      const row = await prisma.reservation.findUnique({
         where: { id: reservationIdNum },
-        select: { programId: true, agentId: true, parentId: true },
+        include: reservationJournalInclude,
       });
-      if (!reservation) {
+      if (!row) {
         return res.status(404).json({ error: 'Réservation introuvable' });
       }
+      reservation = {
+        programId: row.programId,
+        agentId: row.agentId,
+        parentId: row.parentId,
+      };
+      journalBefore = row as ReservationJournalRow;
     }
 
     /** Sans dossier : date du jour à l’enregistrement (sauf si l’appel fournit encore paymentDate, ex. écrans réservation) */
@@ -134,6 +154,37 @@ router.post('/', async (req, res) => {
         },
       });
       console.log('Paiements supprimés (doublons sans fichierId):', deleted);
+    }
+
+    if (reservationIdNum !== null && journalBefore) {
+      try {
+        const journalAfter = await prisma.reservation.findUnique({
+          where: { id: reservationIdNum },
+          include: reservationJournalInclude,
+        });
+        if (journalAfter) {
+          const ja = journalAfter as ReservationJournalRow;
+          const changed = getChangedReservationScalarKeys(journalBefore, ja);
+          const payNote = `Paiement POST /api/payments — #${payment.id} | ${amountNum} DH | ${type}${description ? ` | ${description}` : ''}`;
+          const { summary, detailText } = buildReservationUpdateDetail(journalBefore, ja, 'PUT', {
+            extraNote: payNote,
+          });
+          const summaryFinal =
+            changed.length > 0
+              ? summary
+              : `Paiement enregistré — réservation #${reservationIdNum} — ${ja.firstName} ${ja.lastName}`;
+          await logJournalSuppression(prisma, req, {
+            action: JOURNAL_ACTION.RESERVATION_UPDATED,
+            entityType: 'Reservation',
+            entityId: reservationIdNum,
+            summary: summaryFinal.slice(0, 500),
+            detailText,
+            actorIdFallback: ja.agentId ?? null,
+          });
+        }
+      } catch (journalErr) {
+        console.error('[Journal] après création paiement:', journalErr);
+      }
     }
 
     res.status(201).json(payment);

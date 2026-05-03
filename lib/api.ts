@@ -1,4 +1,56 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://gofly-backend-production.up.railway.app';
+/** Backend Express par défaut (évite d’appeler le domaine Next par erreur). */
+const DEFAULT_BACKEND_URL = 'https://gofly-backend-production.up.railway.app';
+
+/**
+ * URL de base de l’API Express.
+ * Si `NEXT_PUBLIC_API_URL` pointe vers le **même origine** que la page (erreur fréquente sur Railway :
+ * front et variable d’env copiée sur l’URL du front), les requêtes partent vers Next sans le middleware JWT
+ * → 401 « Access token required ». On retombe alors sur le backend par défaut.
+ */
+function stripWww(host: string): string {
+  return host.replace(/^www\./i, '').toLowerCase();
+}
+
+/** True si l’URL API configurée pointe vers le même site que la page (Next), pas Express. */
+function apiUrlTargetsCurrentAppHost(normalized: string): boolean {
+  if (typeof window === 'undefined' || !window.location?.hostname) return false;
+  try {
+    const absolute = normalized.startsWith('http') ? normalized : `https://${normalized}`;
+    const apiHost = stripWww(new URL(absolute).hostname);
+    const pageHost = stripWww(window.location.hostname);
+    if (apiHost === pageHost) return true;
+    // Hébergements type *-frontend* vs *-backend* : éviter d’appeler le host « front » par erreur
+    if (apiHost.includes('frontend') && !apiHost.includes('backend')) return true;
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+export function resolveApiBaseUrl(): string {
+  const raw = (process.env.NEXT_PUBLIC_API_URL || '').trim();
+  if (!raw || raw === '/') return DEFAULT_BACKEND_URL;
+
+  const normalized = raw.replace(/\/$/, '');
+
+  if (typeof window !== 'undefined') {
+    try {
+      const absolute = normalized.startsWith('http') ? normalized : `https://${normalized}`;
+      const apiOrigin = new URL(absolute).origin;
+      if (apiOrigin === window.location.origin || apiUrlTargetsCurrentAppHost(normalized)) {
+        console.warn(
+          '[api] URL API = même site que le front (ou host « frontend») ; utilisation du backend par défaut:',
+          DEFAULT_BACKEND_URL
+        );
+        return DEFAULT_BACKEND_URL;
+      }
+    } catch {
+      return DEFAULT_BACKEND_URL;
+    }
+  }
+
+  return normalized;
+}
 
 // Fonction pour récupérer le token depuis localStorage
 function getAuthToken(): string | null {
@@ -19,7 +71,8 @@ function getAuthToken(): string | null {
 
 export const api = {
   url: (endpoint: string) => {
-    return `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+    const base = resolveApiBaseUrl();
+    return `${base}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
   },
   // Fonction pour faire des requêtes avec l'authentification
   request: async (endpoint: string, options: RequestInit = {}) => {
@@ -27,7 +80,7 @@ export const api = {
     const url = endpoint.startsWith('http') ? endpoint : api.url(endpoint);
     const token = getAuthToken();
     
-    console.log(`🌐 API Config Base URL: ${API_BASE_URL}`);
+    console.log(`🌐 API Config Base URL: ${resolveApiBaseUrl()}`);
     console.log(`🚀 API Request to: ${url}`);
     console.log(`🔑 Token available: ${!!token}`);
     

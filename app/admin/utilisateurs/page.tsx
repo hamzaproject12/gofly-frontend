@@ -53,9 +53,7 @@ export default function GestionUtilisateursPage() {
 
   const fetchAgents = async () => {
     try {
-      const response = await fetch(api.url('/api/admin/agents'), {
-        credentials: 'include',
-      });
+      const response = await api.request('/api/admin/agents');
 
       if (response.ok) {
         const data = await response.json();
@@ -76,12 +74,11 @@ export default function GestionUtilisateursPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(api.url('/api/admin/agents'), {
+      const response = await api.request('/api/admin/agents', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify(formData),
       });
 
@@ -110,12 +107,11 @@ export default function GestionUtilisateursPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(api.url(`/api/admin/agents/${editingAgent.id}`), {
+      const response = await api.request(`/api/admin/agents/${editingAgent.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify({
           nom: formData.nom,
           email: formData.email,
@@ -148,12 +144,11 @@ export default function GestionUtilisateursPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(api.url(`/api/admin/agents/${agent.id}`), {
+      const response = await api.request(`/api/admin/agents/${agent.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify({
           isActive: !agent.isActive
         }),
@@ -184,9 +179,8 @@ export default function GestionUtilisateursPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(api.url(`/api/admin/agents/${agent.id}`), {
+      const response = await api.request(`/api/admin/agents/${agent.id}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
 
       if (response.ok) {

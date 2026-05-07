@@ -119,8 +119,19 @@ export const api = {
       credentials: 'include', // Inclure les cookies aussi
       headers,
     };
+
+    // Important: si `options.headers` est fourni (POST/PUT fréquents),
+    // on fusionne explicitement pour ne pas perdre Authorization injecté ci-dessus.
+    const mergedOptions: RequestInit = {
+      ...defaultOptions,
+      ...options,
+      headers: {
+        ...(defaultOptions.headers as Record<string, string>),
+        ...((options.headers as Record<string, string>) || {}),
+      },
+    };
     
-    return fetch(url, { ...defaultOptions, ...options });
+    return fetch(url, mergedOptions);
   },
   endpoints: {
     programs: '/api/programs',

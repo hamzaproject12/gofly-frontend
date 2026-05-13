@@ -62,10 +62,11 @@ export const register = async (req: Request, res: Response) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { 
-        agentId: agent.id, 
+      {
+        agentId: agent.id,
         email: agent.email,
-        nom: agent.nom 
+        nom: agent.nom,
+        role: agent.role
       },
       process.env.JWT_SECRET || 'fallback-secret',
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as SignOptions

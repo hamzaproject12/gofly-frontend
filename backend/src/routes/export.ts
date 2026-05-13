@@ -6,7 +6,6 @@ import { authenticateToken } from '../middleware/auth';
 const prisma = new PrismaClient();
 const router = Router();
 
-type AuthUser = { agentId?: number; role?: string };
 
 /** Aligné sur la page Gestion des Réservations (app/reservations/page.tsx) */
 const DAYS_URGENCY_WINDOW = 18;
@@ -210,18 +209,13 @@ const HEADERS = [
 ];
 
 function buildExportWhere(
-  query: Record<string, string | undefined>,
-  user: AuthUser
+  query: Record<string, string | undefined>
 ): Prisma.ReservationWhereInput {
   const { program, programId } = query;
 
   const where: Prisma.ReservationWhereInput = {
     isLeader: true,
   };
-
-  if (user.role !== 'ADMIN' && user.agentId != null) {
-    where.agentId = user.agentId;
-  }
 
   if (programId && programId !== 'tous') {
     const id = parseInt(programId, 10);
@@ -242,9 +236,8 @@ router.get(
   authenticateToken,
   async (req: any, res: Response) => {
     try {
-      const user = req.user as AuthUser;
       const query = req.query as Record<string, string | undefined>;
-      const where = buildExportWhere(query, user);
+      const where = buildExportWhere(query);
 
       const leadersRaw = await prisma.reservation.findMany({
         where,

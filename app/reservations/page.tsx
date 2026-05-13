@@ -241,11 +241,6 @@ export default function ReservationsPage() {
       setExportDialogOpen(false);
       const params = new URLSearchParams({
         program: programChoice,
-        status: statutFilter,
-        roomType: chambreFilter,
-        ...(filters.dateFrom && { dateFrom: filters.dateFrom }),
-        ...(filters.dateTo && { dateTo: filters.dateTo }),
-        ...(filters.search && { search: filters.search }),
       });
       const res = await api.request(
         `${api.endpoints.exportReservationsAgency}?${params.toString()}`,

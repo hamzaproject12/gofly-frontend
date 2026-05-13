@@ -213,15 +213,7 @@ function buildExportWhere(
   query: Record<string, string | undefined>,
   user: AuthUser
 ): Prisma.ReservationWhereInput {
-  const {
-    program,
-    programId,
-    status,
-    roomType,
-    dateFrom,
-    dateTo,
-    search,
-  } = query;
+  const { program, programId } = query;
 
   const where: Prisma.ReservationWhereInput = {
     isLeader: true,
@@ -236,42 +228,6 @@ function buildExportWhere(
     if (!Number.isNaN(id)) where.programId = id;
   } else if (program && program !== 'tous') {
     where.program = { name: program };
-  }
-
-  /**
-   * Statut affiché : « Urgent » et « Incomplet » sont affinés après requête (comme sur le front).
-   * Ici on ne filtre en SQL que ce qui est stocké en base.
-   */
-  if (status && status !== 'all' && status !== 'Urgent' && status !== 'Incomplet') {
-    where.status = status;
-  } else if (status === 'Urgent') {
-    where.status = { not: 'Complet' };
-  } else if (status === 'Incomplet') {
-    where.status = 'Incomplet';
-  }
-
-  applyRoomTypeQuery(where as Record<string, unknown>, roomType);
-
-  if (dateFrom || dateTo) {
-    where.reservationDate = {};
-    if (dateFrom) {
-      const start = parseDateStartLocal(String(dateFrom));
-      where.reservationDate.gte = start ?? new Date(dateFrom as string);
-    }
-    if (dateTo) {
-      const end = parseDateEndInclusiveLocal(String(dateTo));
-      where.reservationDate.lte = end ?? new Date(dateTo as string);
-    }
-  }
-
-  const searchTrim = typeof search === 'string' ? search.trim() : '';
-  if (searchTrim) {
-    where.OR = [
-      { firstName: { contains: searchTrim, mode: 'insensitive' } },
-      { lastName: { contains: searchTrim, mode: 'insensitive' } },
-      { phone: { contains: searchTrim, mode: 'insensitive' } },
-      { program: { name: { contains: searchTrim, mode: 'insensitive' } } },
-    ];
   }
 
   return where;
@@ -289,7 +245,6 @@ router.get(
       const user = req.user as AuthUser;
       const query = req.query as Record<string, string | undefined>;
       const where = buildExportWhere(query, user);
-      const statusFilter = (query.status || 'all').trim();
 
       const leadersRaw = await prisma.reservation.findMany({
         where,
@@ -323,12 +278,7 @@ router.get(
         orderBy: [{ programId: 'asc' }, { reservationDate: 'asc' }, { id: 'asc' }],
       });
 
-      let leaders = leadersRaw;
-      if (statusFilter === 'Urgent') {
-        leaders = leadersRaw.filter((r) => isLeaderUrgentForExport(r as LeaderForUrgency));
-      } else if (statusFilter === 'Incomplet') {
-        leaders = leadersRaw.filter((r) => !isLeaderUrgentForExport(r as LeaderForUrgency));
-      }
+      const leaders = leadersRaw;
 
       // Resolve hotel IDs → names
       const hotelIdSet = new Set<number>();

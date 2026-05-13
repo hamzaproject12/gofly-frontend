@@ -47,7 +47,19 @@ console.log('✅ Liste finale des origines autorisées :', allowedOrigins);
 console.log('🚨 --------------------- 🚨');
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    // Autorise les requêtes serveur-à-serveur et outils sans Origin.
+    if (!origin) return callback(null, true);
+
+    const isExplicitlyAllowed = allowedOrigins.includes(origin);
+    const isGoflySubdomain = /^https:\/\/([a-z0-9-]+\.)*gofly-agence\.net$/i.test(origin);
+
+    if (isExplicitlyAllowed || isGoflySubdomain) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`Origin non autorisée par CORS: ${origin}`));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']

@@ -14,15 +14,28 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors({
-  origin: [
+const allowedOrigins = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'https://gofly-beta.vercel.app',
     'https://www.gofly-agence.net',
     'https://gofly-agence.net',
-    ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : [])
-  ],
+    ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',').map(url => url.trim()) : [])
+  ];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+
+    const isExplicitlyAllowed = allowedOrigins.includes(origin);
+    const isGoflySubdomain = /^https:\/\/([a-z0-9-]+\.)*gofly-agence\.net$/i.test(origin);
+
+    if (isExplicitlyAllowed || isGoflySubdomain) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`Origin non autorisée par CORS: ${origin}`));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
   credentials: true

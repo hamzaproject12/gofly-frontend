@@ -167,6 +167,8 @@ export default function ReservationsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [reservationToDelete, setReservationToDelete] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [selectedExportProgram, setSelectedExportProgram] = useState("tous");
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -233,11 +235,12 @@ export default function ReservationsPage() {
       || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   };
 
-  const handleExportAgency = useCallback(async () => {
+  const handleExportAgency = useCallback(async (programChoice: string) => {
     try {
       setExporting(true);
+      setExportDialogOpen(false);
       const params = new URLSearchParams({
-        program: programmeFilter,
+        program: programChoice,
         status: statutFilter,
         roomType: chambreFilter,
         ...(filters.dateFrom && { dateFrom: filters.dateFrom }),
@@ -341,7 +344,6 @@ export default function ReservationsPage() {
       setExporting(false);
     }
   }, [
-    programmeFilter,
     statutFilter,
     chambreFilter,
     filters.dateFrom,
@@ -911,15 +913,59 @@ export default function ReservationsPage() {
                 <Users className="h-5 w-5 text-blue-600" />
                 Liste des Réservations
               </CardTitle>
+              {/* Export Data Dialog */}
+              <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+                <DialogContent className="max-w-sm rounded-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Exporter les données</DialogTitle>
+                    <DialogDescription>
+                      Sélectionnez le programme à exporter. Chaque programme sera placé dans une feuille séparée.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4">
+                    <span className="mb-1.5 block text-xs font-semibold text-gray-600">Programme</span>
+                    <Select value={selectedExportProgram} onValueChange={setSelectedExportProgram}>
+                      <SelectTrigger className="h-11 rounded-lg border border-slate-300 bg-white">
+                        <SelectValue placeholder="Programme" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="tous">Tous les programmes</SelectItem>
+                        {programs.map((program) => (
+                          <SelectItem key={program.id} value={program.name}>
+                            {program.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <DialogFooter className="flex flex-row gap-2 justify-end">
+                    <DialogClose asChild>
+                      <Button variant="outline">Annuler</Button>
+                    </DialogClose>
+                    <Button
+                      disabled={exporting}
+                      onClick={() => handleExportAgency(selectedExportProgram)}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {exporting ? "Export…" : "Exporter"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
               <Button
                 type="button"
                 variant="outline"
                 className="h-10 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 shrink-0 whitespace-nowrap"
                 disabled={exporting}
-                onClick={handleExportAgency}
+                onClick={() => {
+                  setSelectedExportProgram(programmeFilter);
+                  setExportDialogOpen(true);
+                }}
               >
                 <Download className="h-4 w-4 mr-2" />
-                {exporting ? "Export…" : "Exporter Excel (agence)"}
+                {exporting ? "Export…" : "Export data"}
               </Button>
             </div>
           </CardHeader>

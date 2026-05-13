@@ -330,6 +330,25 @@ router.get(
         leaders = leadersRaw.filter((r) => !isLeaderUrgentForExport(r as LeaderForUrgency));
       }
 
+      // Resolve hotel IDs → names
+      const hotelIdSet = new Set<number>();
+      for (const r of leaders) {
+        if (r.hotelMadina) { const n = parseInt(r.hotelMadina, 10); if (!isNaN(n)) hotelIdSet.add(n); }
+        if (r.hotelMakkah) { const n = parseInt(r.hotelMakkah, 10); if (!isNaN(n)) hotelIdSet.add(n); }
+        for (const acc of r.accompagnants || []) {
+          if (acc.hotelMadina) { const n = parseInt(acc.hotelMadina, 10); if (!isNaN(n)) hotelIdSet.add(n); }
+          if (acc.hotelMakkah) { const n = parseInt(acc.hotelMakkah, 10); if (!isNaN(n)) hotelIdSet.add(n); }
+        }
+      }
+      const hotelRows = hotelIdSet.size > 0
+        ? await prisma.hotel.findMany({ where: { id: { in: [...hotelIdSet] } } })
+        : [];
+      const hotelMap = new Map<string, string>(hotelRows.map((h) => [String(h.id), h.name]));
+      const resolveHotel = (id: string | null | undefined): string => {
+        if (!id) return '';
+        return hotelMap.get(id) || id;
+      };
+
       const workbook = new ExcelJS.Workbook();
       workbook.creator = 'Omra Travel';
       workbook.created = new Date();
@@ -391,6 +410,9 @@ router.get(
             paidAmount: leader.paidAmount,
             payments: leader.payments as Pay[],
           };
+          const totalVentesGroupe =
+            leader.price +
+            (leader.accompagnants || []).reduce((sum, acc: any) => sum + (acc.price ?? 0), 0);
 
           const emitRow = (
             person: (typeof leader) & { documents?: typeof leader.documents },
@@ -406,8 +428,8 @@ router.get(
             const reste = Math.max(0, Math.round((vente - remis) * 100) / 100);
 
             const nomComplet = `${person.firstName || ''} ${person.lastName || ''}`.trim();
-            const hk = person.hotelMakkah || leader.hotelMakkah || '';
-            const hm = person.hotelMadina || leader.hotelMadina || '';
+            const hk = resolveHotel(person.hotelMakkah) || resolveHotel(leader.hotelMakkah);
+            const hm = resolveHotel(person.hotelMadina) || resolveHotel(leader.hotelMadina);
 
             sheet.addRow([
               idx,
@@ -430,7 +452,7 @@ router.get(
               isLeader ? a3 : '',
               isLeader ? String(remis) : '',
               isLeader ? String(reste) : '',
-              isLeader ? String(vente) : '',
+              isLeader ? String(totalVentesGroupe) : '',
               transportLabel(person.transport),
               person.remarque || '',
               isLeader ? recu : '',

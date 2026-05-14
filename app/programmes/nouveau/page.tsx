@@ -42,6 +42,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import Link from "next/link"
+import jsPDF from "jspdf"
+import autoTable from "jspdf-autotable"
+import { siteConfig } from "@/lib/config"
 
 interface Hotel {
   id: number;
@@ -112,21 +115,37 @@ function hasRoomsWithoutPrice(hotel: { chambres: ChambresConfig }): boolean {
   return false
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-}
+const fmtNumFr = (n: number, decimals = 0): string =>
+  Number(n).toLocaleString("fr-FR", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })
 
-function escapeXml(s: string): string {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;")
+const fmtDhFr = (n: number): string => `${fmtNumFr(Math.round(n))} DH`
+
+async function loadImageAsDataUrl(
+  url: string
+): Promise<{ data: string; w: number; h: number } | null> {
+  try {
+    const res = await fetch(url, { cache: "force-cache" })
+    if (!res.ok) return null
+    const blob = await res.blob()
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(String(reader.result || ""))
+      reader.onerror = () => reject(new Error("read error"))
+      reader.readAsDataURL(blob)
+    })
+    const { w, h } = await new Promise<{ w: number; h: number }>((resolve) => {
+      const img = new Image()
+      img.onload = () => resolve({ w: img.naturalWidth || 1, h: img.naturalHeight || 1 })
+      img.onerror = () => resolve({ w: 1, h: 1 })
+      img.src = dataUrl
+    })
+    return { data: dataUrl, w, h }
+  } catch {
+    return null
+  }
 }
 
 function totalBedsByCity(hotels: { chambres: ChambresConfig }[]): number {
@@ -594,20 +613,190 @@ export default function NouveauProgramme() {
     formData.hotelsMakkah,
   ])
 
-  const downloadSimulationReport = useCallback(() => {
+  const downloadSimulationReport = useCallback(async () => {
     if (!canRunSimulation) return
     const p = simulationPreview
     const exportedAt = new Date()
     const dateLabel = exportedAt.toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" })
     const fileDate = exportedAt.toISOString().slice(0, 10)
+    const programName = formData.nom.trim() || "Programme"
     const slug =
-      formData.nom
-        .trim()
+      programName
         .replace(/[^\wÀ-ÿ\s-]/gu, "")
         .replace(/\s+/g, "-")
         .slice(0, 48) || "programme"
 
-    const rawHotelsRows: Array<(string | number)[]> = []
+    const doc = new jsPDF({ unit: "pt", format: "a4", compress: true })
+    const pageW = doc.internal.pageSize.getWidth()
+    const pageH = doc.internal.pageSize.getHeight()
+    const marginX = 40
+    const contentW = pageW - 2 * marginX
+
+    // Palette violet / slate / status
+    const COLORS = {
+      violet: [109, 40, 217] as [number, number, number],
+      violetSoft: [237, 233, 254] as [number, number, number],
+      slate: [51, 65, 85] as [number, number, number],
+      slateSoft: [248, 250, 252] as [number, number, number],
+      slateLine: [226, 232, 240] as [number, number, number],
+      green: [22, 163, 74] as [number, number, number],
+      red: [220, 38, 38] as [number, number, number],
+      mute: [120, 120, 120] as [number, number, number],
+    }
+    const setFill = (c: [number, number, number]) => doc.setFillColor(c[0], c[1], c[2])
+    const setText = (c: [number, number, number]) => doc.setTextColor(c[0], c[1], c[2])
+    const setDraw = (c: [number, number, number]) => doc.setDrawColor(c[0], c[1], c[2])
+
+    // === HEADER BAND ===
+    setFill(COLORS.violet)
+    doc.rect(0, 0, pageW, 80, "F")
+    let textX = marginX
+    const logo = await loadImageAsDataUrl(siteConfig.logo)
+    if (logo) {
+      const targetH = 44
+      const targetW = Math.min(120, targetH * (logo.w / Math.max(1, logo.h)))
+      try {
+        doc.addImage(logo.data, "PNG", marginX, 18, targetW, targetH)
+        textX = marginX + targetW + 14
+      } catch {
+        // si le logo n'est pas un PNG décodable, on l'ignore
+      }
+    }
+    doc.setTextColor(255, 255, 255)
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(18)
+    doc.text(siteConfig.name, textX, 38)
+    doc.setFont("helvetica", "normal")
+    doc.setFontSize(10)
+    doc.text("Rapport de simulation de rentabilité (prévisionnel)", textX, 56)
+
+    let y = 110
+
+    // === TITLE BLOCK ===
+    setText(COLORS.violet)
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(18)
+    doc.text(`Programme : ${programName}`, marginX, y)
+    y += 18
+    doc.setFont("helvetica", "normal")
+    doc.setFontSize(10)
+    setText(COLORS.slate)
+    doc.text(`Édité le ${dateLabel}`, marginX, y)
+    y += 22
+
+    const getLastY = (): number =>
+      (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY
+
+    const sectionTitle = (label: string) => {
+      if (y > pageH - 90) {
+        doc.addPage()
+        y = 60
+      }
+      setFill(COLORS.violet)
+      doc.rect(marginX, y - 11, 4, 16, "F")
+      setText(COLORS.violet)
+      doc.setFont("helvetica", "bold")
+      doc.setFontSize(12)
+      doc.text(label, marginX + 12, y)
+      y += 12
+    }
+
+    const kvTable = (rows: [string, string][]) => {
+      autoTable(doc, {
+        startY: y,
+        body: rows,
+        theme: "plain",
+        styles: {
+          fontSize: 10,
+          cellPadding: { top: 5, bottom: 5, left: 8, right: 8 },
+          textColor: COLORS.slate,
+          lineColor: COLORS.slateLine,
+          lineWidth: 0.5,
+        },
+        columnStyles: {
+          0: { fontStyle: "bold", cellWidth: 230 },
+          1: { textColor: [30, 30, 30], halign: "right" },
+        },
+        alternateRowStyles: { fillColor: COLORS.slateSoft },
+        margin: { left: marginX, right: marginX },
+      })
+      y = getLastY() + 16
+    }
+
+    // === INFORMATIONS PROGRAMME ===
+    sectionTitle("Informations du programme")
+    kvTable([
+      ["Change DH / Riyal", fmtNumFr(parseNum(formData.exchange, 0), 2)],
+      ["Nombre de jours Madina", fmtNumFr(parseNum(formData.nbJoursMadina, 0))],
+      ["Nombre de jours Makkah", fmtNumFr(parseNum(formData.nbJoursMakkah, 0))],
+      ["Prix avion (DH)", fmtDhFr(parseNum(formData.prixAvion, 0))],
+      ["Prix visa (Riyal)", fmtNumFr(parseNum(formData.prixVisaRiyal, 0))],
+      ["Profit générique (DH)", fmtDhFr(parseNum(formData.profit, 0))],
+      ["Profit Économique (DH)", fmtDhFr(parseNum(formData.profitEconomique, 0))],
+      ["Profit Normal (DH)", fmtDhFr(parseNum(formData.profitNormal, 0))],
+      ["Profit VIP (DH)", fmtDhFr(parseNum(formData.profitVIP, 0))],
+    ])
+
+    // === DATES LIMITES ===
+    sectionTitle("Dates limites")
+    const fmtDate = (d: Date | null | undefined) =>
+      d ? format(d, "dd/MM/yyyy", { locale: fr }) : "—"
+    kvTable([
+      ["Date limite passeport", fmtDate(formData.datesLimites.passport)],
+      ["Date limite visa", fmtDate(formData.datesLimites.visa)],
+      ["Date limite billets", fmtDate(formData.datesLimites.billets)],
+      ["Date limite hôtels", fmtDate(formData.datesLimites.hotels)],
+    ])
+
+    // === HYPOTHÈSES DE LA SIMULATION ===
+    sectionTitle("Hypothèses de la simulation")
+    kvTable([
+      ["Inclure avion dans le coût", simIncludeAvion ? "Oui" : "Non"],
+      ["Inclure visa dans le coût", simIncludeVisa ? "Oui" : "Non"],
+      ["Plan tarifaire", simPlan],
+      ["Jours Madina (simulation)", simJoursMadina || "(défaut formulaire)"],
+      ["Jours Makkah (simulation)", simJoursMakkah || "(défaut formulaire)"],
+      ["Places agents", fmtNumFr(parseInt(simAgentPlaces || "0", 10) || 0)],
+      ["Charge par place agent (DH)", fmtDhFr(parseNum(simAgentCostPerPlaceDH, 0))],
+      ["Autres charges fixes (DH)", fmtDhFr(parseNum(simAutresChargesDH, 0))],
+    ])
+
+    // === DÉTAIL PAR TYPE DE CHAMBRE ===
+    sectionTitle("Détail par type de chambre")
+    autoTable(doc, {
+      startY: y,
+      head: [["Type", "Places", "Prix / pers. (DH)", "Sous-total (DH)"]],
+      body: p.byType.map((row) => [
+        row.label,
+        fmtNumFr(row.places),
+        fmtNumFr(Math.round(row.unitDh)),
+        fmtNumFr(Math.round(row.subtotalDh)),
+      ]),
+      foot: [[
+        "Total",
+        fmtNumFr(p.totalTravelersMax),
+        "",
+        fmtNumFr(Math.round(p.revenueIfAllPayDh)),
+      ]],
+      headStyles: { fillColor: COLORS.violet, textColor: 255, fontStyle: "bold" },
+      footStyles: { fillColor: COLORS.violetSoft, textColor: COLORS.violet, fontStyle: "bold" },
+      styles: {
+        fontSize: 10,
+        cellPadding: { top: 6, bottom: 6, left: 8, right: 8 },
+        lineColor: COLORS.slateLine,
+        lineWidth: 0.5,
+      },
+      columnStyles: {
+        1: { halign: "right" },
+        2: { halign: "right" },
+        3: { halign: "right" },
+      },
+      margin: { left: marginX, right: marginX },
+    })
+    y = getLastY() + 16
+
+    // === INVENTAIRE HÔTELS ===
+    const hotelRows: string[][] = []
     const pushHotelRows = (
       city: "Madina" | "Makkah",
       hotels: Array<{ name: string; chambres: ChambresConfig }>
@@ -617,14 +806,19 @@ export default function NouveauProgramme() {
           const nbChambres = parseInt(hotel.chambres[t]?.nb || "0", 10) || 0
           const prixRoomRiyal = parseNum(hotel.chambres[t]?.prix, 0)
           if (nbChambres <= 0 && prixRoomRiyal <= 0) continue
-          rawHotelsRows.push([
+          const label =
+            t === 1 ? "Simple"
+            : t === 2 ? "Double"
+            : t === 3 ? "Triple"
+            : t === 4 ? "Quadruple"
+            : "Quintuple"
+          hotelRows.push([
             city,
             hotel.name,
-            t,
-            t === 1 ? "Simple" : t === 2 ? "Double" : t === 3 ? "Triple" : t === 4 ? "Quadruple" : "Quintuple",
-            nbChambres,
-            prixRoomRiyal,
-            nbChambres * t,
+            label,
+            fmtNumFr(nbChambres),
+            fmtNumFr(prixRoomRiyal),
+            fmtNumFr(nbChambres * t),
           ])
         }
       }
@@ -632,145 +826,118 @@ export default function NouveauProgramme() {
     pushHotelRows("Madina", formData.hotelsMadina)
     pushHotelRows("Makkah", formData.hotelsMakkah)
 
-    const detailByTypeRows: Array<(string | number)[]> = p.byType.map((row) => [
-      row.typeKey,
-      row.label,
-      row.places,
-      Math.round(row.unitDh),
-      Math.round(row.subtotalDh),
-    ])
+    if (hotelRows.length > 0) {
+      sectionTitle("Inventaire hôtels et chambres")
+      autoTable(doc, {
+        startY: y,
+        head: [["Ville", "Hôtel", "Type", "Nb chambres", "Prix chambre (Riyal)", "Places"]],
+        body: hotelRows,
+        headStyles: { fillColor: COLORS.violet, textColor: 255, fontStyle: "bold" },
+        styles: {
+          fontSize: 9,
+          cellPadding: { top: 5, bottom: 5, left: 6, right: 6 },
+          lineColor: COLORS.slateLine,
+          lineWidth: 0.5,
+        },
+        columnStyles: {
+          3: { halign: "right" },
+          4: { halign: "right" },
+          5: { halign: "right" },
+        },
+        alternateRowStyles: { fillColor: COLORS.slateSoft },
+        margin: { left: marginX, right: marginX },
+      })
+      y = getLastY() + 16
+    }
 
-    const isNumeric = (v: string | number) => typeof v === "number" && Number.isFinite(v)
-    const xmlCell = (v: string | number) =>
-      isNumeric(v)
-        ? `<Cell><Data ss:Type="Number">${v}</Data></Cell>`
-        : `<Cell><Data ss:Type="String">${escapeXml(String(v))}</Data></Cell>`
-
-    const xmlRows = (rows: Array<Array<string | number>>) =>
-      rows.map((row) => `<Row>${row.map((c) => xmlCell(c)).join("")}</Row>`).join("")
-
-    const resumeRows: Array<(string | number)[]> = [
-      ["Simulation de rentabilité (prévisionnel)", ""],
-      ["Exporté le", dateLabel],
-      ["Nom programme", formData.nom.trim() || "—"],
-      ["", ""],
-      ["Informations programme", ""],
-      ["Change (DH / Riyal)", parseNum(formData.exchange, 0)],
-      ["NB jours Madina", parseNum(formData.nbJoursMadina, 0)],
-      ["NB jours Makkah", parseNum(formData.nbJoursMakkah, 0)],
-      ["Prix avion (DH)", parseNum(formData.prixAvion, 0)],
-      ["Prix visa (Riyal)", parseNum(formData.prixVisaRiyal, 0)],
-      ["Profit générique (DH)", parseNum(formData.profit, 0)],
-      ["Profit Économique (DH)", parseNum(formData.profitEconomique, 0)],
-      ["Profit Normal (DH)", parseNum(formData.profitNormal, 0)],
-      ["Profit VIP (DH)", parseNum(formData.profitVIP, 0)],
-      ["", ""],
-      ["Dates limites (formulaire)", ""],
-      [
-        "Date limite passeport",
-        formData.datesLimites.passport
-          ? format(formData.datesLimites.passport, "dd/MM/yyyy", { locale: fr })
-          : "—",
+    // === RÉSULTAT PRÉVISIONNEL ===
+    if (y > pageH - 320) {
+      doc.addPage()
+      y = 60
+    }
+    sectionTitle("Résultat prévisionnel")
+    autoTable(doc, {
+      startY: y,
+      body: [
+        ["CA si capacité pleine et tous payants", fmtDhFr(p.revenueIfAllPayDh)],
+        ["Total paiement prévu (après agents)", fmtDhFr(p.revenueAfterAgentsDh)],
+        ["Capacité totale (voyageurs)", `${fmtNumFr(p.totalTravelersMax)} pers.`],
+        ["Places payantes", `${fmtNumFr(p.payingTravelers)} pers.`],
+        ["Places agents (non payantes)", `${fmtNumFr(p.agentPlaces)} pers.`],
+        ["Coût agence vol", fmtDhFr(p.costVolAllTravelersDh)],
+        ["Coût agence hôtels", fmtDhFr(p.costHotelsAllTravelersDh)],
+        ["Coût agence visa", fmtDhFr(p.costVisaAllTravelersDh)],
+        ["Charges agents", fmtDhFr(p.agentChargesTotalDh)],
+        ["Autres charges fixes", fmtDhFr(p.autresChargesDh)],
+        ["Total charges", fmtDhFr(p.totalChargesDh)],
       ],
-      [
-        "Date limite visa",
-        formData.datesLimites.visa
-          ? format(formData.datesLimites.visa, "dd/MM/yyyy", { locale: fr })
-          : "—",
-      ],
-      [
-        "Date limite billets",
-        formData.datesLimites.billets
-          ? format(formData.datesLimites.billets, "dd/MM/yyyy", { locale: fr })
-          : "—",
-      ],
-      [
-        "Date limite hôtels",
-        formData.datesLimites.hotels
-          ? format(formData.datesLimites.hotels, "dd/MM/yyyy", { locale: fr })
-          : "—",
-      ],
-      ["", ""],
-      ["Hypothèses simulation", ""],
-      ["Inclure avion", simIncludeAvion ? "Oui" : "Non"],
-      ["Inclure visa", simIncludeVisa ? "Oui" : "Non"],
-      ["Plan tarifaire", simPlan],
-      ["Jours Madina simulation", simJoursMadina || "(défaut formulaire)"],
-      ["Jours Makkah simulation", simJoursMakkah || "(défaut formulaire)"],
-      ["Places agents", parseInt(simAgentPlaces || "0", 10) || 0],
-      ["Charge par place agent (DH)", parseNum(simAgentCostPerPlaceDH, 0)],
-      ["Autres charges fixes (DH)", parseNum(simAutresChargesDH, 0)],
-      ["", ""],
-      ["Résultats simulation", ""],
-      ["Capacité (voyageurs)", p.totalTravelersMax],
-      ["Places payantes (après agents)", p.payingTravelers],
-      ["Places agents (non payantes)", p.agentPlaces],
-      ["Réf. CA si capacité pleine et tous payants (DH)", Math.round(p.revenueIfAllPayDh)],
-      ["Total paiement prévu (DH)", Math.round(p.revenueAfterAgentsDh)],
-      ["Coût agence vol (DH)", Math.round(p.costVolAllTravelersDh)],
-      ["Coût agence hôtel (DH)", Math.round(p.costHotelsAllTravelersDh)],
-      ["Coût agence visa (DH)", Math.round(p.costVisaAllTravelersDh)],
-      ["Charges agents (DH)", Math.round(p.agentChargesTotalDh)],
-      ["Autres charges (DH)", Math.round(p.autresChargesDh)],
-      ["Total charges (DH)", Math.round(p.totalChargesDh)],
-      ["Gain net prévu (DH)", Math.round(p.resultatPrevDh)],
-      ["Change utilisé", p.exchange],
-      ["Jours Madina effectifs", p.joursMadinaEff],
-      ["Jours Makkah effectifs", p.joursMakkahEff],
-    ]
-
-    const hotelRows: Array<(string | number)[]> = [
-      ["Ville", "Hôtel", "Type chambre (nb pers)", "Libellé", "Nb chambres", "Prix chambre (Riyal)", "Places"],
-      ...rawHotelsRows,
-    ]
-
-    const simulationTypeRows: Array<(string | number)[]> = [
-      ["Type clé", "Type", "Places", "Prix / pers. (DH)", "Sous-total (DH)"],
-      ...detailByTypeRows,
-    ]
-
-    // SpreadsheetML : extension .xml = cohérent avec le contenu (évite l’avertissement Excel des fichiers .xls/XML).
-    const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:o="urn:schemas-microsoft-com:office:office"
- xmlns:x="urn:schemas-microsoft-com:office:excel"
- xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:html="http://www.w3.org/TR/REC-html40">
-  <Worksheet ss:Name="Résumé">
-    <Table>
-      ${xmlRows(resumeRows)}
-    </Table>
-  </Worksheet>
-  <Worksheet ss:Name="Détail Simulation">
-    <Table>
-      ${xmlRows(simulationTypeRows)}
-    </Table>
-  </Worksheet>
-  <Worksheet ss:Name="Hôtels Chambres">
-    <Table>
-      ${xmlRows(hotelRows)}
-    </Table>
-  </Worksheet>
-</Workbook>`
-
-    const blob = new Blob([xml], {
-      type: "application/vnd.ms-excel",
+      theme: "plain",
+      styles: {
+        fontSize: 10,
+        cellPadding: { top: 5, bottom: 5, left: 8, right: 8 },
+        textColor: COLORS.slate,
+        lineColor: COLORS.slateLine,
+        lineWidth: 0.5,
+      },
+      columnStyles: {
+        0: { cellWidth: 320 },
+        1: { halign: "right", fontStyle: "bold", textColor: [30, 30, 30] },
+      },
+      alternateRowStyles: { fillColor: COLORS.slateSoft },
+      margin: { left: marginX, right: marginX },
     })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    const filename = `simulation-rentabilite-${slug}-${fileDate}.xml`
-    a.setAttribute("download", filename)
-    a.rel = "noopener"
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    window.setTimeout(() => URL.revokeObjectURL(url), 500)
+    y = getLastY() + 18
+
+    // Encadré du gain net
+    const isProfit = p.resultatPrevDh >= 0
+    const boxH = 80
+    if (y + boxH > pageH - 70) {
+      doc.addPage()
+      y = 60
+    }
+    setFill(isProfit ? COLORS.green : COLORS.red)
+    doc.roundedRect(marginX, y, contentW, boxH, 8, 8, "F")
+    doc.setTextColor(255, 255, 255)
+    doc.setFont("helvetica", "normal")
+    doc.setFontSize(11)
+    doc.text(isProfit ? "GAIN NET PRÉVISIONNEL" : "PERTE NETTE PRÉVISIONNELLE", marginX + 22, y + 28)
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(26)
+    doc.text(fmtDhFr(p.resultatPrevDh), marginX + 22, y + 62)
+    y += boxH + 18
+
+    // Mention de bas de document
+    if (y > pageH - 70) {
+      doc.addPage()
+      y = 60
+    }
+    setText(COLORS.mute)
+    doc.setFont("helvetica", "italic")
+    doc.setFontSize(8)
+    const noteLines = doc.splitTextToSize(
+      "Ce rapport est une projection prévisionnelle basée sur les hypothèses saisies au moment de la simulation. Les résultats réels peuvent différer en fonction du remplissage effectif du programme, des taux de change et des coûts réels constatés. Document à conserver pour comparaison avec le résultat final du programme.",
+      contentW
+    )
+    doc.text(noteLines, marginX, y + 4)
+
+    // === FOOTERS ===
+    const pageCount = doc.getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i)
+      setDraw(COLORS.slateLine)
+      doc.setLineWidth(0.5)
+      doc.line(marginX, pageH - 30, pageW - marginX, pageH - 30)
+      setText(COLORS.mute)
+      doc.setFont("helvetica", "normal")
+      doc.setFontSize(8)
+      doc.text(`${siteConfig.name} — ${programName}`, marginX, pageH - 16)
+      doc.text(`Page ${i} / ${pageCount}`, pageW - marginX, pageH - 16, { align: "right" })
+    }
+
+    doc.save(`rapport-rentabilite-${slug}-${fileDate}.pdf`)
     toast({
       title: "Rapport téléchargé",
-      description:
-        "Fichier tableur Excel XML (.xml) : ouvrez-le avec Excel (résumé, simulation, hôtels).",
+      description: "Rapport PDF de simulation enregistré — à conserver pour comparaison.",
     })
   }, [
     canRunSimulation,

@@ -42,8 +42,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import Link from "next/link"
-import jsPDF from "jspdf"
-import autoTable from "jspdf-autotable"
 import { siteConfig } from "@/lib/config"
 
 interface Hotel {
@@ -116,10 +114,12 @@ function hasRoomsWithoutPrice(hotel: { chambres: ChambresConfig }): boolean {
 }
 
 const fmtNumFr = (n: number, decimals = 0): string =>
-  Number(n).toLocaleString("fr-FR", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  })
+  Number(n)
+    .toLocaleString("fr-FR", {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    })
+    .replace(/ /g, " ")
 
 const fmtDhFr = (n: number): string => `${fmtNumFr(Math.round(n))} DH`
 
@@ -615,6 +615,10 @@ export default function NouveauProgramme() {
 
   const downloadSimulationReport = useCallback(async () => {
     if (!canRunSimulation) return
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ])
     const p = simulationPreview
     const exportedAt = new Date()
     const dateLabel = exportedAt.toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" })
@@ -714,8 +718,8 @@ export default function NouveauProgramme() {
           lineWidth: 0.5,
         },
         columnStyles: {
-          0: { fontStyle: "bold", cellWidth: 230 },
-          1: { textColor: [30, 30, 30], halign: "right" },
+          0: { fontStyle: "bold", cellWidth: 290 },
+          1: { textColor: [30, 30, 30], halign: "right", cellWidth: 220 },
         },
         alternateRowStyles: { fillColor: COLORS.slateSoft },
         margin: { left: marginX, right: marginX },
@@ -780,6 +784,7 @@ export default function NouveauProgramme() {
       ]],
       headStyles: { fillColor: COLORS.violet, textColor: 255, fontStyle: "bold" },
       footStyles: { fillColor: COLORS.violetSoft, textColor: COLORS.violet, fontStyle: "bold" },
+      showFoot: "lastPage",
       styles: {
         fontSize: 10,
         cellPadding: { top: 6, bottom: 6, left: 8, right: 8 },
@@ -787,9 +792,10 @@ export default function NouveauProgramme() {
         lineWidth: 0.5,
       },
       columnStyles: {
-        1: { halign: "right" },
-        2: { halign: "right" },
-        3: { halign: "right" },
+        0: { cellWidth: 120 },
+        1: { halign: "right", cellWidth: 80 },
+        2: { halign: "right", cellWidth: 150 },
+        3: { halign: "right", cellWidth: 150 },
       },
       margin: { left: marginX, right: marginX },
     })
@@ -880,8 +886,8 @@ export default function NouveauProgramme() {
         lineWidth: 0.5,
       },
       columnStyles: {
-        0: { cellWidth: 320 },
-        1: { halign: "right", fontStyle: "bold", textColor: [30, 30, 30] },
+        0: { cellWidth: 310 },
+        1: { halign: "right", fontStyle: "bold", textColor: [30, 30, 30], cellWidth: 200 },
       },
       alternateRowStyles: { fillColor: COLORS.slateSoft },
       margin: { left: marginX, right: marginX },

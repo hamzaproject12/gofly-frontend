@@ -113,13 +113,17 @@ function hasRoomsWithoutPrice(hotel: { chambres: ChambresConfig }): boolean {
   return false
 }
 
-const fmtNumFr = (n: number, decimals = 0): string =>
-  Number(n)
-    .toLocaleString("fr-FR", {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    })
-    .replace(/ /g, " ")
+// Format manuel (pas de toLocaleString : ICU/navigateur insere un espace
+// insecable U+00A0 ou fine U+202F que la fonte Helvetica de jsPDF rend en "/").
+// Ici on garantit une espace ASCII normale (U+0020) comme separateur de milliers.
+const fmtNumFr = (n: number, decimals = 0): string => {
+  const safe = Number.isFinite(n) ? n : 0
+  const fixed = Math.abs(safe).toFixed(decimals)
+  const [intPart, decPart] = fixed.split(".")
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, " ")
+  const sign = safe < 0 ? "-" : ""
+  return sign + grouped + (decPart ? "," + decPart : "")
+}
 
 const fmtDhFr = (n: number): string => `${fmtNumFr(Math.round(n))} DH`
 

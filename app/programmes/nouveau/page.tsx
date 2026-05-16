@@ -35,6 +35,7 @@ import {
   Calculator,
   Info,
   Download,
+  Loader2,
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -1109,7 +1110,7 @@ export default function NouveauProgramme() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!isFormValid) return
+    if (!isFormValid || isSubmitting) return
 
     setIsSubmitting(true)
 
@@ -2141,12 +2142,22 @@ export default function NouveauProgramme() {
                   <div className="flex flex-col gap-3 mt-8">
                     <div className="flex gap-4">
                       <Button
+                        type="button"
                         onClick={handleSubmit}
-                        disabled={!isFormValid}
+                        disabled={!isFormValid || isSubmitting}
                         className="flex-1 h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <Save className="mr-2 h-5 w-5" />
-                        Enregistrer le programme
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            Enregistrement…
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-5 w-5" />
+                            Enregistrer le programme
+                          </>
+                        )}
                       </Button>
                       <Link href="/programmes" className="flex-1">
                         <Button
@@ -2304,12 +2315,22 @@ export default function NouveauProgramme() {
             <Card className="border-0 shadow-xl bg-white">
               <CardContent className="p-4 space-y-3">
                 <Button
+                  type="button"
                   onClick={handleSubmit}
-                  disabled={!isFormValid}
+                  disabled={!isFormValid || isSubmitting}
                   className="w-full h-11 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Save className="mr-2 h-4 w-4" />
-                  Enregistrer le programme
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Enregistrement…
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Enregistrer le programme
+                    </>
+                  )}
                 </Button>
                 <Link href="/programmes">
                   <Button variant="outline" className="w-full h-11 border-2 border-gray-300 hover:border-gray-400">

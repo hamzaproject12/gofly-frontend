@@ -968,6 +968,19 @@ export default function NouvelleChambrePage() {
       return;
     }
 
+      // Déterminer le statut de la chambre (appliqué au leader ET à tous les accompagnants
+      // via common.status). Passeports requis pour TOUS les occupants + visa/hôtel/vol
+      // fournisseur + paiement >= prix.
+      const allDocsAttached =
+        allPassportFilesProvided &&
+        supplierStatus.statutVisa &&
+        supplierStatus.statutHotel &&
+        supplierStatus.statutVol;
+      const roomPrice = Number(formData.prix) || 0;
+      const roomPaid = Number(paidAmount || totalPayments || 0);
+      const isPaid = roomPrice > 0 && roomPaid >= roomPrice;
+      const reservationStatus = allDocsAttached && isPaid ? "Complet" : "Incomplet";
+
       const leaderOccupants = occupants.map((o, i) => {
         const accPhone = (o.phone || "").trim();
         return {
@@ -997,7 +1010,7 @@ export default function NouvelleChambrePage() {
               programId: Number(formData.programId),
               hotelMadina: hotelNameMadina,
               hotelMakkah: hotelNameMakkah,
-              status: "Incomplet",
+              status: reservationStatus,
               statutPasseport: allPassportFilesProvided,
               statutVisa: supplierStatus.statutVisa,
               statutHotel: supplierStatus.statutHotel,

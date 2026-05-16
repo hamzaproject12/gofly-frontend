@@ -737,23 +737,39 @@ export default function EditReservation() {
       const hasExistingPassport = getDocumentUrl('passport') !== null && passportToDelete === null;
       const shouldUpdateStatutPasseport = hasNewPassport || hasExistingPassport;
       
-      // Vérifier si la réservation est complète pour mettre le statut à "Complet"
+      // Vérifier si la chambre est complète. Le statut est unique pour toute la
+      // chambre : il exige le passeport du leader ET de chaque accompagnant.
       const isPassportAttached = shouldUpdateStatutPasseport;
+      const accompagnantsPassportOk =
+        !reservationData?.isLeader || accompagnants.length === 0
+          ? true
+          : accompagnants.every((a) => {
+              const existingPassDoc = (a.documents || []).find((d: any) =>
+                ["passport", "passeport"].includes(d.fileType)
+              );
+              const del = memberPassportDelete[a.id];
+              const newFile = memberPassportFiles[a.id];
+              return (!!existingPassDoc && del == null) || !!newFile;
+            });
       const isVisaComplete = formData.statutVisa;
       const isHotelComplete = formData.statutHotel;
       const isFlightComplete = formData.statutVol;
-      
+
       // Le paidAmount sera recalculé côté backend avec tous les paiements (existants + nouveaux)
-      const isPaymentComplete = (reservationData.paidAmount + newPaymentIds.reduce((sum, id) => sum + parseFloat(paiements.find(p => !p.id)?.montant || '0'), 0)) >= parseFloat(formData.prix);
-      
-      const isReservationComplete = isPassportAttached && 
-                                   isVisaComplete && 
-                                   isHotelComplete && 
-                                   isFlightComplete && 
+      const roomPrice = parseFloat(formData.prix);
+      const isPaymentComplete = roomPrice > 0 && (reservationData.paidAmount + newPaymentIds.reduce((sum, id) => sum + parseFloat(paiements.find(p => !p.id)?.montant || '0'), 0)) >= roomPrice;
+
+      const isReservationComplete = isPassportAttached &&
+                                   accompagnantsPassportOk &&
+                                   isVisaComplete &&
+                                   isHotelComplete &&
+                                   isFlightComplete &&
                                    isPaymentComplete;
+      const roomStatus = isReservationComplete ? 'Complet' : 'Incomplet';
       
       console.log('📊 Vérification statut complet:', {
         isPassportAttached,
+        accompagnantsPassportOk,
         isVisaComplete,
         isHotelComplete,
         isFlightComplete,
@@ -779,8 +795,9 @@ export default function EditReservation() {
         groupe: formData.groupe || null,
         remarque: formData.remarque || null,
         transport: formData.transport ? 'Oui' : null,
-        // Mettre à jour le statut global si toutes les conditions sont remplies
-        ...(isReservationComplete && { status: 'Complet' })
+        // Toujours écrire le statut : passe à "Complet" si tout est rempli,
+        // sinon repasse à "Incomplet" (ex. document retiré / prix augmenté).
+        status: roomStatus,
       }
 
       console.log('📝 Mise à jour réservation:', {
@@ -998,6 +1015,7 @@ export default function EditReservation() {
               passportNumber: a.passportNumber || null,
               reservationDate: formData.dateReservation,
               statutPasseport: statutPasseportMember,
+              status: roomStatus,
             }),
           });
           if (!memberRes.ok) {

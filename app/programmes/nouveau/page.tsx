@@ -1134,16 +1134,13 @@ export default function NouveauProgramme() {
         hotelsMakkah: formData.hotelsMakkah
       }
 
-      const response = await fetch(api.url(api.endpoints.programs), {
+      const response = await api.request(api.endpoints.programs, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(programData),
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
+        const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.error || 'Erreur lors de la création du programme')
       }
 

@@ -734,25 +734,33 @@ export default function EditReservation() {
         bodyJSON: JSON.stringify(body)
       })
 
-      const response = await api.request(`/api/reservations/${reservationId}`, {
-        method: 'PUT',
-        body: JSON.stringify(body),
-      })
+      // Dossier chambre privée (leader + accompagnants) : mise à jour groupée
+      // unique (une seule entrée de journal). Sinon, PUT unitaire classique.
+      const isGroupDossier = !!(
+        reservationData?.isLeader && accompagnants.length > 0
+      )
 
-      console.log('📥 Réponse PUT:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok
-      })
+      if (!isGroupDossier) {
+        const response = await api.request(`/api/reservations/${reservationId}`, {
+          method: 'PUT',
+          body: JSON.stringify(body),
+        })
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Erreur inconnue' }))
-        console.error('❌ Erreur PUT:', errorData)
-        throw new Error(`Erreur lors de la modification de la réservation: ${errorData.error || response.statusText}`)
+        console.log('📥 Réponse PUT:', {
+          status: response.status,
+          statusText: response.statusText,
+          ok: response.ok
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Erreur inconnue' }))
+          console.error('❌ Erreur PUT:', errorData)
+          throw new Error(`Erreur lors de la modification de la réservation: ${errorData.error || response.statusText}`)
+        }
+
+        const responseData = await response.json()
+        console.log('✅ Réponse PUT succès:', responseData)
       }
-
-      const responseData = await response.json()
-      console.log('✅ Réponse PUT succès:', responseData)
 
       // 3. Supprimer l'ancien passeport si on a un nouveau ou si on a marqué pour suppression
       const fileIdToDelete = passportToDelete || (documents.passport ? getPassportFileId() : null);
@@ -891,8 +899,10 @@ export default function EditReservation() {
         })
       }
 
-      // Si c'est un dossier leader, appliquer les mises à jour des accompagnants + fichiers passeport
-      if (reservationData?.isLeader && accompagnants.length > 0) {
+      // Si c'est un dossier leader, gérer les fichiers passeport des accompagnants
+      // et accumuler leurs champs pour un seul appel groupé (une entrée journal).
+      const accompagnantsPayload: any[] = []
+      if (isGroupDossier) {
         for (const a of accompagnants) {
           const delMemberPass = memberPassportDelete[a.id];
           if (delMemberPass != null) {
@@ -932,23 +942,37 @@ export default function EditReservation() {
           );
           const statutPasseportMember =
             (!!existingPassDoc && delMemberPass == null) || !!newPassFile;
-          const memberRes = await api.request(`/api/reservations/${a.id}`, {
+          accompagnantsPayload.push({
+            id: a.id,
+            firstName: a.firstName,
+            lastName: a.lastName,
+            phone: a.phone,
+            passportNumber: a.passportNumber || null,
+            reservationDate: formData.dateReservation,
+            statutPasseport: statutPasseportMember,
+          });
+        }
+
+        // Un seul appel groupé → leader + accompagnants en une transaction,
+        // une seule entrée dans le journal d'activité.
+        const groupRes = await api.request(
+          api.endpoints.reservationGroupUpdate(reservationId),
+          {
             method: "PUT",
             body: JSON.stringify({
-              firstName: a.firstName,
-              lastName: a.lastName,
-              phone: a.phone,
-              passportNumber: a.passportNumber || null,
-              reservationDate: formData.dateReservation,
-              statutPasseport: statutPasseportMember,
+              leader: body,
+              accompagnants: accompagnantsPayload,
             }),
-          });
-          if (!memberRes.ok) {
-            console.warn(`Echec mise à jour accompagnant ${a.id}`);
           }
+        );
+        if (!groupRes.ok) {
+          const err = await groupRes.json().catch(() => ({ error: "Erreur inconnue" }));
+          throw new Error(
+            `Erreur lors de la modification de la chambre: ${err.error || groupRes.statusText}`
+          );
         }
       }
-      
+
       router.push('/reservations')
     } catch (error) {
       console.error('Erreur modification:', error)

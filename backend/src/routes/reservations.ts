@@ -8,6 +8,7 @@ import {
   buildReservationCreationDetail,
   buildReservationDeletionDetail,
   buildReservationUpdateDetail,
+  buildRoomGroupUpdateDetail,
   getChangedReservationScalarKeys,
   shouldSilencePostCreateStatutPatchJournal,
   JOURNAL_ACTION,
@@ -698,6 +699,168 @@ router.post('/', async (req, res) => {
   } catch (error) {
     console.error('Erreur création réservation:', error);
     res.status(500).json({ error: 'Erreur lors de la création de la réservation' });
+  }
+});
+
+/**
+ * Construit le payload Prisma d'update à partir d'un fragment de body, en
+ * appliquant les mêmes règles que le PUT unitaire (champs restreints pour un
+ * accompagnant, recalcul du paidAmount pour un leader).
+ */
+function buildReservationUpdateData(
+  body: any,
+  isAccompagnant: boolean,
+  recomputedPaidAmount: number,
+  previousPaidAmount: number
+): Record<string, unknown> {
+  const updateData: Record<string, unknown> = {};
+  if (body.firstName !== undefined) updateData.firstName = body.firstName;
+  if (body.lastName !== undefined) updateData.lastName = body.lastName;
+  if (body.phone !== undefined) updateData.phone = body.phone;
+  if (body.passportNumber !== undefined) updateData.passportNumber = body.passportNumber || null;
+  if (body.groupe !== undefined) updateData.groupe = body.groupe || null;
+  if (body.remarque !== undefined) updateData.remarque = body.remarque || null;
+  if (body.transport !== undefined) updateData.transport = body.transport || null;
+  if (!isAccompagnant) {
+    if (body.programId !== undefined) updateData.programId = body.programId;
+    if (body.roomType !== undefined) updateData.roomType = body.roomType;
+    if (body.hotelMadina !== undefined) updateData.hotelMadina = body.hotelMadina;
+    if (body.hotelMakkah !== undefined) updateData.hotelMakkah = body.hotelMakkah;
+    if (body.price !== undefined) updateData.price = body.price;
+  }
+  if (body.reservationDate !== undefined) updateData.reservationDate = new Date(body.reservationDate);
+  if (body.statutPasseport !== undefined) updateData.statutPasseport = body.statutPasseport;
+  if (body.statutVisa !== undefined) updateData.statutVisa = body.statutVisa;
+  if (body.statutHotel !== undefined) updateData.statutHotel = body.statutHotel;
+  if (body.statutVol !== undefined) updateData.statutVol = body.statutVol;
+  if (body.status !== undefined) updateData.status = body.status;
+  updateData.paidAmount = isAccompagnant ? previousPaidAmount ?? 0 : recomputedPaidAmount;
+  return updateData;
+}
+
+/**
+ * Modification groupée d'une chambre (dossier leader + accompagnants) en une
+ * seule transaction → UNE seule entrée de journal agrégée, attribuée à
+ * l'auteur de la session.
+ */
+router.put('/group/:leaderId', async (req, res) => {
+  try {
+    const leaderId = parseInt(req.params.leaderId);
+    if (Number.isNaN(leaderId)) {
+      return res.status(400).json({ error: 'leaderId invalide' });
+    }
+    const leaderBody = req.body?.leader ?? {};
+    const accompagnantsBody: any[] = Array.isArray(req.body?.accompagnants)
+      ? req.body.accompagnants
+      : [];
+
+    const leaderBefore = await prisma.reservation.findUnique({
+      where: { id: leaderId },
+      include: reservationJournalInclude,
+    });
+    if (!leaderBefore) {
+      return res.status(404).json({ error: 'Réservation leader non trouvée' });
+    }
+
+    const accIds = accompagnantsBody
+      .map((a) => parseInt(a?.id))
+      .filter((n) => !Number.isNaN(n));
+    const accBefore = accIds.length
+      ? await prisma.reservation.findMany({
+          where: { id: { in: accIds }, parentId: leaderId },
+          include: reservationJournalInclude,
+        })
+      : [];
+    const accBeforeById = new Map(accBefore.map((r) => [r.id, r]));
+
+    // paidAmount du leader recalculé depuis ses paiements (parité avec PUT unitaire)
+    const leaderPayments = await prisma.payment.findMany({ where: { reservationId: leaderId } });
+    const leaderTotalPaid = leaderPayments.reduce((s, p) => s + p.amount, 0);
+
+    await prisma.$transaction(async (tx) => {
+      const leaderUpdate = buildReservationUpdateData(
+        leaderBody,
+        Boolean(leaderBefore.parentId),
+        leaderTotalPaid,
+        leaderBefore.paidAmount
+      );
+      await tx.reservation.update({ where: { id: leaderId }, data: leaderUpdate });
+
+      for (const a of accompagnantsBody) {
+        const aId = parseInt(a?.id);
+        const before = accBeforeById.get(aId);
+        if (!before) continue;
+        const accUpdate = buildReservationUpdateData(
+          a,
+          true,
+          before.paidAmount,
+          before.paidAmount
+        );
+        await tx.reservation.update({ where: { id: aId }, data: accUpdate });
+      }
+
+      // Propagation des statuts partagés du leader vers tous ses accompagnants
+      if (leaderBefore.isLeader && leaderBefore.groupId) {
+        const shared: any = {};
+        if (leaderBody.statutVisa !== undefined) shared.statutVisa = leaderBody.statutVisa;
+        if (leaderBody.statutHotel !== undefined) shared.statutHotel = leaderBody.statutHotel;
+        if (leaderBody.statutVol !== undefined) shared.statutVol = leaderBody.statutVol;
+        if (leaderBody.status !== undefined) shared.status = leaderBody.status;
+        if (leaderBody.reservationDate !== undefined)
+          shared.reservationDate = new Date(leaderBody.reservationDate);
+        if (Object.keys(shared).length > 0) {
+          await tx.reservation.updateMany({ where: { parentId: leaderId }, data: shared });
+        }
+      }
+    });
+
+    const memberIds = [leaderId, ...accBefore.map((r) => r.id)];
+    const afterRows = await prisma.reservation.findMany({
+      where: { id: { in: memberIds } },
+      include: reservationJournalInclude,
+    });
+    const afterById = new Map(afterRows.map((r) => [r.id, r]));
+
+    const pairs: { before: ReservationJournalRow; after: ReservationJournalRow }[] = [];
+    const leaderAfter = afterById.get(leaderId);
+    if (leaderAfter) {
+      pairs.push({
+        before: leaderBefore as ReservationJournalRow,
+        after: leaderAfter as ReservationJournalRow,
+      });
+    }
+    for (const before of accBefore) {
+      const after = afterById.get(before.id);
+      if (after) {
+        pairs.push({
+          before: before as ReservationJournalRow,
+          after: after as ReservationJournalRow,
+        });
+      }
+    }
+
+    try {
+      const { summary, detailText, anyChange } = buildRoomGroupUpdateDetail(pairs);
+      if (anyChange) {
+        await logJournalSuppression(prisma, req, {
+          action: JOURNAL_ACTION.RESERVATION_UPDATED,
+          entityType: 'Reservation',
+          entityId: leaderId,
+          summary,
+          detailText,
+          actorIdFallback: leaderBefore.agentId ?? null,
+        });
+      }
+    } catch (journalErr) {
+      console.error('[Journal] Échec log modification chambre groupée:', journalErr);
+    }
+
+    res.json({ leaderId, members: afterRows });
+  } catch (error) {
+    console.error('Erreur modification groupée chambre:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Erreur modification groupée chambre',
+    });
   }
 });
 

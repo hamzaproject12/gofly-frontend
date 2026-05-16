@@ -138,6 +138,9 @@ export const api = {
     reservations: '/api/reservations',
     /** Création transactionnelle leader + accompagnants (chambre privée) */
     reservationGroup: '/api/reservations/group',
+    /** Modification groupée leader + accompagnants → une seule entrée journal */
+    reservationGroupUpdate: (leaderId: number | string) =>
+      `/api/reservations/group/${leaderId}`,
     expenses: '/api/expenses',
     upload: '/api/upload',
     uploadCloudinary: '/api/upload-cloudinary',

@@ -364,6 +364,46 @@ export function buildReservationUpdateDetail(
   return { summary, detailText: text };
 }
 
+/**
+ * Modification d'une chambre complète (dossier leader + accompagnants) en un seul
+ * appel : produit UNE entrée de journal agrégée listant, par membre, les champs
+ * réellement modifiés. `anyChange` est false si aucun membre n'a changé (dans ce
+ * cas, ne rien journaliser).
+ */
+export function buildRoomGroupUpdateDetail(
+  pairs: { before: ReservationJournalRow; after: ReservationJournalRow }[]
+): { summary: string; detailText: string; anyChange: boolean } {
+  const sorted = [...pairs].sort((a, b) => {
+    if (a.after.isLeader !== b.after.isLeader) return a.after.isLeader ? -1 : 1;
+    return a.after.id - b.after.id;
+  });
+  const leaderPair = sorted.find((p) => p.after.isLeader) ?? sorted[0];
+  const leader = leaderPair?.after;
+
+  const summary = leader
+    ? `Modification chambre (${sorted.length} pers.) — ${leader.firstName} ${leader.lastName} (#${leader.id})`
+    : `Modification chambre (${sorted.length} pers.)`;
+
+  let text = '=== MODIFICATION CHAMBRE (DOSSIER) ===\n';
+  text += 'Origine: API PUT /api/reservations/group/:leaderId\n';
+  text += `Membres concernés: ${sorted.length}\n\n`;
+
+  let anyChange = false;
+  for (const p of sorted) {
+    const role = p.after.isLeader ? 'Leader' : 'Accompagnant';
+    text += `[${role}] #${p.after.id} — ${p.after.firstName} ${p.after.lastName}\n`;
+    const diff = diffReservationJournalRows(p.before, p.after);
+    if (diff) {
+      anyChange = true;
+      text += `${diff}\n\n`;
+    } else {
+      text += '(Aucun champ métier modifié.)\n\n';
+    }
+  }
+
+  return { summary, detailText: text, anyChange };
+}
+
 export function buildReservationDeletionDetail(rows: ReservationJournalRow[]): {
   summary: string;
   detailText: string;

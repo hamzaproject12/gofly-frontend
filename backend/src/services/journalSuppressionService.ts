@@ -258,11 +258,33 @@ export function diffReservationJournalRows(before: ReservationJournalRow, after:
 }
 
 export function compactReservationSnapshot(r: ReservationJournalRow): string {
+  // N'afficher que les statuts à « oui » (passeport joint, visa, hôtel, vol).
+  // Les statuts à false sont volontairement omis.
+  const statutsOui: string[] = [];
+  if (r.statutPasseport) statutsOui.push('Passeport joint: oui');
+  if (r.statutVisa) statutsOui.push('Visa: oui');
+  if (r.statutHotel) statutsOui.push('Hôtel: oui');
+  if (r.statutVol) statutsOui.push('Vol: oui');
+  const statutsLine = statutsOui.length ? statutsOui.join(' | ') : 'aucun';
   return [
     `ID #${r.id} — ${r.firstName} ${r.lastName} | ${r.phone}`,
     `Programme: ${r.program.name} (id=${r.program.id}) | ${r.roomType} | ${r.status} | ${r.price} DH`,
-    `Hôtels: ${r.hotelMadina ?? '—'} / ${r.hotelMakkah ?? '—'} | Statuts P/V/H/Vol: ${r.statutPasseport}/${r.statutVisa}/${r.statutHotel}/${r.statutVol}`,
+    `Hôtels: ${r.hotelMadina ?? '—'} / ${r.hotelMakkah ?? '—'}`,
+    `Statuts: ${statutsLine}`,
   ].join('\n');
+}
+
+/**
+ * Vrai si la réservation vient d'être créée (dans la fenêtre de silence) : on
+ * évite alors d'ajouter une ligne « modifiée » / « paiement » distincte de la
+ * ligne « créée » lors de l'assistant nouvelle réservation / nouvelle chambre.
+ */
+export function isWithinPostCreateSilenceWindow(
+  createdAt: Date | string | null | undefined,
+  silenceMs = 180_000
+): boolean {
+  if (!createdAt) return false;
+  return Date.now() - new Date(createdAt).getTime() <= silenceMs;
 }
 
 const PROGRAM_SCALAR_KEYS: (keyof Program)[] = [

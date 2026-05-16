@@ -5,6 +5,7 @@ import {
   logJournalSuppression,
   buildReservationUpdateDetail,
   getChangedReservationScalarKeys,
+  isWithinPostCreateSilenceWindow,
   JOURNAL_ACTION,
   type ReservationJournalRow,
 } from '../services/journalSuppressionService';
@@ -156,7 +157,14 @@ router.post('/', async (req, res) => {
       console.log('Paiements supprimés (doublons sans fichierId):', deleted);
     }
 
-    if (reservationIdNum !== null && journalBefore) {
+    // Paiements créés pendant l'assistant nouvelle réservation / nouvelle
+    // chambre : ne pas générer de ligne journal distincte — seule la ligne
+    // « Réservation créée » doit apparaître.
+    const isPostCreate =
+      journalBefore != null &&
+      isWithinPostCreateSilenceWindow((journalBefore as any).created_at);
+
+    if (reservationIdNum !== null && journalBefore && !isPostCreate) {
       try {
         const journalAfter = await prisma.reservation.findUnique({
           where: { id: reservationIdNum },

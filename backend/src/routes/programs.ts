@@ -912,7 +912,7 @@ router.delete('/:id', async (req, res) => {
       action: JOURNAL_ACTION.PROGRAM_SOFT_DELETED,
       entityType: 'Program',
       entityId: programId,
-      summary: `Masquage (soft delete) — ${softSummary}`,
+      summary: `Masquage du programme — ${softSummary}`,
       detailText: softDetail,
     });
 
@@ -1010,7 +1010,7 @@ router.delete('/:id/hard', async (req, res) => {
       action: JOURNAL_ACTION.PROGRAM_HARD_DELETED,
       entityType: 'Program',
       entityId: programId,
-      summary: `Suppression définitive — ${program.name} (id=${programId})`,
+      summary: `Suppression définitive du programme — ${program.name}`,
       detailText: hardDetailText,
     });
 

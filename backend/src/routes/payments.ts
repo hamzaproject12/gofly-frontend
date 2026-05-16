@@ -173,14 +173,14 @@ router.post('/', async (req, res) => {
         if (journalAfter) {
           const ja = journalAfter as ReservationJournalRow;
           const changed = getChangedReservationScalarKeys(journalBefore, ja);
-          const payNote = `Paiement POST /api/payments — #${payment.id} | ${amountNum} DH | ${type}${description ? ` | ${description}` : ''}`;
+          const payNote = `Paiement enregistré : ${amountNum} DH — Mode : ${type}${description ? ` — ${description}` : ''}`;
           const { summary, detailText } = buildReservationUpdateDetail(journalBefore, ja, 'PUT', {
             extraNote: payNote,
           });
           const summaryFinal =
             changed.length > 0
               ? summary
-              : `Paiement enregistré — réservation #${reservationIdNum} — ${ja.firstName} ${ja.lastName}`;
+              : `Paiement enregistré — dossier n°${reservationIdNum} — ${ja.firstName} ${ja.lastName}`;
           await logJournalSuppression(prisma, req, {
             action: JOURNAL_ACTION.RESERVATION_UPDATED,
             entityType: 'Reservation',

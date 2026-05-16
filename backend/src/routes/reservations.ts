@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import {
   logJournalSuppression,
   buildReservationCreationDetail,
+  buildReservationGroupCreationDetail,
   buildReservationDeletionDetail,
   buildReservationUpdateDetail,
   buildRoomGroupUpdateDetail,
@@ -434,22 +435,26 @@ router.post('/group', async (req, res) => {
 
     if (result.leaderId != null) {
       try {
-        const leader = await prisma.reservation.findUnique({
-          where: { id: result.leaderId },
+        const memberIds = result.reservations
+          .map((r: { id: number }) => r.id)
+          .filter((n: number) => Number.isFinite(n));
+        const members = await prisma.reservation.findMany({
+          where: { id: { in: memberIds } },
           include: reservationJournalInclude,
         });
-        if (leader) {
-          const row = leader as ReservationJournalRow;
-          const { detailText: baseDetail } = buildReservationCreationDetail(row);
-          const detailText = `${baseDetail}\n--- Groupe (chambre privée) ---\nNombre de membres: ${result.reservations.length}\nIdentifiant groupe: ${result.groupId}\n`;
-          const summary = `Création groupe (${result.reservations.length} pers.) — ${leader.firstName} ${leader.lastName} (#${result.leaderId})`;
+        const leader = members.find((m) => m.id === result.leaderId) ?? null;
+        if (members.length > 0) {
+          const { summary, detailText } = buildReservationGroupCreationDetail(
+            members as ReservationJournalRow[],
+            result.groupId ?? null
+          );
           await logJournalSuppression(prisma, req, {
             action: JOURNAL_ACTION.RESERVATION_CREATED,
             entityType: 'Reservation',
             entityId: result.leaderId,
             summary,
             detailText,
-            actorIdFallback: leader.agentId ?? null,
+            actorIdFallback: leader?.agentId ?? null,
           });
         }
       } catch (journalErr) {
@@ -1089,7 +1094,7 @@ router.put('/:id', async (req, res) => {
           {
             extraNote:
               bodyHadDocs || bodyHadPayments
-                ? 'Fichiers ou liste paiements fournis dans la requête (effet possible hors lignes « champs modifiés »).'
+                ? 'Des documents ou des paiements ont également été mis à jour.'
                 : undefined,
           }
         );

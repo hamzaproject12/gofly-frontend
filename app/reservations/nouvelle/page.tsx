@@ -936,11 +936,16 @@ export default function NouvelleReservation() {
       formData.gender !== "" &&
       formData.nom !== "" &&
       formData.prenom !== "" &&
-      formData.telephone !== "" &&
+      PHONE_REGEX.test((formData.telephone || "").trim()) &&
       formData.prix !== "";
 
-    return baseFieldsValid && arePaymentsValid;
-  }, [formData, arePaymentsValid]);
+    // Si le document passeport est joint, le n° de passeport devient obligatoire
+    const passportNumberOk =
+      !documents.passport ||
+      PASSPORT_REGEX.test((formData.passportNumber || "").trim());
+
+    return baseFieldsValid && passportNumberOk && arePaymentsValid;
+  }, [formData, documents.passport, arePaymentsValid]);
 
   // Calculer la progression des sections
   const section1Complete = useMemo(() => {
@@ -1388,6 +1393,15 @@ export default function NouvelleReservation() {
       toast({
         title: "Passeport invalide",
         description: "Format attendu: 2 lettres + 7 chiffres (ex: AB1234567).",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (documents.passport && !PASSPORT_REGEX.test(passportNumber)) {
+      toast({
+        title: "N° de passeport requis",
+        description:
+          "Le document passeport est joint : renseignez le numéro de passeport (2 lettres + 7 chiffres) avant d'enregistrer.",
         variant: "destructive",
       });
       return;

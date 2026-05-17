@@ -218,6 +218,7 @@ type FormData = {
 };
 
 const PHONE_REGEX = /^\+\d{3}\s\d{9}$/;
+const PASSPORT_REGEX = /^[A-Z]{2}\d{7}$/;
 
 function formatPhoneInput(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 12);
@@ -622,6 +623,20 @@ export default function EditReservation() {
       toast({
         title: "Téléphone invalide",
         description: "Format attendu: +XXX XXXXXXXXX (ex: +212 123456789).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const hasPassportDoc = !!documents.passport || !!getDocumentUrl("passport");
+    if (
+      hasPassportDoc &&
+      !PASSPORT_REGEX.test((formData.passportNumber || "").trim())
+    ) {
+      toast({
+        title: "N° de passeport requis",
+        description:
+          "Le document passeport est joint : renseignez le numéro de passeport (2 lettres + 7 chiffres) avant d'enregistrer.",
         variant: "destructive",
       });
       return;
@@ -1548,6 +1563,12 @@ export default function EditReservation() {
     // 1. Les paiements sont valides (ou il n'y a pas de paiements)
     // 2. ET (il y a des changements OU le formulaire de base est valide)
     const baseFormValid = formData.prix && formData.programId && formData.typeChambre && formData.gender;
+    // Si le document passeport est joint (nouveau ou existant), le n° devient obligatoire
+    const hasPassportDoc = !!documents.passport || !!getDocumentUrl("passport");
+    const passportNumberOk =
+      !hasPassportDoc ||
+      PASSPORT_REGEX.test((formData.passportNumber || "").trim());
+    if (!passportNumberOk) return false;
     // Si des changements sont détectés, activer le bouton même si certains champs ne sont pas remplis
     // (car on peut modifier juste une partie)
     if (hasChanges) {
@@ -1555,7 +1576,7 @@ export default function EditReservation() {
     }
     // Sinon, vérifier que le formulaire de base est valide
     return arePaymentsValid && baseFormValid;
-  }, [arePaymentsValid, hasChanges, formData])
+  }, [arePaymentsValid, hasChanges, formData, documents.passport, passportToDelete, previews, reservationData])
 
   const totalProgress = [section1Complete, section2Complete, section3Complete, section4Complete]
     .filter(Boolean).length * 25

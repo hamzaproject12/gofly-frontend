@@ -106,6 +106,7 @@ const ROOM_CAPACITY: Record<string, number> = {
   QUINT: 5,
 };
 const PHONE_REGEX = /^\+\d{3}\s\d{9}$/;
+const PASSPORT_REGEX = /^[A-Z]{2}\d{7}$/;
 
 function formatPhoneInput(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 12);
@@ -902,11 +903,17 @@ export default function NouvelleChambrePage() {
     occupants.every((o, i) => {
       const fn = (o.firstName || "").trim();
       const ln = (o.lastName || "").trim();
+      // Si le document passeport est joint pour cet occupant, son n° devient obligatoire
+      const passportNumberOk =
+        !occupantPassportFiles[i] ||
+        PASSPORT_REGEX.test((o.passportNumber || "").trim());
       if (i === 0) {
         const ph = (o.phone || "").trim();
-        return fn.length > 0 && ln.length > 0 && ph.length > 0;
+        return (
+          fn.length > 0 && ln.length > 0 && PHONE_REGEX.test(ph) && passportNumberOk
+        );
       }
-      return fn.length > 0 && ln.length > 0;
+      return fn.length > 0 && ln.length > 0 && passportNumberOk;
     });
 
   const allPassportFilesProvided =
@@ -945,6 +952,22 @@ export default function NouvelleChambrePage() {
         title: "Téléphone invalide",
         description:
           "Renseignez l'indicatif et un numéro de 9 chiffres. Format attendu : +XXX XXXXXXXXX (ex: +212 123456789).",
+        variant: "destructive",
+      });
+      return;
+    }
+    const passportFileWithoutNumber = occupants.findIndex(
+      (o, i) =>
+        !!occupantPassportFiles[i] &&
+        !PASSPORT_REGEX.test((o.passportNumber || "").trim())
+    );
+    if (passportFileWithoutNumber !== -1) {
+      toast({
+        title: "N° de passeport requis",
+        description:
+          passportFileWithoutNumber === 0
+            ? "Le passeport du leader est joint : renseignez son numéro (2 lettres + 7 chiffres) avant d'enregistrer."
+            : `Le passeport de l'accompagnant ${passportFileWithoutNumber} est joint : renseignez son numéro (2 lettres + 7 chiffres) avant d'enregistrer.`,
         variant: "destructive",
       });
       return;

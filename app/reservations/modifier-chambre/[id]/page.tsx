@@ -637,6 +637,40 @@ export default function EditReservation() {
       return;
     }
 
+    // Si le document passeport est joint (nouveau ou existant), le n° devient
+    // obligatoire — pour le leader ET pour chaque accompagnant.
+    const leaderHasPassportDoc =
+      documents.passport !== null ||
+      (getDocumentUrl("passport") !== null && passportToDelete === null);
+    if (leaderHasPassportDoc && !PASSPORT_REGEX.test(passportNumber)) {
+      toast({
+        title: "N° de passeport requis",
+        description:
+          "Le document passeport du leader est joint : renseignez son numéro (2 lettres + 7 chiffres) avant d'enregistrer.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const accWithPassportDocMissingNumber = accompagnants.findIndex((a) => {
+      const existingPassDoc = (a.documents || []).find((d: any) =>
+        ["passport", "passeport"].includes(d.fileType)
+      );
+      const del = memberPassportDelete[a.id];
+      const newFile = memberPassportFiles[a.id];
+      const hasDoc = (!!existingPassDoc && del == null) || !!newFile;
+      return hasDoc && !PASSPORT_REGEX.test((a.passportNumber || "").trim());
+    });
+    if (accWithPassportDocMissingNumber !== -1) {
+      toast({
+        title: "N° de passeport requis",
+        description: `Le passeport de l'accompagnant ${
+          accWithPassportDocMissingNumber + 1
+        } est joint : renseignez son numéro (2 lettres + 7 chiffres) avant d'enregistrer.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!arePaymentsValid) {
       toast({
         title: "Paiement incomplet",
@@ -1686,6 +1720,23 @@ export default function EditReservation() {
     // 1. Les paiements sont valides (ou il n'y a pas de paiements)
     // 2. ET (il y a des changements OU le formulaire de base est valide)
     const baseFormValid = formData.prix && formData.programId && formData.typeChambre && formData.gender;
+    // Si le document passeport est joint (leader ou accompagnant), le n° devient obligatoire
+    const leaderHasPassportDoc =
+      documents.passport !== null ||
+      (getDocumentUrl("passport") !== null && passportToDelete === null);
+    const leaderPassportOk =
+      !leaderHasPassportDoc ||
+      PASSPORT_REGEX.test((formData.passportNumber || "").trim());
+    const accompagnantsPassportNumberOk = accompagnants.every((a) => {
+      const existingPassDoc = (a.documents || []).find((d: any) =>
+        ["passport", "passeport"].includes(d.fileType)
+      );
+      const del = memberPassportDelete[a.id];
+      const newFile = memberPassportFiles[a.id];
+      const hasDoc = (!!existingPassDoc && del == null) || !!newFile;
+      return !hasDoc || PASSPORT_REGEX.test((a.passportNumber || "").trim());
+    });
+    if (!leaderPassportOk || !accompagnantsPassportNumberOk) return false;
     // Si des changements sont détectés, activer le bouton même si certains champs ne sont pas remplis
     // (car on peut modifier juste une partie)
     if (hasChanges) {
@@ -1693,7 +1744,7 @@ export default function EditReservation() {
     }
     // Sinon, vérifier que le formulaire de base est valide
     return arePaymentsValid && baseFormValid;
-  }, [arePaymentsValid, hasChanges, formData])
+  }, [arePaymentsValid, hasChanges, formData, documents.passport, passportToDelete, previews, reservationData, accompagnants, memberPassportFiles, memberPassportDelete])
 
   const totalProgress = [section1Complete, section2Complete, section3Complete, section4Complete]
     .filter(Boolean).length * 25

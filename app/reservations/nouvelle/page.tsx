@@ -1501,38 +1501,38 @@ export default function NouvelleReservation() {
       const fileUploadErrors: string[] = [];
       const newUploadedStatus = { ...uploadedStatus };
 
-      // Passeport - Upload vers Cloudinary et création du fichier
+      // Passeport - Upload vers Cloudinary et création du fichier (en parallèle)
       if (documents.passport) {
-        try {
-          const formDataPassport = new FormData();
-          formDataPassport.append("file", documents.passport);
-          formDataPassport.append("reservationId", reservationId.toString());
-          formDataPassport.append("fileType", "passport");
+        const formDataPassport = new FormData();
+        formDataPassport.append("file", documents.passport);
+        formDataPassport.append("reservationId", reservationId.toString());
+        formDataPassport.append("fileType", "passport");
 
-          const response = await fetch(api.url(api.endpoints.uploadCloudinary), {
+        fileUploadPromises.push(
+          fetch(api.url(api.endpoints.uploadCloudinary), {
             method: "POST",
             body: formDataPassport,
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            const uploadedFile = data.results && data.results[0];
-            const fichierId = uploadedFile && uploadedFile.id;
-            
-            if (fichierId) {
-              console.log('✅ Passport uploaded to Cloudinary with fichierId:', fichierId);
-              newUploadedStatus.passport = true;
-            } else {
-              fileUploadErrors.push('Erreur: Aucun fichierId retourné pour le passeport');
-            }
-          } else {
-            const error = await response.json();
-            fileUploadErrors.push(`Erreur lors de l'upload du passeport vers Cloudinary: ${error.error || 'Erreur inconnue'}`);
-          }
-        } catch (error) {
-          console.error('❌ Erreur upload passeport:', error);
-          fileUploadErrors.push('Erreur lors de l\'upload du passeport');
-        }
+          })
+            .then(async (response) => {
+              if (response.ok) {
+                const data = await response.json();
+                const uploadedFile = data.results && data.results[0];
+                const fichierId = uploadedFile && uploadedFile.id;
+                if (fichierId) {
+                  newUploadedStatus.passport = true;
+                } else {
+                  fileUploadErrors.push('Erreur: Aucun fichierId retourné pour le passeport');
+                }
+              } else {
+                const error = await response.json().catch(() => ({}));
+                fileUploadErrors.push(`Erreur lors de l'upload du passeport vers Cloudinary: ${error.error || 'Erreur inconnue'}`);
+              }
+            })
+            .catch((error) => {
+              console.error('❌ Erreur upload passeport:', error);
+              fileUploadErrors.push('Erreur lors de l\'upload du passeport');
+            })
+        );
       }
 
       // Visa
@@ -1801,7 +1801,7 @@ export default function NouvelleReservation() {
         }
       }));
 
-      if (expenseErrors.length > 0) {
+      if (fileUploadErrors.length > 0 || paymentErrors.length > 0 || expenseErrors.length > 0) {
         throw new Error([...fileUploadErrors, ...paymentErrors, ...expenseErrors].join('\n'));
       }
 
@@ -1821,10 +1821,7 @@ export default function NouvelleReservation() {
         description: "La réservation, les documents et les dépenses fournisseur ont été enregistrés avec succès",
       });
 
-      // Attendre un court instant pour que le toast soit visible
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Rediriger vers la page des réservations
+      // Rediriger uniquement après que tout a été enregistré avec succès
       router.push("/reservations");
     } catch (error) {
       console.error("Erreur lors de la création de la réservation:", error);

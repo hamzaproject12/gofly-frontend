@@ -105,6 +105,8 @@ const ROOM_CAPACITY: Record<string, number> = {
   QUAD: 4,
   QUINT: 5,
 };
+const PHONE_REGEX = /^\+\d{3}\s\d{9}$/;
+
 function formatPhoneInput(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 12);
   if (!digits) return "";
@@ -938,6 +940,15 @@ export default function NouvelleChambrePage() {
       });
       return;
     }
+    if (!PHONE_REGEX.test(leaderPhone)) {
+      toast({
+        title: "Téléphone invalide",
+        description:
+          "Renseignez l'indicatif et un numéro de 9 chiffres. Format attendu : +XXX XXXXXXXXX (ex: +212 123456789).",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!canSubmit) {
       toast({
         title: "Formulaire incomplet",
@@ -982,11 +993,10 @@ export default function NouvelleChambrePage() {
       const reservationStatus = allDocsAttached && isPaid ? "Complet" : "Incomplet";
 
       const leaderOccupants = occupants.map((o, i) => {
-        const accPhone = (o.phone || "").trim();
         return {
           ...o,
           passportNumber: (o.passportNumber || "").trim() || "",
-          phone: i === 0 ? leaderPhone : accPhone || leaderPhone,
+          phone: leaderPhone,
           gender: i === 0 ? formData.gender : o.gender,
         };
       });
@@ -1064,94 +1074,105 @@ export default function NouvelleChambrePage() {
         })
       );
 
-      // 2) Paiements liés au leader
-      for (const payment of payments) {
-        if (!payment.amount || !payment.type) continue;
-        let fichierId: number | null = null;
-        if (payment.receipt) {
-          const fd = new FormData();
-          fd.append("file", payment.receipt);
-          fd.append("reservationId", String(leaderId));
-          fd.append("fileType", "payment");
-          const uploadRes = await fetch(api.url(api.endpoints.uploadCloudinary), {
-            method: "POST",
-            body: fd,
-          });
-          if (!uploadRes.ok) {
-            const uploadErr = await uploadRes.json().catch(() => ({}));
-            throw new Error(uploadErr.error || "Erreur upload reçu paiement");
+      // 2) Paiements liés au leader (en parallèle)
+      await Promise.all(
+        payments.map(async (payment) => {
+          if (!payment.amount || !payment.type) return;
+          let fichierId: number | null = null;
+          if (payment.receipt) {
+            const fd = new FormData();
+            fd.append("file", payment.receipt);
+            fd.append("reservationId", String(leaderId));
+            fd.append("fileType", "payment");
+            const uploadRes = await fetch(api.url(api.endpoints.uploadCloudinary), {
+              method: "POST",
+              body: fd,
+            });
+            if (!uploadRes.ok) {
+              const uploadErr = await uploadRes.json().catch(() => ({}));
+              throw new Error(uploadErr.error || "Erreur upload reçu paiement");
+            }
+            const data = await uploadRes.json();
+            fichierId = data?.results?.[0]?.id ?? null;
           }
-          const data = await uploadRes.json();
-          fichierId = data?.results?.[0]?.id ?? null;
-        }
 
-        const paymentRes = await api.request(api.url(api.endpoints.payments), {
-          method: "POST",
-          body: JSON.stringify({
-            amount: parseFloat(payment.amount),
-            type: payment.type,
-            reservationId: leaderId,
-            fichierId: fichierId || undefined,
-            programId: Number(formData.programId),
-          }),
-        });
-        if (!paymentRes.ok) {
-          const paymentErr = await paymentRes.json().catch(() => ({}));
-          throw new Error(paymentErr.error || "Erreur création paiement leader");
-        }
-      }
+          const paymentRes = await api.request(api.url(api.endpoints.payments), {
+            method: "POST",
+            body: JSON.stringify({
+              amount: parseFloat(payment.amount),
+              type: payment.type,
+              reservationId: leaderId,
+              fichierId: fichierId || undefined,
+              programId: Number(formData.programId),
+            }),
+          });
+          if (!paymentRes.ok) {
+            const paymentErr = await paymentRes.json().catch(() => ({}));
+            throw new Error(paymentErr.error || "Erreur création paiement leader");
+          }
+        })
+      );
 
-      // 3) Expenses pour chaque membre (leader + accompagnants)
+      // 3) Expenses pour chaque membre (leader + accompagnants) — en parallèle
       if (programInfo) {
         const roomMadina = programInfo.rooms.find((r) => r.id === Number(roomMadinaId));
         const roomMakkah = programInfo.rooms.find((r) => r.id === Number(roomMakkahId));
+
+        const expenseRequests: Array<{
+          description: string;
+          amount: number;
+          type: string;
+          fichierId?: number;
+          reservationId: number;
+        }> = [];
+
         for (let index = 0; index < createdReservations.length; index++) {
           const reservation = createdReservations[index];
           const occupant = leaderOccupants[index];
           const fullName = `${occupant?.firstName || ""} ${
             occupant?.lastName || ""
           }`.trim();
-          const expensePayloads: Array<{
-            description: string;
-            amount: number;
-            type: string;
-            fichierId?: number;
-          }> = [];
 
           if (customization.includeAvion) {
-            expensePayloads.push({
+            expenseRequests.push({
               description: `Service de vol pour ${fullName}`,
               amount: programInfo.prixAvionDH,
               type: "Vol",
+              reservationId: reservation.id,
             });
           }
           if (customization.includeVisa) {
-            expensePayloads.push({
+            expenseRequests.push({
               description: `Service de visa pour ${fullName}`,
               amount: programInfo.prixVisaRiyal * programInfo.exchange,
               type: "Visa",
+              reservationId: reservation.id,
             });
           }
           if (roomMadina) {
-            expensePayloads.push({
+            expenseRequests.push({
               description: `Service hôtel Madina pour ${fullName}`,
               amount:
                 (roomMadina.prixRoom * customization.joursMadina * programInfo.exchange) /
                 Math.max(1, capacity),
               type: "Hotel Madina",
+              reservationId: reservation.id,
             });
           }
           if (roomMakkah) {
-            expensePayloads.push({
+            expenseRequests.push({
               description: `Service hôtel Makkah pour ${fullName}`,
               amount:
                 (roomMakkah.prixRoom * customization.joursMakkah * programInfo.exchange) /
                 Math.max(1, capacity),
               type: "Hotel Makkah",
+              reservationId: reservation.id,
             });
           }
+        }
 
-          for (const expense of expensePayloads) {
+        await Promise.all(
+          expenseRequests.map(async (expense) => {
             const expenseRes = await api.request(api.url(api.endpoints.expenses), {
               method: "POST",
               body: JSON.stringify({
@@ -1161,7 +1182,7 @@ export default function NouvelleChambrePage() {
                 type: expense.type,
                 fichierId: expense.fichierId,
                 programId: Number(formData.programId),
-                reservationId: reservation.id,
+                reservationId: expense.reservationId,
               }),
             });
             if (!expenseRes.ok) {
@@ -1170,8 +1191,8 @@ export default function NouvelleChambrePage() {
                 expenseErr.error || `Erreur création expense ${expense.type}`
               );
             }
-          }
-        }
+          })
+        );
       }
 
       // 4) Patch statuts leader (passeport cohérent avec les fichiers réellement joints)

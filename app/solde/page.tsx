@@ -5,6 +5,7 @@ import { api } from "@/lib/api"
 import RoleProtectedRoute from "../components/RoleProtectedRoute"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -287,12 +288,7 @@ const formatNumberWithDots = (num: number): string => {
 const formatCurrency = (num: number) => `${formatNumberWithDots(num)} DH`
 const formatSignedCurrency = (num: number) =>
   `${num >= 0 ? "+" : "-"}${formatNumberWithDots(Math.abs(num))} DH`
-const signedLog = (value: number) => {
-  if (value === 0) return 0
-  return Math.sign(value) * Math.log10(Math.abs(value) + 1)
-}
-const formatAxisTick = (value: number, mode: "raw" | "indexed") =>
-  mode === "raw" ? `${Math.round(value / 1000)}k` : `${Math.round(value)}`
+const formatAxisTick = (value: number) => `${Math.round(value / 1000)}k`
 const formatDateLabel = (isoDate?: string) => {
   if (!isoDate) return ""
   const [y, m, d] = isoDate.split("-")
@@ -326,15 +322,12 @@ const agentsCountConfig: ChartConfig = {
 
 export default function SoldeCaissePage() {
   const { toast } = useToast()
-  const chartPrefsStorageKey = "solde-caisse-chart-prefs-v1"
 
   // États pour les filtres
   const [dateDebut, setDateDebut] = useState("")
   const [dateFin, setDateFin] = useState("")
   const [programmeFilter, setProgrammeFilter] = useState("tous")
   const [periodeFilter, setPeriodeFilter] = useState("mois")
-  const [chartScaleMode, setChartScaleMode] = useState<"linear" | "log">("linear")
-  const [chartViewMode, setChartViewMode] = useState<"raw" | "indexed">("raw")
   const [exporting, setExporting] = useState(false)
 
   // États pour les données
@@ -442,42 +435,6 @@ export default function SoldeCaissePage() {
     fetchChartsData()
   }, [fetchData, fetchChartsData])
 
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const raw = window.localStorage.getItem(chartPrefsStorageKey)
-    if (!raw) return
-    try {
-      const parsed = JSON.parse(raw) as {
-        scaleMode?: "linear" | "log"
-        viewMode?: "raw" | "indexed"
-      }
-      if (parsed.scaleMode === "linear" || parsed.scaleMode === "log") {
-        setChartScaleMode(parsed.scaleMode)
-      }
-      if (parsed.viewMode === "raw" || parsed.viewMode === "indexed") {
-        setChartViewMode(parsed.viewMode)
-      }
-    } catch {
-      // Ignore corrupted local preference values.
-    }
-  }, [])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    window.localStorage.setItem(
-      chartPrefsStorageKey,
-      JSON.stringify({ scaleMode: chartScaleMode, viewMode: chartViewMode })
-    )
-  }, [chartPrefsStorageKey, chartScaleMode, chartViewMode])
-
-  const resetChartView = () => {
-    setChartScaleMode("linear")
-    setChartViewMode("raw")
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(chartPrefsStorageKey)
-    }
-  }
-
   // Données par défaut si pas encore chargées
   const data = balanceData || {
     statistics: { totalPaiements: 0, totalDepenses: 0, gainPrevu: 0, soldeFinal: 0, soldeFinalPrevu: 0, countPaiements: 0, countDepenses: 0, countReservations: 0 },
@@ -523,65 +480,22 @@ export default function SoldeCaissePage() {
     profitDiffs[0] || { day: 0, label: "", diff: 0 }
   )
 
-  const toIndexed = useCallback((values: number[]) => {
-    const maxAbs = Math.max(...values.map((v) => Math.abs(v)), 1)
-    return values.map((v) => (v / maxAbs) * 100)
-  }, [])
+  // Quand aucun filtre de période n'est actif, on limite les 4 graphiques
+  // (par mois / par programme) aux 4 derniers éléments faute de place.
+  // Les calculs du résumé en haut restent toujours généraux.
+  const hasPeriodFilter = Boolean(dateDebut || dateFin)
 
-  const timelineDisplayData = useMemo(() => {
-    if (chartViewMode === "raw" && chartScaleMode === "linear") return timelineData
-    const p = timelineData.map((d) => d.paiements)
-    const e = timelineData.map((d) => d.depenses)
-    const r = timelineData.map((d) => d.profit)
-    const [p2, e2, r2] =
-      chartViewMode === "indexed"
-        ? [toIndexed(p), toIndexed(e), toIndexed(r)]
-        : [p, e, r]
-    return timelineData.map((d, i) => ({
-      ...d,
-      paiements: chartScaleMode === "log" ? signedLog(p2[i]) : p2[i],
-      depenses: chartScaleMode === "log" ? signedLog(e2[i]) : e2[i],
-      profit: chartScaleMode === "log" ? signedLog(r2[i]) : r2[i],
-    }))
-  }, [chartScaleMode, chartViewMode, timelineData, toIndexed])
+  const timelineDisplayData = timelineData
 
-  const monthlyDisplayData = useMemo(() => {
-    if (chartViewMode === "raw" && chartScaleMode === "linear") return monthlyComparisonData
-    const p = monthlyComparisonData.map((d) => d.paiements)
-    const e = monthlyComparisonData.map((d) => d.depenses)
-    const pp = monthlyComparisonData.map((d) => d.paiementsPrevus)
-    const [p2, e2, pp2] =
-      chartViewMode === "indexed"
-        ? [toIndexed(p), toIndexed(e), toIndexed(pp)]
-        : [p, e, pp]
-    return monthlyComparisonData.map((d, i) => ({
-      ...d,
-      paiements: chartScaleMode === "log" ? signedLog(p2[i]) : p2[i],
-      depenses: chartScaleMode === "log" ? signedLog(e2[i]) : e2[i],
-      paiementsPrevus: chartScaleMode === "log" ? signedLog(pp2[i]) : pp2[i],
-      ecartReel: (chartScaleMode === "log" ? signedLog(p2[i]) : p2[i]) - (chartScaleMode === "log" ? signedLog(e2[i]) : e2[i]),
-      ecartPrevu: (chartScaleMode === "log" ? signedLog(pp2[i]) : pp2[i]) - (chartScaleMode === "log" ? signedLog(e2[i]) : e2[i]),
-    }))
-  }, [chartScaleMode, chartViewMode, monthlyComparisonData, toIndexed])
+  const monthlyDisplayData = useMemo(
+    () => (hasPeriodFilter ? monthlyComparisonData : monthlyComparisonData.slice(-4)),
+    [hasPeriodFilter, monthlyComparisonData]
+  )
 
-  const programDisplayData = useMemo(() => {
-    if (chartViewMode === "raw" && chartScaleMode === "linear") return programComparisonData
-    const p = programComparisonData.map((d) => d.paiements)
-    const e = programComparisonData.map((d) => d.depenses)
-    const pp = programComparisonData.map((d) => d.paiementsPrevus)
-    const [p2, e2, pp2] =
-      chartViewMode === "indexed"
-        ? [toIndexed(p), toIndexed(e), toIndexed(pp)]
-        : [p, e, pp]
-    return programComparisonData.map((d, i) => ({
-      ...d,
-      paiements: chartScaleMode === "log" ? signedLog(p2[i]) : p2[i],
-      depenses: chartScaleMode === "log" ? signedLog(e2[i]) : e2[i],
-      paiementsPrevus: chartScaleMode === "log" ? signedLog(pp2[i]) : pp2[i],
-      ecartReel: (chartScaleMode === "log" ? signedLog(p2[i]) : p2[i]) - (chartScaleMode === "log" ? signedLog(e2[i]) : e2[i]),
-      ecartPrevu: (chartScaleMode === "log" ? signedLog(pp2[i]) : pp2[i]) - (chartScaleMode === "log" ? signedLog(e2[i]) : e2[i]),
-    }))
-  }, [chartScaleMode, chartViewMode, programComparisonData, toIndexed])
+  const programDisplayData = useMemo(
+    () => (hasPeriodFilter ? programComparisonData : programComparisonData.slice(-4)),
+    [hasPeriodFilter, programComparisonData]
+  )
 
   const agentIndicativeData = useMemo(() => {
     const details = analyticsData?.agentRanking?.details || []
@@ -895,7 +809,7 @@ export default function SoldeCaissePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="space-y-3">
                 <Label htmlFor="programme" className="text-sm font-semibold text-gray-700">
                   🏢 Programme
@@ -930,45 +844,47 @@ export default function SoldeCaissePage() {
                 </Select>
               </div>
               <div className="space-y-3">
-                <Label htmlFor="chartScale" className="text-sm font-semibold text-gray-700">
-                  ⚙️ Échelle graphe
+                <Label htmlFor="dateDebut" className="text-sm font-semibold text-gray-700">
+                  📆 De
                 </Label>
-                <Select value={chartScaleMode} onValueChange={(value: "linear" | "log") => setChartScaleMode(value)}>
-                  <SelectTrigger id="chartScale" className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-11">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="linear">Linéaire</SelectItem>
-                    <SelectItem value="log">Log signée</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Input
+                  id="dateDebut"
+                  type="date"
+                  value={dateDebut}
+                  max={dateFin || undefined}
+                  onChange={(e) => setDateDebut(e.target.value)}
+                  className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-11"
+                />
               </div>
               <div className="space-y-3">
-                <Label htmlFor="chartViewMode" className="text-sm font-semibold text-gray-700">
-                  🎯 Mode de vue
+                <Label htmlFor="dateFin" className="text-sm font-semibold text-gray-700">
+                  📆 À
                 </Label>
-                <Select value={chartViewMode} onValueChange={(value: "raw" | "indexed") => setChartViewMode(value)}>
-                  <SelectTrigger id="chartViewMode" className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-11">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="raw">Valeurs brutes</SelectItem>
-                    <SelectItem value="indexed">Indice (base 100)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Input
+                  id="dateFin"
+                  type="date"
+                  value={dateFin}
+                  min={dateDebut || undefined}
+                  onChange={(e) => setDateFin(e.target.value)}
+                  className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-11"
+                />
               </div>
-              <div className="space-y-3">
-                <Label className="text-sm font-semibold text-gray-700">🧹 Réinitialiser</Label>
+            </div>
+            {(dateDebut || dateFin) && (
+              <div className="mt-4 flex justify-end">
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full h-11 border-2"
-                  onClick={resetChartView}
+                  className="h-9 border-2"
+                  onClick={() => {
+                    setDateDebut("")
+                    setDateFin("")
+                  }}
                 >
-                  Reset vue graphe
+                  Effacer les dates
                 </Button>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
@@ -1020,7 +936,7 @@ export default function SoldeCaissePage() {
                       <YAxis
                         tickLine={false}
                         axisLine={false}
-                        tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)}
+                        tickFormatter={(value) => formatAxisTick(Number(value))}
                       />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip
@@ -1035,7 +951,7 @@ export default function SoldeCaissePage() {
                               <div className="flex w-full items-center justify-between gap-4">
                                 <span className="text-muted-foreground">{timelineChartConfig[name as string]?.label || name}</span>
                                 <span className="font-mono font-semibold">
-                                  {chartViewMode === "raw" ? formatCurrency(Number(value)) : `${Number(value).toFixed(1)} idx`}
+                                  {formatCurrency(Number(value))}
                                 </span>
                               </div>
                             )}
@@ -1135,11 +1051,11 @@ export default function SoldeCaissePage() {
                         }}
                         height={44}
                       />
-                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
+                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value))} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip
                         cursor={false}
-                        content={<ChartTooltipContent formatter={(value) => chartViewMode === "raw" ? formatCurrency(Number(value)) : `${Number(value).toFixed(1)} idx`} />}
+                        content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />}
                       />
                       <ChartLegend content={<ChartLegendContent />} />
                       <Bar dataKey="paiements" fill="var(--color-paiements)" radius={[4, 4, 0, 0]} />
@@ -1190,11 +1106,11 @@ export default function SoldeCaissePage() {
                         }}
                         height={44}
                       />
-                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
+                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value))} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip
                         cursor={false}
-                        content={<ChartTooltipContent formatter={(value) => chartViewMode === "raw" ? formatCurrency(Number(value)) : `${Number(value).toFixed(1)} idx`} />}
+                        content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />}
                       />
                       <ChartLegend content={<ChartLegendContent />} />
                       <Bar dataKey="paiementsPrevus" fill="var(--color-paiementsPrevus)" radius={[4, 4, 0, 0]} />
@@ -1252,11 +1168,11 @@ export default function SoldeCaissePage() {
                           )
                         }}
                       />
-                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
+                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value))} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip
                         cursor={false}
-                        content={<ChartTooltipContent formatter={(value) => chartViewMode === "raw" ? formatCurrency(Number(value)) : `${Number(value).toFixed(1)} idx`} />}
+                        content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />}
                       />
                       <ChartLegend content={<ChartLegendContent />} />
                       <Bar dataKey="paiements" fill="var(--color-paiements)" radius={[4, 4, 0, 0]} />
@@ -1310,11 +1226,11 @@ export default function SoldeCaissePage() {
                           )
                         }}
                       />
-                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
+                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value))} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip
                         cursor={false}
-                        content={<ChartTooltipContent formatter={(value) => chartViewMode === "raw" ? formatCurrency(Number(value)) : `${Number(value).toFixed(1)} idx`} />}
+                        content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />}
                       />
                       <ChartLegend content={<ChartLegendContent />} />
                       <Bar dataKey="paiementsPrevus" fill="var(--color-paiementsPrevus)" radius={[4, 4, 0, 0]} />

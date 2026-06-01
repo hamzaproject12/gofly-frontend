@@ -16,28 +16,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  Calendar,
-  Users,
   FileText,
-  Wallet,
-  Bell,
-  Settings,
-  Search,
-  BarChart3,
-  ArrowUpDown,
   Download,
   Filter,
   CreditCard,
   TrendingUp,
-  TrendingDown,
   Trophy,
-  Target,
-  Activity,
   DollarSign,
   Award,
-  Star,
-  Bed,
-  Hotel as HotelIcon,
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
@@ -55,7 +41,6 @@ import {
   Brush,
   CartesianGrid,
   Cell,
-  ComposedChart,
   Legend,
   Line,
   LineChart,
@@ -66,29 +51,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
-
-// Types pour les nouveaux graphiques
-type RoomsChartData = {
-  roomType: string
-  nbRoomsReserver: number
-  nbRoomsRestant: number
-  totalRooms: number
-}
-
-type HotelsChartData = {
-  hotelName: string
-  nbPersonnes: number
-}
-
-type GenderChartData = {
-  gender: string
-  nbReservations: number
-}
-
-type SoldeChartData = {
-  type: string
-  montant: number
-}
 
 type TimelinePoint = {
   day: number
@@ -382,11 +344,6 @@ export default function SoldeCaissePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // États pour les nouveaux graphiques
-  const [roomsData, setRoomsData] = useState<RoomsChartData[]>([])
-  const [hotelsData, setHotelsData] = useState<HotelsChartData[]>([])
-  const [genderData, setGenderData] = useState<GenderChartData[]>([])
-  const [soldeData, setSoldeData] = useState<SoldeChartData[]>([])
   const [timelineData, setTimelineData] = useState<TimelinePoint[]>([])
   const [monthlyComparisonData, setMonthlyComparisonData] = useState<MonthlyComparisonData[]>([])
   const [programComparisonData, setProgramComparisonData] = useState<ProgramComparisonData[]>([])
@@ -453,57 +410,25 @@ export default function SoldeCaissePage() {
       if (dateDebut) params.append('dateDebut', dateDebut)
       if (dateFin) params.append('dateFin', dateFin)
       
-      // Récupérer toutes les données des graphiques en parallèle
-      const [
-        roomsRes,
-        hotelsRes,
-        genderRes,
-        soldeRes,
-        timelineRes,
-        monthlyRes,
-        programRes
-      ] = await Promise.all([
-        fetch(api.url(`/api/balance/charts/rooms?${params.toString()}`)),
-        fetch(api.url(`/api/balance/charts/hotels?${params.toString()}`)),
-        fetch(api.url(`/api/balance/charts/gender?${params.toString()}`)),
-        fetch(api.url(`/api/balance/charts/solde?${params.toString()}`)),
+      const [timelineRes, monthlyRes, programRes] = await Promise.all([
         fetch(api.url(`/api/balance/charts/timeline?${params.toString()}`)),
         fetch(api.url(`/api/balance/charts/monthly-comparison?${params.toString()}`)),
         fetch(api.url(`/api/balance/charts/program-comparison?${params.toString()}`))
       ])
 
-      const allResponses = [roomsRes, hotelsRes, genderRes, soldeRes, timelineRes, monthlyRes, programRes]
-      if (allResponses.some((res) => !res.ok)) {
+      if ([timelineRes, monthlyRes, programRes].some((res) => !res.ok)) {
         throw new Error('Erreur lors du chargement des données des graphiques')
       }
 
-      const [roomsData, hotelsData, genderData, soldeData, timelineChartData, monthlyChartData, programChartData] = await Promise.all([
-        roomsRes.json(),
-        hotelsRes.json(),
-        genderRes.json(),
-        soldeRes.json(),
+      const [timelineChartData, monthlyChartData, programChartData] = await Promise.all([
         timelineRes.json(),
         monthlyRes.json(),
         programRes.json()
       ])
 
-      setRoomsData(roomsData.data || [])
-      setHotelsData(hotelsData.data || [])
-      setGenderData(genderData.data || [])
-      setSoldeData(soldeData.data || [])
       setTimelineData(timelineChartData.data || [])
       setMonthlyComparisonData(monthlyChartData.data || [])
       setProgramComparisonData(programChartData.data || [])
-
-      console.log('✅ Graphiques chargés:', {
-        rooms: roomsData.data?.length || 0,
-        hotels: hotelsData.data?.length || 0,
-        gender: genderData.data?.length || 0,
-        solde: soldeData.data?.length || 0,
-        timeline: timelineChartData.data?.length || 0,
-        monthly: monthlyChartData.data?.length || 0,
-        program: programChartData.data?.length || 0
-      })
     } catch (err) {
       console.error('❌ Erreur fetchChartsData:', err)
     } finally {
@@ -657,23 +582,6 @@ export default function SoldeCaissePage() {
       ecartPrevu: (chartScaleMode === "log" ? signedLog(pp2[i]) : pp2[i]) - (chartScaleMode === "log" ? signedLog(e2[i]) : e2[i]),
     }))
   }, [chartScaleMode, chartViewMode, programComparisonData, toIndexed])
-
-  const parMoisDisplayData = useMemo(() => {
-    if (chartViewMode === "raw" && chartScaleMode === "linear") return parMois
-    const p = parMois.map((d) => d.paiements)
-    const e = parMois.map((d) => d.depenses)
-    const s = parMois.map((d) => d.solde)
-    const [p2, e2, s2] =
-      chartViewMode === "indexed"
-        ? [toIndexed(p), toIndexed(e), toIndexed(s)]
-        : [p, e, s]
-    return parMois.map((d, i) => ({
-      ...d,
-      paiements: chartScaleMode === "log" ? signedLog(p2[i]) : p2[i],
-      depenses: chartScaleMode === "log" ? signedLog(e2[i]) : e2[i],
-      solde: chartScaleMode === "log" ? signedLog(s2[i]) : s2[i],
-    }))
-  }, [chartScaleMode, chartViewMode, parMois, toIndexed])
 
   const agentIndicativeData = useMemo(() => {
     const details = analyticsData?.agentRanking?.details || []
@@ -1422,305 +1330,6 @@ export default function SoldeCaissePage() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Bar Chart - Entrées vs Sorties */}
-          <div className="lg:col-span-2">
-            <Card className="border-0 shadow-lg h-full">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-gray-500" />
-                  Entrées vs Sorties par Période
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-80 p-1">
-                  {(parMois || []).length > 0 ? (
-                    <ChartContainer config={timelineChartConfig} className="h-full w-full aspect-auto">
-                      <ComposedChart data={parMoisDisplayData} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
-                        <CartesianGrid vertical={false} />
-                        <XAxis dataKey="mois" tickLine={false} axisLine={false} tickMargin={8} />
-                        <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
-                        <ChartTooltip content={<ChartTooltipContent formatter={(value) => chartViewMode === "raw" ? formatCurrency(Number(value)) : `${Number(value).toFixed(1)} idx`} />} />
-                        <ChartLegend content={<ChartLegendContent />} />
-                        <Bar dataKey="paiements" fill="var(--color-paiements)" name="Paiements" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="depenses" fill="var(--color-depenses)" name="Dépenses" radius={[4, 4, 0, 0]} />
-                        <Line type="monotone" dataKey="solde" stroke="var(--color-profit)" strokeWidth={2.5} dot={{ r: 3 }} name="Solde" />
-                      </ComposedChart>
-                    </ChartContainer>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-gray-500">
-                      <p>Aucune donnée disponible pour cette période</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Pie Chart - Répartition des Dépenses */}
-                        <div>
-            <Card className="border-0 shadow-lg h-full">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Target className="h-5 w-5 text-blue-500" />
-                  Répartition des Dépenses
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="h-64 p-1">
-                    {(parTypeDepense || []).length > 0 ? (
-                      <ChartContainer
-                        config={{
-                          total: { label: "Montant", color: "#dc2626" },
-                        }}
-                        className="h-full w-full aspect-auto"
-                      >
-                        <PieChart>
-                          <Pie
-                            data={parTypeDepense}
-                            dataKey="total"
-                            nameKey="type"
-                            innerRadius={40}
-                            outerRadius={95}
-                            paddingAngle={3}
-                          >
-                            {parTypeDepense.map((_, index) => {
-                              const palette = ["#dc2626", "#ea580c", "#eab308", "#16a34a", "#2563eb", "#7c3aed"]
-                              return <Cell key={`cell-${index}`} fill={palette[index % palette.length]} />
-                            })}
-                          </Pie>
-                          <ChartTooltip
-                            content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />}
-                          />
-                          <Legend verticalAlign="bottom" height={36} />
-                        </PieChart>
-                      </ChartContainer>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-gray-500">
-                        <p className="text-sm">Aucune donnée disponible</p>
-                    </div>
-                    )}
-                  </div>
-
-                  {/* Résumé rapide */}
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <h3 className="text-sm font-medium text-gray-700 mb-2">Total Dépenses</h3>
-                    <p className="text-lg font-bold text-red-700">
-                      {summary.totalDepenses.toLocaleString()} DH
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          </div>
-
-        {/* 📊 Résumé des Métriques Clés */}
-        <Card className="border-0 shadow-lg mb-6">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Wallet className="h-5 w-5 text-gray-500" />
-              Résumé des Métriques Clés
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <h3 className="text-sm font-medium text-blue-700 mb-2">Mois le plus rentable</h3>
-                    <div className="flex justify-between items-center">
-                      <span className="text-lg font-bold">{moisMaxBenefice.mois}</span>
-                      <span className="text-lg font-bold text-green-600">
-                        {moisMaxBenefice.solde.toLocaleString()} DH
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <h3 className="text-sm font-medium text-green-700 mb-2">Total des paiements</h3>
-                    <p className="text-2xl font-bold text-green-700">
-                  {summary.totalPaiements.toLocaleString()} DH
-                    </p>
-                  </div>
-
-                  <div className="bg-red-50 p-4 rounded-lg">
-                    <h3 className="text-sm font-medium text-red-700 mb-2">Total des dépenses</h3>
-                    <p className="text-2xl font-bold text-red-700">
-                  {summary.totalDepenses.toLocaleString()} DH
-                    </p>
-                  </div>
-
-                  <div className="bg-yellow-50 p-4 rounded-lg">
-                    <h3 className="text-sm font-medium text-yellow-700 mb-2">Solde total</h3>
-                    <p className="text-2xl font-bold text-yellow-700">
-                  {summary.soldeTotal.toLocaleString()} DH
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-        {/* 📈 ANALYSES AVANCÉES */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">📈 Analyses Avancées</h2>
-            <Badge variant="outline" className="text-green-600 border-green-200">
-              Filtrage par programme
-            </Badge>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* 📊 Graphique Types de Chambres */}
-        <Card className="border-0 shadow-lg">
-          <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Bed className="h-5 w-5 text-blue-500" />
-                Occupation des Chambres par Type
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80 p-1">
-                {chartsLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  </div>
-                ) : roomsData.length > 0 ? (
-                  <ChartContainer
-                    config={{
-                      nbRoomsReserver: { label: "Réservées", color: "#dc2626" },
-                      nbRoomsRestant: { label: "Disponibles", color: "#16a34a" },
-                    }}
-                    className="h-full w-full aspect-auto"
-                  >
-                    <BarChart data={roomsData}>
-                      <CartesianGrid vertical={false} />
-                      <XAxis dataKey="roomType" tickLine={false} axisLine={false} tickMargin={8} />
-                      <YAxis tickLine={false} axisLine={false} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <ChartLegend content={<ChartLegendContent />} />
-                      <Bar dataKey="nbRoomsReserver" fill="var(--color-nbRoomsReserver)" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="nbRoomsRestant" fill="var(--color-nbRoomsRestant)" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ChartContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    <p>Aucune donnée disponible</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 🏨 Graphique Hôtels */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <HotelIcon className="h-5 w-5 text-green-500" />
-                Répartition par Hôtel
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80 p-1">
-                {chartsLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-                  </div>
-                ) : hotelsData.length > 0 ? (
-                  <ChartContainer
-                    config={{ nbPersonnes: { label: "Personnes", color: "#16a34a" } }}
-                    className="h-full w-full aspect-auto"
-                  >
-                    <BarChart data={hotelsData.slice(0, 10)} margin={{ bottom: 24 }}>
-                      <CartesianGrid vertical={false} />
-                      <XAxis dataKey="hotelName" tickLine={false} axisLine={false} angle={-20} textAnchor="end" interval={0} height={52} />
-                      <YAxis tickLine={false} axisLine={false} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Bar dataKey="nbPersonnes" fill="var(--color-nbPersonnes)" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ChartContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    <p>Aucune donnée disponible</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 👥 Graphique Genres */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Users className="h-5 w-5 text-purple-500" />
-                Répartition par Genre
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80 p-1">
-                {chartsLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-                  </div>
-                ) : genderData.length > 0 ? (
-                  <ChartContainer
-                    config={{ nbReservations: { label: "Réservations", color: "#7c3aed" } }}
-                    className="h-full w-full aspect-auto"
-                  >
-                    <BarChart data={genderData}>
-                      <CartesianGrid vertical={false} />
-                      <XAxis dataKey="gender" tickLine={false} axisLine={false} tickMargin={8} />
-                      <YAxis tickLine={false} axisLine={false} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Bar dataKey="nbReservations" fill="var(--color-nbReservations)" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ChartContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    <p>Aucune donnée disponible</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 💰 Graphique Solde Financier */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-yellow-500" />
-                Solde Financier
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80 p-1">
-                {chartsLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
-                  </div>
-                ) : soldeData.length > 0 ? (
-                  <ChartContainer
-                    config={{ montant: { label: "Montant", color: "#eab308" } }}
-                    className="h-full w-full aspect-auto"
-                  >
-                    <BarChart data={soldeData}>
-                      <CartesianGrid vertical={false} />
-                      <XAxis dataKey="type" tickLine={false} axisLine={false} tickMargin={8} />
-                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value), chartViewMode)} />
-                      <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
-                      <Bar dataKey="montant" fill="var(--color-montant)" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ChartContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    <p>Aucune donnée disponible</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* 🏆 TABLEAUX & CLASSEMENTS */}
         {analyticsData && analyticsData.programRanking && analyticsData.agentRanking && (
           <>
@@ -1900,136 +1509,6 @@ export default function SoldeCaissePage() {
               </div>
             </div>
 
-            {/* 📈 Tendances et Cashflow */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              {/* 📊 Évolution Cashflow - Line Chart */}
-              <Card className="border-0 shadow-lg">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-purple-500" />
-                    Évolution du Solde dans le Temps
-                    <Badge variant={analyticsData.cashflow?.summary?.trend === 'positive' ? 'default' : 'destructive'} className="ml-auto">
-                      {analyticsData.cashflow?.summary?.trend === 'positive' ? '↗' : '↘'} {Math.abs(analyticsData.cashflow?.summary?.avgMonthly || 0).toLocaleString()} DH/mois
-                    </Badge>
-                  </CardTitle>
-          </CardHeader>
-          <CardContent>
-                  <div className="space-y-4">
-                    {/* Métriques clés */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-green-50 p-3 rounded-lg">
-                        <p className="text-sm font-medium text-green-700">Total Cashflow</p>
-                        <p className="text-xl font-bold text-green-700">{(analyticsData.cashflow?.summary?.totalCashflow || 0).toLocaleString()} DH</p>
-                      </div>
-                      <div className="bg-blue-50 p-3 rounded-lg">
-                        <p className="text-sm font-medium text-blue-700">Volatilité</p>
-                        <p className="text-xl font-bold text-blue-700">{(analyticsData.cashflow?.summary?.volatility || 0).toLocaleString()} DH</p>
-                      </div>
-                    </div>
-
-                    {/* Graphique Line Chart - HTML/CSS */}
-                    <div className="h-80 p-4">
-                      {(analyticsData.cashflow?.data || []).length > 0 ? (
-                        <div className="flex items-end justify-center gap-4 h-full">
-                          {(analyticsData.cashflow?.data || []).map((item, index) => {
-                            const maxValue = Math.max(...(analyticsData.cashflow?.data || []).map(d => Math.abs(d.netCashflow || 0)))
-                            const height = maxValue > 0 ? Math.abs((item.netCashflow || 0) / maxValue) * 200 : 0
-                            const isPositive = (item.netCashflow || 0) >= 0
-                            
-                            return (
-                              <div key={index} className="flex flex-col items-center gap-2">
-                                <div 
-                                  className={`w-8 rounded-t-sm ${isPositive ? 'bg-green-500' : 'bg-red-500'}`}
-                                  style={{ height: `${height}px`, minHeight: '4px' }}
-                                  title={`${item.netCashflow.toLocaleString()} DH`}
-                                ></div>
-                                <span className="text-xs text-gray-600 font-medium">
-                                  {item.month?.substring(5) || 'N/A'}
-                                </span>
-                                <span className={`text-xs font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                                  {item.netCashflow.toLocaleString()} DH
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center h-full text-gray-500">
-                          <p>Aucune donnée de cashflow disponible</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* 📊 Métriques de Performance */}
-              <Card className="border-0 shadow-lg">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Target className="h-5 w-5 text-green-500" />
-                    Performance
-                    <Badge variant={analyticsData.performance?.trend?.direction === 'up' ? 'default' : 'destructive'} className="ml-auto">
-                      {analyticsData.performance?.trend?.direction === 'up' ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                      {(analyticsData.performance?.trend?.percentage || 0).toFixed(1)}%
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Tendance mois */}
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <h3 className="text-sm font-medium text-blue-700 mb-2">Tendance Mensuelle</h3>
-            <div className="flex justify-between items-center">
-                        <div>
-                          <p className="text-sm text-gray-600">Mois précédent: {(analyticsData.performance?.trend?.lastMonth || 0).toLocaleString()} DH</p>
-                          <p className="text-sm text-gray-600">Ce mois: {(analyticsData.performance?.trend?.thisMonth || 0).toLocaleString()} DH</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-blue-700">
-                            {(analyticsData.performance?.trend?.change || 0) >= 0 ? '+' : ''}{(analyticsData.performance?.trend?.change || 0).toLocaleString()} DH
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Ratio dépenses */}
-                    <div className="bg-orange-50 p-4 rounded-lg">
-                      <h3 className="text-sm font-medium text-orange-700 mb-2">Ratio Dépenses/Paiements</h3>
-                      <div className="flex justify-between items-center">
-                        <span className="text-2xl font-bold text-orange-700">{(analyticsData.performance?.expenseRatio?.ratio || 0).toFixed(1)}%</span>
-                        <div className="text-right">
-                          <p className="text-sm text-gray-600">Paiements: {(analyticsData.performance?.expenseRatio?.payments || 0).toLocaleString()} DH</p>
-                          <p className="text-sm text-gray-600">Dépenses: {(analyticsData.performance?.expenseRatio?.expenses || 0).toLocaleString()} DH</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Diversité programmes */}
-                    <div className="bg-purple-50 p-4 rounded-lg">
-                      <h3 className="text-sm font-medium text-purple-700 mb-2">Diversité Programmes</h3>
-                      <div className="flex justify-between items-center">
-                        <span className="text-2xl font-bold text-purple-700">{(analyticsData.performance?.programDiversity?.diversity || 0).toFixed(1)}%</span>
-                        <div className="text-right">
-                          <p className="text-sm text-gray-600">{analyticsData.performance?.programDiversity?.activePrograms || 0}/{analyticsData.performance?.programDiversity?.totalPrograms || 0} actifs</p>
-                        </div>
-          </div>
-        </div>
-
-                    {/* Meilleur jour */}
-                    {analyticsData.performance?.bestPeriod && (
-                      <div className="bg-yellow-50 p-4 rounded-lg">
-                        <h3 className="text-sm font-medium text-yellow-700 mb-2">Meilleur Jour</h3>
-                        <div className="flex justify-between items-center">
-                          <span className="text-lg font-bold text-yellow-700">{analyticsData.performance.bestPeriod.date}</span>
-                          <span className="text-lg font-bold text-yellow-700">{(analyticsData.performance.bestPeriod.total || 0).toLocaleString()} DH</span>
-                        </div>
-                      </div>
-                    )}
-            </div>
-          </CardContent>
-        </Card>
-            </div>
           </>
         )}
 

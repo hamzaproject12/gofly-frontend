@@ -330,6 +330,12 @@ export default function SoldeCaissePage() {
   const [periodeFilter, setPeriodeFilter] = useState("mois")
   const [exporting, setExporting] = useState(false)
 
+  // 📆 Le filtre par dates n'est appliqué que lorsque "De" ET "À" sont remplis.
+  //    Saisir seulement "De" ne déclenche donc aucune requête.
+  const datesReady = Boolean(dateDebut && dateFin)
+  const appliedDateDebut = datesReady ? dateDebut : ""
+  const appliedDateFin = datesReady ? dateFin : ""
+
   // États pour les données
   const [balanceData, setBalanceData] = useState<BalanceData | null>(null)
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
@@ -354,8 +360,8 @@ export default function SoldeCaissePage() {
       
       // 🚀 UNE SEULE requête vers l'API Balance optimisée
       const params = new URLSearchParams()
-      if (dateDebut) params.append('dateDebut', dateDebut)
-      if (dateFin) params.append('dateFin', dateFin)
+      if (appliedDateDebut) params.append('dateDebut', appliedDateDebut)
+      if (appliedDateFin) params.append('dateFin', appliedDateFin)
       if (programmeFilter && programmeFilter !== 'tous') params.append('programme', programmeFilter)
       if (periodeFilter) params.append('periode', periodeFilter)
 
@@ -392,7 +398,7 @@ export default function SoldeCaissePage() {
     } finally {
       setLoading(false)
     }
-  }, [dateDebut, dateFin, programmeFilter, periodeFilter])
+  }, [appliedDateDebut, appliedDateFin, programmeFilter, periodeFilter])
 
   // 🎯 Fonction pour récupérer les données des graphiques
   const fetchChartsData = useCallback(async () => {
@@ -400,9 +406,9 @@ export default function SoldeCaissePage() {
       setChartsLoading(true)
       const params = new URLSearchParams()
       params.append('programme', programmeFilter || 'tous')
-      if (dateDebut) params.append('dateDebut', dateDebut)
-      if (dateFin) params.append('dateFin', dateFin)
-      
+      if (appliedDateDebut) params.append('dateDebut', appliedDateDebut)
+      if (appliedDateFin) params.append('dateFin', appliedDateFin)
+
       const [timelineRes, monthlyRes, programRes] = await Promise.all([
         fetch(api.url(`/api/balance/charts/timeline?${params.toString()}`)),
         fetch(api.url(`/api/balance/charts/monthly-comparison?${params.toString()}`)),
@@ -427,7 +433,7 @@ export default function SoldeCaissePage() {
     } finally {
       setChartsLoading(false)
     }
-  }, [programmeFilter, dateDebut, dateFin])
+  }, [programmeFilter, appliedDateDebut, appliedDateFin])
 
   // Charger les données au montage et quand les filtres changent
   useEffect(() => {
@@ -483,7 +489,7 @@ export default function SoldeCaissePage() {
   // Quand aucun filtre de période n'est actif, on limite les 4 graphiques
   // (par mois / par programme) aux 4 derniers éléments faute de place.
   // Les calculs du résumé en haut restent toujours généraux.
-  const hasPeriodFilter = Boolean(dateDebut || dateFin)
+  const hasPeriodFilter = datesReady
 
   const timelineDisplayData = timelineData
 

@@ -11,12 +11,17 @@ router.get('/dashboard', async (req, res) => {
     const { periode = 'mois', dateDebut, dateFin, programme } = req.query
 
     // 🔍 Construction des filtres de date
-    const dateFilter: any = {}
+    // ⚠️ Payment et Expense n'ont pas de champ `createdAt`.
+    //    On filtre sur `paymentDate` (paiements) et `date` (dépenses).
+    const paymentDateFilter: any = {}
+    const expenseDateFilter: any = {}
     if (dateDebut && dateFin) {
-      dateFilter.createdAt = {
+      const range = {
         gte: new Date(dateDebut as string),
         lte: new Date(dateFin as string)
       }
+      paymentDateFilter.paymentDate = range
+      expenseDateFilter.date = range
     }
 
     // 🏢 Filtre par programme
@@ -30,7 +35,7 @@ router.get('/dashboard', async (req, res) => {
     // 📈 1. CLASSEMENT PAR PROGRAMME (qui rapporte le plus)
     const programRanking = await prisma.payment.aggregate({
       where: {
-        ...dateFilter,
+        ...paymentDateFilter,
         reservation: programFilter
       },
       _sum: { amount: true },
@@ -40,7 +45,7 @@ router.get('/dashboard', async (req, res) => {
     const programDetails = await prisma.payment.groupBy({
       by: ['reservationId'],
       where: {
-        ...dateFilter,
+        ...paymentDateFilter,
         reservation: programFilter
       },
       _sum: { amount: true },
@@ -208,16 +213,16 @@ router.get('/dashboard', async (req, res) => {
     // 📊 5. MÉTRIQUES DE PERFORMANCE
     const performanceMetrics = {
       // Tendance générale (comparaison mois précédent)
-      trend: await calculateTrend(dateFilter, programFilter),
-      
+      trend: await calculateTrend(programFilter),
+
       // Meilleur jour/mois
-      bestPeriod: await findBestPeriod(dateFilter, programFilter),
-      
+      bestPeriod: await findBestPeriod(paymentDateFilter),
+
       // Ratio dépenses/paiements
-      expenseRatio: await calculateExpenseRatio(dateFilter, programFilter),
-      
+      expenseRatio: await calculateExpenseRatio(paymentDateFilter, expenseDateFilter, programFilter),
+
       // Diversité des programmes
-      programDiversity: await calculateProgramDiversity(dateFilter, programFilter)
+      programDiversity: await calculateProgramDiversity(paymentDateFilter, programFilter)
     }
 
     // 🔧 Conversion des BigInt en Number pour la sérialisation JSON
@@ -280,7 +285,7 @@ router.get('/dashboard', async (req, res) => {
           dateDebut,
           dateFin,
           programme,
-          filters: { dateFilter, programFilter }
+          filters: { paymentDateFilter, expenseDateFilter, programFilter }
         }
       })
     })
@@ -296,7 +301,7 @@ router.get('/dashboard', async (req, res) => {
 })
 
 // 🔧 Fonctions utilitaires
-async function calculateTrend(dateFilter: any, programFilter: any) {
+async function calculateTrend(programFilter: any) {
   const now = new Date()
   const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -336,14 +341,14 @@ async function calculateTrend(dateFilter: any, programFilter: any) {
   }
 }
 
-async function findBestPeriod(dateFilter: any, programFilter: any) {
+async function findBestPeriod(paymentDateFilter: any) {
   const bestDay = await prisma.$queryRaw`
-    SELECT 
+    SELECT
       DATE("paymentDate") as date,
       SUM(amount) as total
     FROM "Payment"
-    WHERE "paymentDate" >= COALESCE(${dateFilter.paymentDate?.gte || '2024-01-01'}::timestamp, '2024-01-01'::timestamp)
-      AND "paymentDate" <= COALESCE(${dateFilter.paymentDate?.lte || '2025-12-31'}::timestamp, '2025-12-31'::timestamp)
+    WHERE "paymentDate" >= COALESCE(${paymentDateFilter.paymentDate?.gte || '2024-01-01'}::timestamp, '2024-01-01'::timestamp)
+      AND "paymentDate" <= COALESCE(${paymentDateFilter.paymentDate?.lte || '2025-12-31'}::timestamp, '2025-12-31'::timestamp)
     GROUP BY DATE("paymentDate")
     ORDER BY total DESC
     LIMIT 1
@@ -360,14 +365,14 @@ async function findBestPeriod(dateFilter: any, programFilter: any) {
   return null
 }
 
-async function calculateExpenseRatio(dateFilter: any, programFilter: any) {
+async function calculateExpenseRatio(paymentDateFilter: any, expenseDateFilter: any, programFilter: any) {
   const totalPayments = await prisma.payment.aggregate({
-    where: { ...dateFilter, reservation: programFilter },
+    where: { ...paymentDateFilter, reservation: programFilter },
     _sum: { amount: true }
   })
 
   const totalExpenses = await prisma.expense.aggregate({
-    where: dateFilter,
+    where: expenseDateFilter,
     _sum: { amount: true }
   })
 
@@ -382,10 +387,10 @@ async function calculateExpenseRatio(dateFilter: any, programFilter: any) {
   }
 }
 
-async function calculateProgramDiversity(dateFilter: any, programFilter: any) {
+async function calculateProgramDiversity(paymentDateFilter: any, programFilter: any) {
   const programCount = await prisma.payment.groupBy({
     by: ['reservationId'],
-    where: { ...dateFilter, reservation: programFilter },
+    where: { ...paymentDateFilter, reservation: programFilter },
     _count: { id: true }
   })
 

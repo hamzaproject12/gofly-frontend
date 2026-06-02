@@ -926,6 +926,43 @@ export default function NouvelleChambrePage() {
     prixPropose !== null &&
     prixPropose < calculatePrice;
 
+  // Raisons pour lesquelles la chambre ne peut pas encore être enregistrée
+  // (miroir de canSubmit + contrainte du prix proposé).
+  const getSubmitBlockers = (): string[] => {
+    const reasons: string[] = [];
+    if (!formData.programId) reasons.push("Le programme n'est pas sélectionné");
+    if (!formData.typeChambre) reasons.push("Le type de chambre n'est pas sélectionné");
+    else if (capacity < 2) reasons.push("Le type de chambre doit comporter au moins 2 personnes");
+    if (!formData.hotelMadina) reasons.push("L'hôtel de Médine n'est pas sélectionné");
+    if (!formData.hotelMakkah) reasons.push("L'hôtel de La Mecque n'est pas sélectionné");
+    if (!roomMadinaId) reasons.push("La chambre de Médine n'est pas sélectionnée");
+    if (!roomMakkahId) reasons.push("La chambre de La Mecque n'est pas sélectionnée");
+    if (!prixGenere) reasons.push("Le prix n'est pas généré");
+
+    // Identités des occupants
+    if (capacity >= 2 && occupants.length !== capacity) {
+      reasons.push(`La chambre doit être complète (${occupants.length}/${capacity} occupants)`);
+    }
+    occupants.forEach((o, i) => {
+      const fn = (o.firstName || "").trim();
+      const ln = (o.lastName || "").trim();
+      const who = i === 0 ? "chef de dossier" : `accompagnant ${i + 1}`;
+      if (!ln) reasons.push(`Le nom du ${who} n'est pas saisi`);
+      if (!fn) reasons.push(`Le prénom du ${who} n'est pas saisi`);
+      if (i === 0) {
+        const ph = (o.phone || "").trim();
+        if (!ph) reasons.push("Le téléphone du chef de dossier n'est pas saisi");
+        else if (!PHONE_REGEX.test(ph)) reasons.push("Le téléphone du chef de dossier n'est pas valide");
+      }
+      if (occupantPassportFiles[i] && !PASSPORT_REGEX.test((o.passportNumber || "").trim())) {
+        reasons.push(`Le n° de passeport du ${who} est invalide (2 lettres + 7 chiffres)`);
+      }
+    });
+
+    if (propositionInvalid) reasons.push("Le prix proposé est inférieur au prix calculé");
+    return reasons;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const leaderPhone = (occupants[0]?.phone || "").trim();
@@ -2367,13 +2404,18 @@ export default function NouvelleChambrePage() {
                       Annuler
                     </Button>
                   </Link>
-                  <Button
-                    type="submit"
-                    disabled={!canSubmit || isSubmitting || propositionInvalid}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                  <BlockersTooltip
+                    blockers={isSubmitting ? [] : getSubmitBlockers()}
+                    title="Enregistrement indisponible :"
                   >
-                    {isSubmitting ? "Enregistrement..." : "Enregistrer"}
-                  </Button>
+                    <Button
+                      type="submit"
+                      disabled={!canSubmit || isSubmitting || propositionInvalid}
+                      className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {isSubmitting ? "Enregistrement..." : "Enregistrer"}
+                    </Button>
+                  </BlockersTooltip>
                 </div>
               </form>
             </CardContent>
@@ -2464,17 +2506,22 @@ export default function NouvelleChambrePage() {
                   </div>
                 )}
               </div>
-              <Button
-                type="submit"
-                disabled={!canSubmit || isSubmitting || propositionInvalid}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 text-lg disabled:opacity-50"
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.querySelector("form")?.requestSubmit();
-                }}
+              <BlockersTooltip
+                blockers={isSubmitting ? [] : getSubmitBlockers()}
+                title="Enregistrement indisponible :"
               >
-                {isSubmitting ? "Enregistrement..." : "Confirmer la Réservation"}
-              </Button>
+                <Button
+                  type="submit"
+                  disabled={!canSubmit || isSubmitting || propositionInvalid}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 text-lg disabled:opacity-50"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.querySelector("form")?.requestSubmit();
+                  }}
+                >
+                  {isSubmitting ? "Enregistrement..." : "Confirmer la Réservation"}
+                </Button>
+              </BlockersTooltip>
             </div>
           </div>
         </div>

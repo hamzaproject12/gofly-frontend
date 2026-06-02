@@ -949,6 +949,28 @@ export default function NouvelleReservation() {
     return baseFieldsValid && passportNumberOk && arePaymentsValid;
   }, [formData, documents.passport, arePaymentsValid]);
 
+  // Raisons pour lesquelles la réservation ne peut pas encore être enregistrée
+  // (miroir de isFormValid + contrainte du prix proposé).
+  const getSubmitBlockers = (): string[] => {
+    const reasons: string[] = [];
+    if (!formData.programme) reasons.push("Le programme n'est pas sélectionné");
+    if (!formData.typeChambre) reasons.push("Le type de chambre n'est pas sélectionné");
+    if (!formData.gender) reasons.push("Le genre n'est pas sélectionné");
+    if (!formData.nom?.trim()) reasons.push("Le nom n'est pas saisi");
+    if (!formData.prenom?.trim()) reasons.push("Le prénom n'est pas saisi");
+    if (!formData.telephone?.trim()) reasons.push("Le téléphone n'est pas saisi");
+    else if (!PHONE_REGEX.test(formData.telephone.trim())) reasons.push("Le téléphone n'est pas valide");
+    if (!formData.prix) reasons.push("Le prix n'est pas généré");
+    if (documents.passport && !PASSPORT_REGEX.test((formData.passportNumber || "").trim())) {
+      reasons.push("Le n° de passeport est invalide (2 lettres + 7 chiffres)");
+    }
+    if (!arePaymentsValid) reasons.push("Un paiement est incomplet (mode et montant requis)");
+    if (prixMode === 'proposition' && prixPropose !== null && prixPropose < calculatePrice) {
+      reasons.push("Le prix proposé est inférieur au prix calculé");
+    }
+    return reasons;
+  };
+
   // Calculer la progression des sections
   const section1Complete = useMemo(() => {
     return (
@@ -3083,13 +3105,18 @@ export default function NouvelleReservation() {
                         Annuler
                       </Button>
                     </Link>
-                    <Button
-                      type="submit"
-                      disabled={!isFormValid || isSubmitting || (prixMode === 'proposition' && prixPropose !== null && prixPropose < calculatePrice)}
-                      className="bg-blue-600 hover:bg-blue-700"
+                    <BlockersTooltip
+                      blockers={isSubmitting ? [] : getSubmitBlockers()}
+                      title="Enregistrement indisponible :"
                     >
-                      {isSubmitting ? 'Enregistrement...' : 'Enregistrer'}
-                    </Button>
+                      <Button
+                        type="submit"
+                        disabled={!isFormValid || isSubmitting || (prixMode === 'proposition' && prixPropose !== null && prixPropose < calculatePrice)}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        {isSubmitting ? 'Enregistrement...' : 'Enregistrer'}
+                      </Button>
+                    </BlockersTooltip>
                   </div>
                 </form>
               </CardContent>
@@ -3221,17 +3248,22 @@ export default function NouvelleReservation() {
               </div>
               
               {/* Bouton de confirmation - désactivé si proposition avec prix inférieur au total */}
-              <Button
-                type="submit"
-                disabled={!isFormValid || isSubmitting || (prixMode === 'proposition' && prixPropose !== null && prixPropose < calculatePrice)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 text-lg"
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.querySelector('form')?.requestSubmit();
-                }}
+              <BlockersTooltip
+                blockers={isSubmitting ? [] : getSubmitBlockers()}
+                title="Enregistrement indisponible :"
               >
-                {isSubmitting ? 'Enregistrement...' : 'Confirmer la Réservation'}
-              </Button>
+                <Button
+                  type="submit"
+                  disabled={!isFormValid || isSubmitting || (prixMode === 'proposition' && prixPropose !== null && prixPropose < calculatePrice)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 text-lg"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.querySelector('form')?.requestSubmit();
+                  }}
+                >
+                  {isSubmitting ? 'Enregistrement...' : 'Confirmer la Réservation'}
+                </Button>
+              </BlockersTooltip>
             </div>
           </div>
         </div>

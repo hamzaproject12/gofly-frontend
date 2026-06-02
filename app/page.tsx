@@ -520,14 +520,15 @@ export default function HomePage() {
                   </div>
 
                   {/* Barre de progression de l'occupation - juste sous les nom et stats */}
-                  <div className="w-full mt-3 mb-0">
-                    <Progress
-                      value={parseInt(program.statistics.occupancyRate)}
-                      className={`h-2 ${
-                        parseInt(program.statistics.occupancyRate) === 100
-                          ? 'bg-green-200'
-                          : 'bg-green-100'
-                      }`}
+                  <div className="w-full mt-3 mb-0 overflow-hidden rounded-full h-2"
+                       style={{
+                         backgroundImage: 'repeating-linear-gradient(45deg, #e5e7eb 0, #e5e7eb 10px, #d1d5db 10px, #d1d5db 20px)'
+                       }}>
+                    <div
+                      className="h-full bg-green-500 transition-all duration-300"
+                      style={{
+                        width: `${parseInt(program.statistics.occupancyRate)}%`
+                      }}
                     />
                   </div>
                 </CardHeader>
@@ -677,14 +678,15 @@ export default function HomePage() {
                   </div>
 
                   {/* Barre de progression de l'occupation - juste sous les nom et stats */}
-                  <div className="w-full mt-3 mb-0">
-                    <Progress
-                      value={parseInt(program.statistics.occupancyRate)}
-                      className={`h-2 ${
-                        parseInt(program.statistics.occupancyRate) === 100
-                          ? 'bg-green-200'
-                          : 'bg-green-100'
-                      }`}
+                  <div className="w-full mt-3 mb-0 overflow-hidden rounded-full h-2"
+                       style={{
+                         backgroundImage: 'repeating-linear-gradient(45deg, #e5e7eb 0, #e5e7eb 10px, #d1d5db 10px, #d1d5db 20px)'
+                       }}>
+                    <div
+                      className="h-full bg-green-500 transition-all duration-300"
+                      style={{
+                        width: `${parseInt(program.statistics.occupancyRate)}%`
+                      }}
                     />
                   </div>
                 </CardHeader>

@@ -1630,6 +1630,52 @@ export default function NouvelleReservation() {
     });
   };
 
+  // Télécharge le reçu (généré ou importé) affiché dans l'aperçu
+  const handleDownloadPaymentReceipt = async (index: number) => {
+    const preview = previews[`payment_${index}`];
+    const file = documents.payment?.[index] || null;
+    let blob: Blob | null = null;
+    let filename = "";
+
+    if (file instanceof File) {
+      blob = file;
+      filename = file.name;
+    } else if (preview?.url) {
+      try {
+        const res = await fetch(preview.url);
+        blob = await res.blob();
+      } catch {
+        // URL distante non téléchargeable (CORS) : ouvrir dans un nouvel onglet
+        window.open(preview.url, "_blank", "noopener,noreferrer");
+        return;
+      }
+    }
+
+    if (!blob) {
+      toast({
+        title: "Téléchargement impossible",
+        description: "Aucun reçu disponible à télécharger.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!filename) {
+      const ext = (blob.type || preview?.type || "").includes("pdf") ? "pdf" : "png";
+      filename = `recu-paiement-${index + 1}.${ext}`;
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
+
   const handleRemovePayment = (index: number) => {
     setPaiements(prev => prev.filter((_, i) => i !== index))
     setDocuments(prev => {
@@ -3133,7 +3179,7 @@ export default function NouvelleReservation() {
                                     <div className="flex items-center gap-2">
                                       <button
                                         type="button"
-                                        className="text-orange-600 hover:text-orange-800 hover:bg-orange-50 p-2 rounded"
+                                        className="flex items-center text-orange-600 hover:text-orange-800 hover:bg-orange-50 p-2 rounded"
                                         onClick={e => {
                                           e.preventDefault();
                                           e.stopPropagation();
@@ -3142,6 +3188,18 @@ export default function NouvelleReservation() {
                                       >
                                         <ZoomIn className="h-3 w-3 mr-1" />
                                         Zoom
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="flex items-center text-orange-600 hover:text-orange-800 hover:bg-orange-50 p-2 rounded"
+                                        onClick={e => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          handleDownloadPaymentReceipt(index);
+                                        }}
+                                      >
+                                        <Download className="h-3 w-3 mr-1" />
+                                        Télécharger
                                       </button>
                                     </div>
                                   </div>

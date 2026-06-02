@@ -1573,6 +1573,7 @@ export default function EditReservation() {
         typeChambre: formData.typeChambre,
         genre: formData.gender,
         resteAPayer: remainingAmount,
+        reservationChambre: groupReservationIds.length,
       });
     } catch {
       toast({

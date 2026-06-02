@@ -792,6 +792,7 @@ export default function NouvelleChambrePage() {
         typeChambre: formData.typeChambre,
         genre: leader.gender,
         resteAPayer: Math.max(0, prixEngage - totalPaye),
+        reservationChambre: occupants.length,
       });
     } catch {
       toast({

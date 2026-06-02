@@ -987,7 +987,27 @@ export default function NouvelleReservation() {
   }
 
   const supprimerPaiement = (index: number) => {
-    setPaiements(paiements.filter((_, i) => i !== index))
+    setPaiements(prev => prev.filter((_, i) => i !== index))
+    // Retire aussi le reçu/document attaché et son aperçu, puis réindexe les paiements suivants
+    setDocuments(prev => {
+      const newPayment = [...(prev.payment || [])]
+      newPayment.splice(index, 1)
+      return { ...prev, payment: newPayment }
+    })
+    setPreviews(prev => {
+      const next: typeof prev = {}
+      for (const key of Object.keys(prev)) {
+        const match = key.match(/^payment_(\d+)$/)
+        if (!match) {
+          next[key] = prev[key]
+          continue
+        }
+        const i = Number(match[1])
+        if (i === index) continue
+        next[i > index ? `payment_${i - 1}` : key] = prev[key]
+      }
+      return next
+    })
   }
 
   const mettreAJourPaiement = <K extends keyof Paiement>(index: number, field: K, value: Paiement[K]) => {
@@ -1341,20 +1361,6 @@ export default function NouvelleReservation() {
       });
     }
   };
-
-  const handleRemovePayment = (index: number) => {
-    setPaiements(prev => prev.filter((_, i) => i !== index))
-    setDocuments(prev => {
-      const newPayment = [...(prev.payment || [])]
-      newPayment.splice(index, 1)
-      return { ...prev, payment: newPayment }
-    })
-    setPreviews(prev => {
-      const newPreviews = { ...prev }
-      delete newPreviews[`payment_${index}`]
-      return newPreviews
-    })
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

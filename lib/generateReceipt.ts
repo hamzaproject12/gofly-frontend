@@ -25,6 +25,8 @@ export interface PaymentReceiptData {
   genre?: string;
   /** Reste à payer en DH (prix engagé − total déjà réglé) */
   resteAPayer?: number;
+  /** Si défini, indique qu'il s'agit d'une réservation de chambre pour ce nombre de personnes */
+  reservationChambre?: number;
 }
 
 // Libellé lisible du type de chambre pour l'affichage sur le reçu.
@@ -227,6 +229,19 @@ export async function generatePaymentReceiptFile(data: PaymentReceiptData): Prom
   ctx.moveTo(W / 2 - 120, cursorY + 18);
   ctx.lineTo(W / 2 + 120, cursorY + 18);
   ctx.stroke();
+
+  // Mention "Réservation de chambre" + nombre de personnes (le cas échéant)
+  if (data.reservationChambre && data.reservationChambre > 0) {
+    const n = data.reservationChambre;
+    ctx.fillStyle = "#c2410e";
+    ctx.font = "600 22px Arial";
+    ctx.fillText(
+      `Réservation de chambre · ${n} personne${n > 1 ? "s" : ""}`,
+      W / 2,
+      cursorY + 52,
+    );
+    cursorY += 36;
+  }
   ctx.textAlign = "left";
 
   // --- Numéro de reçu + date d'émission ---

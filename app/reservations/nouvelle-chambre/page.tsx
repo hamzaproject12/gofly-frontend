@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { generatePaymentReceiptFile } from "@/lib/generateReceipt";
+import { BlockersTooltip } from "@/components/blockers-tooltip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -754,20 +755,34 @@ export default function NouvelleChambrePage() {
     }
   };
 
-  const canGeneratePaymentReceipt = (index: number) => {
-    const payment = payments[index];
-    if (!payment) return false;
-    const amount = Number(payment.amount);
+  // Champs de la réservation présents sur le reçu professionnel : tant qu'ils ne
+  // sont pas remplis, on ne peut ni ajouter de paiement ni générer de reçu.
+  const getReservationBlockers = (): string[] => {
     const leader = occupants[0];
-    return Boolean(
-      payment.type &&
-      !Number.isNaN(amount) &&
-      amount > 0 &&
-      leader?.firstName?.trim() &&
-      leader?.lastName?.trim() &&
-      leader?.phone?.trim()
-    );
+    const reasons: string[] = [];
+    if (!formData.prix) reasons.push("Le prix n'est pas généré");
+    if (!formData.programme?.trim()) reasons.push("Le programme n'est pas sélectionné");
+    if (!formData.typeChambre) reasons.push("Le type de chambre n'est pas sélectionné");
+    if (!leader?.lastName?.trim()) reasons.push("Le nom du chef de dossier n'est pas saisi");
+    if (!leader?.firstName?.trim()) reasons.push("Le prénom du chef de dossier n'est pas saisi");
+    if (!leader?.phone?.trim()) reasons.push("Le téléphone du chef de dossier n'est pas saisi");
+    return reasons;
   };
+
+  // Raisons pour lesquelles le reçu d'un paiement précis ne peut pas être généré.
+  const getPaymentReceiptBlockers = (index: number): string[] => {
+    const reasons = getReservationBlockers();
+    const payment = payments[index];
+    if (!payment?.type) reasons.push("Le mode de paiement n'est pas sélectionné");
+    const amount = Number(payment?.amount);
+    if (!payment?.amount || Number.isNaN(amount) || amount <= 0) {
+      reasons.push("Le montant du paiement n'est pas saisi");
+    }
+    return reasons;
+  };
+
+  const canGeneratePaymentReceipt = (index: number) =>
+    getPaymentReceiptBlockers(index).length === 0;
 
   const handleGeneratePaymentReceipt = async (index: number) => {
     if (!canGeneratePaymentReceipt(index)) return;
@@ -2115,17 +2130,23 @@ export default function NouvelleChambrePage() {
                                     className="h-10 border-2 border-orange-200 focus:border-orange-500 rounded-lg"
                                     disabled={isSubmitting}
                                   />
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleGeneratePaymentReceipt(index)}
-                                    disabled={isSubmitting || !canGeneratePaymentReceipt(index)}
-                                    className="h-10 border-orange-300 text-orange-700 hover:bg-orange-50 whitespace-nowrap"
+                                  <BlockersTooltip
+                                    blockers={getPaymentReceiptBlockers(index)}
+                                    enabledHint="Génère un reçu de paiement professionnel"
+                                    title="Reçu indisponible :"
                                   >
-                                    <Download className="h-3.5 w-3.5 mr-1.5" />
-                                    Generer recu
-                                  </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleGeneratePaymentReceipt(index)}
+                                      disabled={isSubmitting || !canGeneratePaymentReceipt(index)}
+                                      className="h-10 border-orange-300 text-orange-700 hover:bg-orange-50 whitespace-nowrap"
+                                    >
+                                      <Download className="h-3.5 w-3.5 mr-1.5" />
+                                      Generer recu
+                                    </Button>
+                                  </BlockersTooltip>
                                 </>
                               )}
                             </div>
@@ -2226,16 +2247,23 @@ export default function NouvelleChambrePage() {
                         </div>
                       </div>
                     ))}
-                    <Button
-                      type="button"
-                      onClick={addPaymentRow}
-                      variant="outline"
-                      size="sm"
-                      className="w-full border-dashed border-orange-300 text-orange-600 hover:bg-orange-50 h-12"
+                    <BlockersTooltip
+                      blockers={getReservationBlockers()}
+                      title="Paiement indisponible :"
+                      className="block w-full"
                     >
-                      <Plus className="mr-2 h-5 w-5" />
-                      Ajouter un paiement
-                    </Button>
+                      <Button
+                        type="button"
+                        onClick={addPaymentRow}
+                        disabled={getReservationBlockers().length > 0}
+                        variant="outline"
+                        size="sm"
+                        className="w-full border-dashed border-orange-300 text-orange-600 hover:bg-orange-50 h-12"
+                      >
+                        <Plus className="mr-2 h-5 w-5" />
+                        Ajouter un paiement
+                      </Button>
+                    </BlockersTooltip>
                   </div>
                 </div>
 

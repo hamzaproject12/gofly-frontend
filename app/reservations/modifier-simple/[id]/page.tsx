@@ -4,6 +4,7 @@ import { useState, useRef, useMemo, useEffect } from "react"
 import { Loader2 } from "lucide-react"
 import { api } from "@/lib/api"
 import { generatePaymentReceiptFile } from "@/lib/generateReceipt"
+import { BlockersTooltip } from "@/components/blockers-tooltip"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -1406,18 +1407,34 @@ export default function EditReservation() {
   }, [paiements]);
   const remainingAmount = useMemo(() => Math.max(totalPrice - totalPaid, 0), [totalPrice, totalPaid]);
 
-  const canGeneratePaymentReceiptEdit = (index: number) => {
-    const payment = paiements[index];
-    if (!payment) return false;
-    const amount = parseAmount(payment.montant);
-    return Boolean(
-      payment.type &&
-      amount > 0 &&
-      formData.nom?.trim() &&
-      formData.prenom?.trim() &&
-      formData.telephone?.trim()
-    );
+  // Champs de la réservation présents sur le reçu professionnel : tant qu'ils ne
+  // sont pas remplis, on ne peut ni ajouter de paiement ni générer de reçu.
+  const getReservationBlockers = (): string[] => {
+    const reasons: string[] = [];
+    if (!formData.prix) reasons.push("Le prix n'est pas généré");
+    if (!formData.programme?.trim()) reasons.push("Le programme n'est pas sélectionné");
+    if (!formData.typeChambre) reasons.push("Le type de chambre n'est pas sélectionné");
+    if (!formData.gender) reasons.push("Le genre n'est pas sélectionné");
+    if (!formData.nom?.trim()) reasons.push("Le nom n'est pas saisi");
+    if (!formData.prenom?.trim()) reasons.push("Le prénom n'est pas saisi");
+    if (!formData.telephone?.trim()) reasons.push("Le téléphone n'est pas saisi");
+    return reasons;
   };
+
+  // Raisons pour lesquelles le reçu d'un paiement précis ne peut pas être généré.
+  const getPaymentReceiptBlockers = (index: number): string[] => {
+    const reasons = getReservationBlockers();
+    const payment = paiements[index];
+    if (!payment?.type) reasons.push("Le mode de paiement n'est pas sélectionné");
+    const amount = parseAmount(payment?.montant);
+    if (!payment?.montant || amount <= 0) {
+      reasons.push("Le montant du paiement n'est pas saisi");
+    }
+    return reasons;
+  };
+
+  const canGeneratePaymentReceiptEdit = (index: number) =>
+    getPaymentReceiptBlockers(index).length === 0;
 
   const handleGeneratePaymentReceiptEdit = async (index: number) => {
     if (!canGeneratePaymentReceiptEdit(index)) return;
@@ -2645,17 +2662,23 @@ export default function EditReservation() {
                                       accept="image/*,.pdf"
                                       className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg flex-1 min-w-[200px]"
                                     />
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleGeneratePaymentReceiptEdit(index)}
-                                      disabled={isSubmitting || !canGeneratePaymentReceiptEdit(index)}
-                                      className="h-10 border-blue-300 text-blue-700 hover:bg-blue-50 whitespace-nowrap"
+                                    <BlockersTooltip
+                                      blockers={getPaymentReceiptBlockers(index)}
+                                      enabledHint="Génère un reçu de paiement professionnel"
+                                      title="Reçu indisponible :"
                                     >
-                                      <Download className="h-3.5 w-3.5 mr-1.5" />
-                                      Generer recu
-                                    </Button>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleGeneratePaymentReceiptEdit(index)}
+                                        disabled={isSubmitting || !canGeneratePaymentReceiptEdit(index)}
+                                        className="h-10 border-blue-300 text-blue-700 hover:bg-blue-50 whitespace-nowrap"
+                                      >
+                                        <Download className="h-3.5 w-3.5 mr-1.5" />
+                                        Generer recu
+                                      </Button>
+                                    </BlockersTooltip>
                                   </div>
                                 </>
                               )}
@@ -2850,14 +2873,20 @@ export default function EditReservation() {
                           </div>
                         </div>
                       ))}
-                  <Button
-                    type="button"
-                    onClick={ajouterPaiement}
-                    className="mt-2 bg-blue-600 hover:bg-blue-700"
+                  <BlockersTooltip
+                    blockers={getReservationBlockers()}
+                    title="Paiement indisponible :"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Ajouter un paiement
-                  </Button>
+                    <Button
+                      type="button"
+                      onClick={ajouterPaiement}
+                      disabled={getReservationBlockers().length > 0}
+                      className="mt-2 bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Ajouter un paiement
+                    </Button>
+                  </BlockersTooltip>
                     </div>
                   </div>
 

@@ -775,6 +775,9 @@ export default function NouvelleChambrePage() {
     const leader = occupants[0];
     if (!payment || !leader) return;
 
+    const prixEngage = Number(formData.prix) || 0;
+    const totalPaye = payments.reduce((total, p) => total + (Number(p.amount) || 0), 0);
+
     let file: File;
     try {
       file = await generatePaymentReceiptFile({
@@ -785,6 +788,10 @@ export default function NouvelleChambrePage() {
         programme: formData.programme,
         type: payment.type,
         montant: Number(payment.amount) || 0,
+        prixEngage,
+        typeChambre: formData.typeChambre,
+        genre: leader.gender,
+        resteAPayer: Math.max(0, prixEngage - totalPaye),
       });
     } catch {
       toast({

@@ -1569,6 +1569,10 @@ export default function EditReservation() {
         programme: formData.programme,
         type: payment.type,
         montant: parseAmount(payment.montant),
+        prixEngage: totalPrice,
+        typeChambre: formData.typeChambre,
+        genre: formData.gender,
+        resteAPayer: remainingAmount,
       });
     } catch {
       toast({

@@ -17,6 +17,27 @@ export interface PaymentReceiptData {
   montant: number;
   /** Date du paiement au format YYYY-MM-DD (par défaut : aujourd'hui) */
   date?: string;
+  /** Prix engagé en DH (prix calculé − réduction, ou prix proposé) */
+  prixEngage?: number;
+  /** Type de chambre choisi (SINGLE, DOUBLE, TRIPLE, QUAD, QUINT) */
+  typeChambre?: string;
+  /** Genre du client (Homme / Femme) */
+  genre?: string;
+  /** Reste à payer en DH (prix engagé − total déjà réglé) */
+  resteAPayer?: number;
+}
+
+// Libellé lisible du type de chambre pour l'affichage sur le reçu.
+function roomTypeLabel(type?: string): string {
+  if (!type) return "";
+  const labels: Record<string, string> = {
+    SINGLE: "Single (1 personne)",
+    DOUBLE: "Double (2 personnes)",
+    TRIPLE: "Triple (3 personnes)",
+    QUAD: "Quadruple (4 personnes)",
+    QUINT: "Quintuple (5 personnes)",
+  };
+  return labels[type] || type;
 }
 
 // Charge une image (logo) pour le rendu canvas. Renvoie null si l'image est introuvable.
@@ -262,6 +283,60 @@ export async function generatePaymentReceiptFile(data: PaymentReceiptData): Prom
     ["Date du paiement", formatDate(paymentDate)],
   ]);
   cursorY += cardH + 40;
+
+  // --- Carte récapitulative de la réservation (prix engagé, chambre, genre, reste) ---
+  const hasDetails =
+    data.prixEngage !== undefined ||
+    data.resteAPayer !== undefined ||
+    Boolean(data.typeChambre) ||
+    Boolean(data.genre);
+  if (hasDetails) {
+    const detailsH = 200;
+    roundRectPath(M, cursorY, contentW, detailsH, 16);
+    ctx.fillStyle = "#fffbf7";
+    ctx.fill();
+    ctx.strokeStyle = "#fed7aa";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = "#c2410e";
+    ctx.font = "bold 18px Arial";
+    ctx.fillText("DÉTAILS DE LA RÉSERVATION", M + 24, cursorY + 38);
+    ctx.strokeStyle = "#fdba74";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(M + 24, cursorY + 52);
+    ctx.lineTo(M + contentW - 24, cursorY + 52);
+    ctx.stroke();
+
+    // Deux colonnes : type de chambre / genre, puis prix engagé / reste à payer
+    const colGap = 30;
+    const colW = (contentW - 48 - colGap) / 2;
+    const col1X = M + 24;
+    const col2X = M + 24 + colW + colGap;
+    const drawCell = (x: number, y: number, label: string, value: string) => {
+      ctx.fillStyle = "#9ca3af";
+      ctx.font = "15px Arial";
+      ctx.fillText(label.toUpperCase(), x, y);
+      ctx.fillStyle = "#1f2937";
+      ctx.font = "bold 22px Arial";
+      ctx.fillText(truncate(value || "—", colW), x, y + 28);
+    };
+    const fmtDH = (n?: number) =>
+      n === undefined ? "" : `${(Number(n) || 0).toLocaleString("fr-FR")} DH`;
+
+    drawCell(col1X, cursorY + 92, "Type de chambre", roomTypeLabel(data.typeChambre));
+    drawCell(col2X, cursorY + 92, "Genre", data.genre || "");
+    drawCell(col1X, cursorY + 152, "Prix engagé", fmtDH(data.prixEngage));
+    // Reste à payer : mis en évidence en orange
+    ctx.fillStyle = "#9ca3af";
+    ctx.font = "15px Arial";
+    ctx.fillText("RESTE À PAYER", col2X, cursorY + 152);
+    ctx.fillStyle = data.resteAPayer && data.resteAPayer > 0 ? "#c2410e" : "#16a34a";
+    ctx.font = "bold 22px Arial";
+    ctx.fillText(truncate(fmtDH(data.resteAPayer) || "—", colW), col2X, cursorY + 180);
+
+    cursorY += detailsH + 40;
+  }
 
   // --- Encadré du montant ---
   const amtH = 130;

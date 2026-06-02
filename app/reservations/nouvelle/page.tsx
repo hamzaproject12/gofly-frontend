@@ -1283,6 +1283,9 @@ export default function NouvelleReservation() {
     const paiement = paiements[index];
     if (!paiement || !canGeneratePaymentReceipt(index)) return;
 
+    const prixEngage = Number(formData.prix) || 0;
+    const totalPaye = paiements.reduce((total, p) => total + (Number(p.montant) || 0), 0);
+
     let file: File;
     try {
       file = await generatePaymentReceiptFile({
@@ -1294,6 +1297,10 @@ export default function NouvelleReservation() {
         type: paiement.type,
         montant: Number(paiement.montant) || 0,
         date: paiement.date,
+        prixEngage,
+        typeChambre: formData.typeChambre,
+        genre: formData.gender,
+        resteAPayer: Math.max(0, prixEngage - totalPaye),
       });
     } catch {
       toast({

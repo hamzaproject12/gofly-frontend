@@ -237,6 +237,29 @@ export default function HomePage() {
     return gender === 'Homme' ? '👨' : gender === 'Femme' ? '👩' : '👥';
   };
 
+  // Dégradé de la barre d'occupation selon le taux (palette des pages)
+  const getOccupancyGradient = (rate: number) => {
+    if (rate >= 80) {
+      // Presque complet → vert émeraude (objectif atteint)
+      return {
+        gradient: 'linear-gradient(90deg, #10b981 0%, #22c55e 100%)',
+        glow: 'rgba(16, 185, 129, 0.45)'
+      };
+    }
+    if (rate >= 40) {
+      // En progression → bleu / indigo (couleurs du header)
+      return {
+        gradient: 'linear-gradient(90deg, #6366f1 0%, #3b82f6 50%, #0ea5e9 100%)',
+        glow: 'rgba(99, 102, 241, 0.4)'
+      };
+    }
+    // Faible occupation → ambre (à remplir)
+    return {
+      gradient: 'linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%)',
+      glow: 'rgba(245, 158, 11, 0.4)'
+    };
+  };
+
   const getRoomTypeLabel = (roomType: string) => {
     switch (roomType) {
       case 'SINGLE': return '1 Personne';
@@ -520,17 +543,29 @@ export default function HomePage() {
                   </div>
 
                   {/* Barre de progression de l'occupation - juste sous les nom et stats */}
-                  <div className="w-full mt-3 mb-0 overflow-hidden rounded-full h-2"
-                       style={{
-                         backgroundImage: 'repeating-linear-gradient(45deg, #e5e7eb 0, #e5e7eb 10px, #d1d5db 10px, #d1d5db 20px)'
-                       }}>
-                    <div
-                      className="h-full bg-green-500 transition-all duration-300"
-                      style={{
-                        width: `${parseInt(program.statistics.occupancyRate)}%`
-                      }}
-                    />
-                  </div>
+                  {(() => {
+                    const rate = parseInt(program.statistics.occupancyRate);
+                    const { gradient, glow } = getOccupancyGradient(rate);
+                    return (
+                      <div className="w-full mt-3 mb-0 overflow-hidden rounded-full h-3 bg-slate-200/70 shadow-inner ring-1 ring-black/5"
+                           style={{
+                             backgroundImage: 'linear-gradient(90deg, rgba(100, 116, 139, 0.12) 1px, transparent 1px)',
+                             backgroundSize: '12px 100%'
+                           }}>
+                        <div
+                          className="h-full rounded-full transition-all duration-700 ease-out relative overflow-hidden"
+                          style={{
+                            width: `${rate}%`,
+                            backgroundImage: gradient,
+                            boxShadow: `0 1px 6px ${glow}`
+                          }}
+                        >
+                          {/* Reflet brillant en surface */}
+                          <div className="absolute inset-0 bg-gradient-to-b from-white/30 to-transparent" />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </CardHeader>
 
                 {!collapsedPrograms.has(program.id) && (
@@ -678,17 +713,29 @@ export default function HomePage() {
                   </div>
 
                   {/* Barre de progression de l'occupation - juste sous les nom et stats */}
-                  <div className="w-full mt-3 mb-0 overflow-hidden rounded-full h-2"
-                       style={{
-                         backgroundImage: 'repeating-linear-gradient(45deg, #e5e7eb 0, #e5e7eb 10px, #d1d5db 10px, #d1d5db 20px)'
-                       }}>
-                    <div
-                      className="h-full bg-green-500 transition-all duration-300"
-                      style={{
-                        width: `${parseInt(program.statistics.occupancyRate)}%`
-                      }}
-                    />
-                  </div>
+                  {(() => {
+                    const rate = parseInt(program.statistics.occupancyRate);
+                    const { gradient, glow } = getOccupancyGradient(rate);
+                    return (
+                      <div className="w-full mt-3 mb-0 overflow-hidden rounded-full h-3 bg-slate-200/70 shadow-inner ring-1 ring-black/5"
+                           style={{
+                             backgroundImage: 'linear-gradient(90deg, rgba(100, 116, 139, 0.12) 1px, transparent 1px)',
+                             backgroundSize: '12px 100%'
+                           }}>
+                        <div
+                          className="h-full rounded-full transition-all duration-700 ease-out relative overflow-hidden"
+                          style={{
+                            width: `${rate}%`,
+                            backgroundImage: gradient,
+                            boxShadow: `0 1px 6px ${glow}`
+                          }}
+                        >
+                          {/* Reflet brillant en surface */}
+                          <div className="absolute inset-0 bg-gradient-to-b from-white/30 to-transparent" />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </CardHeader>
 
                 {!collapsedPrograms.has(program.id) && (

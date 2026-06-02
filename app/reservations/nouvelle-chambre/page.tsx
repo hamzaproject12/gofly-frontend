@@ -186,16 +186,14 @@ export default function NouvelleChambrePage() {
     remarque: "",
     transport: false,
   });
-  const [payments, setPayments] = useState<PaymentRow[]>([
-    { amount: "", type: "", receipt: null },
-  ]);
+  const [payments, setPayments] = useState<PaymentRow[]>([]);
   /** Aperçus locaux alignés sur les index occupants / paiements (comme Nouvelle Réservation) */
   const [occupantPreviews, setOccupantPreviews] = useState<
     Array<{ url: string; type: string } | null>
   >([]);
   const [paymentPreviews, setPaymentPreviews] = useState<
     Array<{ url: string; type: string } | null>
-  >([null]);
+  >([]);
   const [previewImage, setPreviewImage] = useState<{
     url: string;
     title: string;

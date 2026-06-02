@@ -1149,7 +1149,13 @@ export default function NouveauProgramme() {
         description: 'Le programme a été créé avec succès',
       })
 
+      // Redirection fiable vers le dashboard. On garde `isSubmitting` à true
+      // (bouton désactivé) pendant la navigation pour éviter qu'un second clic
+      // ne recrée un programme en double.
       router.push('/')
+      router.refresh()
+      window.location.href = '/'
+      return
     } catch (error) {
       console.error('Erreur:', error)
       toast({
@@ -1157,7 +1163,6 @@ export default function NouveauProgramme() {
         description: error instanceof Error ? error.message : 'Une erreur est survenue lors de la création du programme',
         variant: 'destructive',
       })
-    } finally {
       setIsSubmitting(false)
     }
   }

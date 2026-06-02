@@ -1346,18 +1346,21 @@ export default function EditReservation() {
     if (previews[type]) {
       return previews[type].url;
     }
-    
+
     // Si on a marqué le passeport pour suppression, ne pas afficher l'ancien
     if (type === 'passport' && passportToDelete !== null) {
       return null;
     }
-    
+
+    // Guard: reservationData not yet loaded
+    if (!reservationData) return null;
+
     // Ensuite vérifier dans les documents existants de la réservation
     // Gérer les variations de types (passport/passeport, payment/paiement)
-    const typeVariations = type === 'passport' ? ['passport', 'passeport'] : 
+    const typeVariations = type === 'passport' ? ['passport', 'passeport'] :
                           type === 'payment' ? ['payment', 'paiement'] : [type];
-    
-    const existingDoc = (reservationData.documents || reservationData.fichiers || []).find((d: any) => 
+
+    const existingDoc = (reservationData.documents || reservationData.fichiers || []).find((d: any) =>
       typeVariations.includes(d.fileType)
     );
     

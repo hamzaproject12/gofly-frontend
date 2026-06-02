@@ -1149,7 +1149,7 @@ export default function NouveauProgramme() {
         description: 'Le programme a été créé avec succès',
       })
 
-      router.push('/programmes')
+      router.push('/')
     } catch (error) {
       console.error('Erreur:', error)
       toast({

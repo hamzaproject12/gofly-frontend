@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { generatePaymentReceiptFile } from "@/lib/generateReceipt";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -774,13 +775,18 @@ export default function NouvelleChambrePage() {
     const leader = occupants[0];
     if (!payment || !leader) return;
 
-    const amount = Number(payment.amount) || 0;
-    const paymentDate = new Date().toISOString().slice(0, 10);
-    const canvas = document.createElement("canvas");
-    canvas.width = 1200;
-    canvas.height = 800;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
+    let file: File;
+    try {
+      file = await generatePaymentReceiptFile({
+        nom: leader.lastName,
+        prenom: leader.firstName,
+        telephone: leader.phone,
+        passportNumber: leader.passportNumber,
+        programme: formData.programme,
+        type: payment.type,
+        montant: Number(payment.amount) || 0,
+      });
+    } catch {
       toast({
         title: "Erreur",
         description: "Impossible de générer le reçu pour le moment.",
@@ -788,45 +794,6 @@ export default function NouvelleChambrePage() {
       });
       return;
     }
-
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "#e5e7eb";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(30, 30, canvas.width - 60, canvas.height - 60);
-
-    ctx.fillStyle = "#1f2937";
-    ctx.font = "bold 42px Arial";
-    ctx.fillText("Recu de paiement", 60, 100);
-    ctx.fillStyle = "#4b5563";
-    ctx.font = "22px Arial";
-    ctx.fillText(`Date: ${paymentDate}`, 60, 150);
-    ctx.fillText(`Programme: ${formData.programme || "-"}`, 60, 190);
-    ctx.fillStyle = "#111827";
-    ctx.font = "bold 28px Arial";
-    ctx.fillText("Client", 60, 265);
-    ctx.font = "22px Arial";
-    ctx.fillText(`Nom complet: ${leader.lastName} ${leader.firstName}`, 60, 310);
-    ctx.fillText(`Telephone: ${leader.phone}`, 60, 345);
-    ctx.font = "bold 28px Arial";
-    ctx.fillText("Paiement", 60, 430);
-    ctx.font = "22px Arial";
-    ctx.fillText(`Type: ${payment.type}`, 60, 475);
-    ctx.fillText(`Montant: ${amount.toLocaleString("fr-FR")} DH`, 60, 510);
-
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/png")
-    );
-    if (!blob) {
-      toast({
-        title: "Erreur",
-        description: "Generation du recu echouee.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const file = new File([blob], `recu-${Date.now()}.png`, { type: "image/png" });
     setPaymentField(index, "receipt", file);
     setPaymentPreviews((prev) => {
       const next = [...prev];

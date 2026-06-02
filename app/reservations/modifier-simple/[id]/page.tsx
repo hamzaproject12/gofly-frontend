@@ -180,6 +180,21 @@ interface FileInputs {
   hotelBooked: HTMLInputElement | null;
 }
 
+function formatPhoneInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 12);
+  if (!digits) return "";
+  const country = digits.slice(0, 3);
+  const local = digits.slice(3, 12);
+  return local ? `+${country} ${local}` : `+${country}`;
+}
+
+function formatPassportInput(value: string): string {
+  const chars = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const letters = chars.replace(/[^A-Z]/g, "").slice(0, 2);
+  const numbers = chars.replace(/[^0-9]/g, "").slice(0, 7);
+  return `${letters}${numbers}`;
+}
+
 const planThemesModifier = {
   Économique: { name: "Économique", icon: Leaf },
   Normal: { name: "Normal", icon: ShieldCheck },

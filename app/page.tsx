@@ -518,32 +518,19 @@ export default function HomePage() {
                       </Button>
                     </div>
                   </div>
-                </CardHeader>
 
-                {/* Barre de progression de l'occupation */}
-                <div className="px-6 pt-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-gray-700">Occupation</p>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {program.statistics.placesOccupees}/{program.statistics.totalPlaces}
-                      </p>
-                    </div>
+                  {/* Barre de progression de l'occupation - juste sous les nom et stats */}
+                  <div className="w-full mt-3 mb-0">
                     <Progress
                       value={parseInt(program.statistics.occupancyRate)}
-                      className={`h-3 ${
-                        parseInt(program.statistics.occupancyRate) >= 80
-                          ? 'bg-red-100'
-                          : parseInt(program.statistics.occupancyRate) >= 50
-                            ? 'bg-yellow-100'
-                            : 'bg-green-100'
+                      className={`h-2 ${
+                        parseInt(program.statistics.occupancyRate) === 100
+                          ? 'bg-green-200'
+                          : 'bg-green-100'
                       }`}
                     />
-                    <p className="text-xs text-gray-500">
-                      {program.statistics.occupancyRate}% occupé · {program.statistics.placesRestantes} places restantes
-                    </p>
                   </div>
-                </div>
+                </CardHeader>
 
                 {!collapsedPrograms.has(program.id) && (
                 <CardContent className="p-6">
@@ -688,32 +675,19 @@ export default function HomePage() {
                       </Button>
                     </div>
                   </div>
-                </CardHeader>
 
-                {/* Barre de progression de l'occupation */}
-                <div className="px-6 pt-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-gray-700">Occupation</p>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {program.statistics.placesOccupees}/{program.statistics.totalPlaces}
-                      </p>
-                    </div>
+                  {/* Barre de progression de l'occupation - juste sous les nom et stats */}
+                  <div className="w-full mt-3 mb-0">
                     <Progress
                       value={parseInt(program.statistics.occupancyRate)}
-                      className={`h-3 ${
-                        parseInt(program.statistics.occupancyRate) >= 80
-                          ? 'bg-red-100'
-                          : parseInt(program.statistics.occupancyRate) >= 50
-                            ? 'bg-yellow-100'
-                            : 'bg-green-100'
+                      className={`h-2 ${
+                        parseInt(program.statistics.occupancyRate) === 100
+                          ? 'bg-green-200'
+                          : 'bg-green-100'
                       }`}
                     />
-                    <p className="text-xs text-gray-500">
-                      {program.statistics.occupancyRate}% occupé · {program.statistics.placesRestantes} places restantes
-                    </p>
                   </div>
-                </div>
+                </CardHeader>
 
                 {!collapsedPrograms.has(program.id) && (
                 <CardContent className="p-6">

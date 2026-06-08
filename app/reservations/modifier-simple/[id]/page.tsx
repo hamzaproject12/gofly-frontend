@@ -44,18 +44,36 @@ import { useRouter, useParams } from "next/navigation"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
 
 // Types
 type DocumentType = 'passport' | 'visa' | 'flightBooked' | 'hotelBooked' | 'payment';
+type OcrExtractData = {
+  first_name?: string;
+  last_name?: string;
+  passport?: string;
+  personal_id_number?: string;
+  sex?: string;
+};
+type OcrTarget = "leader" | number;
 
 function formatPassportInput(value: string): string {
   const chars = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
   const letters = chars.replace(/[^A-Z]/g, "").slice(0, 2);
   const numbers = chars.replace(/[^0-9]/g, "").slice(0, 7);
   return `${letters}${numbers}`;
+}
+
+function mapOcrSexToGender(sex?: string): string {
+  if (!sex) return "";
+  const s = sex.toUpperCase();
+  if (s === "M" || s === "MALE" || s === "H" || s === "HOMME") return "Homme";
+  if (s === "F" || s === "FEMALE" || s === "FEMME") return "Femme";
+  return "";
 }
 
 // Custom Hook: Blob Proxy for PDF Display
@@ -393,6 +411,8 @@ export default function EditReservation() {
     }>
   >([])
   const [passportToDelete, setPassportToDelete] = useState<number | null>(null) // ID du fichier passeport à supprimer
+  const [ocrProcessingTarget, setOcrProcessingTarget] = useState<OcrTarget | null>(null)
+  const [ocrValidation, setOcrValidation] = useState<{ target: OcrTarget; data: OcrExtractData } | null>(null)
   const [documents, setDocuments] = useState<{
     passport: File | null;
     visa: File | null;
@@ -1046,11 +1066,17 @@ export default function EditReservation() {
           }));
         };
         reader.readAsDataURL(file);
+        if (type === "passport") {
+          void runPassportOcr(file, "leader");
+        }
       } else if (file.type === 'application/pdf') {
         setPreviews(prev => ({
           ...prev,
           [type]: { url: URL.createObjectURL(file), type: file.type }
         }));
+        if (type === "passport") {
+          void runPassportOcr(file, "leader");
+        }
       }
     }
   }
@@ -1101,6 +1127,51 @@ export default function EditReservation() {
     }
   }
 
+  const runPassportOcr = async (file: File, target: OcrTarget) => {
+    setOcrProcessingTarget(target);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/passport-ocr", { method: "POST", body: fd });
+      const json = await res.json();
+      if (json?.data) {
+        setOcrValidation({ target, data: json.data });
+      }
+    } catch {
+      // OCR silently fails
+    } finally {
+      setOcrProcessingTarget(null);
+    }
+  };
+
+  const applyOcrValidation = () => {
+    if (!ocrValidation) return;
+    const { target, data } = ocrValidation;
+    if (target === "leader") {
+      setFormData((prev) => ({
+        ...prev,
+        prenom: data.first_name || prev.prenom,
+        nom: data.last_name || prev.nom,
+        passportNumber: data.passport ? formatPassportInput(data.passport) : prev.passportNumber,
+        gender: mapOcrSexToGender(data.sex) || prev.gender,
+      }));
+    } else {
+      setAccompagnants((prev) =>
+        prev.map((a) =>
+          a.id === target
+            ? {
+                ...a,
+                firstName: data.first_name || a.firstName,
+                lastName: data.last_name || a.lastName,
+                passportNumber: data.passport ? formatPassportInput(data.passport) : a.passportNumber,
+              }
+            : a
+        )
+      );
+    }
+    setOcrValidation(null);
+  };
+
   const handleRemoveDocument = (type: string) => {
     if (type === 'passport') {
       setDocuments(prev => ({ ...prev, passport: null }))
@@ -1147,6 +1218,7 @@ export default function EditReservation() {
         }));
       };
       reader.readAsDataURL(file);
+      void runPassportOcr(file, memberId);
     } else {
       setPreviews((p) => ({
         ...p,
@@ -1155,6 +1227,7 @@ export default function EditReservation() {
           type: file.type,
         },
       }));
+      void runPassportOcr(file, memberId);
     }
   };
 
@@ -1613,6 +1686,12 @@ export default function EditReservation() {
           {passportToDelete !== null && (
             <p className="text-xs text-orange-600">
               L&apos;ancien passeport sera remplacé par le nouveau fichier
+            </p>
+          )}
+          {ocrProcessingTarget === "leader" && (
+            <p className="text-xs text-blue-600 flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Lecture du passeport en cours...
             </p>
           )}
         </div>
@@ -3025,6 +3104,54 @@ export default function EditReservation() {
             libres, et les jaunes les places attribuées à ce dossier (groupe). Le cadre jaune
             autour d&apos;une ligne correspond à la chambre où votre groupe est enregistré.
           </p>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de validation OCR */}
+      <Dialog open={!!ocrValidation} onOpenChange={() => setOcrValidation(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Données lues sur le passeport</DialogTitle>
+            <DialogDescription>
+              Vérifiez les informations extraites avant de les appliquer.
+            </DialogDescription>
+          </DialogHeader>
+          {ocrValidation && (
+            <div className="space-y-3 py-2">
+              {ocrValidation.data.first_name && (
+                <div className="flex justify-between text-sm">
+                  <Label className="text-gray-600">Prénom</Label>
+                  <span className="font-medium">{ocrValidation.data.first_name}</span>
+                </div>
+              )}
+              {ocrValidation.data.last_name && (
+                <div className="flex justify-between text-sm">
+                  <Label className="text-gray-600">Nom</Label>
+                  <span className="font-medium">{ocrValidation.data.last_name}</span>
+                </div>
+              )}
+              {ocrValidation.data.passport && (
+                <div className="flex justify-between text-sm">
+                  <Label className="text-gray-600">N° Passeport</Label>
+                  <span className="font-medium">{formatPassportInput(ocrValidation.data.passport)}</span>
+                </div>
+              )}
+              {ocrValidation.data.sex && mapOcrSexToGender(ocrValidation.data.sex) && (
+                <div className="flex justify-between text-sm">
+                  <Label className="text-gray-600">Genre</Label>
+                  <span className="font-medium">{mapOcrSexToGender(ocrValidation.data.sex)}</span>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setOcrValidation(null)}>
+              Ignorer
+            </Button>
+            <Button onClick={applyOcrValidation} className="bg-blue-600 hover:bg-blue-700">
+              Appliquer
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

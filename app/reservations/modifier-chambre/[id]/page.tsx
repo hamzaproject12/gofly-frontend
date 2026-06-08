@@ -1373,9 +1373,13 @@ export default function EditReservation() {
             return sum + parseAmount(paiement.montant);
           }, 0);
 
+          // Sans prix dossier valide, ne pas plafonner (sinon montant forcé à 0 → saisie impossible)
+          const canCapToRemaining = Number.isFinite(totalPrice) && totalPrice > 0;
           const allowedMax = Math.max(totalPrice - sumOther, 0);
-          const clamped = Math.min(numericValue, allowedMax);
-          if (Number.isFinite(totalPrice) && totalPrice > 0 && numericValue > allowedMax) {
+          const clamped = canCapToRemaining
+            ? Math.min(numericValue, allowedMax)
+            : numericValue;
+          if (canCapToRemaining && numericValue > allowedMax) {
             toast({
               title: "Montant dépasse le prix suggéré",
               description: `Le total des paiements ne doit pas dépasser ${totalPrice.toLocaleString(

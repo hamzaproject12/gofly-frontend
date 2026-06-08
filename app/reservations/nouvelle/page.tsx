@@ -1035,15 +1035,32 @@ export default function NouvelleReservation() {
 
   const mettreAJourPaiement = <K extends keyof Paiement>(index: number, field: K, value: Paiement[K]) => {
     if (field === "montant" && typeof value === "string") {
-      const montantSaisi = Number(value);
       const prixSuggere = Number(formData.prix) || 0;
 
-      if (value.trim() !== "" && !Number.isNaN(montantSaisi) && prixSuggere > 0) {
-        const totalHorsLigne = paiements.reduce(
+      setPaiements(prev => {
+        const newPaiements = [...prev];
+
+        if (value.trim() === "") {
+          newPaiements[index] = { ...newPaiements[index], montant: "" };
+          return newPaiements;
+        }
+
+        let numericValue = Number(value);
+        if (Number.isNaN(numericValue)) return prev;
+        if (numericValue < 0) numericValue = 0;
+
+        const sumOther = prev.reduce(
           (sum, p, i) => sum + (i === index ? 0 : Number(p.montant) || 0),
           0
         );
-        if (totalHorsLigne + montantSaisi > prixSuggere) {
+
+        // Sans prix dossier valide, ne pas plafonner (sinon montant forcé à 0 → saisie impossible)
+        const canCapToRemaining = prixSuggere > 0;
+        const allowedMax = Math.max(prixSuggere - sumOther, 0);
+        const clamped = canCapToRemaining
+          ? Math.min(numericValue, allowedMax)
+          : numericValue;
+        if (canCapToRemaining && numericValue > allowedMax) {
           toast({
             title: "Montant dépasse le prix suggéré",
             description: `Le total des paiements ne doit pas dépasser ${prixSuggere.toLocaleString(
@@ -1051,9 +1068,12 @@ export default function NouvelleReservation() {
             )} DH.`,
             variant: "destructive",
           });
-          return;
         }
-      }
+
+        newPaiements[index] = { ...newPaiements[index], montant: String(clamped) };
+        return newPaiements;
+      });
+      return;
     }
 
     setPaiements(prev => {

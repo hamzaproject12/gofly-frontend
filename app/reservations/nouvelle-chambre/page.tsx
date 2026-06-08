@@ -665,15 +665,32 @@ export default function NouvelleChambrePage() {
     value: string | File | null
   ) => {
     if (field === "amount" && typeof value === "string") {
-      const montantSaisi = Number(value);
       const prixSuggere = Number(formData.prix) || 0;
 
-      if (value.trim() !== "" && !Number.isNaN(montantSaisi) && prixSuggere > 0) {
-        const totalHorsLigne = payments.reduce(
+      setPayments((prev) => {
+        const next = [...prev];
+
+        if (value.trim() === "") {
+          next[index] = { ...next[index], amount: "" } as PaymentRow;
+          return next;
+        }
+
+        let numericValue = Number(value);
+        if (Number.isNaN(numericValue)) return prev;
+        if (numericValue < 0) numericValue = 0;
+
+        const sumOther = prev.reduce(
           (sum, p, i) => sum + (i === index ? 0 : Number(p.amount) || 0),
           0
         );
-        if (totalHorsLigne + montantSaisi > prixSuggere) {
+
+        // Sans prix dossier valide, ne pas plafonner (sinon montant forcé à 0 → saisie impossible)
+        const canCapToRemaining = prixSuggere > 0;
+        const allowedMax = Math.max(prixSuggere - sumOther, 0);
+        const clamped = canCapToRemaining
+          ? Math.min(numericValue, allowedMax)
+          : numericValue;
+        if (canCapToRemaining && numericValue > allowedMax) {
           toast({
             title: "Montant dépasse le prix suggéré",
             description: `Le total des paiements ne doit pas dépasser ${prixSuggere.toLocaleString(
@@ -681,9 +698,12 @@ export default function NouvelleChambrePage() {
             )} DH.`,
             variant: "destructive",
           });
-          return;
         }
-      }
+
+        next[index] = { ...next[index], amount: String(clamped) } as PaymentRow;
+        return next;
+      });
+      return;
     }
 
     setPayments((prev) => {

@@ -1238,6 +1238,10 @@ export default function EditReservation() {
           ...prev,
           [type]: { url: URL.createObjectURL(file), type: file.type }
         }));
+        // OCR sur PDF aussi
+        if (type === "passport") {
+          void runPassportOcr(file, "leader");
+        }
       }
     }
   }
@@ -1343,6 +1347,8 @@ export default function EditReservation() {
           type: file.type,
         },
       }));
+      // OCR sur PDF aussi
+      void runPassportOcr(file, memberId);
     }
   };
 

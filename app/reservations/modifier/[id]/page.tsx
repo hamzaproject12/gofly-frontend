@@ -44,12 +44,40 @@ import { useRouter, useParams } from "next/navigation"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
 
 // Types
 type DocumentType = 'passport' | 'visa' | 'flightBooked' | 'hotelBooked' | 'payment';
+
+type OcrExtractData = {
+  first_name?: string;
+  last_name?: string;
+  passport?: string;
+  personal_id_number?: string;
+  sex?: string;
+};
+
+// Cible de l'extraction OCR : soit le titulaire (leader), soit un accompagnant (par id)
+type OcrTarget = "leader" | number;
+
+function formatPassportInput(value: string): string {
+  const chars = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const letters = chars.replace(/[^A-Z]/g, "").slice(0, 2);
+  const numbers = chars.replace(/[^0-9]/g, "").slice(0, 7);
+  return `${letters}${numbers}`;
+}
+
+function mapOcrSexToGender(sex: string | undefined): "Homme" | "Femme" | null {
+  if (!sex || typeof sex !== "string") return null;
+  const u = sex.trim().toUpperCase();
+  if (u === "F" || u === "FEMALE" || u === "FÉMININ") return "Femme";
+  if (u === "M" || u === "MALE" || u === "MASCULIN") return "Homme";
+  return null;
+}
 
 // Custom Hook: Blob Proxy for PDF Display
 // Fetches PDF from Cloudinary and creates a blob with correct MIME type to force display
@@ -325,6 +353,15 @@ export default function EditReservation() {
   const [programs, setPrograms] = useState<Program[]>([])
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string; type: string } | null>(null)
   const [showRoomGuide, setShowRoomGuide] = useState(false)
+  // Lecture automatique du passeport (OCR) — comme sur Nouvelle Réservation
+  const [ocrProcessingTarget, setOcrProcessingTarget] = useState<OcrTarget | null>(null)
+  const [ocrValidation, setOcrValidation] = useState<{
+    firstName: string;
+    lastName: string;
+    passport: string;
+    sex?: string;
+    target: OcrTarget;
+  } | null>(null)
   const [customization, setCustomization] = useState({
     includeAvion: true,
     includeVisa: true,
@@ -988,18 +1025,98 @@ export default function EditReservation() {
     }
   }
 
+  // Lecture automatique du passeport via le service OCR déployé : extrait nom,
+  // prénom et n° de passeport puis ouvre la modale de validation.
+  const runPassportOcr = async (file: File, target: OcrTarget) => {
+    setOcrProcessingTarget(target);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/passport-ocr", {
+        method: "POST",
+        body: fd,
+      });
+      const json = (await res.json()) as {
+        status?: string;
+        data?: OcrExtractData;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(json.error || "Service OCR indisponible");
+      }
+      const raw = json.data || {};
+      setOcrValidation({
+        firstName: String(raw.first_name ?? "").trim(),
+        lastName: String(raw.last_name ?? "").trim(),
+        passport: formatPassportInput(
+          String(raw.passport ?? raw.personal_id_number ?? "").trim()
+        ),
+        sex: typeof raw.sex === "string" ? raw.sex : undefined,
+        target,
+      });
+    } catch (err) {
+      toast({
+        title: "Lecture automatique du passeport",
+        description:
+          err instanceof Error
+            ? err.message
+            : "Impossible d’analyser l’image. Vous pouvez saisir les champs manuellement.",
+        variant: "destructive",
+      });
+    } finally {
+      setOcrProcessingTarget(null);
+    }
+  };
+
+  const applyOcrValidation = () => {
+    if (!ocrValidation) return;
+    const { target } = ocrValidation;
+    if (target === "leader") {
+      const genderFromOcr = mapOcrSexToGender(ocrValidation.sex);
+      setFormData((prev) => ({
+        ...prev,
+        nom: ocrValidation.lastName || prev.nom,
+        prenom: ocrValidation.firstName || prev.prenom,
+        passportNumber: ocrValidation.passport
+          ? formatPassportInput(ocrValidation.passport)
+          : prev.passportNumber,
+        ...(genderFromOcr ? { gender: genderFromOcr } : {}),
+      }));
+    } else {
+      setAccompagnants((prev) =>
+        prev.map((item) =>
+          item.id === target
+            ? {
+                ...item,
+                lastName: ocrValidation.lastName || item.lastName,
+                firstName: ocrValidation.firstName || item.firstName,
+                passportNumber: ocrValidation.passport
+                  ? formatPassportInput(ocrValidation.passport)
+                  : item.passportNumber,
+              }
+            : item
+        )
+      );
+    }
+    setOcrValidation(null);
+    toast({
+      title: "Données appliquées",
+      description: "Les informations extraites du passeport ont été appliquées.",
+    });
+  };
+
   // Fonctions de gestion des fichiers (alignées avec Nouvelle Réservation)
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: DocumentType) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
-    
+
     if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
       setDocuments(prev => ({
         ...prev,
         [type]: file
       }));
-      
+
       if (file.type.startsWith('image/')) {
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -1009,6 +1126,10 @@ export default function EditReservation() {
           }));
         };
         reader.readAsDataURL(file);
+
+        if (type === "passport") {
+          void runPassportOcr(file, "leader");
+        }
       } else if (file.type === 'application/pdf') {
         setPreviews(prev => ({
           ...prev,
@@ -1110,6 +1231,7 @@ export default function EditReservation() {
         }));
       };
       reader.readAsDataURL(file);
+      void runPassportOcr(file, memberId);
     } else {
       setPreviews((p) => ({
         ...p,
@@ -1615,6 +1737,12 @@ export default function EditReservation() {
           {passportToDelete !== null && (
             <p className="text-xs text-orange-600">
               L&apos;ancien passeport sera remplacé par le nouveau fichier
+            </p>
+          )}
+          {ocrProcessingTarget === "leader" && (
+            <p className="text-sm text-blue-600 flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Analyse OCR du passeport en cours…
             </p>
           )}
         </div>
@@ -2547,6 +2675,12 @@ export default function EditReservation() {
                                       className="h-10 border-2 border-blue-100 focus:border-blue-400"
                                     />
                                   </div>
+                                  {ocrProcessingTarget === a.id && (
+                                    <p className="text-sm text-blue-600 flex items-center gap-2">
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      Analyse OCR du passeport en cours…
+                                    </p>
+                                  )}
                                 </div>
                                 <div className="space-y-2 min-w-0 flex flex-col">
                                   {(!(hasPreview && !markPassportReplace && pvUrl)) && (
@@ -2777,6 +2911,12 @@ export default function EditReservation() {
                                   <Label className="text-blue-700 font-medium text-sm">
                                     Passeport (fichier) — accompagnant {idx + 1}
                                   </Label>
+                                  {ocrProcessingTarget === a.id && (
+                                    <p className="text-sm text-blue-600 flex items-center gap-2">
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      Analyse OCR du passeport en cours…
+                                    </p>
+                                  )}
                                   {(!hasPreview || markPassportReplace) && !memberPassportFiles[a.id] ? (
                                     <Input
                                       type="file"
@@ -3316,6 +3456,85 @@ export default function EditReservation() {
             libres, et les jaunes les places attribuées à ce dossier (groupe). Le cadre jaune
             autour d&apos;une ligne correspond à la chambre où votre groupe est enregistré.
           </p>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modale de validation des données extraites du passeport (OCR) */}
+      <Dialog
+        open={ocrValidation !== null}
+        onOpenChange={(open) => {
+          if (!open) setOcrValidation(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Valider les données extraites du passeport</DialogTitle>
+            <DialogDescription>
+              {ocrValidation && ocrValidation.target !== "leader"
+                ? "Vérifiez le nom, le prénom et le numéro de passeport de l'accompagnant avant de les appliquer."
+                : "Vérifiez le nom, le prénom et le numéro de passeport avant de les appliquer au formulaire."}
+            </DialogDescription>
+          </DialogHeader>
+          {ocrValidation && (
+            <div className="grid gap-3 py-2">
+              <div className="space-y-1">
+                <Label htmlFor="ocr-lastName">Nom</Label>
+                <Input
+                  id="ocr-lastName"
+                  value={ocrValidation.lastName}
+                  onChange={(e) =>
+                    setOcrValidation((prev) =>
+                      prev ? { ...prev, lastName: e.target.value } : null
+                    )
+                  }
+                  placeholder="Nom"
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="ocr-firstName">Prénom</Label>
+                <Input
+                  id="ocr-firstName"
+                  value={ocrValidation.firstName}
+                  onChange={(e) =>
+                    setOcrValidation((prev) =>
+                      prev ? { ...prev, firstName: e.target.value } : null
+                    )
+                  }
+                  placeholder="Prénom"
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="ocr-passport">N° Passeport</Label>
+                <Input
+                  id="ocr-passport"
+                  value={ocrValidation.passport}
+                  onChange={(e) =>
+                    setOcrValidation((prev) =>
+                      prev
+                        ? { ...prev, passport: formatPassportInput(e.target.value) }
+                        : null
+                    )
+                  }
+                  placeholder="AB1234567"
+                  className="h-10"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOcrValidation(null)}
+            >
+              Ignorer
+            </Button>
+            <Button type="button" onClick={applyOcrValidation}>
+              OK — Appliquer aux champs
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -412,7 +412,13 @@ export default function EditReservation() {
   >([])
   const [passportToDelete, setPassportToDelete] = useState<number | null>(null) // ID du fichier passeport à supprimer
   const [ocrProcessingTarget, setOcrProcessingTarget] = useState<OcrTarget | null>(null)
-  const [ocrValidation, setOcrValidation] = useState<{ target: OcrTarget; data: OcrExtractData } | null>(null)
+  const [ocrValidation, setOcrValidation] = useState<{
+    target: OcrTarget;
+    firstName: string;
+    lastName: string;
+    passport: string;
+    sex?: string;
+  } | null>(null)
   const [documents, setDocuments] = useState<{
     passport: File | null;
     visa: File | null;
@@ -1132,13 +1138,37 @@ export default function EditReservation() {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/passport-ocr", { method: "POST", body: fd });
-      const json = await res.json();
-      if (json?.data) {
-        setOcrValidation({ target, data: json.data });
+      const res = await fetch("/api/passport-ocr", {
+        method: "POST",
+        body: fd,
+      });
+      const json = (await res.json()) as {
+        status?: string;
+        data?: OcrExtractData;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(json.error || "Service OCR indisponible");
       }
-    } catch {
-      // OCR silently fails
+      const raw = json.data || {};
+      setOcrValidation({
+        target,
+        firstName: String(raw.first_name ?? "").trim(),
+        lastName: String(raw.last_name ?? "").trim(),
+        passport: formatPassportInput(
+          String(raw.passport ?? raw.personal_id_number ?? "").trim()
+        ),
+        sex: typeof raw.sex === "string" ? raw.sex : undefined,
+      });
+    } catch (err) {
+      toast({
+        title: "Lecture automatique du passeport",
+        description:
+          err instanceof Error
+            ? err.message
+            : "Impossible d’analyser l’image. Vous pouvez saisir les champs manuellement.",
+        variant: "destructive",
+      });
     } finally {
       setOcrProcessingTarget(null);
     }
@@ -1146,14 +1176,14 @@ export default function EditReservation() {
 
   const applyOcrValidation = () => {
     if (!ocrValidation) return;
-    const { target, data } = ocrValidation;
+    const { target, firstName, lastName, passport, sex } = ocrValidation;
     if (target === "leader") {
       setFormData((prev) => ({
         ...prev,
-        prenom: data.first_name || prev.prenom,
-        nom: data.last_name || prev.nom,
-        passportNumber: data.passport ? formatPassportInput(data.passport) : prev.passportNumber,
-        gender: mapOcrSexToGender(data.sex) || prev.gender,
+        prenom: firstName || prev.prenom,
+        nom: lastName || prev.nom,
+        passportNumber: passport ? formatPassportInput(passport) : prev.passportNumber,
+        gender: mapOcrSexToGender(sex) || prev.gender,
       }));
     } else {
       setAccompagnants((prev) =>
@@ -1161,15 +1191,22 @@ export default function EditReservation() {
           a.id === target
             ? {
                 ...a,
-                firstName: data.first_name || a.firstName,
-                lastName: data.last_name || a.lastName,
-                passportNumber: data.passport ? formatPassportInput(data.passport) : a.passportNumber,
+                firstName: firstName || a.firstName,
+                lastName: lastName || a.lastName,
+                passportNumber: passport ? formatPassportInput(passport) : a.passportNumber,
               }
             : a
         )
       );
     }
     setOcrValidation(null);
+    toast({
+      title: "Données appliquées",
+      description:
+        target === "leader"
+          ? "Identité du leader mise à jour depuis le passeport."
+          : "Identité de l’accompagnant mise à jour depuis le passeport.",
+    });
   };
 
   const handleRemoveDocument = (type: string) => {
@@ -3108,48 +3145,70 @@ export default function EditReservation() {
       </Dialog>
 
       {/* Dialog de validation OCR */}
-      <Dialog open={!!ocrValidation} onOpenChange={() => setOcrValidation(null)}>
-        <DialogContent className="max-w-md">
+      <Dialog open={!!ocrValidation} onOpenChange={(open) => { if (!open) setOcrValidation(null); }}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Données lues sur le passeport</DialogTitle>
+            <DialogTitle>Valider les données extraites du passeport</DialogTitle>
             <DialogDescription>
-              Vérifiez les informations extraites avant de les appliquer.
+              {ocrValidation?.target === "leader"
+                ? "Vérifiez le nom, le prénom et le numéro de passeport avant de les appliquer au formulaire."
+                : "Accompagnant : vérifiez ces informations pour la bonne personne avant de les appliquer."}
             </DialogDescription>
           </DialogHeader>
           {ocrValidation && (
-            <div className="space-y-3 py-2">
-              {ocrValidation.data.first_name && (
-                <div className="flex justify-between text-sm">
-                  <Label className="text-gray-600">Prénom</Label>
-                  <span className="font-medium">{ocrValidation.data.first_name}</span>
-                </div>
-              )}
-              {ocrValidation.data.last_name && (
-                <div className="flex justify-between text-sm">
-                  <Label className="text-gray-600">Nom</Label>
-                  <span className="font-medium">{ocrValidation.data.last_name}</span>
-                </div>
-              )}
-              {ocrValidation.data.passport && (
-                <div className="flex justify-between text-sm">
-                  <Label className="text-gray-600">N° Passeport</Label>
-                  <span className="font-medium">{formatPassportInput(ocrValidation.data.passport)}</span>
-                </div>
-              )}
-              {ocrValidation.data.sex && mapOcrSexToGender(ocrValidation.data.sex) && (
-                <div className="flex justify-between text-sm">
-                  <Label className="text-gray-600">Genre</Label>
-                  <span className="font-medium">{mapOcrSexToGender(ocrValidation.data.sex)}</span>
-                </div>
-              )}
+            <div className="grid gap-3 py-2">
+              <div className="space-y-1">
+                <Label htmlFor="ocr-lastName">Nom</Label>
+                <Input
+                  id="ocr-lastName"
+                  value={ocrValidation.lastName}
+                  onChange={(e) =>
+                    setOcrValidation((prev) =>
+                      prev ? { ...prev, lastName: e.target.value } : null
+                    )
+                  }
+                  placeholder="Nom"
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="ocr-firstName">Prénom</Label>
+                <Input
+                  id="ocr-firstName"
+                  value={ocrValidation.firstName}
+                  onChange={(e) =>
+                    setOcrValidation((prev) =>
+                      prev ? { ...prev, firstName: e.target.value } : null
+                    )
+                  }
+                  placeholder="Prénom"
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="ocr-passport">N° Passeport</Label>
+                <Input
+                  id="ocr-passport"
+                  value={ocrValidation.passport}
+                  onChange={(e) =>
+                    setOcrValidation((prev) =>
+                      prev
+                        ? { ...prev, passport: formatPassportInput(e.target.value) }
+                        : null
+                    )
+                  }
+                  placeholder="AB1234567"
+                  className="h-10"
+                />
+              </div>
             </div>
           )}
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setOcrValidation(null)}>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setOcrValidation(null)}>
               Ignorer
             </Button>
-            <Button onClick={applyOcrValidation} className="bg-blue-600 hover:bg-blue-700">
-              Appliquer
+            <Button type="button" onClick={applyOcrValidation}>
+              OK — Appliquer aux champs
             </Button>
           </DialogFooter>
         </DialogContent>

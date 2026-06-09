@@ -396,6 +396,9 @@ export default function EditReservation() {
   // État pour stocker les valeurs initiales (pour détecter les changements)
   const [initialData, setInitialData] = useState<any>(null)
 
+  // Hôtels Autre assignés à la réservation (lecture seule)
+  const [reservationHotelsAutre, setReservationHotelsAutre] = useState<Array<{ hotelId: number; roomId: number; hotelName: string }>>([])
+
   const [paiements, setPaiements] = useState<Paiement[]>([])
   const [previews, setPreviews] = useState<{ [key: string]: { url: string, type: string } }>({})
   const [reservationData, setReservationData] = useState<any>(null)
@@ -505,6 +508,7 @@ export default function EditReservation() {
           })
           
           setFormData(initialFormData)
+          setReservationHotelsAutre(Array.isArray(reservationData.hotelsAutre) ? reservationData.hotelsAutre : [])
           // Stocker les données initiales complètes (formulaire + réservation)
           setInitialData({
             ...reservationData,
@@ -2061,7 +2065,7 @@ export default function EditReservation() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-lg">🕌</span>
-                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina *</Label>
+                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina</Label>
                           <button
                             type="button"
                             onClick={() => setShowRoomGuide(true)}
@@ -2080,7 +2084,7 @@ export default function EditReservation() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-lg">🕋</span>
-                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah *</Label>
+                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah</Label>
                           <button
                             type="button"
                             onClick={() => setShowRoomGuide(true)}
@@ -2096,6 +2100,17 @@ export default function EditReservation() {
                           </span>
                         </div>
                       </div>
+                      {reservationHotelsAutre.map((h, i) => (
+                        <div key={`${h.hotelId}-${i}`} className="space-y-2">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-lg">🏨</span>
+                            <Label className="text-blue-700 font-medium text-sm">Hôtel Autre</Label>
+                          </div>
+                          <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                            <span className="text-gray-900 font-medium">{h.hotelName || `#${h.hotelId}`}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </>
                 ) : (
@@ -2103,7 +2118,7 @@ export default function EditReservation() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-lg">🕌</span>
-                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina *</Label>
+                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina</Label>
                           <button
                             type="button"
                             onClick={() => setShowRoomGuide(true)}
@@ -2122,7 +2137,7 @@ export default function EditReservation() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-lg">🕋</span>
-                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah *</Label>
+                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah</Label>
                           <button
                             type="button"
                             onClick={() => setShowRoomGuide(true)}
@@ -2138,6 +2153,17 @@ export default function EditReservation() {
                           </span>
                         </div>
                       </div>
+                      {reservationHotelsAutre.map((h, i) => (
+                        <div key={`${h.hotelId}-${i}`} className="space-y-2">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-lg">🏨</span>
+                            <Label className="text-blue-700 font-medium text-sm">Hôtel Autre</Label>
+                          </div>
+                          <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                            <span className="text-gray-900 font-medium">{h.hotelName || `#${h.hotelId}`}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
               </div>

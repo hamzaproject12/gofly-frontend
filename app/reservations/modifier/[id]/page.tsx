@@ -394,6 +394,9 @@ export default function EditReservation() {
     paiements: []
   })
 
+  // Hôtels Autre assignés à la réservation (lecture seule ici, comme Madina/Makkah)
+  const [reservationHotelsAutre, setReservationHotelsAutre] = useState<Array<{ hotelId: number; roomId: number; hotelName: string }>>([])
+
   // État pour stocker les valeurs initiales (pour détecter les changements)
   const [initialData, setInitialData] = useState<any>(null)
 
@@ -498,6 +501,7 @@ export default function EditReservation() {
           })
           
           setFormData(initialFormData)
+          setReservationHotelsAutre(Array.isArray(reservationData.hotelsAutre) ? reservationData.hotelsAutre : [])
           // Stocker les données initiales complètes (formulaire + réservation)
           setInitialData({
             ...reservationData,
@@ -2081,7 +2085,7 @@ export default function EditReservation() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-lg">🕌</span>
-                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina *</Label>
+                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina</Label>
                           <button
                             type="button"
                             onClick={() => setShowRoomGuide(true)}
@@ -2100,7 +2104,7 @@ export default function EditReservation() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-lg">🕋</span>
-                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah *</Label>
+                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah</Label>
                           <button
                             type="button"
                             onClick={() => setShowRoomGuide(true)}
@@ -2116,6 +2120,17 @@ export default function EditReservation() {
                           </span>
                         </div>
                       </div>
+                      {reservationHotelsAutre.map((h, i) => (
+                        <div key={`${h.hotelId}-${i}`} className="space-y-2">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-lg">🏨</span>
+                            <Label className="text-blue-700 font-medium text-sm">Hôtel Autre</Label>
+                          </div>
+                          <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                            <span className="text-gray-900 font-medium">{h.hotelName || `#${h.hotelId}`}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </>
                 ) : (
@@ -2148,7 +2163,7 @@ export default function EditReservation() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-lg">🕌</span>
-                      <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina *</Label>
+                      <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina</Label>
                       <button
                         type="button"
                         onClick={() => setShowRoomGuide(true)}
@@ -2282,7 +2297,7 @@ export default function EditReservation() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-lg">🕋</span>
-                      <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah *</Label>
+                      <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah</Label>
                       <button
                         type="button"
                         onClick={() => setShowRoomGuide(true)}
@@ -2412,6 +2427,71 @@ export default function EditReservation() {
                         </div>
                       )}
                   </div>
+                  {reservationHotelsAutre.map((h, idxA) => (
+                    <div key={`${h.hotelId}-${idxA}`} className="space-y-2">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-lg">🏨</span>
+                        <Label className="text-blue-700 font-medium text-sm">Hôtel Autre</Label>
+                      </div>
+                      <div className="h-10 px-3 py-2 border-2 border-blue-200 rounded-lg bg-blue-50 flex items-center">
+                        <span className="text-gray-900 font-medium">{h.hotelName || `#${h.hotelId}`}</span>
+                      </div>
+                      {programDetail?.rooms && formData.typeChambre && formData.gender && (
+                        <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-medium text-green-700">🏨 Chambres (aperçu des places)</span>
+                          </div>
+                          <div className="grid gap-2">
+                            {(() => {
+                              const filteredRooms = programDetail.rooms.filter(
+                                (room: any) =>
+                                  room.hotelId === h.hotelId &&
+                                  room.roomType === formData.typeChambre &&
+                                  (room.gender === formData.gender || room.gender === "Mixte" || !room.gender)
+                              );
+                              if (filteredRooms.length === 0) {
+                                return (<div className="text-xs text-gray-500 text-center py-2">Aucune chambre trouvée</div>);
+                              }
+                              const sortedRooms = sortRoomsByAlgorithm(filteredRooms, formData.gender);
+                              return sortedRooms.map((room: any, index: number) => {
+                                const placesOccupees = room.nbrPlaceTotal - room.nbrPlaceRestantes;
+                                const placesDisponibles = room.nbrPlaceRestantes;
+                                const isBookedRoom = room.id === h.roomId;
+                                return (
+                                  <div
+                                    key={index}
+                                    className={`relative p-2 rounded border transition-all ${isBookedRoom ? "border-yellow-400 bg-yellow-50" : "border-gray-300 bg-white"}`}
+                                  >
+                                    <div className="flex items-center">
+                                      <div className="flex items-center gap-2 w-20">
+                                        <span className="text-sm">{getGenderIconRoom(room.gender)}</span>
+                                        <span className="text-xs font-medium text-gray-700">({placesDisponibles}/{room.nbrPlaceTotal})</span>
+                                      </div>
+                                      <div className="flex-1 flex justify-center">
+                                        <div className="flex gap-1.5">
+                                          {Array.from({ length: room.nbrPlaceTotal }, (_, placeIndex) => {
+                                            let placeColor = "bg-gray-300";
+                                            if (placeIndex < placesOccupees) placeColor = "bg-red-500";
+                                            else placeColor = "bg-green-500";
+                                            return (
+                                              <div key={placeIndex} className={`w-4 h-4 rounded-full ${placeColor} transition-all`} title={`Place ${placeIndex + 1}`} />
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                      <div className="w-8 flex justify-end">
+                                        {isBookedRoom && (<div className="w-3 h-3 bg-yellow-400 rounded-full" title="Chambre du dossier" />)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              });
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
                     </>
                   )}

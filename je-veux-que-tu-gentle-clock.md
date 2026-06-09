@@ -22,12 +22,12 @@
 ## 📍 État d'avancement (Claude Code MET À JOUR cette section après CHAQUE étape)
 
 - **Branche** : `feat/hotels-autre`
-- **Dernier commit** : `90815c7` — checkpoint Phases 1-3 création (schéma + backend cœur + frontend création)
-- **Fait** : Phase 1 ✅ · Phase 2 ✅ (vérifié runtime API) · Phase 3 création ✅ (`nouvelle`, `nouvelle-chambre`, `programmes/nouveau`, `hotels` — compile + render OK ; click-through navigateur restant à confirmer)
-- **Prochaine étape** : Phase 3 — pages `modifier/[id]`, `modifier-chambre/[id]`, `modifier-simple/[id]`, détail `[id]`
-- **Reste après ça** : commit (fin Phase 3) → push prod (Vercel + Railway) → Phase 4 (reporting)
+- **Dernier commit** : `88d5c36` — fin Phase 3 (pages `modifier*` + détail affichent les hôtels Autre). Avant : `90815c7` (Phases 1-3 création).
+- **Fait** : Phase 1 ✅ · Phase 2 ✅ (vérifié runtime API) · Phase 3 ✅ COMPLÈTE — création (`nouvelle`, `nouvelle-chambre`, `programmes/nouveau`, `hotels`) + `modifier/[id]`, `modifier-chambre/[id]`, `modifier-simple/[id]`, détail `[id]`. Toutes compilent + rendent (HTTP 200). **Click-through navigateur reste à confirmer par l'utilisateur.**
+- **Prochaine étape** : confirmer Phase 3 au navigateur (scénarios Phase 5) → push prod (Vercel + Railway) → Phase 4 (reporting : export, balance, analytics, reçu)
+- **Reste après ça** : Phase 4 (reporting) — voir Phase 4 du plan
 - **Repères déjà créés** : helper `parseHotelsAutre` → `backend/src/services/hotelsAutreService.ts` ; `applyRoomBooking` factorisé dans `reservations.ts` ; composant `components/reservations/HotelCategoryBlock.tsx`
-- **Données de test (Railway)** : programme id 36 « TEST M+M+Autre » (Madina+Makkah+2 Autre) ; id 37 « TEST Autre seul » (2 Autre uniquement) ; hôtels Autre « Hotel Istanbul TEST », « Hotel Le Caire TEST »
+- **Données de test (Railway)** : programme id 36 « TEST M+M+Autre » (Madina+Makkah+2 Autre) ; id 37 « TEST Autre seul » (2 Autre uniquement) ; hôtels Autre « Hotel Istanbul TEST », « Hotel Le Caire TEST » ; réservation id 167 (LIT sur prog 36 avec 1 hôtel Autre) pour tester pages modifier*/détail
 
 ## Contexte
 

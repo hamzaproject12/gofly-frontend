@@ -112,6 +112,7 @@ model Program {
   expenses         Expense[]
   hotelsMadina     ProgramHotelMadina[]
   hotelsMakkah     ProgramHotelMakkah[]
+  hotelsAutre      ProgramHotelAutre[]
   reservations     Reservation[]
   rooms            Room[]
   payments         Payment[]
@@ -123,6 +124,7 @@ model Hotel {
   city           City
   programsMadina ProgramHotelMadina[]
   programsMakkah ProgramHotelMakkah[]
+  programsAutre  ProgramHotelAutre[]
   rooms          Room[]
 
   @@unique([name, city])
@@ -142,6 +144,18 @@ model ProgramHotelMakkah {
   id        Int     @id @default(autoincrement())
   programId Int
   hotelId   Int
+  hotel     Hotel   @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  program   Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, hotelId])
+}
+
+model ProgramHotelAutre {
+  id        Int     @id @default(autoincrement())
+  programId Int
+  hotelId   Int
+  nbJours   Int     @default(0)
+  ordre     Int     @default(0)
   hotel     Hotel   @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   program   Program @relation(fields: [programId], references: [id], onDelete: Cascade)
 
@@ -173,6 +187,7 @@ model Reservation {
   roomType        RoomType
   hotelMadina     String?
   hotelMakkah     String?
+  hotelsAutre     Json?
   price           Float
   paidAmount      Float     @default(0)
   status          String    @default("Incomplet") @db.VarChar(50)
@@ -279,4 +294,5 @@ enum Status {
 enum City {
   Madina
   Makkah
+  Autre
 }

@@ -22,9 +22,10 @@ import {
 interface Hotel {
   id: number;
   name: string;
-  city: 'Madina' | 'Makkah';
+  city: 'Madina' | 'Makkah' | 'Autre';
   programsMadina?: any[];
   programsMakkah?: any[];
+  programsAutre?: any[];
 }
 
 export default function GestionHotelsPage() {
@@ -37,7 +38,7 @@ export default function GestionHotelsPage() {
   // Form states
   const [formData, setFormData] = useState({
     name: '',
-    city: 'Madina' as 'Madina' | 'Makkah'
+    city: 'Madina' as 'Madina' | 'Makkah' | 'Autre'
   });
 
   useEffect(() => {
@@ -176,13 +177,15 @@ export default function GestionHotelsPage() {
   };
 
   const getCityBadgeColor = (city: string) => {
-    return city === 'Madina' 
-      ? 'bg-green-100 text-green-800' 
-      : 'bg-blue-100 text-blue-800';
+    if (city === 'Madina') return 'bg-green-100 text-green-800';
+    if (city === 'Makkah') return 'bg-blue-100 text-blue-800';
+    return 'bg-emerald-100 text-emerald-800';
   };
 
   const getCityIcon = (city: string) => {
-    return city === 'Madina' ? '🕌' : '🕋';
+    if (city === 'Madina') return '🕌';
+    if (city === 'Makkah') return '🕋';
+    return '🏨';
   };
 
   return (
@@ -255,11 +258,12 @@ export default function GestionHotelsPage() {
                           <select
                             id="hotel-city"
                             value={formData.city}
-                            onChange={(e) => setFormData({ ...formData, city: e.target.value as 'Madina' | 'Makkah' })}
+                            onChange={(e) => setFormData({ ...formData, city: e.target.value as 'Madina' | 'Makkah' | 'Autre' })}
                             className="h-12 w-full text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm bg-white px-3"
                           >
                             <option value="Madina">🕌 Madina</option>
                             <option value="Makkah">🕋 Makkah</option>
+                            <option value="Autre">🏨 Autre</option>
                           </select>
                         </div>
                       </div>

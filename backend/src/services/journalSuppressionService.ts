@@ -1,6 +1,7 @@
 import { Request } from 'express';
 import jwt from 'jsonwebtoken';
 import { PrismaClient, Reservation, Room, Program, FixedCharge, Agent, Hotel } from '@prisma/client';
+import { parseHotelsAutre } from './hotelsAutreService';
 
 export const JOURNAL_ACTION = {
   RESERVATION_CREATED: 'RESERVATION_CREATED',
@@ -207,6 +208,7 @@ const RES_FIELD_FR: Partial<Record<keyof Reservation, string>> = {
   roomType: 'Type de chambre',
   hotelMadina: 'Hôtel Madina',
   hotelMakkah: 'Hôtel Makkah',
+  hotelsAutre: 'Hôtels Autre',
   price: 'Prix (DH)',
   paidAmount: 'Montant payé (DH)',
   status: 'Statut du dossier',
@@ -264,12 +266,17 @@ export function compactReservationSnapshot(r: ReservationJournalRow): string {
   if (r.statutHotel) statutsOui.push('Hôtel: oui');
   if (r.statutVol) statutsOui.push('Vol: oui');
   const statutsLine = statutsOui.length ? statutsOui.join(' | ') : 'aucun';
-  return [
+  const autreEntries = parseHotelsAutre(r.hotelsAutre);
+  const lines = [
     `Dossier n°${r.id} — ${r.firstName} ${r.lastName} — Téléphone : ${r.phone}`,
     `Programme : ${r.program.name} — Type de chambre : ${r.roomType} — Statut : ${r.status} — Prix : ${r.price} DH`,
     `Hôtel Madina : ${r.hotelMadina ?? 'non précisé'} — Hôtel Makkah : ${r.hotelMakkah ?? 'non précisé'}`,
-    `Documents/statuts : ${statutsLine}`,
-  ].join('\n');
+  ];
+  if (autreEntries.length > 0) {
+    lines.push(`Hôtels Autre : ${autreEntries.map((e) => e.hotelName || `#${e.hotelId}`).join(', ')}`);
+  }
+  lines.push(`Documents/statuts : ${statutsLine}`);
+  return lines.join('\n');
 }
 
 /**

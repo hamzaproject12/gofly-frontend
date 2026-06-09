@@ -265,6 +265,7 @@ export default function NouveauProgramme() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [hotelsMadina, setHotelsMadina] = useState<Hotel[]>([])
   const [hotelsMakkah, setHotelsMakkah] = useState<Hotel[]>([])
+  const [hotelsAutreList, setHotelsAutreList] = useState<Hotel[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   // Remplacer la structure du state pour les hôtels
@@ -292,6 +293,14 @@ export default function NouveauProgramme() {
         [key: number]: { nb: string, prix: string }
       }
     }>,
+    hotelsAutre: [] as Array<{
+      name: string,
+      nbJours: string,
+      ordre: string,
+      chambres: {
+        [key: number]: { nb: string, prix: string }
+      }
+    }>,
     datesLimites: {
       visa: null as Date | null,
       hotels: null as Date | null,
@@ -304,6 +313,9 @@ export default function NouveauProgramme() {
   const [showAutreMadinaInput, setShowAutreMadinaInput] = useState(false);
   const [autreHotelMakkah, setAutreHotelMakkah] = useState("");
   const [showAutreMakkahInput, setShowAutreMakkahInput] = useState(false);
+  // Catégorie « Autre » (N hôtels génériques)
+  const [autreHotelAutre, setAutreHotelAutre] = useState("");
+  const [showAutreAutreInput, setShowAutreAutreInput] = useState(false);
 
   /** Hypothèses pour la simulation (même logique de prix que « Nouvelle réservation ») */
   const [simIncludeAvion, setSimIncludeAvion] = useState(true)
@@ -425,8 +437,14 @@ export default function NouveauProgramme() {
     if (!formData.datesLimites.billets) reasons.push("Date limite billets est obligatoire.")
     if (!formData.datesLimites.hotels) reasons.push("Date limite hotels est obligatoire.")
 
-    if (formData.hotelsMadina.length === 0) reasons.push("Selectionnez au moins un hotel a Madina.")
-    if (formData.hotelsMakkah.length === 0) reasons.push("Selectionnez au moins un hotel a Makkah.")
+    // Madina/Makkah/Autre sont tous optionnels — exiger seulement au moins un hôtel.
+    if (
+      formData.hotelsMadina.length === 0 &&
+      formData.hotelsMakkah.length === 0 &&
+      formData.hotelsAutre.length === 0
+    ) {
+      reasons.push("Selectionnez au moins un hotel (Madina, Makkah ou Autre).")
+    }
 
     for (const hotel of formData.hotelsMadina) {
       if (!hasAtLeastOneFullyPricedRoom(hotel)) {
@@ -443,6 +461,15 @@ export default function NouveauProgramme() {
       }
       if (hasRoomsWithoutPrice(hotel)) {
         reasons.push(`Hotel Makkah "${hotel.name}" contient des chambres sans prix.`)
+      }
+    }
+
+    for (const hotel of formData.hotelsAutre) {
+      if (!hasAtLeastOneFullyPricedRoom(hotel)) {
+        reasons.push(`Hotel Autre "${hotel.name}" doit contenir au moins 1 chambre avec prix.`)
+      }
+      if (hasRoomsWithoutPrice(hotel)) {
+        reasons.push(`Hotel Autre "${hotel.name}" contient des chambres sans prix.`)
       }
     }
 
@@ -969,23 +996,27 @@ export default function NouveauProgramme() {
   useEffect(() => {
     const fetchHotels = async () => {
       try {
-        const [madinaResponse, makkahResponse] = await Promise.all([
+        const [madinaResponse, makkahResponse, autreResponse] = await Promise.all([
           fetch(api.url('/api/hotels/available?city=Madina')),
-          fetch(api.url('/api/hotels/available?city=Makkah'))
+          fetch(api.url('/api/hotels/available?city=Makkah')),
+          fetch(api.url('/api/hotels/available?city=Autre'))
         ]);
 
-        if (!madinaResponse.ok || !makkahResponse.ok) {
+        if (!madinaResponse.ok || !makkahResponse.ok || !autreResponse.ok) {
           throw new Error('Erreur lors du chargement des hôtels');
         }
 
         const madinaHotels = await madinaResponse.json();
         const makkahHotels = await makkahResponse.json();
+        const autreHotels = await autreResponse.json();
 
         console.log('Hôtels Madina chargés:', madinaHotels);
         console.log('Hôtels Makkah chargés:', makkahHotels);
+        console.log('Hôtels Autre chargés:', autreHotels);
 
         setHotelsMadina(madinaHotels || []);
         setHotelsMakkah(makkahHotels || []);
+        setHotelsAutreList(autreHotels || []);
       } catch (error) {
         console.error('Erreur:', error);
         toast({
@@ -996,6 +1027,7 @@ export default function NouveauProgramme() {
         // Initialiser avec des tableaux vides en cas d'erreur
         setHotelsMadina([]);
         setHotelsMakkah([]);
+        setHotelsAutreList([]);
       } finally {
         setIsLoading(false);
       }
@@ -1108,6 +1140,57 @@ export default function NouveauProgramme() {
     });
   }
 
+  // ----- Catégorie « Autre » -----
+  const toggleHotelAutre = (hotelName: string) => {
+    setFormData(prev => {
+      const exists = prev.hotelsAutre.find(h => h.name === hotelName);
+      if (exists) {
+        return { ...prev, hotelsAutre: prev.hotelsAutre.filter(h => h.name !== hotelName) };
+      }
+      // Ordre par défaut = position d'ajout (séquence Turquie→X→Y)
+      const nextOrdre = (prev.hotelsAutre.length + 1).toString();
+      return {
+        ...prev,
+        hotelsAutre: [
+          ...prev.hotelsAutre,
+          {
+            name: hotelName,
+            nbJours: "",
+            ordre: nextOrdre,
+            chambres: {
+              1: { nb: "", prix: "" },
+              2: { nb: "", prix: "" },
+              3: { nb: "", prix: "" },
+              4: { nb: "", prix: "" },
+              5: { nb: "", prix: "" },
+            }
+          }
+        ]
+      };
+    });
+  }
+
+  const handleChambreChangeAutre = (hotelName: string, type: number, field: 'nb' | 'prix', value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      hotelsAutre: prev.hotelsAutre.map(hotel =>
+        hotel.name === hotelName
+          ? { ...hotel, chambres: { ...hotel.chambres, [type]: { ...hotel.chambres[type], [field]: value } } }
+          : hotel
+      )
+    }));
+  }
+
+  // Modifier nbJours / ordre d'un hôtel Autre
+  const handleAutreFieldChange = (hotelName: string, field: 'nbJours' | 'ordre', value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      hotelsAutre: prev.hotelsAutre.map(hotel =>
+        hotel.name === hotelName ? { ...hotel, [field]: value } : hotel
+      )
+    }));
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!isFormValid || isSubmitting) return
@@ -1131,7 +1214,13 @@ export default function NouveauProgramme() {
         flightDeadline: formData.datesLimites.billets,
         passportDeadline: formData.datesLimites.passport,
         hotelsMadina: formData.hotelsMadina,
-        hotelsMakkah: formData.hotelsMakkah
+        hotelsMakkah: formData.hotelsMakkah,
+        hotelsAutre: formData.hotelsAutre.map(h => ({
+          name: h.name,
+          nbJours: h.nbJours ? parseInt(h.nbJours) : 0,
+          ordre: h.ordre ? parseInt(h.ordre) : 0,
+          chambres: h.chambres,
+        }))
       }
 
       const response = await api.request(api.endpoints.programs, {
@@ -1371,7 +1460,7 @@ export default function NouveauProgramme() {
                       <div className="mb-4 flex items-center justify-between gap-4">
                         <h3 className="text-lg font-semibold text-yellow-800 flex items-center gap-2">
                           <MapPin className="h-5 w-5" />
-                          Hôtels à Madina *
+                          Hôtels à Madina
                         </h3>
                         <div className="text-xs md:text-sm font-semibold text-yellow-900 bg-yellow-200/70 px-3 py-1.5 rounded-full">
                           {madinaBedsCount} lits Madina / {makkahBedsCount} lits Makkah
@@ -1549,7 +1638,7 @@ export default function NouveauProgramme() {
                       <div className="mb-4 flex items-center justify-between gap-4">
                         <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
                           <MapPin className="h-5 w-5" />
-                          Hôtels à Makkah *
+                          Hôtels à Makkah
                         </h3>
                         <div className="text-xs md:text-sm font-semibold text-blue-900 bg-blue-200/70 px-3 py-1.5 rounded-full">
                           {makkahBedsCount} lits Makkah / {madinaBedsCount} lits Madina
@@ -1719,6 +1808,198 @@ export default function NouveauProgramme() {
                                   }
                                 }}
                                 disabled={!autreHotelMakkah.trim() || formData.hotelsMakkah.some(h => h.name === autreHotelMakkah.trim())}
+                              >
+                                Ajouter
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Hôtels Autre (N hôtels génériques : ex. Turquie → ville X → ville Y) */}
+                    <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-xl border border-emerald-200 mt-6">
+                      <div className="mb-4 flex items-center justify-between gap-4">
+                        <h3 className="text-lg font-semibold text-emerald-800 flex items-center gap-2">
+                          <MapPin className="h-5 w-5" />
+                          Hôtels Autre
+                        </h3>
+                      </div>
+                      <div className="flex flex-col gap-4">
+                        {hotelsAutreList.length === 0 ? (
+                          <div className="text-center py-4 text-gray-500">
+                            <p>Aucun hôtel « Autre » trouvé.</p>
+                            <p className="text-sm">Créez-en via la page Hôtels (ville « Autre »), ou ajoutez-en un ci-dessous.</p>
+                          </div>
+                        ) : (
+                          hotelsAutreList.map((hotel, index) => {
+                            const selected = formData.hotelsAutre.some(h => h.name === hotel.name);
+                            const current = formData.hotelsAutre.find(h => h.name === hotel.name);
+                            return (
+                              <div key={index} className="border border-emerald-200 rounded-lg p-3 bg-white/70">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <Checkbox
+                                    checked={selected}
+                                    onCheckedChange={() => toggleHotelAutre(hotel.name)}
+                                    className="data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                                  />
+                                  <span className="text-sm font-medium text-emerald-800">{hotel.name}</span>
+                                </label>
+                                {selected && (
+                                  <>
+                                    <div className="mt-3 grid grid-cols-2 gap-3 max-w-md">
+                                      <div>
+                                        <div className="text-xs text-emerald-700 mb-1 font-semibold">Nb de nuits</div>
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          placeholder="0"
+                                          value={current?.nbJours || ""}
+                                          onChange={e => handleAutreFieldChange(hotel.name, 'nbJours', e.target.value)}
+                                          className="h-9 w-full text-center border-emerald-300 focus:border-emerald-500 text-sm"
+                                        />
+                                      </div>
+                                      <div>
+                                        <div className="text-xs text-emerald-700 mb-1 font-semibold">Ordre</div>
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          placeholder="0"
+                                          value={current?.ordre || ""}
+                                          onChange={e => handleAutreFieldChange(hotel.name, 'ordre', e.target.value)}
+                                          className="h-9 w-full text-center border-emerald-300 focus:border-emerald-500 text-sm"
+                                        />
+                                      </div>
+                                    </div>
+                                    <div className="mt-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                                      {[1,2,3,4,5].map(type => (
+                                        <div key={type} className="bg-white border border-emerald-200 rounded-lg p-4 shadow-sm">
+                                          <div className="text-center mb-3">
+                                            <div className="flex items-center justify-center gap-1 mb-2">
+                                              {Array.from({ length: type }, (_, i) => (
+                                                <div key={i} className="w-6 h-6 flex items-center justify-center">
+                                                  <User className="w-5 h-5 text-emerald-600" />
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                          <div className="mb-3">
+                                            <div className="text-sm text-emerald-700 mb-2 text-center font-semibold">Chambres</div>
+                                            <div className="flex justify-center">
+                                              <div className="inline-flex items-center bg-gray-50 border border-emerald-300 rounded-lg">
+                                                <Button
+                                                  type="button"
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className="h-8 w-8 p-0 hover:bg-emerald-100 text-emerald-600 border-r border-emerald-200 rounded-l-lg"
+                                                  onClick={() => {
+                                                    const currentValue = parseInt(formData.hotelsAutre.find(h => h.name === hotel.name)?.chambres[type]?.nb || "0");
+                                                    const newValue = Math.max(0, currentValue - 1);
+                                                    handleChambreChangeAutre(hotel.name, type, 'nb', newValue.toString());
+                                                  }}
+                                                >
+                                                  <span className="text-sm font-semibold">−</span>
+                                                </Button>
+                                                <div className="h-8 w-10 flex items-center justify-center text-sm font-semibold text-emerald-800 bg-white">
+                                                  {formData.hotelsAutre.find(h => h.name === hotel.name)?.chambres[type]?.nb || "0"}
+                                                </div>
+                                                <Button
+                                                  type="button"
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className="h-8 w-8 p-0 hover:bg-emerald-100 text-emerald-600 border-l border-emerald-200 rounded-r-lg"
+                                                  onClick={() => {
+                                                    const currentValue = parseInt(formData.hotelsAutre.find(h => h.name === hotel.name)?.chambres[type]?.nb || "0");
+                                                    const newValue = currentValue + 1;
+                                                    handleChambreChangeAutre(hotel.name, type, 'nb', newValue.toString());
+                                                  }}
+                                                >
+                                                  <span className="text-sm font-semibold">+</span>
+                                                </Button>
+                                              </div>
+                                            </div>
+                                            <div className="mt-2 flex justify-center">
+                                              <div className="flex flex-wrap items-center gap-1 max-w-32">
+                                                {Array.from({ length: parseInt(formData.hotelsAutre.find(h => h.name === hotel.name)?.chambres[type]?.nb || "0") }, (_, i) => (
+                                                  <div key={i} className="w-4 h-4 text-emerald-600">
+                                                    <Bed className="w-4 h-4" />
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <div className="text-sm text-emerald-700 mb-2 text-center font-semibold">Prix (Riyal)</div>
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              placeholder="0"
+                                              value={formData.hotelsAutre.find(h => h.name === hotel.name)?.chambres[type]?.prix || ""}
+                                              onChange={e => handleChambreChangeAutre(hotel.name, type, 'prix', e.target.value)}
+                                              className="h-9 w-full text-center border-emerald-300 focus:border-emerald-500 text-sm"
+                                            />
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                        {/* Ajouter un hôtel Autre à la volée */}
+                        <div className="border border-emerald-200 rounded-lg p-3 bg-white/70 mt-2">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <Checkbox
+                              checked={showAutreAutreInput}
+                              onCheckedChange={() => setShowAutreAutreInput((v) => !v)}
+                              className="data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                            />
+                            <span className="text-sm font-medium text-emerald-800">Ajouter un hôtel</span>
+                          </label>
+                          {showAutreAutreInput && (
+                            <div className="mt-2 flex gap-2 items-center">
+                              <Input
+                                type="text"
+                                placeholder="Nom de l'hôtel"
+                                value={autreHotelAutre}
+                                onChange={e => setAutreHotelAutre(e.target.value)}
+                                className="h-9 border-2 border-emerald-200 focus:border-emerald-400 rounded-lg text-sm"
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded"
+                                onClick={() => {
+                                  const trimmed = autreHotelAutre.trim();
+                                  if (trimmed && !formData.hotelsAutre.some(h => h.name === trimmed)) {
+                                    const newHotel = { id: Date.now(), name: trimmed, city: 'Autre' as const };
+                                    setHotelsAutreList(prev => [...prev, newHotel]);
+                                    const nextOrdre = (formData.hotelsAutre.length + 1).toString();
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      hotelsAutre: [
+                                        ...prev.hotelsAutre,
+                                        {
+                                          name: trimmed,
+                                          nbJours: "",
+                                          ordre: nextOrdre,
+                                          chambres: {
+                                            1: { nb: "", prix: "" },
+                                            2: { nb: "", prix: "" },
+                                            3: { nb: "", prix: "" },
+                                            4: { nb: "", prix: "" },
+                                            5: { nb: "", prix: "" },
+                                          }
+                                        }
+                                      ]
+                                    }));
+                                    setAutreHotelAutre("");
+                                    setShowAutreAutreInput(false);
+                                  }
+                                }}
+                                disabled={!autreHotelAutre.trim() || formData.hotelsAutre.some(h => h.name === autreHotelAutre.trim())}
                               >
                                 Ajouter
                               </Button>

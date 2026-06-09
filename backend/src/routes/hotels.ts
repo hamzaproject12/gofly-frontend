@@ -4,7 +4,7 @@ import { PrismaClient, City as PrismaCity } from '@prisma/client';
 const router = express.Router();
 const prisma = new PrismaClient();
 
-const VALID_CITIES = ['Madina', 'Makkah'] as const;
+const VALID_CITIES = ['Madina', 'Makkah', 'Autre'] as const;
 type City = typeof VALID_CITIES[number];
 
 // Test route
@@ -87,7 +87,7 @@ router.get('/available', async (req, res) => {
     
     if (!VALID_CITIES.includes(cityParam as City)) {
       console.log('❌ Ville invalide:', cityParam);
-      return res.status(400).json({ error: 'Invalid city. Use Madina or Makkah' });
+      return res.status(400).json({ error: 'Invalid city. Use Madina, Makkah or Autre' });
     }
 
     console.log('🔍 Recherche des hôtels pour la ville:', cityParam);
@@ -196,7 +196,7 @@ router.post('/', async (req, res) => {
 
     if (!VALID_CITIES.includes(city as City)) {
       console.log('❌ Ville invalide:', city);
-      return res.status(400).json({ error: 'Invalid city. Use Madina or Makkah' });
+      return res.status(400).json({ error: 'Invalid city. Use Madina, Makkah or Autre' });
     }
 
     console.log('✅ Création de l\'hôtel:', { name, city });
@@ -231,7 +231,7 @@ router.put('/:id', async (req, res) => {
 
     if (!VALID_CITIES.includes(city as City)) {
       console.log('❌ Ville invalide:', city);
-      return res.status(400).json({ error: 'Invalid city. Use Madina or Makkah' });
+      return res.status(400).json({ error: 'Invalid city. Use Madina, Makkah or Autre' });
     }
 
     // Check if hotel exists
@@ -288,13 +288,18 @@ router.delete('/:id', async (req, res) => {
       where: { hotelId: parseInt(id) }
     });
 
-    if (programsMadina > 0 || programsMakkah > 0) {
-      console.log('❌ Hôtel utilisé dans des programmes:', { programsMadina, programsMakkah });
-      return res.status(400).json({ 
+    const programsAutre = await prisma.programHotelAutre.count({
+      where: { hotelId: parseInt(id) }
+    });
+
+    if (programsMadina > 0 || programsMakkah > 0 || programsAutre > 0) {
+      console.log('❌ Hôtel utilisé dans des programmes:', { programsMadina, programsMakkah, programsAutre });
+      return res.status(400).json({
         error: 'Cannot delete hotel. It is used in programs.',
         details: {
           programsMadina,
-          programsMakkah
+          programsMakkah,
+          programsAutre
         }
       });
     }

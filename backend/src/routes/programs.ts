@@ -24,6 +24,7 @@ router.get('/', async (req, res) => {
       include: {
         hotelsMadina: { include: { hotel: true } },
         hotelsMakkah: { include: { hotel: true } },
+        hotelsAutre: { include: { hotel: true } },
         rooms: { include: { hotel: true } }
       }
     });
@@ -46,6 +47,7 @@ router.get('/:id', async (req, res) => {
       include: {
         hotelsMadina: { include: { hotel: true } },
         hotelsMakkah: { include: { hotel: true } },
+        hotelsAutre: { include: { hotel: true } },
         rooms: { include: { hotel: true } }
       }
     });
@@ -80,7 +82,8 @@ router.post('/', async (req, res) => {
       flightDeadline,
       passportDeadline,
       hotelsMadina,
-      hotelsMakkah
+      hotelsMakkah,
+      hotelsAutre
     } = req.body;
 
     // Create the program with new financial/logistical fields
@@ -115,7 +118,7 @@ router.post('/', async (req, res) => {
     };
 
     // Helper to find or create a hotel by city and name
-    async function findOrCreateHotel(city: 'Madina' | 'Makkah', name: string) {
+    async function findOrCreateHotel(city: 'Madina' | 'Makkah' | 'Autre', name: string) {
       try {
         // Essayer de trouver l'hôtel existant
         const existing = await prisma.hotel.findFirst({ 
@@ -281,12 +284,78 @@ router.post('/', async (req, res) => {
       }
     }
 
+    // Link hotels for Autre (N hôtels génériques) and create rooms if provided
+    if (Array.isArray(hotelsAutre)) {
+      for (const entry of hotelsAutre) {
+        const hotelName = typeof entry === 'string' ? entry : entry.name;
+        if (!hotelName) continue;
+        const hotel = await findOrCreateHotel('Autre', hotelName);
+        const nbJours = entry && typeof entry === 'object' && entry.nbJours != null ? Number(entry.nbJours) || 0 : 0;
+        const ordre = entry && typeof entry === 'object' && entry.ordre != null ? Number(entry.ordre) || 0 : 0;
+        // Create join row (ignore if already exists), carrying nbJours/ordre
+        try {
+          await prisma.programHotelAutre.create({ data: { programId: program.id, hotelId: hotel.id, nbJours, ordre } });
+        } catch {}
+
+        // Create rooms from configuration
+        if (entry && typeof entry === 'object' && entry.chambres) {
+          for (const key of Object.keys(entry.chambres)) {
+            const type = Number(key);
+            const roomType = mapTypeToRoomType(type);
+            if (!roomType) continue; // ignore unsupported types
+            const config = entry.chambres[type];
+            const nb = config?.nb ? Number(config.nb) : 0;
+            const prix = config?.prix ? parseFloat(config.prix) : 0;
+            if (nb > 0 && prix > 0) {
+              const roomsSnapAutre = await prisma.room.findMany({
+                where: {
+                  programId: program.id,
+                  hotelId: hotel.id,
+                  roomType,
+                  gender: 'Mixte',
+                },
+                include: { hotel: true, program: { select: { id: true, name: true } } },
+              });
+              if (roomsSnapAutre.length > 0) {
+                await prisma.room.deleteMany({
+                  where: { id: { in: roomsSnapAutre.map((r) => r.id) } },
+                });
+                await logRoomsDeletedFromSnapshot(
+                  prisma,
+                  req,
+                  roomsSnapAutre as RoomJournalRow[],
+                  'CRÉATION_PROGRAMME — remplacement chambres Autre (type configuré)'
+                );
+              }
+
+              // Créer le nombre exact de rooms demandé
+              for (let i = 0; i < nb; i++) {
+                await prisma.room.create({
+                  data: {
+                    programId: program.id,
+                    hotelId: hotel.id,
+                    roomType,
+                    gender: 'Mixte',
+                    nbrPlaceTotal: type, // Capacité selon le type (1=SINGLE, 2=DOUBLE, 3=TRIPLE, etc.)
+                    nbrPlaceRestantes: type, // Capacité selon le type
+                    prixRoom: prix,
+                    listeIdsReservation: [],
+                  }
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
     // Return the created program with relations
     const createdProgram = await prisma.program.findUnique({
       where: { id: program.id },
       include: {
         hotelsMadina: { include: { hotel: true } },
         hotelsMakkah: { include: { hotel: true } },
+        hotelsAutre: { include: { hotel: true } },
         rooms: { include: { hotel: true } },
       }
     });
@@ -328,11 +397,13 @@ router.put('/:id', async (req, res) => {
       passportDeadline,
       hotelsMadina,
       hotelsMakkah,
+      hotelsAutre,
     } = req.body;
-    
+
     console.log(`\n📥 Données extraites:`);
     console.log(`  hotelsMadina:`, hotelsMadina?.length || 0, 'hôtel(s)');
     console.log(`  hotelsMakkah:`, hotelsMakkah?.length || 0, 'hôtel(s)');
+    console.log(`  hotelsAutre:`, hotelsAutre?.length || 0, 'hôtel(s)');
 
     const program = await prisma.program.update({
       where: { id: programIdNum },
@@ -366,7 +437,7 @@ router.put('/:id', async (req, res) => {
       }
     };
 
-    async function findOrCreateHotel(city: 'Madina' | 'Makkah', name: string) {
+    async function findOrCreateHotel(city: 'Madina' | 'Makkah' | 'Autre', name: string) {
       const existing = await prisma.hotel.findFirst({ where: { city, name } });
       if (existing) return existing;
       try {
@@ -379,7 +450,7 @@ router.put('/:id', async (req, res) => {
       }
     }
 
-    async function upsertRoomsForEntries(city: 'Madina' | 'Makkah', entries: any[]) {
+    async function upsertRoomsForEntries(city: 'Madina' | 'Makkah' | 'Autre', entries: any[]) {
       if (!Array.isArray(entries)) return;
       for (const entry of entries) {
         const hotelName = typeof entry === 'string' ? entry : entry?.name;
@@ -390,8 +461,16 @@ router.put('/:id', async (req, res) => {
         try {
           if (city === 'Madina') {
             await prisma.programHotelMadina.create({ data: { programId: program.id, hotelId: hotel.id } });
-          } else {
+          } else if (city === 'Makkah') {
             await prisma.programHotelMakkah.create({ data: { programId: program.id, hotelId: hotel.id } });
+          } else {
+            const nbJours = entry && typeof entry === 'object' && entry.nbJours != null ? Number(entry.nbJours) || 0 : 0;
+            const ordre = entry && typeof entry === 'object' && entry.ordre != null ? Number(entry.ordre) || 0 : 0;
+            await prisma.programHotelAutre.upsert({
+              where: { programId_hotelId: { programId: program.id, hotelId: hotel.id } },
+              create: { programId: program.id, hotelId: hotel.id, nbJours, ordre },
+              update: { nbJours, ordre },
+            });
           }
         } catch {}
 
@@ -567,7 +646,7 @@ router.put('/:id', async (req, res) => {
       const pendingRoomLogs: { rooms: RoomJournalRow[]; context: string }[] = [];
       await prisma.$transaction(async (tx) => {
         // Fonction helper pour trouver ou créer un hôtel dans la transaction
-        async function findOrCreateHotelInTx(city: 'Madina' | 'Makkah', name: string) {
+        async function findOrCreateHotelInTx(city: 'Madina' | 'Makkah' | 'Autre', name: string) {
           const existing = await tx.hotel.findFirst({ where: { city, name } });
           if (existing) return existing;
           try {
@@ -582,7 +661,7 @@ router.put('/:id', async (req, res) => {
         }
         
         // Créer une version de la fonction qui utilise le client de transaction
-        async function upsertRoomsForEntriesWithTx(city: 'Madina' | 'Makkah', entries: any[]) {
+        async function upsertRoomsForEntriesWithTx(city: 'Madina' | 'Makkah' | 'Autre', entries: any[]) {
           if (!Array.isArray(entries)) return;
           for (const entry of entries) {
             const hotelName = typeof entry === 'string' ? entry : entry?.name;
@@ -608,21 +687,31 @@ router.put('/:id', async (req, res) => {
                     where: { programId: program.id, hotelId: hotel.id }
                   });
                   if (!existingLink) {
-                    await tx.programHotelMadina.create({ 
-                      data: { programId: program.id, hotelId: hotel.id } 
+                    await tx.programHotelMadina.create({
+                      data: { programId: program.id, hotelId: hotel.id }
                     });
                     console.log(`[TX] Created link for program ${program.id} and hotel ${hotel.id} in ${city}`);
                   }
-                } else {
+                } else if (city === 'Makkah') {
                   existingLink = await tx.programHotelMakkah.findFirst({
                     where: { programId: program.id, hotelId: hotel.id }
                   });
                   if (!existingLink) {
-                    await tx.programHotelMakkah.create({ 
-                      data: { programId: program.id, hotelId: hotel.id } 
+                    await tx.programHotelMakkah.create({
+                      data: { programId: program.id, hotelId: hotel.id }
                     });
                     console.log(`[TX] Created link for program ${program.id} and hotel ${hotel.id} in ${city}`);
                   }
+                } else {
+                  // Autre : porte nbJours/ordre → upsert pour refléter les éditions
+                  const nbJours = entry && typeof entry === 'object' && entry.nbJours != null ? Number(entry.nbJours) || 0 : 0;
+                  const ordre = entry && typeof entry === 'object' && entry.ordre != null ? Number(entry.ordre) || 0 : 0;
+                  await tx.programHotelAutre.upsert({
+                    where: { programId_hotelId: { programId: program.id, hotelId: hotel.id } },
+                    create: { programId: program.id, hotelId: hotel.id, nbJours, ordre },
+                    update: { nbJours, ordre },
+                  });
+                  console.log(`[TX] Upserted Autre link for program ${program.id} and hotel ${hotel.id} (nbJours=${nbJours}, ordre=${ordre})`);
                 }
               } catch (linkError: any) {
                 // Si c'est une erreur de contrainte unique (P2002), c'est OK (la relation existe déjà)
@@ -834,6 +923,7 @@ router.put('/:id', async (req, res) => {
         // Appeler les fonctions pour mettre à jour les rooms
         await upsertRoomsForEntriesWithTx('Madina', hotelsMadina);
         await upsertRoomsForEntriesWithTx('Makkah', hotelsMakkah);
+        await upsertRoomsForEntriesWithTx('Autre', hotelsAutre);
       }, {
         timeout: 30000, // Timeout de 30 secondes pour les transactions longues
       });
@@ -847,7 +937,7 @@ router.put('/:id', async (req, res) => {
 
     const updated = await prisma.program.findUnique({
       where: { id: program.id },
-      include: { hotelsMadina: { include: { hotel: true } }, hotelsMakkah: { include: { hotel: true } }, rooms: { include: { hotel: true } } }
+      include: { hotelsMadina: { include: { hotel: true } }, hotelsMakkah: { include: { hotel: true } }, hotelsAutre: { include: { hotel: true } }, rooms: { include: { hotel: true } } }
     });
 
     const roomsCountAfterPut = await prisma.room.count({ where: { programId: program.id } });
@@ -980,6 +1070,10 @@ router.delete('/:id/hard', async (req, res) => {
       });
 
       await tx.programHotelMakkah.deleteMany({
+        where: { programId: programId }
+      });
+
+      await tx.programHotelAutre.deleteMany({
         where: { programId: programId }
       });
 

@@ -28,7 +28,14 @@ export interface ProgramOverview {
     name: string;
     city: string;
   }>;
-  
+  hotelsAutre: Array<{
+    id: number;
+    name: string;
+    city: string;
+    nbJours: number;
+    ordre: number;
+  }>;
+
   // Réservations par chambre
   reservationsByRoom: {
     couple: {
@@ -101,6 +108,11 @@ export class ProgramOverviewService {
             }
           },
           hotelsMakkah: {
+            include: {
+              hotel: true
+            }
+          },
+          hotelsAutre: {
             include: {
               hotel: true
             }
@@ -199,7 +211,17 @@ export class ProgramOverviewService {
           name: ph.hotel.name,
           city: ph.hotel.city
         })),
-        
+        hotelsAutre: program.hotelsAutre
+          .slice()
+          .sort((a, b) => a.ordre - b.ordre)
+          .map(ph => ({
+            id: ph.hotel.id,
+            name: ph.hotel.name,
+            city: ph.hotel.city,
+            nbJours: ph.nbJours,
+            ordre: ph.ordre
+          })),
+
         reservationsByRoom,
         
         totalExpenses,

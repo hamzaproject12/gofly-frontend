@@ -22,6 +22,7 @@ interface Reservation {
   prix: string | number;
   hotelMadina: string;
   hotelMakkah: string;
+  hotelsAutre?: Array<{ hotelId: number; roomId: number; hotelName: string }>;
   dateReservation: string;
   statut: string;
   paiementRecu: number;
@@ -67,6 +68,7 @@ export default function ReservationDetails() {
             programme: data.program?.name || '',
             hotelMadina: data.hotelMadina,
             hotelMakkah: data.hotelMakkah,
+            hotelsAutre: Array.isArray(data.hotelsAutre) ? data.hotelsAutre : [],
             dateReservation: data.reservationDate,
             statut: data.status,
             paiementRecu: data.paidAmount,
@@ -154,14 +156,24 @@ export default function ReservationDetails() {
                   Hôtels
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <span className="text-green-700 font-medium text-sm">Hôtel à Madina</span>
-                    <div className="h-10 border-2 border-green-200 rounded-lg flex items-center px-3 bg-white">{reservation.hotelMadina}</div>
-                  </div>
-                  <div className="space-y-2">
-                    <span className="text-green-700 font-medium text-sm">Hôtel à Makkah</span>
-                    <div className="h-10 border-2 border-green-200 rounded-lg flex items-center px-3 bg-white">{reservation.hotelMakkah}</div>
-                  </div>
+                  {reservation.hotelMadina && (
+                    <div className="space-y-2">
+                      <span className="text-green-700 font-medium text-sm">Hôtel à Madina</span>
+                      <div className="h-10 border-2 border-green-200 rounded-lg flex items-center px-3 bg-white">{reservation.hotelMadina}</div>
+                    </div>
+                  )}
+                  {reservation.hotelMakkah && (
+                    <div className="space-y-2">
+                      <span className="text-green-700 font-medium text-sm">Hôtel à Makkah</span>
+                      <div className="h-10 border-2 border-green-200 rounded-lg flex items-center px-3 bg-white">{reservation.hotelMakkah}</div>
+                    </div>
+                  )}
+                  {(reservation.hotelsAutre || []).map((h, i) => (
+                    <div key={`${h.hotelId}-${i}`} className="space-y-2">
+                      <span className="text-green-700 font-medium text-sm">🏨 Hôtel Autre</span>
+                      <div className="h-10 border-2 border-green-200 rounded-lg flex items-center px-3 bg-white">{h.hotelName || `#${h.hotelId}`}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
               {/* Section Paiements détaillés */}

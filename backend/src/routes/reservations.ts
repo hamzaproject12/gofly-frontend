@@ -15,6 +15,7 @@ import {
   JOURNAL_ACTION,
   type ReservationJournalRow,
 } from '../services/journalSuppressionService';
+import { parseHotelsAutre, type HotelAutreEntry } from '../services/hotelsAutreService';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -39,6 +40,44 @@ function applyRoomTypeQuery(where: Record<string, unknown>, roomType: unknown) {
 function getPlacesByRoomType(roomType: string): number {
   // Chaque réservation décrémente de 1 place
   return 1;
+}
+
+/**
+ * Décrémente les places d'une chambre et y rattache la réservation.
+ * Factorisé depuis les blocs Madina/Makkah (POST /) pour être réutilisé tel quel
+ * par les hôtels Autre. Ne fait rien si roomId est absent ; n'échoue pas la
+ * réservation en cas d'erreur (comportement historique).
+ */
+async function applyRoomBooking(
+  roomId: number | null | undefined,
+  roomType: string,
+  gender: string,
+  reservationId: number,
+  label = 'chambre'
+): Promise<void> {
+  if (!roomId) return;
+  console.log(`🏨 Mise à jour chambre ${label} ID:`, roomId);
+  try {
+    const room = await prisma.room.findUnique({ where: { id: Number(roomId) } });
+    if (!room) {
+      console.log(`⚠️ Chambre ${label} non trouvée avec ID:`, roomId);
+      return;
+    }
+    const placesAReserver = getPlacesByRoomType(roomType);
+    const updateData: any = {
+      nbrPlaceRestantes: Math.max(0, room.nbrPlaceRestantes - placesAReserver),
+      listeIdsReservation: { push: reservationId },
+    };
+    // Si la chambre est de genre "Mixte", figer le gender avec celui du client
+    if (room.gender === 'Mixte') {
+      updateData.gender = gender;
+      console.log(`🔄 Chambre ${label} de genre Mixte - mise à jour vers:`, gender);
+    }
+    await prisma.room.update({ where: { id: room.id }, data: updateData });
+    console.log(`✅ Chambre ${label} mise à jour (ID ${room.id}) — places restantes:`, updateData.nbrPlaceRestantes);
+  } catch (error) {
+    console.error(`❌ Erreur mise à jour chambre ${label}:`, error);
+  }
 }
 
 // Fonction helper pour extraire l'agentId du token JWT
@@ -323,6 +362,7 @@ router.post('/group', async (req, res) => {
       roomType,
       roomMadinaId,
       roomMakkahId,
+      roomAutreIds,
       occupants,
       leaderPrice,
       leaderPaidAmount = 0,
@@ -330,40 +370,56 @@ router.post('/group', async (req, res) => {
       common
     } = req.body;
 
+    // Hôtels « Autre » : snapshot [{ hotelId, roomId, hotelName }] partagé par tous les membres
+    const autreEntries: HotelAutreEntry[] = parseHotelsAutre(common?.hotelsAutre);
+    // Rooms Autre à décrémenter : liste explicite si fournie, sinon dérivée du snapshot
+    const roomAutreIdList: number[] = (Array.isArray(roomAutreIds)
+      ? roomAutreIds.map((x: any) => Number(x))
+      : autreEntries.map((e) => e.roomId)
+    ).filter((n) => Number.isFinite(n) && n > 0);
+
     if (!Array.isArray(occupants) || occupants.length < 2) {
       return res.status(400).json({ error: 'Le groupe doit contenir au moins 2 personnes.' });
     }
     if (!roomType || !common?.programId) {
       return res.status(400).json({ error: 'Paramètres obligatoires manquants (programId/roomType).' });
     }
-    if (!roomMadinaId || !roomMakkahId) {
-      return res.status(400).json({ error: 'Les rooms Madina et Makkah sont obligatoires pour chambre privée.' });
+    // Assoupli : au moins une room (Madina, Makkah OU Autre) doit être fournie
+    if (!roomMadinaId && !roomMakkahId && roomAutreIdList.length === 0) {
+      return res.status(400).json({ error: 'Au moins une chambre (Madina, Makkah ou Autre) est obligatoire pour chambre privée.' });
     }
 
     const agentId = extractAgentIdFromToken(req);
     const groupSize = occupants.length;
 
     const result = await prisma.$transaction(async (tx) => {
-      const [madinaRoom, makkahRoom] = await Promise.all([
-        tx.room.findUnique({ where: { id: Number(roomMadinaId) } }),
-        tx.room.findUnique({ where: { id: Number(roomMakkahId) } }),
-      ]);
+      // Catégories réellement présentes uniquement
+      const roomsToBook: { id: number; label: string }[] = [];
+      if (roomMadinaId) roomsToBook.push({ id: Number(roomMadinaId), label: 'Madina' });
+      if (roomMakkahId) roomsToBook.push({ id: Number(roomMakkahId), label: 'Makkah' });
+      for (const rid of roomAutreIdList) roomsToBook.push({ id: rid, label: 'Autre' });
 
-      if (!madinaRoom || !makkahRoom) {
-        throw new Error('Une ou plusieurs rooms sont introuvables.');
-      }
-      if (madinaRoom.roomType !== roomType || makkahRoom.roomType !== roomType) {
-        throw new Error('Le type de room sélectionné ne correspond pas au type de chambre demandé.');
-      }
-      if (madinaRoom.programId !== Number(common.programId) || makkahRoom.programId !== Number(common.programId)) {
-        throw new Error('Les rooms sélectionnées ne sont pas liées au programme choisi.');
-      }
-      // Chambre privée = uniquement des rooms totalement vides au moment de la réservation
-      if (madinaRoom.nbrPlaceRestantes !== madinaRoom.nbrPlaceTotal || makkahRoom.nbrPlaceRestantes !== makkahRoom.nbrPlaceTotal) {
-        throw new Error('Chambre privée: seules les rooms totalement vides peuvent être réservées.');
-      }
-      if (madinaRoom.nbrPlaceRestantes < groupSize || makkahRoom.nbrPlaceRestantes < groupSize) {
-        throw new Error('Pas assez de places disponibles pour cette chambre privée.');
+      // Charger et valider chaque room présente
+      const loadedRooms = [] as Awaited<ReturnType<typeof tx.room.findUnique>>[];
+      for (const { id, label } of roomsToBook) {
+        const room = await tx.room.findUnique({ where: { id } });
+        if (!room) {
+          throw new Error(`Une ou plusieurs rooms sont introuvables (${label}).`);
+        }
+        if (room.roomType !== roomType) {
+          throw new Error(`Le type de room sélectionné ne correspond pas au type de chambre demandé (${label}).`);
+        }
+        if (room.programId !== Number(common.programId)) {
+          throw new Error(`Les rooms sélectionnées ne sont pas liées au programme choisi (${label}).`);
+        }
+        // Chambre privée = uniquement des rooms totalement vides au moment de la réservation
+        if (room.nbrPlaceRestantes !== room.nbrPlaceTotal) {
+          throw new Error(`Chambre privée: seules les rooms totalement vides peuvent être réservées (${label}).`);
+        }
+        if (room.nbrPlaceRestantes < groupSize) {
+          throw new Error(`Pas assez de places disponibles pour cette chambre privée (${label}).`);
+        }
+        loadedRooms.push(room);
       }
 
       const createdReservations = [];
@@ -389,6 +445,7 @@ router.post('/group', async (req, res) => {
             gender: person.gender || "Homme",
             hotelMadina: common.hotelMadina,
             hotelMakkah: common.hotelMakkah,
+            hotelsAutre: autreEntries.length > 0 ? autreEntries : undefined,
             reservationDate: new Date(reservationDate),
             status: common.status || 'Incomplet',
             statutPasseport: Boolean(common.statutPasseport),
@@ -413,22 +470,17 @@ router.post('/group', async (req, res) => {
       }
 
       const createdIds = createdReservations.map(r => r.id);
-      await Promise.all([
-        tx.room.update({
-          where: { id: madinaRoom.id },
-          data: {
-            nbrPlaceRestantes: madinaRoom.nbrPlaceRestantes - groupSize,
-            listeIdsReservation: { push: createdIds }
-          }
-        }),
-        tx.room.update({
-          where: { id: makkahRoom.id },
-          data: {
-            nbrPlaceRestantes: makkahRoom.nbrPlaceRestantes - groupSize,
-            listeIdsReservation: { push: createdIds }
-          }
-        })
-      ]);
+      await Promise.all(
+        loadedRooms.map((room) =>
+          tx.room.update({
+            where: { id: room!.id },
+            data: {
+              nbrPlaceRestantes: room!.nbrPlaceRestantes - groupSize,
+              listeIdsReservation: { push: createdIds }
+            }
+          })
+        )
+      );
 
       return { leaderId, reservations: createdReservations, groupId: normalizedGroupId };
     });
@@ -508,7 +560,10 @@ router.get('/:id', async (req, res) => {
 // Create new reservation
 router.post('/', async (req, res) => {
   try {
-    const { firstName, lastName, phone, passportNumber, groupe, remarque, transport, programId, roomType, gender, hotelMadina, hotelMakkah, price, reservationDate, status, statutPasseport, statutVisa, statutHotel, statutVol, paidAmount, reduction, roomMadinaId, roomMakkahId, plan, typeReservation, isLeader, parentId, groupId, familyMixed, roomSlot } = req.body;
+    const { firstName, lastName, phone, passportNumber, groupe, remarque, transport, programId, roomType, gender, hotelMadina, hotelMakkah, hotelsAutre, price, reservationDate, status, statutPasseport, statutVisa, statutHotel, statutVol, paidAmount, reduction, roomMadinaId, roomMakkahId, plan, typeReservation, isLeader, parentId, groupId, familyMixed, roomSlot } = req.body;
+
+    // Hôtels « Autre » : tableau [{ hotelId, roomId, hotelName }] (optionnel)
+    const hotelsAutreEntries: HotelAutreEntry[] = parseHotelsAutre(hotelsAutre);
     
     // Extraire l'agentId du token JWT
     const agentId = extractAgentIdFromToken(req);
@@ -536,6 +591,7 @@ router.post('/', async (req, res) => {
         gender: gender || "Homme",
         hotelMadina,
         hotelMakkah,
+        hotelsAutre: hotelsAutreEntries.length > 0 ? hotelsAutreEntries : undefined,
         price: parseFloat(price),
         reduction: reduction ? parseFloat(reduction) : 0,
         reservationDate: new Date(reservationDate),
@@ -576,104 +632,19 @@ router.post('/', async (req, res) => {
       console.log('🔄 Mise à jour des chambres...');
       
       // Récupérer les informations de la réservation pour identifier les chambres
-      const { roomType, gender, programId } = reservation;
-      
+      const { roomType, gender } = reservation;
+
       // Mettre à jour la chambre Madina si un ID est fourni
-      if (roomMadinaId) {
-        console.log('🏨 Mise à jour chambre Madina ID:', roomMadinaId);
-        
-        try {
-          // Récupérer la chambre directement par son ID
-          const roomMadina = await prisma.room.findUnique({
-            where: { id: roomMadinaId }
-          });
-          
-          if (roomMadina) {
-            // Calculer le nombre de places à réserver selon le type de chambre
-            const placesAReserver = getPlacesByRoomType(roomType);
-            
-            // Mettre à jour la chambre
-            const updateData: any = {
-              nbrPlaceRestantes: Math.max(0, roomMadina.nbrPlaceRestantes - placesAReserver),
-              listeIdsReservation: {
-                push: reservation.id
-              }
-            };
-            
-            // Si la chambre est de genre "Mixte", mettre à jour le gender avec celui du client
-            if (roomMadina.gender === 'Mixte') {
-              updateData.gender = gender;
-              console.log('🔄 Chambre Madina de genre Mixte - mise à jour vers:', gender);
-            }
-            
-            await prisma.room.update({
-              where: { id: roomMadina.id },
-              data: updateData
-            });
-            
-            console.log('✅ Chambre Madina mise à jour:');
-            console.log('   - Places restantes AVANT:', roomMadina.nbrPlaceRestantes);
-            console.log('   - Places restantes APRÈS:', Math.max(0, roomMadina.nbrPlaceRestantes - placesAReserver));
-            console.log('   - Réservation ajoutée à la liste');
-            if (roomMadina.gender === 'Mixte') {
-              console.log('   - Genre mis à jour de Mixte vers:', gender);
-            }
-          } else {
-            console.log('⚠️ Chambre Madina non trouvée avec ID:', roomMadinaId);
-          }
-        } catch (error) {
-          console.error('❌ Erreur mise à jour chambre Madina:', error);
-        }
-      }
-      
+      await applyRoomBooking(roomMadinaId, roomType, gender, reservation.id, 'Madina');
+
       // Mettre à jour la chambre Makkah si un ID est fourni
-      if (roomMakkahId) {
-        console.log('🏨 Mise à jour chambre Makkah ID:', roomMakkahId);
-        
-        try {
-          // Récupérer la chambre directement par son ID
-          const roomMakkah = await prisma.room.findUnique({
-            where: { id: roomMakkahId }
-          });
-          
-          if (roomMakkah) {
-            // Calculer le nombre de places à réserver selon le type de chambre
-            const placesAReserver = getPlacesByRoomType(roomType);
-            
-            // Mettre à jour la chambre
-            const updateDataMakkah: any = {
-              nbrPlaceRestantes: Math.max(0, roomMakkah.nbrPlaceRestantes - placesAReserver),
-              listeIdsReservation: {
-                push: reservation.id
-              }
-            };
-            
-            // Si la chambre est de genre "Mixte", mettre à jour le gender avec celui du client
-            if (roomMakkah.gender === 'Mixte') {
-              updateDataMakkah.gender = gender;
-              console.log('🔄 Chambre Makkah de genre Mixte - mise à jour vers:', gender);
-            }
-            
-            await prisma.room.update({
-              where: { id: roomMakkah.id },
-              data: updateDataMakkah
-            });
-            
-            console.log('✅ Chambre Makkah mise à jour:');
-            console.log('   - Places restantes AVANT:', roomMakkah.nbrPlaceRestantes);
-            console.log('   - Places restantes APRÈS:', Math.max(0, roomMakkah.nbrPlaceRestantes - placesAReserver));
-            console.log('   - Réservation ajoutée à la liste');
-            if (roomMakkah.gender === 'Mixte') {
-              console.log('   - Genre mis à jour de Mixte vers:', gender);
-            }
-          } else {
-            console.log('⚠️ Chambre Makkah non trouvée avec ID:', roomMakkahId);
-          }
-        } catch (error) {
-          console.error('❌ Erreur mise à jour chambre Makkah:', error);
-        }
+      await applyRoomBooking(roomMakkahId, roomType, gender, reservation.id, 'Makkah');
+
+      // Mettre à jour chaque chambre Autre sélectionnée (optionnel)
+      for (const entry of hotelsAutreEntries) {
+        await applyRoomBooking(entry.roomId, roomType, gender, reservation.id, `Autre (${entry.hotelName || entry.hotelId})`);
       }
-      
+
       console.log('✅ Mise à jour des chambres terminée');
     } catch (roomUpdateError) {
       console.error('❌ Erreur lors de la mise à jour des chambres:', roomUpdateError);
@@ -731,6 +702,10 @@ function buildReservationUpdateData(
     if (body.roomType !== undefined) updateData.roomType = body.roomType;
     if (body.hotelMadina !== undefined) updateData.hotelMadina = body.hotelMadina;
     if (body.hotelMakkah !== undefined) updateData.hotelMakkah = body.hotelMakkah;
+    if (body.hotelsAutre !== undefined) {
+      const entries = parseHotelsAutre(body.hotelsAutre);
+      updateData.hotelsAutre = entries.length > 0 ? entries : null;
+    }
     if (body.price !== undefined) updateData.price = body.price;
   }
   if (body.reservationDate !== undefined) updateData.reservationDate = new Date(body.reservationDate);
@@ -884,6 +859,7 @@ router.put('/:id', async (req, res) => {
       roomType,
       hotelMadina,
       hotelMakkah,
+      hotelsAutre,
       price,
       reservationDate,
       documents,
@@ -949,6 +925,10 @@ router.put('/:id', async (req, res) => {
       if (roomType !== undefined) updateData.roomType = roomType;
       if (hotelMadina !== undefined) updateData.hotelMadina = hotelMadina;
       if (hotelMakkah !== undefined) updateData.hotelMakkah = hotelMakkah;
+      if (hotelsAutre !== undefined) {
+        const entries = parseHotelsAutre(hotelsAutre);
+        updateData.hotelsAutre = entries.length > 0 ? entries : null;
+      }
       if (price !== undefined) updateData.price = price;
     }
     if (reservationDate !== undefined) updateData.reservationDate = new Date(reservationDate);

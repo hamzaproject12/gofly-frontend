@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { HotelCategoryBlock } from "@/components/reservations/HotelCategoryBlock"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 
@@ -58,6 +59,7 @@ interface Program {
   name: string;
   hotelsMadina: Array<{ hotel: Hotel }>;
   hotelsMakkah: Array<{ hotel: Hotel }>;
+  hotelsAutre?: Array<{ hotel: Hotel; nbJours: number; ordre: number }>;
 }
 
 interface Hotel {
@@ -248,6 +250,9 @@ export default function NouvelleReservation() {
   // États séparés pour les places sélectionnées à Madina et Makkah
   const [selectedPlacesMadina, setSelectedPlacesMadina] = useState<{[roomId: number]: number[]}>({});
   const [selectedPlacesMakkah, setSelectedPlacesMakkah] = useState<{[roomId: number]: number[]}>({});
+  // Hôtels Autre : sélection de chambre par hôtel + valeur du Select par hôtel ("none" ou id)
+  const [selectedPlacesAutre, setSelectedPlacesAutre] = useState<{[hotelId: number]: {[roomId: number]: number[]}}>({});
+  const [hotelsAutreSelection, setHotelsAutreSelection] = useState<{[hotelId: number]: string}>({});
 
   // États pour la personnalisation du calcul de prix
   const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
@@ -430,183 +435,76 @@ export default function NouvelleReservation() {
   // Filtrer les hôtels par ville avec la nouvelle modélisation
   const hotelsMadina = programmeSelectionne?.hotelsMadina?.map((ph: { hotel: Hotel }) => ph.hotel) || [];
   const hotelsMakkah = programmeSelectionne?.hotelsMakkah?.map((ph: { hotel: Hotel }) => ph.hotel) || [];
+  // Hôtels Autre du programme, triés par ordre d'affichage (séquence Turquie→X→Y)
+  const hotelsAutreProgramme = [...(programmeSelectionne?.hotelsAutre || [])].sort((a, b) => a.ordre - b.ordre);
 
   // Fonction pour calculer le prix automatiquement
   const calculatePrice = useMemo(() => {
-    console.log('=== DEBUG CALCUL PRIX ===');
-    console.log('programInfo:', programInfo);
-    console.log('formData.typeChambre:', formData.typeChambre);
-    console.log('formData.gender:', formData.gender);
-    console.log('formData.hotelMadina:', formData.hotelMadina);
-    console.log('formData.hotelMakkah:', formData.hotelMakkah);
-    
-    if (!programInfo || !formData.typeChambre || !formData.gender || !formData.hotelMadina || !formData.hotelMakkah) {
-      console.log('❌ Conditions non remplies pour le calcul');
+    // Garde-fou assoupli : seules les bases (programme, type, genre) sont requises.
+    // Chaque catégorie d'hôtel (Madina / Makkah / Autre) est OPTIONNELLE et vaut 0
+    // si absente ou non sélectionnée.
+    if (!programInfo || !formData.typeChambre || !formData.gender) {
       return 0;
     }
 
     const roomType = formData.typeChambre;
     const gender = formData.gender;
-    const hotelMadinaId = parseInt(formData.hotelMadina);
-    const hotelMakkahId = parseInt(formData.hotelMakkah);
 
-    console.log('Recherche chambres pour:', { roomType, gender, hotelMadinaId, hotelMakkahId });
-    console.log('Rooms disponibles:', programInfo.rooms);
+    // Une valeur d'hôtel vide ("") ou "none" = catégorie non sélectionnée
+    const hasMadina = !!formData.hotelMadina && formData.hotelMadina !== "none";
+    const hasMakkah = !!formData.hotelMakkah && formData.hotelMakkah !== "none";
 
-    // Vérifier d'abord si des hôtels sont sélectionnés
-    if (formData.hotelMadina === "none" && formData.hotelMakkah === "none") {
-      console.log('✅ Aucun hôtel sélectionné - calcul sans hébergement');
-      // Si aucun hôtel n'est sélectionné, on peut quand même calculer le prix
-      const prixAvion = customization.includeAvion ? programInfo.prixAvionDH : 0;
-      const prixVisa = customization.includeVisa ? programInfo.prixVisaRiyal : 0;
-      
-      // Récupérer le profit selon le plan sélectionné
-      const getProfitByPlan = () => {
-        switch (customization.plan) {
-          case "Économique":
-            return programInfo.profitEconomique || programInfo.profit || 0;
-          case "VIP":
-            return programInfo.profitVIP || programInfo.profit || 0;
-          case "Normal":
-          default:
-            return programInfo.profitNormal || programInfo.profit || 0;
-        }
-      };
-      
-      const profit = getProfitByPlan();
-      
-      // LOGS DÉTAILLÉS DU CALCUL SANS HÔTEL
-      console.log('🔍 === DÉTAIL DU CALCUL DU PRIX (SANS HÔTEL) ===');
-      console.log('📊 Données de base:');
-      console.log('   - Taux de change:', programInfo.exchange, 'DH/Riyal');
-      console.log('   - Plan sélectionné:', customization.plan);
-      
-      console.log('✈️ Prix Avion:');
-      console.log('   - Inclus:', customization.includeAvion ? 'OUI' : 'NON');
-      console.log('   - Prix:', prixAvion, 'DH');
-      
-      console.log('📄 Prix Visa:');
-      console.log('   - Inclus:', customization.includeVisa ? 'OUI' : 'NON');
-      console.log('   - Prix:', prixVisa, 'Riyals');
-      console.log('   - Conversion en DH:', prixVisa * programInfo.exchange, 'DH');
-      
-      console.log('🧮 Calcul détaillé:');
-      console.log('   - Prix Avion:', prixAvion, 'DH');
-      console.log('   - Plan:', customization.plan);
-      console.log('   - Profit:', profit, 'DH');
-      console.log('   - Visa converti:', prixVisa * programInfo.exchange, 'DH');
-      
-      const prixFinal = prixAvion + profit + (prixVisa * programInfo.exchange);
-
-      console.log('💰 === RÉSULTAT FINAL (SANS HÔTEL) ===');
-      console.log('   - Prix Avion:', prixAvion, 'DH');
-      console.log('   - Plan:', customization.plan);
-      console.log('   - Profit:', profit, 'DH');
-      console.log('   - Visa converti:', prixVisa * programInfo.exchange, 'DH');
-      console.log('   - PRIX FINAL:', prixFinal, 'DH');
-      console.log('✅ Prix calculé (sans hôtel):', prixFinal);
-      return Math.round(prixFinal);
-    }
-
-    // Utiliser les chambres sélectionnées par l'utilisateur
-    let roomMadina = null;
-    let roomMakkah = null;
-
-    if (formData.hotelMadina !== "none") {
-      // Récupérer l'ID de la chambre sélectionnée
-      const selectedRoomMadinaId = Object.keys(selectedPlacesMadina)[0];
-      if (selectedRoomMadinaId) {
-        roomMadina = programInfo.rooms.find(r => r.id === parseInt(selectedRoomMadinaId));
-        console.log('🏨 Chambre Madina sélectionnée par l\'utilisateur:', selectedRoomMadinaId);
+    // Résoudre la chambre sélectionnée (ou la première compatible) pour une catégorie
+    const resolveRoom = (
+      hotelIdStr: string,
+      selectedPlaces: { [roomId: number]: number[] }
+    ) => {
+      let room: typeof programInfo.rooms[number] | null = null;
+      const selectedRoomId = Object.keys(selectedPlaces)[0];
+      if (selectedRoomId) {
+        room = programInfo.rooms.find((r) => r.id === parseInt(selectedRoomId)) || null;
       }
-      
-      // Si aucune chambre n'est sélectionnée, utiliser la première disponible
-      if (!roomMadina) {
-        roomMadina = programInfo.rooms.find(r => 
-          r.hotelId === hotelMadinaId && 
-          r.roomType === roomType && 
-          (r.gender === gender || r.gender === 'Mixte')
-        );
-        console.log('⚠️ Aucune chambre Madina sélectionnée, utilisation de la première trouvée');
+      if (!room) {
+        room =
+          programInfo.rooms.find(
+            (r) =>
+              r.hotelId === parseInt(hotelIdStr) &&
+              r.roomType === roomType &&
+              (r.gender === gender || r.gender === "Mixte")
+          ) || null;
       }
-    }
+      return room;
+    };
 
-    if (formData.hotelMakkah !== "none") {
-      // Récupérer l'ID de la chambre sélectionnée
-      const selectedRoomMakkahId = Object.keys(selectedPlacesMakkah)[0];
-      if (selectedRoomMakkahId) {
-        roomMakkah = programInfo.rooms.find(r => r.id === parseInt(selectedRoomMakkahId));
-        console.log('🏨 Chambre Makkah sélectionnée par l\'utilisateur:', selectedRoomMakkahId);
-      }
-      
-      // Si aucune chambre n'est sélectionnée, utiliser la première disponible
-      if (!roomMakkah) {
-        roomMakkah = programInfo.rooms.find(r => 
-          r.hotelId === hotelMakkahId && 
-          r.roomType === roomType && 
-          (r.gender === gender || r.gender === 'Mixte')
-        );
-        console.log('⚠️ Aucune chambre Makkah sélectionnée, utilisation de la première trouvée');
-      }
-    }
+    const roomMadina = hasMadina
+      ? resolveRoom(formData.hotelMadina, selectedPlacesMadina)
+      : null;
+    const roomMakkah = hasMakkah
+      ? resolveRoom(formData.hotelMakkah, selectedPlacesMakkah)
+      : null;
 
-    console.log('🏨 === CHAMBRES TROUVÉES ===');
-    if (roomMadina) {
-      console.log('   - Room Madina ID:', roomMadina.id);
-      console.log('   - Hôtel ID:', roomMadina.hotelId);
-      console.log('   - Type:', roomMadina.roomType);
-      console.log('   - Genre:', roomMadina.gender);
-      console.log('   - Prix par room:', roomMadina.prixRoom, 'Riyals');
-      console.log('   - Places totales:', roomMadina.nbrPlaceTotal);
-      console.log('   - Places restantes AVANT réservation:', roomMadina.nbrPlaceRestantes);
-    } else {
-      console.log('   - Aucune room Madina trouvée');
+    // Si une catégorie Madina/Makkah est sélectionnée mais sans chambre trouvée
+    // ou sans place dispo → comportement historique : prix 0.
+    if ((hasMadina && !roomMadina) || (hasMakkah && !roomMakkah)) {
+      return 0;
     }
-    
-    if (roomMakkah) {
-      console.log('   - Room Makkah ID:', roomMakkah.id);
-      console.log('   - Hôtel ID:', roomMakkah.hotelId);
-      console.log('   - Type:', roomMakkah.roomType);
-      console.log('   - Genre:', roomMakkah.gender);
-      console.log('   - Prix par room:', roomMakkah.prixRoom, 'Riyals');
-      console.log('   - Places totales:', roomMakkah.nbrPlaceTotal);
-      console.log('   - Places restantes AVANT réservation:', roomMakkah.nbrPlaceRestantes);
-    } else {
-      console.log('   - Aucune room Makkah trouvée');
-    }
-
-    // Vérifier que les chambres nécessaires sont trouvées
-    if ((formData.hotelMadina !== "none" && !roomMadina) || (formData.hotelMakkah !== "none" && !roomMakkah)) {
-      console.log('❌ Chambres non trouvées pour les hôtels sélectionnés');
+    if (
+      (roomMadina && roomMadina.nbrPlaceRestantes <= 0) ||
+      (roomMakkah && roomMakkah.nbrPlaceRestantes <= 0)
+    ) {
       return 0;
     }
 
-    // Vérifier qu'il reste des places dans les chambres sélectionnées
-    if ((roomMadina && roomMadina.nbrPlaceRestantes <= 0) || (roomMakkah && roomMakkah.nbrPlaceRestantes <= 0)) {
-      console.log('❌ Pas de places disponibles');
-      return 0;
-    }
+    const nbPersonnes =
+      ({ SINGLE: 1, DOUBLE: 2, TRIPLE: 3, QUAD: 4, QUINT: 5 } as Record<string, number>)[
+        roomType
+      ] || 1;
 
-    // Calcul selon la formule
-    const prixRoomMadina = roomMadina?.prixRoom || 0;
-    const prixRoomMakkah = roomMakkah?.prixRoom || 0;
-    
-    // Convertir le type de chambre en nombre de personnes
-    const nbPersonnes = {
-      'SINGLE': 1,
-      'DOUBLE': 2,
-      'TRIPLE': 3,
-      'QUAD': 4,
-      'QUINT': 5
-    }[roomType] || 1;
-
-    // Utiliser les valeurs personnalisées ou les valeurs par défaut du programme
     const prixAvion = customization.includeAvion ? programInfo.prixAvionDH : 0;
     const prixVisa = customization.includeVisa ? programInfo.prixVisaRiyal : 0;
     const joursUtilisesMadina = customization.joursMadina;
     const joursUtilisesMakkah = customization.joursMakkah;
 
-    // Récupérer le profit selon le plan sélectionné
     const getProfitByPlan = () => {
       switch (customization.plan) {
         case "Économique":
@@ -618,69 +516,47 @@ export default function NouvelleReservation() {
           return programInfo.profitNormal || programInfo.profit || 0;
       }
     };
-    
     const profit = getProfitByPlan();
 
-    // Calculer le prix des hôtels selon la sélection
-    const prixHotelMadina = (formData.hotelMadina !== "none" && roomMadina) ? (prixRoomMadina / nbPersonnes) * joursUtilisesMadina : 0;
-    const prixHotelMakkah = (formData.hotelMakkah !== "none" && roomMakkah) ? (prixRoomMakkah / nbPersonnes) * joursUtilisesMakkah : 0;
+    const prixHotelMadina = roomMadina
+      ? (roomMadina.prixRoom / nbPersonnes) * joursUtilisesMadina
+      : 0;
+    const prixHotelMakkah = roomMakkah
+      ? (roomMakkah.prixRoom / nbPersonnes) * joursUtilisesMakkah
+      : 0;
 
-    // LOGS DÉTAILLÉS DU CALCUL
-    console.log('🔍 === DÉTAIL DU CALCUL DU PRIX ===');
-    console.log('📊 Données de base:');
-    console.log('   - Type de chambre:', roomType, `(${nbPersonnes} personne${nbPersonnes > 1 ? 's' : ''})`);
-    console.log('   - Genre:', gender);
-    console.log('   - Taux de change:', programInfo.exchange, 'DH/Riyal');
-    console.log('   - Plan sélectionné:', customization.plan);
-    
-    console.log('✈️ Prix Avion:');
-    console.log('   - Inclus:', customization.includeAvion ? 'OUI' : 'NON');
-    console.log('   - Prix:', prixAvion, 'DH');
-    
-    console.log('📄 Prix Visa:');
-    console.log('   - Inclus:', customization.includeVisa ? 'OUI' : 'NON');
-    console.log('   - Prix:', prixVisa, 'Riyals');
-    
-    console.log('🏨 Prix Hôtel Madina:');
-    if (formData.hotelMadina !== "none" && roomMadina) {
-      console.log('   - Prix par room:', prixRoomMadina, 'Riyals');
-      console.log('   - Divisé par:', nbPersonnes, 'personne(s)');
-      console.log('   - Multiplié par:', joursUtilisesMadina, 'jour(s)');
-      console.log('   - Total:', prixHotelMadina, 'Riyals');
-    } else {
-      console.log('   - Aucun hôtel sélectionné');
+    // Hôtels Autre : Σ (prixRoom / nbPersonnes) * nbJours(hôtel) pour chaque hôtel sélectionné
+    let prixHotelAutre = 0;
+    const hotelsAutreProgramme = programmeSelectionne?.hotelsAutre || [];
+    for (const ph of hotelsAutreProgramme) {
+      const sel = selectedPlacesAutre[ph.hotel.id];
+      if (!sel) continue;
+      const roomId = Object.keys(sel)[0];
+      if (!roomId) continue;
+      const room = programInfo.rooms.find((r) => r.id === parseInt(roomId));
+      if (!room) continue;
+      prixHotelAutre += (room.prixRoom / nbPersonnes) * (ph.nbJours || 0);
     }
-    
-    console.log('🏨 Prix Hôtel Makkah:');
-    if (formData.hotelMakkah !== "none" && roomMakkah) {
-      console.log('   - Prix par room:', prixRoomMakkah, 'Riyals');
-      console.log('   - Divisé par:', nbPersonnes, 'personne(s)');
-      console.log('   - Multiplié par:', joursUtilisesMakkah, 'jour(s)');
-      console.log('   - Total:', prixHotelMakkah, 'Riyals');
-    } else {
-      console.log('   - Aucun hôtel sélectionné');
-    }
-    
-    console.log('🧮 Calcul détaillé:');
-    console.log('   - Prix Avion:', prixAvion, 'DH');
-    console.log('   - Plan sélectionné:', customization.plan);
-    console.log('   - Profit:', profit, 'DH');
-    console.log('   - Total Riyals (Visa + Hôtels):', (prixVisa + prixHotelMakkah + prixHotelMadina), 'Riyals');
-    console.log('   - Conversion en DH:', (prixVisa + prixHotelMakkah + prixHotelMadina) * programInfo.exchange, 'DH');
-    
-    const prixFinal = prixAvion 
-      + profit 
-      + (prixVisa + prixHotelMakkah + prixHotelMadina) * programInfo.exchange;
 
-    console.log('💰 === RÉSULTAT FINAL ===');
-    console.log('   - Prix Avion:', prixAvion, 'DH');
-    console.log('   - Plan:', customization.plan);
-    console.log('   - Profit:', profit, 'DH');
-    console.log('   - Services (Visa + Hôtels) convertis:', (prixVisa + prixHotelMakkah + prixHotelMadina) * programInfo.exchange, 'DH');
-    console.log('   - PRIX FINAL:', prixFinal, 'DH');
-    console.log('✅ Prix calculé:', prixFinal);
-    return Math.round(prixFinal); // Arrondir à l'entier le plus proche
-  }, [programInfo, formData.typeChambre, formData.gender, formData.hotelMadina, formData.hotelMakkah, customization]);
+    const prixFinal =
+      prixAvion +
+      profit +
+      (prixVisa + prixHotelMakkah + prixHotelMadina + prixHotelAutre) *
+        programInfo.exchange;
+
+    return Math.round(prixFinal);
+  }, [
+    programInfo,
+    formData.typeChambre,
+    formData.gender,
+    formData.hotelMadina,
+    formData.hotelMakkah,
+    selectedPlacesMadina,
+    selectedPlacesMakkah,
+    selectedPlacesAutre,
+    programmeSelectionne,
+    customization,
+  ]);
 
   // Fonction pour trier les rooms selon l'algorithme spécifié
   const sortRoomsByAlgorithm = (rooms: any[], selectedGender: string) => {
@@ -916,6 +792,38 @@ export default function NouvelleReservation() {
       }
     }
   }, [programInfo, formData.hotelMakkah, formData.typeChambre, formData.gender, selectedPlacesMakkah]);
+
+  // Sélectionner automatiquement la première place libre pour chaque hôtel Autre activé
+  useEffect(() => {
+    if (!programInfo || !programInfo.rooms || !formData.typeChambre || !formData.gender) return;
+    for (const ph of hotelsAutreProgramme) {
+      const hotelId = ph.hotel.id;
+      if ((hotelsAutreSelection[hotelId] ?? "none") === "none") continue;
+      const filteredRooms = programInfo.rooms.filter(room =>
+        room.hotelId === hotelId &&
+        room.roomType === formData.typeChambre &&
+        (room.gender === formData.gender || room.gender === 'Mixte' || !room.gender)
+      );
+      if (filteredRooms.length === 0) continue;
+      const currentSelection = Object.entries(selectedPlacesAutre[hotelId] || {})[0];
+      if (currentSelection) {
+        const room = filteredRooms.find(r => r.id === parseInt(currentSelection[0]));
+        if (!room || room.nbrPlaceRestantes === 0) {
+          const sortedRooms = sortRoomsByAlgorithm(filteredRooms, formData.gender);
+          const firstRoom = sortedRooms.find(r => r.nbrPlaceRestantes > 0);
+          if (firstRoom) {
+            setSelectedPlacesAutre(prev => ({ ...prev, [hotelId]: { [firstRoom.id]: [getFirstAvailablePlace(firstRoom)] } }));
+          }
+        }
+      } else {
+        const sortedRooms = sortRoomsByAlgorithm(filteredRooms, formData.gender);
+        const firstRoom = sortedRooms.find(r => r.nbrPlaceRestantes > 0);
+        if (firstRoom) {
+          setSelectedPlacesAutre(prev => ({ ...prev, [hotelId]: { [firstRoom.id]: [getFirstAvailablePlace(firstRoom)] } }));
+        }
+      }
+    }
+  }, [programInfo, formData.typeChambre, formData.gender, hotelsAutreSelection, selectedPlacesAutre, programmeSelectionne]);
 
   // Vérifier si les champs obligatoires sont remplis
   const arePaymentsValid = useMemo(() => {
@@ -1536,13 +1444,23 @@ export default function NouvelleReservation() {
           status: reservationStatus,
           statutPasseport: attachmentStatus.passport,
           statutVisa: customization.includeVisa ? formData.statutVisa : false,
-          statutHotel: (formData.hotelMadina !== "none" || formData.hotelMakkah !== "none") ? formData.statutHotel : false,
+          statutHotel: (formData.hotelMadina !== "none" || formData.hotelMakkah !== "none" || Object.keys(selectedPlacesAutre).length > 0) ? formData.statutHotel : false,
           statutVol: customization.includeAvion ? formData.statutVol : false,
           paidAmount: paidAmount,
           plan: customization.plan,
           // Ajouter les IDs des chambres sélectionnées
           roomMadinaId: Object.keys(selectedPlacesMadina)[0] ? parseInt(Object.keys(selectedPlacesMadina)[0]) : null,
-          roomMakkahId: Object.keys(selectedPlacesMakkah)[0] ? parseInt(Object.keys(selectedPlacesMakkah)[0]) : null
+          roomMakkahId: Object.keys(selectedPlacesMakkah)[0] ? parseInt(Object.keys(selectedPlacesMakkah)[0]) : null,
+          // Hôtels Autre sélectionnés : [{ hotelId, roomId, hotelName }]
+          hotelsAutre: hotelsAutreProgramme
+            .filter((ph) => (hotelsAutreSelection[ph.hotel.id] ?? "none") !== "none")
+            .map((ph) => {
+              const roomIdStr = Object.keys(selectedPlacesAutre[ph.hotel.id] || {})[0];
+              return roomIdStr
+                ? { hotelId: ph.hotel.id, roomId: parseInt(roomIdStr), hotelName: ph.hotel.name }
+                : null;
+            })
+            .filter((e): e is { hotelId: number; roomId: number; hotelName: string } => e !== null)
         }),
       });
 
@@ -1869,7 +1787,7 @@ export default function NouvelleReservation() {
         body: JSON.stringify({
           statutPasseport: newUploadedStatus.passport,
           statutVisa: customization.includeVisa ? formData.statutVisa : false,
-          statutHotel: (formData.hotelMadina !== "none" || formData.hotelMakkah !== "none") ? formData.statutHotel : false,
+          statutHotel: (formData.hotelMadina !== "none" || formData.hotelMakkah !== "none" || Object.keys(selectedPlacesAutre).length > 0) ? formData.statutHotel : false,
           statutVol: customization.includeAvion ? formData.statutVol : false
         }),
       });
@@ -1963,7 +1881,12 @@ export default function NouvelleReservation() {
                               hotelMadina: "", // Réinitialiser les hôtels lors du changement de programme
                               hotelMakkah: ""
                             }));
-                            
+                            // Réinitialiser aussi les sélections Madina/Makkah/Autre
+                            setSelectedPlacesMadina({});
+                            setSelectedPlacesMakkah({});
+                            setSelectedPlacesAutre({});
+                            setHotelsAutreSelection({});
+
                             console.log('✅ FormData mis à jour avec programId:', selectedProgram?.id.toString());
                           }}
                         >
@@ -2191,308 +2114,94 @@ export default function NouvelleReservation() {
 
                   {/* Choix des hôtels */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {/* Hôtel à Madina */}
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-lg">🕌</span>
-                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina *</Label>
-                          <button
-                            type="button"
-                            onClick={() => setShowRoomGuide(true)}
-                            className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-colors"
-                            title="Guide des chambres"
-                          >
-                            <Info className="h-4 w-4" />
-                          </button>
-                          {formData.hotelMadina === "none" && (
-                            <span className="text-xs text-red-600 font-medium px-2 py-1 bg-red-50 rounded-full border border-red-200">
-                              Désactivé
-                            </span>
-                          )}
-                        </div>
-                                                <Select
+                      {hotelsMadina.length > 0 && (
+                        <HotelCategoryBlock
+                          labelIcon="🕌"
+                          labelText="Hôtel à Madina"
+                          headerIcon="🕌"
+                          headerText="Chambres disponibles à Madina"
+                          hotels={hotelsMadina}
                           value={formData.hotelMadina}
                           onValueChange={(value) => setFormData(prev => ({ ...prev, hotelMadina: value }))}
-                          disabled={!formData.programId} // Désactiver si aucun programme n'est sélectionné
-                        >
-                          <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
-                            <SelectValue placeholder={formData.programId ? "Sélectionner un hôtel à Madina" : "Sélectionnez d'abord un programme"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Sans hôtel</SelectItem>
-                            {programs
-                              .find(p => p.id === parseInt(formData.programId))
-                              ?.hotelsMadina
-                              ?.map((ph: { hotel: Hotel }) => (
-                                <SelectItem key={ph.hotel.id} value={ph.hotel.id.toString()}>
-                                  {ph.hotel.name}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                        
-                        {/* Chambres disponibles pour Madina */}
-                        {programInfo && programInfo.rooms && formData.hotelMadina && formData.hotelMadina !== "none" && formData.typeChambre && formData.gender && (
-                          <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-xs font-medium text-green-700">🕌 Chambres disponibles à Madina</span>
-                            </div>
-                            <div className="grid gap-2">
-                              {(() => {
-                                // Filtrer les rooms selon le type et l'hôtel, incluant les rooms Mixte
-                                const filteredRooms = programInfo.rooms.filter(room => 
-                                  room.hotelId === parseInt(formData.hotelMadina) && 
-                                  room.roomType === formData.typeChambre && 
-                                  (room.gender === formData.gender || room.gender === 'Mixte' || !room.gender)
-                                );
-                                
-                                if (filteredRooms.length === 0) {
-                                  return (
-                                    <div className="text-xs text-gray-500 text-center py-2">
-                                      Aucune chambre trouvée
-                                    </div>
-                                  );
-                                }
-                                
-                                // Trier les rooms selon l'algorithme spécifié
-                                const sortedRooms = sortRoomsByAlgorithm(filteredRooms, formData.gender);
-                                
-                                return sortedRooms.map((room, index) => {
-                                  const placesOccupees = room.nbrPlaceTotal - room.nbrPlaceRestantes;
-                                  const placesDisponibles = room.nbrPlaceRestantes;
-                                  const isSelected = Object.keys(selectedPlacesMadina).includes(room.id.toString());
-                                  
-                                  // Déterminer l'icône selon le gender
-                                  const getGenderIcon = (gender: string) => {
-                                    switch (gender) {
-                                      case 'Homme': return '👨';
-                                      case 'Femme': return '👩';
-                                      case 'Mixte': return '👥';
-                                      default: return '👥';
-                                    }
-                                  };
-                                  
-                                  return (
-                                    <div 
-                                      key={index} 
-                                      className={`relative p-2 rounded border transition-all cursor-pointer ${
-                                        isSelected 
-                                          ? 'border-yellow-400 bg-yellow-50' 
-                                          : 'border-gray-300 bg-white hover:border-blue-300'
-                                      }`}
-                                      onClick={() => {
-                                        if (room.nbrPlaceRestantes > 0) {
-                                          const firstAvailablePlace = getFirstAvailablePlace(room);
-                                          setSelectedPlacesMadina({ [room.id]: [firstAvailablePlace] });
-                                        }
-                                      }}
-                                    >
-                                      {/* Disposition optimisée : ratio à gauche, points centrés, choix à droite */}
-                                      <div className="flex items-center">
-                                        {/* Ratio à gauche */}
-                                        <div className="flex items-center gap-2 w-20">
-                                          <span className="text-sm">{getGenderIcon(room.gender)}</span>
-                                          <span className="text-xs font-medium text-gray-700">
-                                            ({placesDisponibles}/{room.nbrPlaceTotal})
-                                          </span>
-                                        </div>
-                                        
-                                        {/* Points des places centrés absolument */}
-                                        <div className="flex-1 flex justify-center">
-                                          <div className="flex gap-1.5">
-                                            {Array.from({ length: room.nbrPlaceTotal }, (_, placeIndex) => {
-                                              let placeColor = 'bg-gray-300';
-                                              let placeTitle = `Place ${placeIndex + 1}`;
-                                              
-                                              if (placeIndex < placesOccupees) {
-                                                placeColor = 'bg-red-500';
-                                                placeTitle = `Place ${placeIndex + 1} occupée`;
-                                              } else if (isSelected && selectedPlacesMadina[room.id]?.includes(placeIndex)) {
-                                                placeColor = 'bg-yellow-400';
-                                                placeTitle = `Place ${placeIndex + 1} - Votre réservation`;
-                                              } else {
-                                                placeColor = 'bg-green-500';
-                                                placeTitle = `Place ${placeIndex + 1} libre`;
-                                              }
-                                              
-                                              return (
-                                                <div
-                                                  key={placeIndex}
-                                                  className={`w-4 h-4 rounded-full ${placeColor} transition-all`}
-                                                  title={placeTitle}
-                                                />
-                                              );
-                                            })}
-                                          </div>
-                                        </div>
-                                        
-                                        {/* Point de choix à droite */}
-                                        <div className="w-8 flex justify-end">
-                                          {isSelected && (
-                                            <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                });
-                              })()}
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                          disabled={!formData.programId}
+                          rooms={programInfo?.rooms || []}
+                          roomType={formData.typeChambre}
+                          gender={formData.gender}
+                          selectedPlaces={selectedPlacesMadina}
+                          onSelectRoom={(roomId, place) => setSelectedPlacesMadina({ [roomId]: [place] })}
+                          sortRoomsByAlgorithm={sortRoomsByAlgorithm}
+                          getFirstAvailablePlace={getFirstAvailablePlace}
+                          onShowGuide={() => setShowRoomGuide(true)}
+                          hoverBorderClass="hover:border-blue-300"
+                          placeholderText="Sélectionner un hôtel à Madina"
+                        />
+                      )}
 
-                                            {/* Hôtel à Makkah */}
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-lg">🕋</span>
-                          <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah *</Label>
-                          <button
-                            type="button"
-                            onClick={() => setShowRoomGuide(true)}
-                            className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-colors"
-                            title="Guide des chambres"
-                          >
-                            <Info className="h-4 w-4" />
-                          </button>
-                          {formData.hotelMakkah === "none" && (
-                            <span className="text-xs text-red-600 font-medium px-2 py-1 bg-red-50 rounded-full border border-red-200">
-                              Désactivé
-                            </span>
-                          )}
-                        </div>
-                                                <Select
+                      {hotelsMakkah.length > 0 && (
+                        <HotelCategoryBlock
+                          labelIcon="🕋"
+                          labelText="Hôtel à Makkah"
+                          headerIcon="🕋"
+                          headerText="Chambres disponibles à Makkah"
+                          hotels={hotelsMakkah}
                           value={formData.hotelMakkah}
                           onValueChange={(value) => setFormData(prev => ({ ...prev, hotelMakkah: value }))}
-                          disabled={!formData.programId} // Désactiver si aucun programme n'est sélectionné
-                        >
-                          <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
-                            <SelectValue placeholder={formData.programId ? "Sélectionner un hôtel à Makkah" : "Sélectionnez d'abord un programme"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Sans hôtel</SelectItem>
-                            {programs
-                              .find(p => p.id === parseInt(formData.programId))
-                              ?.hotelsMakkah
-                              ?.map((ph: { hotel: Hotel }) => (
-                                <SelectItem key={ph.hotel.id} value={ph.hotel.id.toString()}>
-                                  {ph.hotel.name}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                        
-                        {/* Chambres disponibles pour Makkah */}
-                        {programInfo && programInfo.rooms && formData.hotelMakkah && formData.hotelMakkah !== "none" && formData.typeChambre && formData.gender && (
-                          <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-xs font-medium text-green-700">🕋 Chambres disponibles à Makkah</span>
-                            </div>
-                            <div className="grid gap-2">
-                              {(() => {
-                                // Filtrer les rooms selon le type et l'hôtel, incluant les rooms Mixte
-                                const filteredRooms = programInfo.rooms.filter(room => 
-                                  room.hotelId === parseInt(formData.hotelMakkah) && 
-                                  room.roomType === formData.typeChambre && 
-                                  (room.gender === formData.gender || room.gender === 'Mixte' || !room.gender)
-                                );
-                                
-                                if (filteredRooms.length === 0) {
-                                  return (
-                                    <div className="text-xs text-gray-500 text-center py-2">
-                                      Aucune chambre trouvée
-                                    </div>
-                                  );
-                                }
-                                
-                                // Trier les rooms selon l'algorithme spécifié
-                                const sortedRooms = sortRoomsByAlgorithm(filteredRooms, formData.gender);
-                                
-                                return sortedRooms.map((room, index) => {
-                                  const placesOccupees = room.nbrPlaceTotal - room.nbrPlaceRestantes;
-                                  const placesDisponibles = room.nbrPlaceRestantes;
-                                  const isSelected = Object.keys(selectedPlacesMakkah).includes(room.id.toString());
-                                  
-                                  // Déterminer l'icône selon le gender
-                                  const getGenderIcon = (gender: string) => {
-                                    switch (gender) {
-                                      case 'Homme': return '👨';
-                                      case 'Femme': return '👩';
-                                      case 'Mixte': return '👥';
-                                      default: return '👥';
-                                    }
-                                  };
-                                  
-                                  return (
-                                    <div 
-                                      key={index} 
-                                      className={`relative p-2 rounded border transition-all cursor-pointer ${
-                                        isSelected 
-                                          ? 'border-yellow-400 bg-yellow-50' 
-                                          : 'border-gray-300 bg-white hover:border-green-300'
-                                      }`}
-                                      onClick={() => {
-                                        if (room.nbrPlaceRestantes > 0) {
-                                          const firstAvailablePlace = getFirstAvailablePlace(room);
-                                          setSelectedPlacesMakkah({ [room.id]: [firstAvailablePlace] });
-                                        }
-                                      }}
-                                    >
-                                      {/* Disposition optimisée : ratio à gauche, points centrés, choix à droite */}
-                                      <div className="flex items-center">
-                                        {/* Ratio à gauche */}
-                                        <div className="flex items-center gap-2 w-20">
-                                          <span className="text-sm">{getGenderIcon(room.gender)}</span>
-                                          <span className="text-xs font-medium text-gray-700">
-                                            ({placesDisponibles}/{room.nbrPlaceTotal})
-                                          </span>
-                                        </div>
-                                        
-                                        {/* Points des places centrés absolument */}
-                                        <div className="flex-1 flex justify-center">
-                                          <div className="flex gap-1.5">
-                                            {Array.from({ length: room.nbrPlaceTotal }, (_, placeIndex) => {
-                                              let placeColor = 'bg-gray-300';
-                                              let placeTitle = `Place ${placeIndex + 1}`;
-                                              
-                                              if (placeIndex < placesOccupees) {
-                                                placeColor = 'bg-red-500';
-                                                placeTitle = `Place ${placeIndex + 1} occupée`;
-                                              } else if (isSelected && selectedPlacesMakkah[room.id]?.includes(placeIndex)) {
-                                                placeColor = 'bg-yellow-400';
-                                                placeTitle = `Place ${placeIndex + 1} - Votre réservation`;
-                                              } else {
-                                                placeColor = 'bg-green-500';
-                                                placeTitle = `Place ${placeIndex + 1} libre`;
-                                              }
-                                              
-                                              return (
-                                                <div
-                                                  key={placeIndex}
-                                                  className={`w-4 h-4 rounded-full ${placeColor} transition-all`}
-                                                  title={placeTitle}
-                                                />
-                                              );
-                                            })}
-                                          </div>
-                                        </div>
-                                        
-                                        {/* Point de choix à droite */}
-                                        <div className="w-8 flex justify-end">
-                                          {isSelected && (
-                                            <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                });
-                              })()}
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                          disabled={!formData.programId}
+                          rooms={programInfo?.rooms || []}
+                          roomType={formData.typeChambre}
+                          gender={formData.gender}
+                          selectedPlaces={selectedPlacesMakkah}
+                          onSelectRoom={(roomId, place) => setSelectedPlacesMakkah({ [roomId]: [place] })}
+                          sortRoomsByAlgorithm={sortRoomsByAlgorithm}
+                          getFirstAvailablePlace={getFirstAvailablePlace}
+                          onShowGuide={() => setShowRoomGuide(true)}
+                          hoverBorderClass="hover:border-green-300"
+                          placeholderText="Sélectionner un hôtel à Makkah"
+                        />
+                      )}
                     </div>
+
+                    {/* Hôtels Autre (N hôtels génériques, optionnels) */}
+                    {hotelsAutreProgramme.length > 0 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        {hotelsAutreProgramme.map((ph) => {
+                          const hotelId = ph.hotel.id;
+                          const value = hotelsAutreSelection[hotelId] ?? "none";
+                          return (
+                            <HotelCategoryBlock
+                              key={hotelId}
+                              labelIcon="🏨"
+                              labelText={ph.hotel.name}
+                              headerIcon="🏨"
+                              headerText={`Chambres disponibles — ${ph.hotel.name}`}
+                              hotels={[ph.hotel]}
+                              value={value}
+                              onValueChange={(v) => {
+                                setHotelsAutreSelection(prev => ({ ...prev, [hotelId]: v }));
+                                if (v === "none") {
+                                  setSelectedPlacesAutre(prev => {
+                                    const next = { ...prev };
+                                    delete next[hotelId];
+                                    return next;
+                                  });
+                                }
+                              }}
+                              disabled={!formData.programId}
+                              rooms={programInfo?.rooms || []}
+                              roomType={formData.typeChambre}
+                              gender={formData.gender}
+                              selectedPlaces={selectedPlacesAutre[hotelId] || {}}
+                              onSelectRoom={(roomId, place) => setSelectedPlacesAutre(prev => ({ ...prev, [hotelId]: { [roomId]: [place] } }))}
+                              sortRoomsByAlgorithm={sortRoomsByAlgorithm}
+                              getFirstAvailablePlace={getFirstAvailablePlace}
+                              onShowGuide={() => setShowRoomGuide(true)}
+                              hoverBorderClass="hover:border-green-300"
+                              placeholderText={`Sélectionner ${ph.hotel.name}`}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
 

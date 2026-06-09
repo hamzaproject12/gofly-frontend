@@ -57,6 +57,7 @@ interface Program {
   name: string;
   hotelsMadina: Array<{ hotel: Hotel }>;
   hotelsMakkah: Array<{ hotel: Hotel }>;
+  hotelsAutre?: Array<{ hotel: Hotel; nbJours: number; ordre: number }>;
 }
 
 type RoomRow = {
@@ -176,6 +177,8 @@ export default function NouvelleChambrePage() {
 
   const [roomMadinaId, setRoomMadinaId] = useState("");
   const [roomMakkahId, setRoomMakkahId] = useState("");
+  // Hôtels Autre : id de chambre sélectionnée par hôtel (optionnel)
+  const [roomAutreIds, setRoomAutreIds] = useState<{ [hotelId: number]: string }>({});
 
   const [occupants, setOccupants] = useState<Occupant[]>([]);
   const [occupantPassportFiles, setOccupantPassportFiles] = useState<
@@ -233,6 +236,9 @@ export default function NouvelleChambrePage() {
     programmeSelectionne?.hotelsMadina?.map((ph) => ph.hotel) || [];
   const hotelsMakkah =
     programmeSelectionne?.hotelsMakkah?.map((ph) => ph.hotel) || [];
+  const hotelsAutreProgramme = [...(programmeSelectionne?.hotelsAutre || [])].sort(
+    (a, b) => a.ordre - b.ordre
+  );
 
   useEffect(() => {
     const load = async () => {
@@ -383,24 +389,11 @@ export default function NouvelleChambrePage() {
   ]);
 
   const calculatePrice = useMemo(() => {
-    if (
-      !programInfo ||
-      !formData.typeChambre ||
-      !formData.hotelMadina ||
-      !formData.hotelMakkah ||
-      !roomMadinaId ||
-      !roomMakkahId
-    ) {
+    // Garde-fou assoupli : seuls programme + type sont requis. Chaque catégorie
+    // d'hôtel (Madina / Makkah / Autre) est optionnelle.
+    if (!programInfo || !formData.typeChambre) {
       return 0;
     }
-
-    const roomMadina = programInfo.rooms.find(
-      (r) => r.id === Number(roomMadinaId)
-    );
-    const roomMakkah = programInfo.rooms.find(
-      (r) => r.id === Number(roomMakkahId)
-    );
-    if (!roomMadina || !roomMakkah) return 0;
 
     const roomType = formData.typeChambre;
     const nbPersonnes =
@@ -411,6 +404,13 @@ export default function NouvelleChambrePage() {
         QUAD: 4,
         QUINT: 5,
       }[roomType] || 1;
+
+    const roomMadina = roomMadinaId
+      ? programInfo.rooms.find((r) => r.id === Number(roomMadinaId))
+      : null;
+    const roomMakkah = roomMakkahId
+      ? programInfo.rooms.find((r) => r.id === Number(roomMakkahId))
+      : null;
 
     const getProfitByPlan = () => {
       switch (customization.plan) {
@@ -427,21 +427,30 @@ export default function NouvelleChambrePage() {
     const prixVisa = customization.includeVisa ? programInfo.prixVisaRiyal : 0;
     const profit = getProfitByPlan();
 
-    const prixRoomMadina = roomMadina.prixRoom || 0;
-    const prixRoomMakkah = roomMakkah.prixRoom || 0;
-    // Même logique que "Nouvelle Réservation" (coût unitaire), puis x capacité chambre
+    // Coût unitaire (par personne) par catégorie, 0 si non sélectionnée
     const prixHotelMadinaUnitaire =
-      formData.hotelMadina !== "none"
-        ? (prixRoomMadina / nbPersonnes) * customization.joursMadina
+      roomMadina && formData.hotelMadina !== "none"
+        ? ((roomMadina.prixRoom || 0) / nbPersonnes) * customization.joursMadina
         : 0;
     const prixHotelMakkahUnitaire =
-      formData.hotelMakkah !== "none"
-        ? (prixRoomMakkah / nbPersonnes) * customization.joursMakkah
+      roomMakkah && formData.hotelMakkah !== "none"
+        ? ((roomMakkah.prixRoom || 0) / nbPersonnes) * customization.joursMakkah
         : 0;
+
+    // Hôtels Autre : Σ (prixRoom / nbPersonnes) * nbJours(hôtel) pour chaque room sélectionnée
+    let prixHotelAutreUnitaire = 0;
+    for (const ph of hotelsAutreProgramme) {
+      const roomIdStr = roomAutreIds[ph.hotel.id];
+      if (!roomIdStr) continue;
+      const room = programInfo.rooms.find((r) => r.id === Number(roomIdStr));
+      if (!room) continue;
+      prixHotelAutreUnitaire += ((room.prixRoom || 0) / nbPersonnes) * (ph.nbJours || 0);
+    }
+
     const prixUnitaire =
       prixAvion +
       profit +
-      (prixVisa + prixHotelMakkahUnitaire + prixHotelMadinaUnitaire) *
+      (prixVisa + prixHotelMakkahUnitaire + prixHotelMadinaUnitaire + prixHotelAutreUnitaire) *
         programInfo.exchange;
     const prixFinal = prixUnitaire * nbPersonnes;
 
@@ -453,6 +462,8 @@ export default function NouvelleChambrePage() {
     formData.hotelMakkah,
     roomMadinaId,
     roomMakkahId,
+    roomAutreIds,
+    programmeSelectionne,
     customization,
   ]);
 
@@ -929,14 +940,14 @@ export default function NouvelleChambrePage() {
     occupantPassportFiles.every(Boolean);
 
   /** Configuration voyage + prix + identités minimales (sans exiger passeports ni pièces jointes) */
+  // Au moins une room (Madina, Makkah OU Autre) doit être sélectionnée
+  const hasAnyRoomSelected =
+    !!roomMadinaId || !!roomMakkahId || Object.values(roomAutreIds).some(Boolean);
   const canSubmit =
     !!formData.programId &&
     !!formData.typeChambre &&
     capacity >= 2 &&
-    !!formData.hotelMadina &&
-    !!formData.hotelMakkah &&
-    !!roomMadinaId &&
-    !!roomMakkahId &&
+    hasAnyRoomSelected &&
     prixGenere &&
     identitiesMinimumOk;
   const propositionInvalid =
@@ -951,10 +962,7 @@ export default function NouvelleChambrePage() {
     if (!formData.programId) reasons.push("Le programme n'est pas sélectionné");
     if (!formData.typeChambre) reasons.push("Le type de chambre n'est pas sélectionné");
     else if (capacity < 2) reasons.push("Le type de chambre doit comporter au moins 2 personnes");
-    if (!formData.hotelMadina) reasons.push("L'hôtel de Médine n'est pas sélectionné");
-    if (!formData.hotelMakkah) reasons.push("L'hôtel de La Mecque n'est pas sélectionné");
-    if (!roomMadinaId) reasons.push("La chambre de Médine n'est pas sélectionnée");
-    if (!roomMakkahId) reasons.push("La chambre de La Mecque n'est pas sélectionnée");
+    if (!hasAnyRoomSelected) reasons.push("Sélectionnez au moins une chambre (Madina, Makkah ou Autre)");
     if (!prixGenere) reasons.push("Le prix n'est pas généré");
 
     // Identités des occupants
@@ -1060,6 +1068,15 @@ export default function NouvelleChambrePage() {
       const isPaid = roomPrice > 0 && roomPaid >= roomPrice;
       const reservationStatus = allDocsAttached && isPaid ? "Complet" : "Incomplet";
 
+      // Snapshot des hôtels Autre sélectionnés : [{ hotelId, roomId, hotelName }]
+      const autreSnapshot = hotelsAutreProgramme
+        .filter((ph) => !!roomAutreIds[ph.hotel.id])
+        .map((ph) => ({
+          hotelId: ph.hotel.id,
+          roomId: Number(roomAutreIds[ph.hotel.id]),
+          hotelName: ph.hotel.name,
+        }));
+
       const leaderOccupants = occupants.map((o, i) => {
         return {
           ...o,
@@ -1078,8 +1095,9 @@ export default function NouvelleChambrePage() {
             typeReservation: "CHAMBRE_PRIVEE",
             familyMixed,
             roomType: formData.typeChambre,
-            roomMadinaId: Number(roomMadinaId),
-            roomMakkahId: Number(roomMakkahId),
+            roomMadinaId: roomMadinaId ? Number(roomMadinaId) : null,
+            roomMakkahId: roomMakkahId ? Number(roomMakkahId) : null,
+            roomAutreIds: autreSnapshot.map((e) => e.roomId),
             reservationDate: formData.dateReservation,
             leaderPrice: Number(formData.prix),
             leaderPaidAmount: Number(paidAmount || totalPayments || 0),
@@ -1088,6 +1106,7 @@ export default function NouvelleChambrePage() {
               programId: Number(formData.programId),
               hotelMadina: hotelNameMadina,
               hotelMakkah: hotelNameMakkah,
+              hotelsAutre: autreSnapshot,
               status: reservationStatus,
               statutPasseport: allPassportFilesProvided,
               statutVisa: supplierStatus.statutVisa,
@@ -1379,6 +1398,7 @@ export default function NouvelleChambrePage() {
                           }));
                           setRoomMadinaId("");
                           setRoomMakkahId("");
+                          setRoomAutreIds({});
                         }}
                       >
                         <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
@@ -1404,6 +1424,7 @@ export default function NouvelleChambrePage() {
                           setFormData((prev) => ({ ...prev, typeChambre: v }));
                           setRoomMadinaId("");
                           setRoomMakkahId("");
+                          setRoomAutreIds({});
                         }}
                       >
                         <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
@@ -1459,9 +1480,10 @@ export default function NouvelleChambrePage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    {hotelsMadina.length > 0 && (
                     <div className="space-y-2">
                       <Label className="text-blue-700 font-medium text-sm">
-                        Hôtel à Madina *
+                        Hôtel à Madina
                       </Label>
                       <Select
                         value={formData.hotelMadina}
@@ -1489,10 +1511,12 @@ export default function NouvelleChambrePage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    )}
 
+                    {hotelsMakkah.length > 0 && (
                     <div className="space-y-2">
                       <Label className="text-blue-700 font-medium text-sm">
-                        Hôtel à Makkah *
+                        Hôtel à Makkah
                       </Label>
                       <Select
                         value={formData.hotelMakkah}
@@ -1520,6 +1544,7 @@ export default function NouvelleChambrePage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    )}
 
                   </div>
 
@@ -1607,6 +1632,7 @@ export default function NouvelleChambrePage() {
 
                   {formData.programId && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    {hotelsMadina.length > 0 && (
                     <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
                       <div className="flex items-center gap-2 mb-2">
                         <Info className="h-4 w-4 text-green-700" />
@@ -1661,6 +1687,8 @@ export default function NouvelleChambrePage() {
                         ))}
                       </div>
                     </div>
+                    )}
+                    {hotelsMakkah.length > 0 && (
                     <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
                       <div className="flex items-center gap-2 mb-2">
                         <Info className="h-4 w-4 text-green-700" />
@@ -1715,6 +1743,82 @@ export default function NouvelleChambrePage() {
                         ))}
                       </div>
                     </div>
+                    )}
+                    {hotelsAutreProgramme.map((ph) => {
+                      const hotelId = ph.hotel.id;
+                      const candidates = (programInfo?.rooms || [])
+                        .filter((room) => {
+                          if (room.hotelId !== hotelId || room.roomType !== formData.typeChambre) return false;
+                          if (room.nbrPlaceRestantes !== room.nbrPlaceTotal) return false;
+                          if (familyMixed) return true;
+                          return room.gender === formData.gender || room.gender === "Mixte";
+                        })
+                        .sort((a, b) => a.id - b.id);
+                      return (
+                        <div key={hotelId} className="mt-2 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Info className="h-4 w-4 text-emerald-700" />
+                            <span className="text-xs font-medium text-emerald-700">
+                              {ph.hotel.name} — chambres disponibles (libres uniquement)
+                            </span>
+                          </div>
+                          <div className="grid gap-2">
+                            {candidates.length === 0 ? (
+                              <div className="text-xs text-gray-500 text-center py-2">Aucune chambre libre</div>
+                            ) : (
+                              candidates.map((room) => {
+                                const selected = roomAutreIds[hotelId] === String(room.id);
+                                return (
+                                  <div
+                                    key={room.id}
+                                    className={`p-2 rounded border cursor-pointer transition-all ${
+                                      selected
+                                        ? "border-yellow-400 bg-yellow-50"
+                                        : "border-gray-300 bg-white hover:border-emerald-300"
+                                    }`}
+                                    onClick={() =>
+                                      setRoomAutreIds((prev) => {
+                                        const next = { ...prev };
+                                        if (next[hotelId] === String(room.id)) delete next[hotelId];
+                                        else next[hotelId] = String(room.id);
+                                        return next;
+                                      })
+                                    }
+                                  >
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="text-xs font-medium">
+                                        Room #{room.id} - {room.gender}
+                                      </span>
+                                      <span className="text-xs text-gray-600">
+                                        ({room.nbrPlaceRestantes}/{room.nbrPlaceTotal})
+                                      </span>
+                                    </div>
+                                    <div className="flex gap-1.5">
+                                      {Array.from({ length: room.nbrPlaceTotal }, (_, idx) => {
+                                        const placesOccupees = room.nbrPlaceTotal - room.nbrPlaceRestantes;
+                                        const litReserve =
+                                          selected && idx >= placesOccupees && idx < placesOccupees + capacity;
+                                        let placeColor = "bg-gray-300";
+                                        if (idx < placesOccupees) placeColor = "bg-red-500";
+                                        else if (litReserve) placeColor = "bg-yellow-400";
+                                        else placeColor = "bg-green-500";
+                                        return (
+                                          <div
+                                            key={idx}
+                                            className={`w-4 h-4 rounded-full ${placeColor}`}
+                                            title={`Place ${idx + 1}`}
+                                          />
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                     </div>
                   )}
                 </div>

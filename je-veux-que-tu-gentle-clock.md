@@ -22,7 +22,7 @@
 ## 📍 État d'avancement (Claude Code MET À JOUR cette section après CHAQUE étape)
 
 - **Branche** : `feat/hotels-autre`
-- **Dernier commit** : `9925f78` — NB jours Madina/Makkah déplacés dans leurs onglets + requis seulement si la catégorie a des hôtels. Avant : `7c3f06e` (onglets), merge `735fdbb` (Phases 1-3, prod), `88d5c36`, `90815c7`.
+- **Dernier commit** : `7bcb183` — NB jours inline dans l'en-tête d'onglet ; Autre sans champ « ordre » (ordre = ordre d'ajout) + nb nuits obligatoire ; simulation rentabilité adaptée aux catégories présentes (Madina/Makkah/Autre). Avant : `9925f78`, `7c3f06e` (onglets), merge `735fdbb` (Phases 1-3, prod).
 - **Note prod** : tout est mergé sur **main** au fil de l'eau (préférence utilisateur « always use main ») → chaque merge redéclenche Vercel/Railway. Schéma DB inchangé depuis Phase 1.
 - **Fait** : Phase 1 ✅ · Phase 2 ✅ (vérifié runtime API) · Phase 3 ✅ COMPLÈTE — création (`nouvelle`, `nouvelle-chambre`, `programmes/nouveau` [onglets], `hotels`) + `modifier/[id]`, `modifier-chambre/[id]`, `modifier-simple/[id]`, détail `[id]`. Toutes compilent + rendent (HTTP 200). **Click-through navigateur reste à confirmer par l'utilisateur.**
 - **Prochaine étape** : confirmer au navigateur (scénarios Phase 5 + UX onglets) → re-merger `feat/hotels-autre` sur main → Phase 4 (reporting : export, balance, analytics, reçu)

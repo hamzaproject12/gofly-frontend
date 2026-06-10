@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
 import ExcelJS from 'exceljs';
 import { authenticateToken } from '../middleware/auth';
+import { parseHotelsAutre } from '../services/hotelsAutreService';
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -189,6 +190,7 @@ const HEADERS = [
   'N° passport',
   'Hotel Makkah',
   'Hotel medina',
+  'Autres hôtels',
   'Chambre',
   'Image passport',
   'Image CIN',
@@ -273,14 +275,19 @@ router.get(
 
       const leaders = leadersRaw;
 
-      // Resolve hotel IDs → names
+      // Resolve hotel IDs → names (Madina/Makkah + hôtels Autre snapshotés en JSON)
       const hotelIdSet = new Set<number>();
+      const collectAutreIds = (json: unknown) => {
+        for (const e of parseHotelsAutre(json)) hotelIdSet.add(e.hotelId);
+      };
       for (const r of leaders) {
         if (r.hotelMadina) { const n = parseInt(r.hotelMadina, 10); if (!isNaN(n)) hotelIdSet.add(n); }
         if (r.hotelMakkah) { const n = parseInt(r.hotelMakkah, 10); if (!isNaN(n)) hotelIdSet.add(n); }
+        collectAutreIds(r.hotelsAutre);
         for (const acc of r.accompagnants || []) {
           if (acc.hotelMadina) { const n = parseInt(acc.hotelMadina, 10); if (!isNaN(n)) hotelIdSet.add(n); }
           if (acc.hotelMakkah) { const n = parseInt(acc.hotelMakkah, 10); if (!isNaN(n)) hotelIdSet.add(n); }
+          collectAutreIds(acc.hotelsAutre);
         }
       }
       const hotelRows = hotelIdSet.size > 0
@@ -291,6 +298,12 @@ router.get(
         if (!id) return '';
         return hotelMap.get(id) || id;
       };
+      // Liste des hôtels Autre d'une personne, en noms (snapshot, sinon résolu par id)
+      const autreHotelsLabel = (json: unknown): string =>
+        parseHotelsAutre(json)
+          .map((e) => e.hotelName || hotelMap.get(String(e.hotelId)) || '')
+          .filter(Boolean)
+          .join(', ');
 
       const workbook = new ExcelJS.Workbook();
       workbook.creator = 'Omra Travel';
@@ -373,6 +386,7 @@ router.get(
             const nomComplet = `${person.firstName || ''} ${person.lastName || ''}`.trim();
             const hk = resolveHotel(person.hotelMakkah) || resolveHotel(leader.hotelMakkah);
             const hm = resolveHotel(person.hotelMadina) || resolveHotel(leader.hotelMadina);
+            const autres = autreHotelsLabel(person.hotelsAutre) || autreHotelsLabel(leader.hotelsAutre);
 
             sheet.addRow([
               idx,
@@ -383,6 +397,7 @@ router.get(
               person.passportNumber || '',
               hk,
               hm,
+              autres,
               chambre,
               passportUrl(docs as any),
               cinUrl(docs as any),

@@ -1,5 +1,6 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
+import { parseHotelsAutre } from '../services/hotelsAutreService';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -405,31 +406,61 @@ router.get('/charts/hotels', async (req, res) => {
     // Filtre par programme
     const programFilter = programme && programme !== 'tous' ? { name: programme as string } : undefined;
 
-    // Récupérer les réservations avec les hôtels
+    // Récupérer les réservations avec les hôtels (Madina/Makkah + Autre en JSON)
     const reservations = await prisma.reservation.findMany({
       where: {
-        ...(programFilter && { 
-          program: programFilter 
+        ...(programFilter && {
+          program: programFilter
         })
       },
       select: {
         hotelMadina: true,
-        hotelMakkah: true
+        hotelMakkah: true,
+        hotelsAutre: true
       }
     });
 
-    // Compter les personnes par hôtel
+    // Certaines réservations stockent l'id de l'hôtel (legacy), d'autres son nom.
+    // On résout d'abord tous les ids → noms pour agréger par NOM (évite les
+    // doublons "12" / "Hotel X").
+    const asHotelId = (value: string | null | undefined): number | null => {
+      if (!value) return null;
+      const trimmed = value.trim();
+      const n = parseInt(trimmed, 10);
+      return Number.isInteger(n) && String(n) === trimmed ? n : null;
+    };
+
+    const hotelIdSet = new Set<number>();
+    const autreByReservation = reservations.map((r) => parseHotelsAutre(r.hotelsAutre));
+    reservations.forEach((r, i) => {
+      const im = asHotelId(r.hotelMadina); if (im) hotelIdSet.add(im);
+      const ik = asHotelId(r.hotelMakkah); if (ik) hotelIdSet.add(ik);
+      for (const e of autreByReservation[i]) hotelIdSet.add(e.hotelId);
+    });
+
+    const hotelRows = hotelIdSet.size > 0
+      ? await prisma.hotel.findMany({ where: { id: { in: [...hotelIdSet] } } })
+      : [];
+    const nameByHotelId = new Map<number, string>(hotelRows.map((h) => [h.id, h.name]));
+
+    const resolveHotelName = (value: string | null | undefined): string | null => {
+      if (!value) return null;
+      const id = asHotelId(value);
+      return id != null ? (nameByHotelId.get(id) || value) : value;
+    };
+
+    // Compter les personnes par hôtel (Madina, Makkah, et chaque hôtel Autre)
     const hotelStats: { [key: string]: number } = {};
-    
-    reservations.forEach(reservation => {
-      // Hôtel à Madina
-      if (reservation.hotelMadina && reservation.hotelMadina !== 'Sans hôtel') {
-        hotelStats[reservation.hotelMadina] = (hotelStats[reservation.hotelMadina] || 0) + 1;
-      }
-      
-      // Hôtel à Makkah
-      if (reservation.hotelMakkah && reservation.hotelMakkah !== 'Sans hôtel') {
-        hotelStats[reservation.hotelMakkah] = (hotelStats[reservation.hotelMakkah] || 0) + 1;
+    const bump = (name: string | null | undefined) => {
+      if (!name || name === 'Sans hôtel') return;
+      hotelStats[name] = (hotelStats[name] || 0) + 1;
+    };
+
+    reservations.forEach((reservation, i) => {
+      bump(resolveHotelName(reservation.hotelMadina));
+      bump(resolveHotelName(reservation.hotelMakkah));
+      for (const e of autreByReservation[i]) {
+        bump(e.hotelName || nameByHotelId.get(e.hotelId) || null);
       }
     });
 

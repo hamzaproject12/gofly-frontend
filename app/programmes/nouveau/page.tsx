@@ -426,8 +426,9 @@ export default function NouveauProgramme() {
   const validateRequiredFields = useMemo(() => {
     const reasons: string[] = []
     if (!formData.nom.trim()) reasons.push("Le nom du programme est obligatoire.")
-    if (!formData.nbJoursMadina.trim()) reasons.push("NB jours Madina est obligatoire.")
-    if (!formData.nbJoursMakkah.trim()) reasons.push("NB jours Makkah est obligatoire.")
+    // NB jours requis uniquement si la catégorie contient au moins un hôtel
+    if (formData.hotelsMadina.length > 0 && !formData.nbJoursMadina.trim()) reasons.push("NB jours Madina est obligatoire.")
+    if (formData.hotelsMakkah.length > 0 && !formData.nbJoursMakkah.trim()) reasons.push("NB jours Makkah est obligatoire.")
     if (!formData.exchange.trim()) reasons.push("Exchange est obligatoire.")
     if (!formData.prixAvion.trim()) reasons.push("Prix avion est obligatoire.")
     if (!formData.prixVisaRiyal.trim()) reasons.push("Prix visa est obligatoire.")
@@ -1331,36 +1332,9 @@ export default function NouveauProgramme() {
                       Détails financiers et durée
                     </h3>
                     
-                    {/* Grille principale pour les champs standards */}
+                    {/* Grille principale pour les champs standards.
+                        (NB Jours Madina/Makkah ont été déplacés dans leurs onglets respectifs ci-dessous.) */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="nbJoursMadina" className="text-green-700 font-medium flex items-center gap-2">
-                          <MapPin className="h-4 w-4" />
-                          NB Jours Madina *
-                        </Label>
-                        <Input
-                          id="nbJoursMadina"
-                          type="number"
-                          value={formData.nbJoursMadina}
-                          onChange={(e) => setFormData({ ...formData, nbJoursMadina: e.target.value })}
-                          placeholder="Ex: 4"
-                          className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="nbJoursMakkah" className="text-green-700 font-medium flex items-center gap-2">
-                          <MapPin className="h-4 w-4" />
-                          NB Jours Makkah *
-                        </Label>
-                        <Input
-                          id="nbJoursMakkah"
-                          type="number"
-                          value={formData.nbJoursMakkah}
-                          onChange={(e) => setFormData({ ...formData, nbJoursMakkah: e.target.value })}
-                          placeholder="Ex: 15"
-                          className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
-                        />
-                      </div>
                       <div className="space-y-2">
                         <Label htmlFor="exchange" className="text-green-700 font-medium flex items-center gap-2">
                           <DollarSign className="h-4 w-4" />
@@ -1481,6 +1455,20 @@ export default function NouveauProgramme() {
                         <div className="text-xs md:text-sm font-semibold text-yellow-900 bg-yellow-200/70 px-3 py-1.5 rounded-full">
                           {madinaBedsCount} lits Madina / {makkahBedsCount} lits Makkah
                         </div>
+                      </div>
+                      <div className="mb-4 max-w-xs">
+                        <Label htmlFor="nbJoursMadina" className="text-yellow-800 font-medium flex items-center gap-2 mb-1">
+                          <MapPin className="h-4 w-4" />
+                          NB Jours Madina{formData.hotelsMadina.length > 0 ? " *" : ""}
+                        </Label>
+                        <Input
+                          id="nbJoursMadina"
+                          type="number"
+                          value={formData.nbJoursMadina}
+                          onChange={(e) => setFormData({ ...formData, nbJoursMadina: e.target.value })}
+                          placeholder="Ex: 4"
+                          className="h-11 border-2 border-yellow-200 focus:border-yellow-500 rounded-lg bg-white/80"
+                        />
                       </div>
                       <div className="flex flex-col gap-4">
                         {hotelsMadina.length === 0 ? (
@@ -1661,6 +1649,20 @@ export default function NouveauProgramme() {
                         <div className="text-xs md:text-sm font-semibold text-blue-900 bg-blue-200/70 px-3 py-1.5 rounded-full">
                           {makkahBedsCount} lits Makkah / {madinaBedsCount} lits Madina
                         </div>
+                      </div>
+                      <div className="mb-4 max-w-xs">
+                        <Label htmlFor="nbJoursMakkah" className="text-blue-800 font-medium flex items-center gap-2 mb-1">
+                          <MapPin className="h-4 w-4" />
+                          NB Jours Makkah{formData.hotelsMakkah.length > 0 ? " *" : ""}
+                        </Label>
+                        <Input
+                          id="nbJoursMakkah"
+                          type="number"
+                          value={formData.nbJoursMakkah}
+                          onChange={(e) => setFormData({ ...formData, nbJoursMakkah: e.target.value })}
+                          placeholder="Ex: 15"
+                          className="h-11 border-2 border-blue-200 focus:border-blue-500 rounded-lg bg-white/80"
+                        />
                       </div>
 
                       <div className="space-y-3">

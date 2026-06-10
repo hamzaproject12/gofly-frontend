@@ -492,6 +492,7 @@ export default function NouveauProgramme() {
 
   const madinaBedsCount = useMemo(() => totalBedsByCity(formData.hotelsMadina), [formData.hotelsMadina])
   const makkahBedsCount = useMemo(() => totalBedsByCity(formData.hotelsMakkah), [formData.hotelsMakkah])
+  const autreBedsCount = useMemo(() => totalBedsByCity(formData.hotelsAutre), [formData.hotelsAutre])
 
   const simulationPreview = useMemo(() => {
     const exchange = parseNum(formData.exchange, 1) || 1
@@ -1485,13 +1486,13 @@ export default function NouveauProgramme() {
                   <Tabs value={activeHotelTab} onValueChange={(v) => setActiveHotelTab(v as "madina" | "makkah" | "autre")} className="mb-6">
                     <TabsList className="grid w-full grid-cols-3 h-auto">
                       <TabsTrigger value="madina" className="data-[state=active]:bg-yellow-100 data-[state=active]:text-yellow-900">
-                        🕌 Madina{formData.hotelsMadina.length > 0 ? ` (${formData.hotelsMadina.length})` : ""}
+                        🕌 Madina <span className="ml-1 font-semibold">[{madinaBedsCount}]</span>
                       </TabsTrigger>
                       <TabsTrigger value="makkah" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">
-                        🕋 Makkah{formData.hotelsMakkah.length > 0 ? ` (${formData.hotelsMakkah.length})` : ""}
+                        🕋 Makkah <span className="ml-1 font-semibold">[{makkahBedsCount}]</span>
                       </TabsTrigger>
                       <TabsTrigger value="autre" className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-900">
-                        🏨 Autre{formData.hotelsAutre.length > 0 ? ` (${formData.hotelsAutre.length})` : ""}
+                        🏨 Autre <span className="ml-1 font-semibold">[{autreBedsCount}]</span>
                       </TabsTrigger>
                     </TabsList>
 
@@ -1518,7 +1519,7 @@ export default function NouveauProgramme() {
                           />
                         </div>
                         <div className="text-xs md:text-sm font-semibold text-yellow-900 bg-yellow-200/70 px-3 py-1.5 rounded-full">
-                          {madinaBedsCount} lits Madina / {makkahBedsCount} lits Makkah
+                          {madinaBedsCount} lits
                         </div>
                       </div>
                       <div className="flex flex-col gap-4">
@@ -1712,7 +1713,7 @@ export default function NouveauProgramme() {
                           />
                         </div>
                         <div className="text-xs md:text-sm font-semibold text-blue-900 bg-blue-200/70 px-3 py-1.5 rounded-full">
-                          {makkahBedsCount} lits Makkah / {madinaBedsCount} lits Madina
+                          {makkahBedsCount} lits
                         </div>
                       </div>
 
@@ -1897,6 +1898,9 @@ export default function NouveauProgramme() {
                           <MapPin className="h-5 w-5" />
                           Hôtels Autre
                         </h3>
+                        <div className="text-xs md:text-sm font-semibold text-emerald-900 bg-emerald-200/70 px-3 py-1.5 rounded-full">
+                          {autreBedsCount} lits
+                        </div>
                       </div>
                       <div className="flex flex-col gap-4">
                         {hotelsAutreList.length === 0 ? (

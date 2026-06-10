@@ -40,6 +40,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import Link from "next/link"
@@ -316,6 +317,8 @@ export default function NouveauProgramme() {
   // Catégorie « Autre » (N hôtels génériques)
   const [autreHotelAutre, setAutreHotelAutre] = useState("");
   const [showAutreAutreInput, setShowAutreAutreInput] = useState(false);
+  // Onglet de catégorie d'hôtel actif (Madina / Makkah / Autre)
+  const [activeHotelTab, setActiveHotelTab] = useState<"madina" | "makkah" | "autre">("madina");
 
   /** Hypothèses pour la simulation (même logique de prix que « Nouvelle réservation ») */
   const [simIncludeAvion, setSimIncludeAvion] = useState(true)
@@ -1453,10 +1456,23 @@ export default function NouveauProgramme() {
                     </div>
                   </div>
 
-                  {/* Hôtels - Layout en 2 colonnes */}
-                  <div className="flex flex-col gap-6 mb-6">
+                  {/* Hôtels — sélection par catégorie via onglets (Madina / Makkah / Autre) */}
+                  <Tabs value={activeHotelTab} onValueChange={(v) => setActiveHotelTab(v as "madina" | "makkah" | "autre")} className="mb-6">
+                    <TabsList className="grid w-full grid-cols-3 h-auto">
+                      <TabsTrigger value="madina" className="data-[state=active]:bg-yellow-100 data-[state=active]:text-yellow-900">
+                        🕌 Madina{formData.hotelsMadina.length > 0 ? ` (${formData.hotelsMadina.length})` : ""}
+                      </TabsTrigger>
+                      <TabsTrigger value="makkah" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">
+                        🕋 Makkah{formData.hotelsMakkah.length > 0 ? ` (${formData.hotelsMakkah.length})` : ""}
+                      </TabsTrigger>
+                      <TabsTrigger value="autre" className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-900">
+                        🏨 Autre{formData.hotelsAutre.length > 0 ? ` (${formData.hotelsAutre.length})` : ""}
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="madina">
                     {/* Hôtels à Madina */}
-                    <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-xl border border-yellow-200 mb-6 w-full">
+                    <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-xl border border-yellow-200 w-full">
                       <div className="mb-4 flex items-center justify-between gap-4">
                         <h3 className="text-lg font-semibold text-yellow-800 flex items-center gap-2">
                           <MapPin className="h-5 w-5" />
@@ -1632,7 +1648,9 @@ export default function NouveauProgramme() {
                         </div>
                       </div>
                     </div>
+                    </TabsContent>
 
+                    <TabsContent value="makkah">
                     {/* Hôtels à Makkah */}
                     <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
                       <div className="mb-4 flex items-center justify-between gap-4">
@@ -1816,9 +1834,11 @@ export default function NouveauProgramme() {
                         </div>
                       </div>
                     </div>
+                    </TabsContent>
 
+                    <TabsContent value="autre">
                     {/* Hôtels Autre (N hôtels génériques : ex. Turquie → ville X → ville Y) */}
-                    <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-xl border border-emerald-200 mt-6">
+                    <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-xl border border-emerald-200">
                       <div className="mb-4 flex items-center justify-between gap-4">
                         <h3 className="text-lg font-semibold text-emerald-800 flex items-center gap-2">
                           <MapPin className="h-5 w-5" />
@@ -2008,7 +2028,8 @@ export default function NouveauProgramme() {
                         </div>
                       </div>
                     </div>
-                  </div>
+                    </TabsContent>
+                  </Tabs>
 
                   {/* Simulation : après infos de base, financier et hôtels — champs désactivés tant que les prérequis ne sont pas remplis */}
                   <div

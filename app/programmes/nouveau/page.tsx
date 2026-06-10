@@ -204,6 +204,8 @@ function unitTicketPriceDh(params: {
   joursMakkah: number
   includeAvion: boolean
   includeVisa: boolean
+  /** Coût hôtels « Autre » déjà par voyageur (Σ prixRoom/nbPersonnes × nuits), en Riyal */
+  prixHotelAutreRiyalPerTraveler?: number
 }): number {
   const nbPersonnes = params.roomTypeKey
   const p = profitForPlan(
@@ -223,7 +225,8 @@ function unitTicketPriceDh(params: {
     params.prixRoomMakkahRiyal > 0 && nbPersonnes > 0
       ? (params.prixRoomMakkahRiyal / nbPersonnes) * params.joursMakkah
       : 0
-  const riyalTotal = prixVisa + prixHotelMadina + prixHotelMakkah
+  const riyalTotal =
+    prixVisa + prixHotelMadina + prixHotelMakkah + (params.prixHotelAutreRiyalPerTraveler ?? 0)
   const prixFinal = prixAvion + p + riyalTotal * params.exchange
   return Math.round(prixFinal)
 }
@@ -243,6 +246,8 @@ function unitAgencyCostTravelerDh(params: {
   joursMakkah: number
   includeAvion: boolean
   includeVisa: boolean
+  /** Coût hôtels « Autre » déjà par voyageur (Σ prixRoom/nbPersonnes × nuits), en Riyal */
+  prixHotelAutreRiyalPerTraveler?: number
 }): number {
   const nbPersonnes = params.roomTypeKey
   const prixAvion = params.includeAvion ? params.prixAvionDH : 0
@@ -255,7 +260,8 @@ function unitAgencyCostTravelerDh(params: {
     params.prixRoomMakkahRiyal > 0 && nbPersonnes > 0
       ? (params.prixRoomMakkahRiyal / nbPersonnes) * params.joursMakkah
       : 0
-  const riyalTotal = prixVisa + prixHotelMadina + prixHotelMakkah
+  const riyalTotal =
+    prixVisa + prixHotelMadina + prixHotelMakkah + (params.prixHotelAutreRiyalPerTraveler ?? 0)
   return Math.round(prixAvion + riyalTotal * params.exchange)
 }
 
@@ -469,6 +475,10 @@ export default function NouveauProgramme() {
     }
 
     for (const hotel of formData.hotelsAutre) {
+      // Nb de nuits obligatoire dès qu'un hôtel Autre est sélectionné (comme Madina/Makkah)
+      if (!String(hotel.nbJours ?? "").trim() || Number(hotel.nbJours) <= 0) {
+        reasons.push(`Nb de nuits pour l'hôtel Autre "${hotel.name}" est obligatoire.`)
+      }
       if (!hasAtLeastOneFullyPricedRoom(hotel)) {
         reasons.push(`Hotel Autre "${hotel.name}" doit contenir au moins 1 chambre avec prix.`)
       }
@@ -511,12 +521,33 @@ export default function NouveauProgramme() {
 
     const labels = ["", "Simple", "Double", "Triple", "Quadruple", "Quintuple"]
 
+    const hasMadina = formData.hotelsMadina.length > 0
+    const hasMakkah = formData.hotelsMakkah.length > 0
+    const hasAutre = formData.hotelsAutre.length > 0
+
     for (let t = 1; t <= 5; t++) {
       const pm = weightedAvgRoomPriceRiyal(formData.hotelsMadina, t)
       const pk = weightedAvgRoomPriceRiyal(formData.hotelsMakkah, t)
       const madinaPlacesT = placesByType(formData.hotelsMadina, t)
       const makkahPlacesT = placesByType(formData.hotelsMakkah, t)
-      const paired = Math.min(madinaPlacesT, makkahPlacesT)
+
+      // Hôtels « Autre » : séquence (le voyageur loge dans chacun) →
+      // capacité = min sur les hôtels Autre ; coût = somme par voyageur (Riyal).
+      let autrePlacesT = Infinity
+      let autreRiyalPerTraveler = 0
+      for (const h of formData.hotelsAutre) {
+        autrePlacesT = Math.min(autrePlacesT, placesByType([h], t))
+        const priceH = weightedAvgRoomPriceRiyal([h], t)
+        const nights = parseNum(h.nbJours, 0)
+        if (priceH > 0 && t > 0) autreRiyalPerTraveler += (priceH / t) * nights
+      }
+
+      // Goulot d'étranglement = min des places parmi les catégories PRÉSENTES
+      const presentPlaces: number[] = []
+      if (hasMadina) presentPlaces.push(madinaPlacesT)
+      if (hasMakkah) presentPlaces.push(makkahPlacesT)
+      if (hasAutre) presentPlaces.push(autrePlacesT === Infinity ? 0 : autrePlacesT)
+      const paired = presentPlaces.length > 0 ? Math.min(...presentPlaces) : 0
       if (paired <= 0) continue
 
       const unitDh = unitTicketPriceDh({
@@ -535,6 +566,7 @@ export default function NouveauProgramme() {
         joursMakkah: jK,
         includeAvion: simIncludeAvion,
         includeVisa: simIncludeVisa,
+        prixHotelAutreRiyalPerTraveler: autreRiyalPerTraveler,
       })
       const subtotalDh = paired * unitDh
       const nbPersonnes = t
@@ -542,7 +574,8 @@ export default function NouveauProgramme() {
       const unitCostVisaDh = simIncludeVisa ? prixVisaRiyal * exchange : 0
       const unitCostHotelsDh =
         ((pm > 0 && nbPersonnes > 0 ? (pm / nbPersonnes) * jM : 0) +
-          (pk > 0 && nbPersonnes > 0 ? (pk / nbPersonnes) * jK : 0)) *
+          (pk > 0 && nbPersonnes > 0 ? (pk / nbPersonnes) * jK : 0) +
+          autreRiyalPerTraveler) *
         exchange
       const unitCostDh = unitAgencyCostTravelerDh({
         exchange,
@@ -555,6 +588,7 @@ export default function NouveauProgramme() {
         joursMakkah: jK,
         includeAvion: simIncludeAvion,
         includeVisa: simIncludeVisa,
+        prixHotelAutreRiyalPerTraveler: autreRiyalPerTraveler,
       })
       costVolAllTravelersDh += paired * unitCostVolDh
       costHotelsAllTravelersDh += paired * unitCostHotelsDh
@@ -617,6 +651,7 @@ export default function NouveauProgramme() {
     formData.nbJoursMakkah,
     formData.hotelsMadina,
     formData.hotelsMakkah,
+    formData.hotelsAutre,
     simIncludeAvion,
     simIncludeVisa,
     simPlan,
@@ -630,13 +665,28 @@ export default function NouveauProgramme() {
   const canRunSimulation = useMemo(() => {
     if (!formData.nom.trim()) return false
     if (!String(formData.exchange).trim()) return false
-    if (!String(formData.nbJoursMadina).trim()) return false
-    if (!String(formData.nbJoursMakkah).trim()) return false
     if (!String(formData.prixAvion).trim()) return false
     if (!String(formData.prixVisaRiyal).trim()) return false
-    if (formData.hotelsMadina.length === 0 || formData.hotelsMakkah.length === 0) return false
-    if (!hasHotelInventoryConfigured(formData.hotelsMadina)) return false
-    if (!hasHotelInventoryConfigured(formData.hotelsMakkah)) return false
+
+    const hasMadina = formData.hotelsMadina.length > 0
+    const hasMakkah = formData.hotelsMakkah.length > 0
+    const hasAutre = formData.hotelsAutre.length > 0
+    // Au moins une catégorie présente (la simulation s'adapte aux hôtels choisis)
+    if (!hasMadina && !hasMakkah && !hasAutre) return false
+
+    if (hasMadina) {
+      if (!String(formData.nbJoursMadina).trim()) return false
+      if (!hasHotelInventoryConfigured(formData.hotelsMadina)) return false
+    }
+    if (hasMakkah) {
+      if (!String(formData.nbJoursMakkah).trim()) return false
+      if (!hasHotelInventoryConfigured(formData.hotelsMakkah)) return false
+    }
+    if (hasAutre) {
+      if (!hasHotelInventoryConfigured(formData.hotelsAutre)) return false
+      // chaque hôtel Autre doit avoir un nb de nuits valide
+      if (formData.hotelsAutre.some(h => !String(h.nbJours ?? "").trim() || Number(h.nbJours) <= 0)) return false
+    }
     return true
   }, [
     formData.nom,
@@ -647,6 +697,7 @@ export default function NouveauProgramme() {
     formData.prixVisaRiyal,
     formData.hotelsMadina,
     formData.hotelsMakkah,
+    formData.hotelsAutre,
   ])
 
   const downloadSimulationReport = useCallback(async () => {
@@ -1447,28 +1498,28 @@ export default function NouveauProgramme() {
                     <TabsContent value="madina">
                     {/* Hôtels à Madina */}
                     <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-xl border border-yellow-200 w-full">
-                      <div className="mb-4 flex items-center justify-between gap-4">
+                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                         <h3 className="text-lg font-semibold text-yellow-800 flex items-center gap-2">
                           <MapPin className="h-5 w-5" />
                           Hôtels à Madina
                         </h3>
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="nbJoursMadina" className="text-yellow-800 font-medium text-sm whitespace-nowrap">
+                            NB Jours Madina{formData.hotelsMadina.length > 0 ? " *" : ""}
+                          </Label>
+                          <Input
+                            id="nbJoursMadina"
+                            type="number"
+                            min="0"
+                            value={formData.nbJoursMadina}
+                            onChange={(e) => setFormData({ ...formData, nbJoursMadina: e.target.value })}
+                            placeholder="Ex: 4"
+                            className="h-9 w-20 text-center border-2 border-yellow-200 focus:border-yellow-500 rounded-lg bg-white/80"
+                          />
+                        </div>
                         <div className="text-xs md:text-sm font-semibold text-yellow-900 bg-yellow-200/70 px-3 py-1.5 rounded-full">
                           {madinaBedsCount} lits Madina / {makkahBedsCount} lits Makkah
                         </div>
-                      </div>
-                      <div className="mb-4 max-w-xs">
-                        <Label htmlFor="nbJoursMadina" className="text-yellow-800 font-medium flex items-center gap-2 mb-1">
-                          <MapPin className="h-4 w-4" />
-                          NB Jours Madina{formData.hotelsMadina.length > 0 ? " *" : ""}
-                        </Label>
-                        <Input
-                          id="nbJoursMadina"
-                          type="number"
-                          value={formData.nbJoursMadina}
-                          onChange={(e) => setFormData({ ...formData, nbJoursMadina: e.target.value })}
-                          placeholder="Ex: 4"
-                          className="h-11 border-2 border-yellow-200 focus:border-yellow-500 rounded-lg bg-white/80"
-                        />
                       </div>
                       <div className="flex flex-col gap-4">
                         {hotelsMadina.length === 0 ? (
@@ -1641,28 +1692,28 @@ export default function NouveauProgramme() {
                     <TabsContent value="makkah">
                     {/* Hôtels à Makkah */}
                     <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
-                      <div className="mb-4 flex items-center justify-between gap-4">
+                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                         <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
                           <MapPin className="h-5 w-5" />
                           Hôtels à Makkah
                         </h3>
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="nbJoursMakkah" className="text-blue-800 font-medium text-sm whitespace-nowrap">
+                            NB Jours Makkah{formData.hotelsMakkah.length > 0 ? " *" : ""}
+                          </Label>
+                          <Input
+                            id="nbJoursMakkah"
+                            type="number"
+                            min="0"
+                            value={formData.nbJoursMakkah}
+                            onChange={(e) => setFormData({ ...formData, nbJoursMakkah: e.target.value })}
+                            placeholder="Ex: 15"
+                            className="h-9 w-20 text-center border-2 border-blue-200 focus:border-blue-500 rounded-lg bg-white/80"
+                          />
+                        </div>
                         <div className="text-xs md:text-sm font-semibold text-blue-900 bg-blue-200/70 px-3 py-1.5 rounded-full">
                           {makkahBedsCount} lits Makkah / {madinaBedsCount} lits Madina
                         </div>
-                      </div>
-                      <div className="mb-4 max-w-xs">
-                        <Label htmlFor="nbJoursMakkah" className="text-blue-800 font-medium flex items-center gap-2 mb-1">
-                          <MapPin className="h-4 w-4" />
-                          NB Jours Makkah{formData.hotelsMakkah.length > 0 ? " *" : ""}
-                        </Label>
-                        <Input
-                          id="nbJoursMakkah"
-                          type="number"
-                          value={formData.nbJoursMakkah}
-                          onChange={(e) => setFormData({ ...formData, nbJoursMakkah: e.target.value })}
-                          placeholder="Ex: 15"
-                          className="h-11 border-2 border-blue-200 focus:border-blue-500 rounded-lg bg-white/80"
-                        />
                       </div>
 
                       <div className="space-y-3">
@@ -1869,29 +1920,16 @@ export default function NouveauProgramme() {
                                 </label>
                                 {selected && (
                                   <>
-                                    <div className="mt-3 grid grid-cols-2 gap-3 max-w-md">
-                                      <div>
-                                        <div className="text-xs text-emerald-700 mb-1 font-semibold">Nb de nuits</div>
-                                        <Input
-                                          type="number"
-                                          min="0"
-                                          placeholder="0"
-                                          value={current?.nbJours || ""}
-                                          onChange={e => handleAutreFieldChange(hotel.name, 'nbJours', e.target.value)}
-                                          className="h-9 w-full text-center border-emerald-300 focus:border-emerald-500 text-sm"
-                                        />
-                                      </div>
-                                      <div>
-                                        <div className="text-xs text-emerald-700 mb-1 font-semibold">Ordre</div>
-                                        <Input
-                                          type="number"
-                                          min="0"
-                                          placeholder="0"
-                                          value={current?.ordre || ""}
-                                          onChange={e => handleAutreFieldChange(hotel.name, 'ordre', e.target.value)}
-                                          className="h-9 w-full text-center border-emerald-300 focus:border-emerald-500 text-sm"
-                                        />
-                                      </div>
+                                    <div className="mt-3 max-w-xs">
+                                      <div className="text-xs text-emerald-700 mb-1 font-semibold">Nb de nuits *</div>
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        placeholder="Ex: 3"
+                                        value={current?.nbJours || ""}
+                                        onChange={e => handleAutreFieldChange(hotel.name, 'nbJours', e.target.value)}
+                                        className="h-9 w-full text-center border-emerald-300 focus:border-emerald-500 text-sm"
+                                      />
                                     </div>
                                     <div className="mt-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                                       {[1,2,3,4,5].map(type => (

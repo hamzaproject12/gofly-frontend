@@ -22,8 +22,8 @@
 ## 📍 État d'avancement (Claude Code MET À JOUR cette section après CHAQUE étape)
 
 - **Branche** : `feat/hotels-autre`
-- **Dernier commit** : `7c3f06e` — UX `/programmes/nouveau` : hôtels Madina/Makkah/Autre regroupés en onglets. Avant : merge `735fdbb` sur **main** (poussé en prod) ; `88d5c36` fin Phase 3 ; `90815c7` Phases 1-3 création.
-- **Note prod** : `main` a reçu les Phases 1-3 (merge `735fdbb`, poussé → déploiements Vercel/Railway). Le commit UX `7c3f06e` est pour l'instant **uniquement sur `feat/hotels-autre`** (pas encore re-mergé sur main).
+- **Dernier commit** : `9925f78` — NB jours Madina/Makkah déplacés dans leurs onglets + requis seulement si la catégorie a des hôtels. Avant : `7c3f06e` (onglets), merge `735fdbb` (Phases 1-3, prod), `88d5c36`, `90815c7`.
+- **Note prod** : tout est mergé sur **main** au fil de l'eau (préférence utilisateur « always use main ») → chaque merge redéclenche Vercel/Railway. Schéma DB inchangé depuis Phase 1.
 - **Fait** : Phase 1 ✅ · Phase 2 ✅ (vérifié runtime API) · Phase 3 ✅ COMPLÈTE — création (`nouvelle`, `nouvelle-chambre`, `programmes/nouveau` [onglets], `hotels`) + `modifier/[id]`, `modifier-chambre/[id]`, `modifier-simple/[id]`, détail `[id]`. Toutes compilent + rendent (HTTP 200). **Click-through navigateur reste à confirmer par l'utilisateur.**
 - **Prochaine étape** : confirmer au navigateur (scénarios Phase 5 + UX onglets) → re-merger `feat/hotels-autre` sur main → Phase 4 (reporting : export, balance, analytics, reçu)
 - **Reste après ça** : Phase 4 (reporting) — voir Phase 4 du plan

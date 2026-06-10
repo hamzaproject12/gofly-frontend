@@ -240,6 +240,15 @@ export default function NouvelleChambrePage() {
     (a, b) => a.ordre - b.ordre
   );
 
+  // Disposition des blocs hôtels : Madina = 1 bloc, Makkah = 1 bloc, chaque Autre = 1 bloc.
+  // 1 hôtel → pleine largeur, 2 → côte à côte, 3+ → max 3 par ligne (les suivants passent à la ligne).
+  const hotelBlockCount =
+    (hotelsMadina.length > 0 ? 1 : 0) +
+    (hotelsMakkah.length > 0 ? 1 : 0) +
+    hotelsAutreProgramme.length;
+  const hotelGridColsClass =
+    hotelBlockCount >= 3 ? "md:grid-cols-3" : hotelBlockCount === 2 ? "md:grid-cols-2" : "md:grid-cols-1";
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -1631,7 +1640,7 @@ export default function NouvelleChambrePage() {
                   )}
 
                   {formData.programId && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <div className={`grid grid-cols-1 ${hotelGridColsClass} gap-4 mt-2`}>
                     {hotelsMadina.length > 0 && (
                     <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
                       <div className="flex items-center gap-2 mb-2">

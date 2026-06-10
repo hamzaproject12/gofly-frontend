@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/components/ui/use-toast"
 import { usePathname, useRouter } from "next/navigation"
+import { useUnsavedChangesOptional } from "@/app/components/UnsavedChangesProvider"
 import {
   CalendarIcon,
   Plus,
@@ -269,6 +270,7 @@ export default function NouveauProgramme() {
   const { toast } = useToast()
   const router = useRouter()
   const pathname = usePathname()
+  const unsavedChanges = useUnsavedChangesOptional()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [hotelsMadina, setHotelsMadina] = useState<Hotel[]>([])
   const [hotelsMakkah, setHotelsMakkah] = useState<Hotel[]>([])
@@ -1293,6 +1295,11 @@ export default function NouveauProgramme() {
         title: 'Succès',
         description: 'Le programme a été créé avec succès',
       })
+
+      // Enregistrement réussi : on neutralise le garde-fou « modifications non
+      // enregistrées » (local + provider global) pour que la redirection ne
+      // déclenche pas l'alerte navigateur « Changes you made may not be saved ».
+      unsavedChanges?.clearDirty()
 
       // Redirection fiable vers le dashboard. On garde `isSubmitting` à true
       // (bouton désactivé) pendant la navigation pour éviter qu'un second clic

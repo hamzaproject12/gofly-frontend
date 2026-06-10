@@ -438,6 +438,15 @@ export default function NouvelleReservation() {
   // Hôtels Autre du programme, triés par ordre d'affichage (séquence Turquie→X→Y)
   const hotelsAutreProgramme = [...(programmeSelectionne?.hotelsAutre || [])].sort((a, b) => a.ordre - b.ordre);
 
+  // Disposition des blocs hôtels : Madina = 1 bloc, Makkah = 1 bloc, chaque Autre = 1 bloc.
+  // 1 hôtel → pleine largeur, 2 → côte à côte, 3+ → max 3 par ligne (les suivants passent à la ligne).
+  const hotelBlockCount =
+    (hotelsMadina.length > 0 ? 1 : 0) +
+    (hotelsMakkah.length > 0 ? 1 : 0) +
+    hotelsAutreProgramme.length;
+  const hotelGridColsClass =
+    hotelBlockCount >= 3 ? "md:grid-cols-3" : hotelBlockCount === 2 ? "md:grid-cols-2" : "md:grid-cols-1";
+
   // Fonction pour calculer le prix automatiquement
   const calculatePrice = useMemo(() => {
     // Garde-fou assoupli : seules les bases (programme, type, genre) sont requises.
@@ -2112,8 +2121,8 @@ export default function NouvelleReservation() {
                     </div>
                   )}
 
-                  {/* Choix des hôtels */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Choix des hôtels — grille unique adaptative (max 3 par ligne) */}
+                    <div className={`grid grid-cols-1 ${hotelGridColsClass} gap-4`}>
                       {hotelsMadina.length > 0 && (
                         <HotelCategoryBlock
                           labelIcon="🕌"
@@ -2159,12 +2168,9 @@ export default function NouvelleReservation() {
                           placeholderText="Sélectionner un hôtel à Makkah"
                         />
                       )}
-                    </div>
 
-                    {/* Hôtels Autre (N hôtels génériques, optionnels) */}
-                    {hotelsAutreProgramme.length > 0 && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                        {hotelsAutreProgramme.map((ph) => {
+                      {/* Hôtels Autre (N hôtels génériques, optionnels) — même grille */}
+                      {hotelsAutreProgramme.map((ph) => {
                           const hotelId = ph.hotel.id;
                           const value = hotelsAutreSelection[hotelId] ?? "none";
                           return (
@@ -2200,8 +2206,7 @@ export default function NouvelleReservation() {
                             />
                           );
                         })}
-                      </div>
-                    )}
+                    </div>
                   </div>
 
 

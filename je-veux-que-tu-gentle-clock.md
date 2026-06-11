@@ -21,14 +21,13 @@
 
 ## 📍 État d'avancement (Claude Code MET À JOUR cette section après CHAQUE étape)
 
-- **Branche** : `feat/hotels-autre`
-- **Dernier commit** : `4d69dfa` — compteur de lits par catégorie sur les 3 onglets (🕌 Madina [N] | 🕋 Makkah [N] | 🏨 Autre [N]) + badge in-tab simplifié. Avant : `7bcb183` (NB jours inline + simulation Autre), `9925f78`, `7c3f06e` (onglets), merge `735fdbb` (Phases 1-3, prod).
-- **Note prod** : tout est mergé sur **main** au fil de l'eau (préférence utilisateur « always use main ») → chaque merge redéclenche Vercel/Railway. Schéma DB inchangé depuis Phase 1.
-- **Fait** : Phase 1 ✅ · Phase 2 ✅ (vérifié runtime API) · Phase 3 ✅ COMPLÈTE — création (`nouvelle`, `nouvelle-chambre`, `programmes/nouveau` [onglets], `hotels`) + `modifier/[id]`, `modifier-chambre/[id]`, `modifier-simple/[id]`, détail `[id]`. Toutes compilent + rendent (HTTP 200). **Click-through navigateur reste à confirmer par l'utilisateur.**
-- **Prochaine étape** : confirmer au navigateur (scénarios Phase 5 + UX onglets) → re-merger `feat/hotels-autre` sur main → Phase 4 (reporting : export, balance, analytics, reçu)
-- **Reste après ça** : Phase 4 (reporting) — voir Phase 4 du plan
-- **Repères déjà créés** : helper `parseHotelsAutre` → `backend/src/services/hotelsAutreService.ts` ; `applyRoomBooking` factorisé dans `reservations.ts` ; composant `components/reservations/HotelCategoryBlock.tsx`
-- **Données de test (Railway)** : programme id 36 « TEST M+M+Autre » (Madina+Makkah+2 Autre) ; id 37 « TEST Autre seul » (2 Autre uniquement) ; hôtels Autre « Hotel Istanbul TEST », « Hotel Le Caire TEST » ; réservation id 167 (LIT sur prog 36 avec 1 hôtel Autre) pour tester pages modifier*/détail
+- **Branche** : `main` (tout est mergé ; `feat/hotels-autre` synchronisée au même point)
+- **Dernier commit** : `67c1d15` — Phase 4 reporting : colonne « Autres hôtels » dans l'export Excel + fix agrégation id→nom dans `balance.ts /charts/hotels` (+ inclusion des hôtels Autre). Avant : `79a1334` (anti-alerte beforeunload à l'enregistrement programme + grille hôtels adaptative réservations), `88d5c36` (affichage Autre sur modifier*/détail — fin Phase 3), `4d69dfa` (compteur de lits par onglet), `7bcb183`, merge `735fdbb` (Phases 1-3, prod).
+- **Note prod** : tout est mergé sur **main** au fil de l'eau (préférence utilisateur « always use main ») → chaque merge redéclenche Vercel/Railway. Schéma DB inchangé depuis Phase 1. Backend `tsc --noEmit` → exit 0.
+- **Fait** : Phase 1 ✅ · Phase 2 ✅ (vérifié runtime API) · Phase 3 ✅ COMPLÈTE — création (`nouvelle`, `nouvelle-chambre`, `programmes/nouveau` [onglets], `hotels`) + `modifier/[id]`, `modifier-chambre/[id]`, `modifier-simple/[id]`, détail `[id]` (tous lisent `reservation.hotelsAutre` et rendent un bloc « 🏨 Hôtel Autre ») · **Phase 4 ✅** — `export.ts` (colonne « Autres hôtels », leader + accompagnants) et `balance.ts /charts/hotels` (fix id→nom + Autre). `analytics/dashboard` et `generateReceipt` : **aucune section hôtel à étendre** (le reçu n'affiche pas d'hôtel ; l'overview programme déjà géré par `programOverviewService` en Phase 2). **L'IMPLÉMENTATION DES PHASES 1-4 EST TERMINÉE.**
+- **Prochaine étape (reste)** : (1) **validation navigateur** par l'utilisateur — créer un programme M+M+2 Autre et un « Autre seul », faire une réservation LIT + une chambre privée, vérifier prix / décrément des places / non-régression Madina-Makkah ; (2) **nettoyage des données de test** (à NE PAS faire encore — l'utilisateur a besoin des programmes 36/37).
+- **Repères déjà créés** : helper `parseHotelsAutre` → `backend/src/services/hotelsAutreService.ts` (utilisé par `reservations.ts`, `export.ts`, `balance.ts`) ; `applyRoomBooking` factorisé dans `reservations.ts` ; composant `components/reservations/HotelCategoryBlock.tsx`
+- **Données de test (Railway) — NE PAS SUPPRIMER** : programme id 36 « TEST M+M+Autre » (Madina+Makkah+2 Autre) ; id 37 « TEST Autre seul » (2 Autre uniquement) ; hôtels Autre « Hotel Istanbul TEST », « Hotel Le Caire TEST » ; réservation id 167 (LIT sur prog 36 avec 1 hôtel Autre) pour tester pages modifier*/détail
 
 ## Contexte
 

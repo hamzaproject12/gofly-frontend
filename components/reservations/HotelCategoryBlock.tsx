@@ -63,6 +63,13 @@ interface HotelCategoryBlockProps {
   hoverBorderClass?: string;
   /** Placeholder du Select quand un programme est sélectionné */
   placeholderText?: string;
+  /**
+   * Autorise l'option « Sans hôtel » (valeur "none") dans le Select.
+   * Mettre `false` quand la désactivation de l'hôtel se fait ailleurs
+   * (ex. interrupteur du panneau « Éditer »), pour rendre le choix obligatoire.
+   * Défaut: true (compat. existant).
+   */
+  allowNone?: boolean;
 }
 
 const getGenderIcon = (gender: string) => {
@@ -97,6 +104,7 @@ export function HotelCategoryBlock({
   onShowGuide,
   hoverBorderClass = "hover:border-blue-300",
   placeholderText,
+  allowNone = true,
 }: HotelCategoryBlockProps) {
   const showRooms =
     rooms && value && value !== "none" && roomType && gender;
@@ -116,7 +124,7 @@ export function HotelCategoryBlock({
             <Info className="h-4 w-4" />
           </button>
         )}
-        {value === "none" && (
+        {allowNone && value === "none" && (
           <span className="text-xs text-red-600 font-medium px-2 py-1 bg-red-50 rounded-full border border-red-200">
             Désactivé
           </span>
@@ -133,7 +141,7 @@ export function HotelCategoryBlock({
           />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="none">Sans hôtel</SelectItem>
+          {allowNone && <SelectItem value="none">Sans hôtel</SelectItem>}
           {hotels.map((hotel) => (
             <SelectItem key={hotel.id} value={hotel.id.toString()}>
               {hotel.name}

@@ -259,10 +259,16 @@ export default function NouvelleReservation() {
   const [customization, setCustomization] = useState({
     includeAvion: true,
     includeVisa: true,
+    // Activation par catégorie (ON = hôtel obligatoire ; OFF = exclu du prix + non requis).
+    includeMadina: true,
+    includeMakkah: true,
     joursMadina: 0, // Sera initialisé avec les valeurs du programme
     joursMakkah: 0, // Sera initialisé avec les valeurs du programme
     plan: "Normal" // Plan par défaut: Économique, Normal, VIP
   });
+  // Hôtels « Autre » : activation (ON par défaut = obligatoire) + durée éditable par hôtel.
+  const [autreActive, setAutreActive] = useState<{ [hotelId: number]: boolean }>({});
+  const [autreJours, setAutreJours] = useState<{ [hotelId: number]: number }>({});
 
   // Dynamic Theme Engine - Configuration des thèmes pour chaque plan
   const planThemes = useMemo(() => ({
@@ -438,14 +444,34 @@ export default function NouvelleReservation() {
   // Hôtels Autre du programme, triés par ordre d'affichage (séquence Turquie→X→Y)
   const hotelsAutreProgramme = [...(programmeSelectionne?.hotelsAutre || [])].sort((a, b) => a.ordre - b.ordre);
 
+  // Blocs hôtels réellement affichés (catégorie présente ET activée via le panneau « Éditer »).
+  const showMadinaBlock = hotelsMadina.length > 0 && customization.includeMadina;
+  const showMakkahBlock = hotelsMakkah.length > 0 && customization.includeMakkah;
+  const hotelsAutreActifs = hotelsAutreProgramme.filter((ph) => autreActive[ph.hotel.id] !== false);
+
   // Disposition des blocs hôtels : Madina = 1 bloc, Makkah = 1 bloc, chaque Autre = 1 bloc.
   // 1 hôtel → pleine largeur, 2 → côte à côte, 3+ → max 3 par ligne (les suivants passent à la ligne).
   const hotelBlockCount =
-    (hotelsMadina.length > 0 ? 1 : 0) +
-    (hotelsMakkah.length > 0 ? 1 : 0) +
-    hotelsAutreProgramme.length;
+    (showMadinaBlock ? 1 : 0) +
+    (showMakkahBlock ? 1 : 0) +
+    hotelsAutreActifs.length;
   const hotelGridColsClass =
     hotelBlockCount >= 3 ? "md:grid-cols-3" : hotelBlockCount === 2 ? "md:grid-cols-2" : "md:grid-cols-1";
+
+  // Hôtels actifs (obligatoires) sans chambre sélectionnée → motifs de blocage de l'enregistrement.
+  const hotelsRequisManquants: string[] = [];
+  if (showMadinaBlock && Object.keys(selectedPlacesMadina).length === 0) {
+    hotelsRequisManquants.push("Sélectionnez une chambre pour l'hôtel à Madina");
+  }
+  if (showMakkahBlock && Object.keys(selectedPlacesMakkah).length === 0) {
+    hotelsRequisManquants.push("Sélectionnez une chambre pour l'hôtel à Makkah");
+  }
+  for (const ph of hotelsAutreActifs) {
+    if (Object.keys(selectedPlacesAutre[ph.hotel.id] || {}).length === 0) {
+      hotelsRequisManquants.push(`Sélectionnez une chambre pour l'hôtel « ${ph.hotel.name} »`);
+    }
+  }
+  const hotelsComplets = hotelsRequisManquants.length === 0;
 
   // Fonction pour calculer le prix automatiquement
   const calculatePrice = useMemo(() => {
@@ -459,9 +485,10 @@ export default function NouvelleReservation() {
     const roomType = formData.typeChambre;
     const gender = formData.gender;
 
-    // Une valeur d'hôtel vide ("") ou "none" = catégorie non sélectionnée
-    const hasMadina = !!formData.hotelMadina && formData.hotelMadina !== "none";
-    const hasMakkah = !!formData.hotelMakkah && formData.hotelMakkah !== "none";
+    // Une valeur d'hôtel vide ("") ou "none" = catégorie non sélectionnée.
+    // Une catégorie désactivée (switch OFF du panneau « Éditer ») est exclue du prix.
+    const hasMadina = customization.includeMadina && !!formData.hotelMadina && formData.hotelMadina !== "none";
+    const hasMakkah = customization.includeMakkah && !!formData.hotelMakkah && formData.hotelMakkah !== "none";
 
     // Résoudre la chambre sélectionnée (ou la première compatible) pour une catégorie
     const resolveRoom = (
@@ -534,17 +561,20 @@ export default function NouvelleReservation() {
       ? (roomMakkah.prixRoom / nbPersonnes) * joursUtilisesMakkah
       : 0;
 
-    // Hôtels Autre : Σ (prixRoom / nbPersonnes) * nbJours(hôtel) pour chaque hôtel sélectionné
+    // Hôtels Autre : Σ (prixRoom / nbPersonnes) * nbJours(hôtel) pour chaque hôtel ACTIVÉ sélectionné.
+    // La durée utilisée est celle éditée dans le panneau (autreJours), sinon celle du programme.
     let prixHotelAutre = 0;
-    const hotelsAutreProgramme = programmeSelectionne?.hotelsAutre || [];
-    for (const ph of hotelsAutreProgramme) {
+    const hotelsAutreProgrammePrix = programmeSelectionne?.hotelsAutre || [];
+    for (const ph of hotelsAutreProgrammePrix) {
+      if (autreActive[ph.hotel.id] === false) continue;
       const sel = selectedPlacesAutre[ph.hotel.id];
       if (!sel) continue;
       const roomId = Object.keys(sel)[0];
       if (!roomId) continue;
       const room = programInfo.rooms.find((r) => r.id === parseInt(roomId));
       if (!room) continue;
-      prixHotelAutre += (room.prixRoom / nbPersonnes) * (ph.nbJours || 0);
+      const nuits = autreJours[ph.hotel.id] ?? ph.nbJours ?? 0;
+      prixHotelAutre += (room.prixRoom / nbPersonnes) * nuits;
     }
 
     const prixFinal =
@@ -565,6 +595,8 @@ export default function NouvelleReservation() {
     selectedPlacesAutre,
     programmeSelectionne,
     customization,
+    autreActive,
+    autreJours,
   ]);
 
   // Fonction pour trier les rooms selon l'algorithme spécifié
@@ -720,10 +752,67 @@ export default function NouvelleReservation() {
         ...prev,
         joursMadina: programInfo.nbJoursMadina,
         joursMakkah: programInfo.nbJoursMakkah,
+        // Nouveau programme → toutes les catégories présentes redeviennent obligatoires (ON).
+        includeMadina: true,
+        includeMakkah: true,
         plan: prev.plan || "Normal" // Garder le plan existant ou utiliser "Normal" par défaut
       }));
     }
   }, [programInfo]);
+
+  // Initialiser l'activation (tous ON = obligatoire) et la durée éditable de chaque hôtel Autre,
+  // et pré-sélectionner l'hôtel pour que ses chambres s'affichent (la chambre sera auto-choisie).
+  useEffect(() => {
+    const active: { [hotelId: number]: boolean } = {};
+    const jours: { [hotelId: number]: number } = {};
+    const selection: { [hotelId: number]: string } = {};
+    for (const ph of hotelsAutreProgramme) {
+      active[ph.hotel.id] = true;
+      jours[ph.hotel.id] = ph.nbJours || 0;
+      selection[ph.hotel.id] = ph.hotel.id.toString();
+    }
+    setAutreActive(active);
+    setAutreJours(jours);
+    setHotelsAutreSelection(selection);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.programId]);
+
+  // --- Bascule d'activation par catégorie d'hôtel (panneau « Éditer ») ---
+  // OFF → l'hôtel est exclu du prix et n'est plus obligatoire ; on nettoie sa sélection.
+  // ON  → le bloc réapparaît et la chambre est auto-sélectionnée.
+  const toggleIncludeMadina = (checked: boolean) => {
+    setCustomization(prev => ({ ...prev, includeMadina: checked }));
+    if (!checked) {
+      setFormData(prev => ({ ...prev, hotelMadina: "none" }));
+      setSelectedPlacesMadina({});
+    } else {
+      setFormData(prev => ({ ...prev, hotelMadina: prev.hotelMadina === "none" ? "" : prev.hotelMadina }));
+    }
+  };
+
+  const toggleIncludeMakkah = (checked: boolean) => {
+    setCustomization(prev => ({ ...prev, includeMakkah: checked }));
+    if (!checked) {
+      setFormData(prev => ({ ...prev, hotelMakkah: "none" }));
+      setSelectedPlacesMakkah({});
+    } else {
+      setFormData(prev => ({ ...prev, hotelMakkah: prev.hotelMakkah === "none" ? "" : prev.hotelMakkah }));
+    }
+  };
+
+  const toggleAutreActive = (hotelId: number, checked: boolean) => {
+    setAutreActive(prev => ({ ...prev, [hotelId]: checked }));
+    if (!checked) {
+      setHotelsAutreSelection(prev => ({ ...prev, [hotelId]: "none" }));
+      setSelectedPlacesAutre(prev => {
+        const next = { ...prev };
+        delete next[hotelId];
+        return next;
+      });
+    } else {
+      setHotelsAutreSelection(prev => ({ ...prev, [hotelId]: hotelId.toString() }));
+    }
+  };
 
   // Réinitialiser les statuts quand les services sont désactivés
   useEffect(() => {
@@ -863,8 +952,8 @@ export default function NouvelleReservation() {
       !documents.passport ||
       PASSPORT_REGEX.test((formData.passportNumber || "").trim());
 
-    return baseFieldsValid && passportNumberOk && arePaymentsValid;
-  }, [formData, documents.passport, arePaymentsValid]);
+    return baseFieldsValid && passportNumberOk && arePaymentsValid && hotelsComplets;
+  }, [formData, documents.passport, arePaymentsValid, hotelsComplets]);
 
   // Raisons pour lesquelles la réservation ne peut pas encore être enregistrée
   // (miroir de isFormValid + contrainte du prix proposé).
@@ -882,6 +971,8 @@ export default function NouvelleReservation() {
       reasons.push("Le n° de passeport est invalide (2 lettres + 7 chiffres)");
     }
     if (!arePaymentsValid) reasons.push("Un paiement est incomplet (mode et montant requis)");
+    // Chaque hôtel actif (non désactivé dans « Éditer ») doit avoir une chambre choisie.
+    reasons.push(...hotelsRequisManquants);
     if (prixMode === 'proposition' && prixPropose !== null && prixPropose < calculatePrice) {
       reasons.push("Le prix proposé est inférieur au prix calculé");
     }
@@ -1460,9 +1551,9 @@ export default function NouvelleReservation() {
           // Ajouter les IDs des chambres sélectionnées
           roomMadinaId: Object.keys(selectedPlacesMadina)[0] ? parseInt(Object.keys(selectedPlacesMadina)[0]) : null,
           roomMakkahId: Object.keys(selectedPlacesMakkah)[0] ? parseInt(Object.keys(selectedPlacesMakkah)[0]) : null,
-          // Hôtels Autre sélectionnés : [{ hotelId, roomId, hotelName }]
+          // Hôtels Autre actifs et sélectionnés : [{ hotelId, roomId, hotelName }]
           hotelsAutre: hotelsAutreProgramme
-            .filter((ph) => (hotelsAutreSelection[ph.hotel.id] ?? "none") !== "none")
+            .filter((ph) => autreActive[ph.hotel.id] !== false && (hotelsAutreSelection[ph.hotel.id] ?? "none") !== "none")
             .map((ph) => {
               const roomIdStr = Object.keys(selectedPlacesAutre[ph.hotel.id] || {})[0];
               return roomIdStr
@@ -1705,8 +1796,8 @@ export default function NouvelleReservation() {
         expensesToCreate.push(visaExpense);
       }
 
-      // 3. Expense pour l'hôtel Madina (si sélectionné)
-      if (formData.hotelMadina !== "none" && programInfo) {
+      // 3. Expense pour l'hôtel Madina (si activé et sélectionné)
+      if (customization.includeMadina && formData.hotelMadina !== "none" && programInfo) {
         const roomMadina = programInfo.rooms.find(r => 
           r.hotelId === parseInt(formData.hotelMadina) && 
           r.roomType === formData.typeChambre && 
@@ -1733,8 +1824,8 @@ export default function NouvelleReservation() {
         }
       }
 
-      // 4. Expense pour l'hôtel Makkah (si sélectionné)
-      if (formData.hotelMakkah !== "none" && programInfo) {
+      // 4. Expense pour l'hôtel Makkah (si activé et sélectionné)
+      if (customization.includeMakkah && formData.hotelMakkah !== "none" && programInfo) {
         const roomMakkah = programInfo.rooms.find(r => 
           r.hotelId === parseInt(formData.hotelMakkah) && 
           r.roomType === formData.typeChambre && 
@@ -1758,6 +1849,32 @@ export default function NouvelleReservation() {
             reservationId: reservationId
           };
           expensesToCreate.push(hotelMakkahExpense);
+        }
+      }
+
+      // 5. Expenses pour les hôtels Autre actifs et sélectionnés
+      if (programInfo) {
+        const nbPersonnesAutre = {
+          'SINGLE': 1, 'DOUBLE': 2, 'TRIPLE': 3, 'QUAD': 4, 'QUINT': 5
+        }[formData.typeChambre] || 1;
+        for (const ph of hotelsAutreProgramme) {
+          if (autreActive[ph.hotel.id] === false) continue;
+          const sel = selectedPlacesAutre[ph.hotel.id];
+          const roomIdStr = sel ? Object.keys(sel)[0] : undefined;
+          if (!roomIdStr) continue;
+          const roomAutre = programInfo.rooms.find(r => r.id === parseInt(roomIdStr));
+          if (!roomAutre) continue;
+          const nuits = autreJours[ph.hotel.id] ?? ph.nbJours ?? 0;
+          const montantHotelAutre = (roomAutre.prixRoom / nbPersonnesAutre) * nuits;
+          expensesToCreate.push({
+            description: `Service hôtel ${ph.hotel.name} pour ${formData.prenom} ${formData.nom}`,
+            amount: montantHotelAutre * programInfo.exchange, // Montant en Dirhams (Riyal * exchange)
+            date: new Date().toISOString(),
+            type: 'Hotel Autre',
+            fichierId: fichierIds.hotelBooked || null,
+            programId: parseInt(formData.programId),
+            reservationId: reservationId
+          });
         }
       }
 
@@ -2020,113 +2137,154 @@ export default function NouvelleReservation() {
                     </div>
 
                   {/* Section de personnalisation compacte */}
-                  {isCustomizationOpen && formData.programId && programInfo && (
-                    <div className="mt-4 mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="flex items-center gap-8">
-                        {/* Services inclus */}
-                        <div className="flex items-center gap-6">
-                          <span className="text-sm font-semibold text-blue-700">Services:</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">✈️</span>
-                            <span className="text-sm font-medium text-blue-700">Avion</span>
-                            <Switch
-                              checked={customization.includeAvion}
-                              onCheckedChange={(checked) => 
-                                setCustomization(prev => ({ ...prev, includeAvion: checked }))
-                              }
-                              className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                            />
-                          </div>
-                          
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">📄</span>
-                            <span className="text-sm font-medium text-blue-700">Visa</span>
-                            <Switch
-                              checked={customization.includeVisa}
-                              onCheckedChange={(checked) => 
-                                setCustomization(prev => ({ ...prev, includeVisa: checked }))
-                              }
-                              className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                            />
-                          </div>
+                  {isCustomizationOpen && formData.programId && programInfo && (() => {
+                    // Descripteurs des hôtels du programme : Madina / Makkah (si présents) + chaque Autre.
+                    // active = ON (obligatoire) ; OFF = exclu du prix + non requis. jours = nuits éditables.
+                    const hotelToggles = [
+                      ...(hotelsMadina.length > 0 ? [{
+                        key: "madina",
+                        icon: "🕌",
+                        label: "Madina",
+                        active: customization.includeMadina,
+                        onToggle: toggleIncludeMadina,
+                        jours: customization.joursMadina,
+                        onJours: (v: number) => setCustomization(prev => ({ ...prev, joursMadina: v })),
+                        defJours: programInfo.nbJoursMadina,
+                      }] : []),
+                      ...(hotelsMakkah.length > 0 ? [{
+                        key: "makkah",
+                        icon: "🕋",
+                        label: "Makkah",
+                        active: customization.includeMakkah,
+                        onToggle: toggleIncludeMakkah,
+                        jours: customization.joursMakkah,
+                        onJours: (v: number) => setCustomization(prev => ({ ...prev, joursMakkah: v })),
+                        defJours: programInfo.nbJoursMakkah,
+                      }] : []),
+                      ...hotelsAutreProgramme.map((ph) => ({
+                        key: `autre-${ph.hotel.id}`,
+                        icon: "🏨",
+                        label: ph.hotel.name,
+                        active: autreActive[ph.hotel.id] !== false,
+                        onToggle: (checked: boolean) => toggleAutreActive(ph.hotel.id, checked),
+                        jours: autreJours[ph.hotel.id] ?? ph.nbJours ?? 0,
+                        onJours: (v: number) => setAutreJours(prev => ({ ...prev, [ph.hotel.id]: v })),
+                        defJours: ph.nbJours ?? 0,
+                      })),
+                    ];
+
+                    return (
+                    <div className="mt-4 mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200 space-y-3">
+                      {/* Services inclus + réinitialiser */}
+                      <div className="flex items-center flex-wrap gap-x-6 gap-y-2">
+                        <span className="text-sm font-semibold text-blue-700">Services:</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">✈️</span>
+                          <span className="text-sm font-medium text-blue-700">Avion</span>
+                          <Switch
+                            checked={customization.includeAvion}
+                            onCheckedChange={(checked) =>
+                              setCustomization(prev => ({ ...prev, includeAvion: checked }))
+                            }
+                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                          />
                         </div>
-                        
-                        {/* Séparateur */}
-                        <div className="w-px h-8 bg-blue-300"></div>
-                        
-                        {/* Durée du séjour */}
-                        <div className="flex items-center gap-6">
-                          <span className="text-sm font-semibold text-blue-700">Durée:</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">🕌</span>
-                            <span className="text-sm font-medium text-blue-700">Madina</span>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={customization.joursMadina}
-                              onChange={(e) => 
-                                setCustomization(prev => ({ 
-                                  ...prev, 
-                                  joursMadina: parseInt(e.target.value) || 0 
-                                }))
-                              }
-                              className="w-16 h-8 text-xs border border-blue-200 focus:border-blue-500 rounded text-center"
-                              placeholder="Jours"
-                            />
-                            <span className="text-xs text-blue-500">(déf: {programInfo.nbJoursMadina})</span>
-                          </div>
-                          
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">🕋</span>
-                            <span className="text-sm font-medium text-blue-700">Makkah</span>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={customization.joursMakkah}
-                              onChange={(e) => 
-                                setCustomization(prev => ({ 
-                                  ...prev, 
-                                  joursMakkah: parseInt(e.target.value) || 0 
-                                }))
-                              }
-                              className="w-16 h-8 text-xs border border-blue-200 focus:border-blue-500 rounded text-center"
-                              placeholder="Jours"
-                            />
-                            <span className="text-xs text-blue-500">(déf: {programInfo.nbJoursMakkah})</span>
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">📄</span>
+                          <span className="text-sm font-medium text-blue-700">Visa</span>
+                          <Switch
+                            checked={customization.includeVisa}
+                            onCheckedChange={(checked) =>
+                              setCustomization(prev => ({ ...prev, includeVisa: checked }))
+                            }
+                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                          />
                         </div>
-                        
-                        {/* Séparateur */}
-                        <div className="w-px h-8 bg-blue-300"></div>
-                        
-                        {/* Bouton réinitialiser */}
                         <Button
                           type="button"
                           onClick={() => {
-                            setCustomization({
-                              ...customization,
+                            setCustomization(prev => ({
+                              ...prev,
                               includeAvion: true,
                               includeVisa: true,
+                              includeMadina: true,
+                              includeMakkah: true,
                               joursMadina: programInfo.nbJoursMadina,
-                              joursMakkah: programInfo.nbJoursMakkah
-                            });
+                              joursMakkah: programInfo.nbJoursMakkah,
+                            }));
+                            // Réactiver tous les hôtels Autre + restaurer leur durée et leur sélection.
+                            const active: { [hotelId: number]: boolean } = {};
+                            const jours: { [hotelId: number]: number } = {};
+                            const selection: { [hotelId: number]: string } = {};
+                            for (const ph of hotelsAutreProgramme) {
+                              active[ph.hotel.id] = true;
+                              jours[ph.hotel.id] = ph.nbJours || 0;
+                              selection[ph.hotel.id] = ph.hotel.id.toString();
+                            }
+                            setAutreActive(active);
+                            setAutreJours(jours);
+                            setHotelsAutreSelection(selection);
+                            setFormData(prev => ({
+                              ...prev,
+                              hotelMadina: prev.hotelMadina === "none" ? "" : prev.hotelMadina,
+                              hotelMakkah: prev.hotelMakkah === "none" ? "" : prev.hotelMakkah,
+                            }));
                           }}
                           variant="outline"
                           size="sm"
-                          className="h-8 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+                          className="h-8 text-xs border-blue-300 text-blue-700 hover:bg-blue-50 ml-auto"
                         >
                           Réinitialiser
                         </Button>
                       </div>
+
+                      {/* Hôtels : activation (ON = obligatoire) + durée (nuits) éditable par hôtel */}
+                      {hotelToggles.length > 0 && (
+                        <div className="pt-3 border-t border-blue-200">
+                          <div className="flex items-start flex-wrap gap-x-6 gap-y-3">
+                            <span className="text-sm font-semibold text-blue-700 pt-1.5">Hôtels:</span>
+                            {hotelToggles.map((h) => (
+                              <div key={h.key} className="flex items-center gap-2">
+                                <span className="text-lg">{h.icon}</span>
+                                <span className={`text-sm font-medium ${h.active ? "text-blue-700" : "text-gray-400 line-through"}`}>
+                                  {h.label}
+                                </span>
+                                <Switch
+                                  checked={h.active}
+                                  onCheckedChange={(checked) => h.onToggle(checked)}
+                                  className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                />
+                                {h.active && (
+                                  <>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      value={h.jours}
+                                      onChange={(e) => h.onJours(parseInt(e.target.value) || 0)}
+                                      className="w-14 h-8 text-xs border border-blue-200 focus:border-blue-500 rounded text-center"
+                                      placeholder="Nuits"
+                                    />
+                                    <span className="text-xs text-blue-500">nuits (déf: {h.defJours})</span>
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          <p className="text-xs text-blue-500 mt-2">
+                            Désactivez un hôtel pour le rendre optionnel (exclu du prix). Les hôtels actifs sont obligatoires.
+                          </p>
+                        </div>
+                      )}
                     </div>
-                  )}
+                    );
+                  })()}
 
                   {/* Choix des hôtels — grille unique adaptative (max 3 par ligne) */}
                     <div className={`grid grid-cols-1 ${hotelGridColsClass} gap-4`}>
-                      {hotelsMadina.length > 0 && (
+                      {showMadinaBlock && (
                         <HotelCategoryBlock
                           labelIcon="🕌"
-                          labelText="Hôtel à Madina"
+                          labelText="Hôtel à Madina *"
                           headerIcon="🕌"
                           headerText="Chambres disponibles à Madina"
                           hotels={hotelsMadina}
@@ -2143,13 +2301,14 @@ export default function NouvelleReservation() {
                           onShowGuide={() => setShowRoomGuide(true)}
                           hoverBorderClass="hover:border-blue-300"
                           placeholderText="Sélectionner un hôtel à Madina"
+                          allowNone={false}
                         />
                       )}
 
-                      {hotelsMakkah.length > 0 && (
+                      {showMakkahBlock && (
                         <HotelCategoryBlock
                           labelIcon="🕋"
-                          labelText="Hôtel à Makkah"
+                          labelText="Hôtel à Makkah *"
                           headerIcon="🕋"
                           headerText="Chambres disponibles à Makkah"
                           hotels={hotelsMakkah}
@@ -2166,18 +2325,19 @@ export default function NouvelleReservation() {
                           onShowGuide={() => setShowRoomGuide(true)}
                           hoverBorderClass="hover:border-green-300"
                           placeholderText="Sélectionner un hôtel à Makkah"
+                          allowNone={false}
                         />
                       )}
 
-                      {/* Hôtels Autre (N hôtels génériques, optionnels) — même grille */}
-                      {hotelsAutreProgramme.map((ph) => {
+                      {/* Hôtels Autre actifs (obligatoires) — désactivables via le panneau « Éditer » */}
+                      {hotelsAutreActifs.map((ph) => {
                           const hotelId = ph.hotel.id;
-                          const value = hotelsAutreSelection[hotelId] ?? "none";
+                          const value = hotelsAutreSelection[hotelId] ?? hotelId.toString();
                           return (
                             <HotelCategoryBlock
                               key={hotelId}
                               labelIcon="🏨"
-                              labelText={ph.hotel.name}
+                              labelText={`${ph.hotel.name} *`}
                               headerIcon="🏨"
                               headerText={`Chambres disponibles — ${ph.hotel.name}`}
                               hotels={[ph.hotel]}
@@ -2203,6 +2363,7 @@ export default function NouvelleReservation() {
                               onShowGuide={() => setShowRoomGuide(true)}
                               hoverBorderClass="hover:border-green-300"
                               placeholderText={`Sélectionner ${ph.hotel.name}`}
+                              allowNone={false}
                             />
                           );
                         })}

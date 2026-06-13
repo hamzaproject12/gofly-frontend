@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   Calendar as CalendarIcon,
   Sparkles,
@@ -36,7 +37,7 @@ type RoomType = "SINGLE" | "DOUBLE" | "TRIPLE" | "QUAD" | "QUINT"
 interface Hotel {
   id: number
   name: string
-  city: "Madina" | "Makkah"
+  city: "Madina" | "Makkah" | "Autre"
 }
 
 interface ProgramApi {
@@ -58,12 +59,14 @@ interface ProgramApi {
   profitVIP: number
   hotelsMadina: Array<{ hotel: { id: number; name: string; city: "Madina" } }>
   hotelsMakkah: Array<{ hotel: { id: number; name: string; city: "Makkah" } }>
+  hotelsAutre?: Array<{ hotel: { id: number; name: string; city: "Autre" }; nbJours: number; ordre: number }>
   rooms: Array<{
     hotelId: number
-    hotel: { id: number; name: string; city: "Madina" | "Makkah" }
+    hotel: { id: number; name: string; city: "Madina" | "Makkah" | "Autre" }
     roomType: RoomType
     prixRoom: number
     nbrPlaceTotal: number
+    nbrPlaceRestantes?: number
   }>
 }
 
@@ -91,6 +94,8 @@ export default function ModifierProgrammePage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [hotelsMadina, setHotelsMadina] = useState<Hotel[]>([])
   const [hotelsMakkah, setHotelsMakkah] = useState<Hotel[]>([])
+  const [hotelsAutreList, setHotelsAutreList] = useState<Hotel[]>([])
+  const [activeHotelTab, setActiveHotelTab] = useState<"madina" | "makkah" | "autre">("madina")
 
   const [formData, setFormData] = useState({
     nom: "",
@@ -112,6 +117,12 @@ export default function ModifierProgrammePage() {
       name: string
       chambres: { [key: number]: { nb: string; prix: string } }
     }>,
+    hotelsAutre: [] as Array<{
+      name: string
+      nbJours: string
+      ordre: string
+      chambres: { [key: number]: { nb: string; prix: string } }
+    }>,
     datesLimites: {
       visa: null as Date | null,
       hotels: null as Date | null,
@@ -124,16 +135,25 @@ export default function ModifierProgrammePage() {
   const [roomConstraints, setRoomConstraints] = useState<{
     Madina: Record<string, Record<number, { occupied: number; total: number }>>
     Makkah: Record<string, Record<number, { occupied: number; total: number }>>
-  }>({ Madina: {}, Makkah: {} })
+    Autre: Record<string, Record<number, { occupied: number; total: number }>>
+  }>({ Madina: {}, Makkah: {}, Autre: {} })
+
+  // Total de lits (places) par catégorie = Σ (nb chambres × capacité du type)
+  const bedsOf = (hotels: Array<{ chambres: { [key: number]: { nb: string; prix: string } } }>) =>
+    hotels.reduce((sum, h) => sum + [1, 2, 3, 4, 5].reduce((s, t) => s + (parseInt(h.chambres[t]?.nb || "0", 10) || 0) * t, 0), 0)
+  const madinaBedsCount = useMemo(() => bedsOf(formData.hotelsMadina), [formData.hotelsMadina])
+  const makkahBedsCount = useMemo(() => bedsOf(formData.hotelsMakkah), [formData.hotelsMakkah])
+  const autreBedsCount = useMemo(() => bedsOf(formData.hotelsAutre), [formData.hotelsAutre])
 
   useEffect(() => {
     const fetchAll = async () => {
       try {
         setIsLoading(true)
-        const [programRes, madinaRes, makkahRes] = await Promise.all([
+        const [programRes, madinaRes, makkahRes, autreRes] = await Promise.all([
           fetch(api.url(`/api/programs/${id}`)),
           fetch(api.url('/api/hotels/available?city=Madina')),
           fetch(api.url('/api/hotels/available?city=Makkah')),
+          fetch(api.url('/api/hotels/available?city=Autre')),
         ])
 
         if (!programRes.ok) {
@@ -143,9 +163,11 @@ export default function ModifierProgrammePage() {
         const program: ProgramApi = await programRes.json()
         const madinaHotels: Hotel[] = madinaRes.ok ? await madinaRes.json() : []
         const makkahHotels: Hotel[] = makkahRes.ok ? await makkahRes.json() : []
+        const autreHotels: Hotel[] = autreRes.ok ? await autreRes.json() : []
 
         setHotelsMadina(madinaHotels)
         setHotelsMakkah(makkahHotels)
+        setHotelsAutreList(autreHotels)
 
         // Préparer les structures d'hôtels sélectionnés avec chambres/prix (nb = compteur de rooms)
         const selectedMadina = program.hotelsMadina.map(h => ({
@@ -168,10 +190,26 @@ export default function ModifierProgrammePage() {
             5: { nb: "0", prix: "" },
           },
         }))
+        // Hôtels Autre du programme (triés par ordre d'affichage), avec nb nuits
+        const selectedAutre = [...(program.hotelsAutre || [])]
+          .sort((a, b) => a.ordre - b.ordre)
+          .map(h => ({
+            name: h.hotel.name,
+            nbJours: String(h.nbJours ?? ""),
+            ordre: String(h.ordre ?? ""),
+            chambres: {
+              1: { nb: "0", prix: "" },
+              2: { nb: "0", prix: "" },
+              3: { nb: "0", prix: "" },
+              4: { nb: "0", prix: "" },
+              5: { nb: "0", prix: "" },
+            },
+          }))
 
         // Contraintes rooms: total et occupées
         const constraintsMadina: Record<string, Record<number, { occupied: number; total: number }>> = {}
         const constraintsMakkah: Record<string, Record<number, { occupied: number; total: number }>> = {}
+        const constraintsAutre: Record<string, Record<number, { occupied: number; total: number }>> = {}
 
         // Agréger les rooms → nb (compte), prix (première valeur), contraintes
         // Utiliser un compteur séparé pour éviter les problèmes de mutation
@@ -195,7 +233,7 @@ export default function ModifierProgrammePage() {
           }
 
           // Mettre à jour contraintes
-          const mapRef = city === "Madina" ? constraintsMadina : constraintsMakkah
+          const mapRef = city === "Madina" ? constraintsMadina : city === "Makkah" ? constraintsMakkah : constraintsAutre
           mapRef[hotelName] = mapRef[hotelName] || {}
           const entry = mapRef[hotelName][typeIndex] || { occupied: 0, total: 0 }
           entry.total += 1
@@ -228,6 +266,17 @@ export default function ModifierProgrammePage() {
             }
           }
         }
+        for (const hotel of selectedAutre) {
+          const key = `Autre:${hotel.name}`
+          if (roomCounts[key]) {
+            for (let type = 1; type <= 5; type++) {
+              hotel.chambres[type as 1 | 2 | 3 | 4 | 5] = {
+                nb: String(roomCounts[key][type].count),
+                prix: roomCounts[key][type].prix,
+              }
+            }
+          }
+        }
 
         setFormData({
           nom: program.name,
@@ -243,6 +292,7 @@ export default function ModifierProgrammePage() {
           dateCreation: program.created_at ? new Date(program.created_at) : new Date(),
           hotelsMadina: selectedMadina,
           hotelsMakkah: selectedMakkah,
+          hotelsAutre: selectedAutre,
           datesLimites: {
             visa: program.visaDeadline ? new Date(program.visaDeadline) : null,
             hotels: program.hotelDeadline ? new Date(program.hotelDeadline) : null,
@@ -250,7 +300,7 @@ export default function ModifierProgrammePage() {
             passport: program.passportDeadline ? new Date(program.passportDeadline) : null,
           },
         })
-        setRoomConstraints({ Madina: constraintsMadina, Makkah: constraintsMakkah })
+        setRoomConstraints({ Madina: constraintsMadina, Makkah: constraintsMakkah, Autre: constraintsAutre })
       } catch (error) {
         console.error(error)
         toast({ title: "Erreur", description: error instanceof Error ? error.message : "Impossible de charger le programme", variant: "destructive" })
@@ -293,6 +343,19 @@ export default function ModifierProgrammePage() {
 
       const normalizedMadina = normalizeHotelChambres(formData.hotelsMadina)
       const normalizedMakkah = normalizeHotelChambres(formData.hotelsMakkah)
+      // Hôtels Autre : conserver nb nuits + ordre (ordre = position d'affichage = ordre de la liste)
+      const normalizedAutre = formData.hotelsAutre.map((hotel, idx) => ({
+        name: hotel.name,
+        nbJours: hotel.nbJours ? parseInt(hotel.nbJours, 10) : 0,
+        ordre: hotel.ordre ? parseInt(hotel.ordre, 10) : idx + 1,
+        chambres: {
+          1: hotel.chambres[1] || { nb: "0", prix: "" },
+          2: hotel.chambres[2] || { nb: "0", prix: "" },
+          3: hotel.chambres[3] || { nb: "0", prix: "" },
+          4: hotel.chambres[4] || { nb: "0", prix: "" },
+          5: hotel.chambres[5] || { nb: "0", prix: "" },
+        },
+      }))
 
       // Analyser les changements pour chaque hôtel
       const analyzeRoomChanges = (hotels: typeof normalizedMadina, city: string) => {
@@ -344,6 +407,7 @@ export default function ModifierProgrammePage() {
         passportDeadline: formData.datesLimites.passport ?? undefined,
         hotelsMadina: normalizedMadina,
         hotelsMakkah: normalizedMakkah,
+        hotelsAutre: normalizedAutre,
       }
 
       console.log(`\n📤 === REQUÊTE ENVOYÉE AU BACKEND ===`)
@@ -440,34 +504,9 @@ export default function ModifierProgrammePage() {
                         Détails financiers et durée
                       </h3>
                       
-                      {/* Grille principale pour les champs standards */}
+                      {/* Grille principale pour les champs standards.
+                          (NB Jours Madina/Makkah déplacés dans leurs onglets ci-dessous.) */}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                        <div className="space-y-2">
-                          <Label className="text-green-700 font-medium flex items-center gap-2">
-                            <MapPin className="h-4 w-4" />
-                            NB Jours Madina
-                          </Label>
-                          <Input 
-                            type="number" 
-                            value={formData.nbJoursMadina} 
-                            onChange={(e) => setFormData({ ...formData, nbJoursMadina: e.target.value })} 
-                            placeholder="Ex: 4"
-                            className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" 
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-green-700 font-medium flex items-center gap-2">
-                            <MapPin className="h-4 w-4" />
-                            NB Jours Makkah
-                          </Label>
-                          <Input 
-                            type="number" 
-                            value={formData.nbJoursMakkah} 
-                            onChange={(e) => setFormData({ ...formData, nbJoursMakkah: e.target.value })} 
-                            placeholder="Ex: 15"
-                            className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" 
-                          />
-                        </div>
                         <div className="space-y-2">
                           <Label className="text-green-700 font-medium flex items-center gap-2">
                             <DollarSign className="h-4 w-4" />
@@ -557,13 +596,45 @@ export default function ModifierProgrammePage() {
                       </div>
                     </div>
 
-                    {/* Hôtels à Madina */}
-                    <div className="flex flex-col gap-6 mb-6">
-                      <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-xl border border-yellow-200 mb-6 w-full">
-                        <h3 className="text-lg font-semibold text-yellow-800 mb-4 flex items-center gap-2">
-                          <MapPin className="h-5 w-5" />
-                          Hôtels à Madina
-                        </h3>
+                    {/* Hôtels — sélection par catégorie via onglets (Madina / Makkah / Autre) */}
+                    <Tabs value={activeHotelTab} onValueChange={(v) => setActiveHotelTab(v as "madina" | "makkah" | "autre")} className="mb-6">
+                      <TabsList className="grid w-full grid-cols-3 h-auto">
+                        <TabsTrigger value="madina" className="data-[state=active]:bg-yellow-100 data-[state=active]:text-yellow-900">
+                          🕌 Madina <span className="ml-1 font-semibold">[{madinaBedsCount}]</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="makkah" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900">
+                          🕋 Makkah <span className="ml-1 font-semibold">[{makkahBedsCount}]</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="autre" className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-900">
+                          🏨 Autre <span className="ml-1 font-semibold">[{autreBedsCount}]</span>
+                        </TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="madina">
+                      <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-xl border border-yellow-200 w-full">
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                          <h3 className="text-lg font-semibold text-yellow-800 flex items-center gap-2">
+                            <MapPin className="h-5 w-5" />
+                            Hôtels à Madina
+                          </h3>
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor="nbJoursMadina" className="text-yellow-800 font-medium text-sm whitespace-nowrap">
+                              NB Jours Madina{formData.hotelsMadina.length > 0 ? " *" : ""}
+                            </Label>
+                            <Input
+                              id="nbJoursMadina"
+                              type="number"
+                              min="0"
+                              value={formData.nbJoursMadina}
+                              onChange={(e) => setFormData({ ...formData, nbJoursMadina: e.target.value })}
+                              placeholder="Ex: 4"
+                              className="h-9 w-20 text-center border-2 border-yellow-200 focus:border-yellow-500 rounded-lg bg-white/80"
+                            />
+                          </div>
+                          <div className="text-xs md:text-sm font-semibold text-yellow-900 bg-yellow-200/70 px-3 py-1.5 rounded-full">
+                            {madinaBedsCount} lits
+                          </div>
+                        </div>
                         <div className="flex flex-col gap-4">
                           {hotelsMadina.map((hotel) => {
                             const selected = formData.hotelsMadina.some((h) => h.name === hotel.name)
@@ -668,13 +739,33 @@ export default function ModifierProgrammePage() {
                           })}
                         </div>
                       </div>
+                      </TabsContent>
 
-                      {/* Hôtels à Makkah */}
+                      <TabsContent value="makkah">
                       <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
-                        <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
-                          <MapPin className="h-5 w-5" />
-                          Hôtels à Makkah
-                        </h3>
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                          <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
+                            <MapPin className="h-5 w-5" />
+                            Hôtels à Makkah
+                          </h3>
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor="nbJoursMakkah" className="text-blue-800 font-medium text-sm whitespace-nowrap">
+                              NB Jours Makkah{formData.hotelsMakkah.length > 0 ? " *" : ""}
+                            </Label>
+                            <Input
+                              id="nbJoursMakkah"
+                              type="number"
+                              min="0"
+                              value={formData.nbJoursMakkah}
+                              onChange={(e) => setFormData({ ...formData, nbJoursMakkah: e.target.value })}
+                              placeholder="Ex: 15"
+                              className="h-9 w-20 text-center border-2 border-blue-200 focus:border-blue-500 rounded-lg bg-white/80"
+                            />
+                          </div>
+                          <div className="text-xs md:text-sm font-semibold text-blue-900 bg-blue-200/70 px-3 py-1.5 rounded-full">
+                            {makkahBedsCount} lits
+                          </div>
+                        </div>
                         <div className="space-y-3">
                           {hotelsMakkah.map((hotel) => {
                             const selected = formData.hotelsMakkah.some((h) => h.name === hotel.name)
@@ -779,7 +870,144 @@ export default function ModifierProgrammePage() {
                           })}
                         </div>
                       </div>
-                    </div>
+                      </TabsContent>
+
+                      <TabsContent value="autre">
+                      <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-xl border border-emerald-200">
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                          <h3 className="text-lg font-semibold text-emerald-800 flex items-center gap-2">
+                            <MapPin className="h-5 w-5" />
+                            Hôtels Autre
+                          </h3>
+                          <div className="text-xs md:text-sm font-semibold text-emerald-900 bg-emerald-200/70 px-3 py-1.5 rounded-full">
+                            {autreBedsCount} lits
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-4">
+                          {formData.hotelsAutre.length === 0 ? (
+                            <div className="text-center py-4 text-gray-500 text-sm">
+                              Ce programme ne contient aucun hôtel « Autre ».
+                            </div>
+                          ) : (
+                          hotelsAutreList
+                            .filter((hotel) => formData.hotelsAutre.some((h) => h.name === hotel.name))
+                            .map((hotel) => {
+                            const current = formData.hotelsAutre.find((h) => h.name === hotel.name)
+                            return (
+                              <div key={hotel.id} className="border border-emerald-200 rounded-lg p-3 bg-white/70">
+                                <div className="flex items-center gap-2">
+                                  <Checkbox
+                                    checked
+                                    disabled
+                                    className="data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                                  />
+                                  <span className="text-sm font-medium text-emerald-800">{hotel.name}</span>
+                                </div>
+                                <div className="mt-3 max-w-xs">
+                                  <div className="text-xs text-emerald-700 mb-1 font-semibold">Nb de nuits *</div>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    placeholder="Ex: 3"
+                                    value={current?.nbJours || ""}
+                                    onChange={(e) => setFormData(prev => ({
+                                      ...prev,
+                                      hotelsAutre: prev.hotelsAutre.map(h => h.name === hotel.name ? { ...h, nbJours: e.target.value } : h)
+                                    }))}
+                                    className="h-9 w-full text-center border-emerald-300 focus:border-emerald-500 text-sm"
+                                  />
+                                </div>
+                                <div className="mt-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                                  {[1, 2, 3, 4, 5].map((type) => {
+                                    const occupied = roomConstraints.Autre[hotel.name]?.[type]?.occupied || 0;
+                                    const total = roomConstraints.Autre[hotel.name]?.[type]?.total || 0;
+                                    const currentValue = parseInt(current?.chambres[type]?.nb || "0", 10);
+                                    const canDecrement = currentValue > occupied;
+                                    return (
+                                      <div key={type} className="bg-white border border-emerald-200 rounded-lg p-4 shadow-sm">
+                                        <div className="text-center mb-3">
+                                          <div className="flex items-center justify-center gap-1 mb-2">
+                                            {Array.from({ length: type }, (_, i) => (
+                                              <div key={i} className="w-6 h-6 flex items-center justify-center">
+                                                <User className="w-5 h-5 text-emerald-600" />
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                        <div className="mb-3">
+                                          <div className="text-sm text-emerald-700 mb-2 text-center font-semibold">Chambres</div>
+                                          <div className="flex justify-center">
+                                            <div className="inline-flex items-center bg-gray-50 border border-emerald-300 rounded-lg">
+                                              <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 w-8 p-0 hover:bg-emerald-100 text-emerald-600 border-r border-emerald-200 rounded-l-lg"
+                                                disabled={!canDecrement}
+                                                onClick={() => {
+                                                  if (!canDecrement) return;
+                                                  const newValue = Math.max(occupied, currentValue - 1);
+                                                  setFormData(prev => ({
+                                                    ...prev,
+                                                    hotelsAutre: prev.hotelsAutre.map(h => h.name === hotel.name ? {
+                                                      ...h,
+                                                      chambres: { ...h.chambres, [type]: { ...h.chambres[type], nb: String(newValue) } }
+                                                    } : h)
+                                                  }))
+                                                }}
+                                              >
+                                                <span className="text-sm font-semibold">−</span>
+                                              </Button>
+                                              <div className="h-8 w-12 flex items-center justify-center text-sm font-semibold text-emerald-800 bg-white">
+                                                {currentValue}
+                                              </div>
+                                              <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 w-8 p-0 hover:bg-emerald-100 text-emerald-600 border-l border-emerald-200 rounded-r-lg"
+                                                onClick={() => {
+                                                  const newValue = currentValue + 1;
+                                                  setFormData(prev => ({
+                                                    ...prev,
+                                                    hotelsAutre: prev.hotelsAutre.map(h => h.name === hotel.name ? {
+                                                      ...h,
+                                                      chambres: { ...h.chambres, [type]: { ...h.chambres[type], nb: String(newValue) } }
+                                                    } : h)
+                                                  }))
+                                                }}
+                                              >
+                                                <span className="text-sm font-semibold">+</span>
+                                              </Button>
+                                            </div>
+                                          </div>
+                                          <div className="mt-1 text-center text-[11px] text-gray-500">Occupées: {occupied} • Total actuel: {total}</div>
+                                        </div>
+                                        <div>
+                                          <div className="text-sm text-emerald-700 mb-2 text-center font-semibold">Prix (Riyal)</div>
+                                          <Input
+                                            type="number"
+                                            value={current?.chambres[type]?.prix || ""}
+                                            onChange={(e) => setFormData(prev => ({
+                                              ...prev,
+                                              hotelsAutre: prev.hotelsAutre.map(h => h.name === hotel.name ? {
+                                                ...h,
+                                                chambres: { ...h.chambres, [type]: { ...h.chambres[type], prix: e.target.value } }
+                                              } : h)
+                                            }))}
+                                            className="h-9 w-full text-center border-emerald-300 focus:border-emerald-500 text-sm"
+                                          />
+                                        </div>
+                                      </div>
+                                    )})}
+                                </div>
+                              </div>
+                            )
+                          }))}
+                        </div>
+                      </div>
+                      </TabsContent>
+                    </Tabs>
 
                     {/* Dates limites */}
                     <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200">

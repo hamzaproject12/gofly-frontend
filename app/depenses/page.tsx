@@ -116,6 +116,18 @@ export default function DepensesPage() {
     fetchData()
   }, [fetchData])
 
+  // Pré-sélection du programme depuis l'URL (?programme=<id>) — bouton "Voir dépenses"
+  const [urlFilterApplied, setUrlFilterApplied] = useState(false)
+  useEffect(() => {
+    if (urlFilterApplied || programmes.length === 0) return
+    const programmeId = new URLSearchParams(window.location.search).get("programme")
+    if (programmeId) {
+      const match = programmes.find((p) => String(p.id) === programmeId)
+      if (match) setProgrammeFilter(match.name)
+    }
+    setUrlFilterApplied(true)
+  }, [programmes, urlFilterApplied])
+
   // Filtrage des dépenses (maintenant côté client pour la recherche instantanée)
   const filteredDepenses = depenses.filter((depense) => {
     const searchMatch =

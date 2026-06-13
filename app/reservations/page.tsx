@@ -598,6 +598,18 @@ export default function ReservationsPage() {
     setMounted(true)
   }, [])
 
+  // Pré-sélection du programme depuis l'URL (?programme=<id>) — bouton "Voir réservations"
+  const [urlFilterApplied, setUrlFilterApplied] = useState(false)
+  useEffect(() => {
+    if (urlFilterApplied || programs.length === 0) return
+    const programmeId = new URLSearchParams(window.location.search).get("programme")
+    if (programmeId) {
+      const match = programs.find((p) => String(p.id) === programmeId)
+      if (match) setProgrammeFilter(match.name)
+    }
+    setUrlFilterApplied(true)
+  }, [programs, urlFilterApplied])
+
   useEffect(() => {
     if (mounted) {
       fetchData()

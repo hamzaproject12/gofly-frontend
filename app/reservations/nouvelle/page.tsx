@@ -735,6 +735,19 @@ export default function NouvelleReservation() {
     setSelectedPlacesMakkah({});
   }, [formData.programId, formData.typeChambre, formData.gender]);
 
+  // Auto-sélection du premier hôtel Madina/Makkah quand la catégorie est active (modifiable ensuite).
+  // La place libre est ensuite auto-sélectionnée par les effets dédiés.
+  useEffect(() => {
+    if (!formData.programId) return;
+    if (customization.includeMadina && hotelsMadina.length > 0 && !formData.hotelMadina) {
+      setFormData(prev => ({ ...prev, hotelMadina: hotelsMadina[0].id.toString() }));
+    }
+    if (customization.includeMakkah && hotelsMakkah.length > 0 && !formData.hotelMakkah) {
+      setFormData(prev => ({ ...prev, hotelMakkah: hotelsMakkah[0].id.toString() }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.programId, customization.includeMadina, customization.includeMakkah, formData.hotelMadina, formData.hotelMakkah]);
+
   // Charger les détails du programme quand il est sélectionné
   useEffect(() => {
     console.log('🔄 useEffect - programId changé:', formData.programId);

@@ -979,6 +979,41 @@ export default function NouvelleChambrePage() {
     }
   }, [sortedRoomCandidatesMakkah]);
 
+  // Auto-sélection du premier hôtel Madina/Makkah quand la catégorie est active (modifiable ensuite).
+  // La chambre correspondante est ensuite auto-sélectionnée par les effets ci-dessus.
+  useEffect(() => {
+    if (!formData.programId) return;
+    if (customization.includeMadina && hotelsMadina.length > 0 && !formData.hotelMadina) {
+      setFormData((p) => ({ ...p, hotelMadina: hotelsMadina[0].id.toString() }));
+    }
+    if (customization.includeMakkah && hotelsMakkah.length > 0 && !formData.hotelMakkah) {
+      setFormData((p) => ({ ...p, hotelMakkah: hotelsMakkah[0].id.toString() }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.programId, programInfo, customization.includeMadina, customization.includeMakkah, formData.hotelMadina, formData.hotelMakkah]);
+
+  // Auto-sélection de la première chambre disponible pour chaque hôtel Autre actif.
+  useEffect(() => {
+    if (!programInfo || !formData.typeChambre) return;
+    for (const ph of hotelsAutreProgramme) {
+      const hotelId = ph.hotel.id;
+      if (autreActive[hotelId] === false) continue;
+      if (roomAutreIds[hotelId]) continue;
+      const candidates = programInfo.rooms
+        .filter((room) => {
+          if (room.hotelId !== hotelId || room.roomType !== formData.typeChambre) return false;
+          if (room.nbrPlaceRestantes !== room.nbrPlaceTotal) return false;
+          if (familyMixed) return true;
+          return room.gender === formData.gender || room.gender === "Mixte";
+        })
+        .sort((a, b) => a.id - b.id);
+      if (candidates.length > 0) {
+        setRoomAutreIds((prev) => (prev[hotelId] ? prev : { ...prev, [hotelId]: String(candidates[0].id) }));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [programInfo, formData.typeChambre, formData.gender, familyMixed, autreActive, roomAutreIds]);
+
   const prixGenere =
     calculatePrice > 0 &&
     String(formData.prix || "").trim() !== "" &&
@@ -1574,74 +1609,8 @@ export default function NouvelleChambrePage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    {showMadinaBlock && (
-                    <div className="space-y-2">
-                      <Label className="text-blue-700 font-medium text-sm">
-                        Hôtel à Madina *
-                      </Label>
-                      <Select
-                        value={formData.hotelMadina}
-                        onValueChange={(v) => {
-                          setFormData((p) => ({ ...p, hotelMadina: v }));
-                          setRoomMadinaId("");
-                        }}
-                        disabled={!formData.programId}
-                      >
-                        <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
-                          <SelectValue
-                            placeholder={
-                              formData.programId
-                                ? "Sélectionner un hôtel à Madina"
-                                : "Sélectionnez d'abord un programme"
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {hotelsMadina.map((h) => (
-                            <SelectItem key={h.id} value={h.id.toString()}>
-                              {h.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    )}
-
-                    {showMakkahBlock && (
-                    <div className="space-y-2">
-                      <Label className="text-blue-700 font-medium text-sm">
-                        Hôtel à Makkah *
-                      </Label>
-                      <Select
-                        value={formData.hotelMakkah}
-                        onValueChange={(v) => {
-                          setFormData((p) => ({ ...p, hotelMakkah: v }));
-                          setRoomMakkahId("");
-                        }}
-                        disabled={!formData.programId}
-                      >
-                        <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
-                          <SelectValue
-                            placeholder={
-                              formData.programId
-                                ? "Sélectionner un hôtel à Makkah"
-                                : "Sélectionnez d'abord un programme"
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {hotelsMakkah.map((h) => (
-                            <SelectItem key={h.id} value={h.id.toString()}>
-                              {h.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    )}
-
-                  </div>
+                  {/* Les Selects Madina/Makkah sont désormais réunis avec leurs chambres
+                      dans la grille adaptative ci-dessous (alignée sur Nouvelle Réservation). */}
 
                   {isCustomizationOpen && (() => {
                     // Descripteurs des hôtels du programme : Madina / Makkah (si présents) + chaque Autre.
@@ -1761,7 +1730,26 @@ export default function NouvelleChambrePage() {
                   {formData.programId && (
                     <div className={`grid grid-cols-1 ${hotelGridColsClass} gap-4 mt-2`}>
                     {showMadinaBlock && (
-                    <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg">🕌</span>
+                        <Label className="text-blue-700 font-medium text-sm">Hôtel à Madina *</Label>
+                      </div>
+                      <Select
+                        value={formData.hotelMadina}
+                        onValueChange={(v) => { setFormData((p) => ({ ...p, hotelMadina: v })); setRoomMadinaId(""); }}
+                        disabled={!formData.programId}
+                      >
+                        <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
+                          <SelectValue placeholder={formData.programId ? "Sélectionner un hôtel à Madina" : "Sélectionnez d'abord un programme"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {hotelsMadina.map((h) => (
+                            <SelectItem key={h.id} value={h.id.toString()}>{h.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="p-3 bg-green-50 rounded-lg border border-green-200">
                       <div className="flex items-center gap-2 mb-2">
                         <Info className="h-4 w-4 text-green-700" />
                         <span className="text-xs font-medium text-green-700">
@@ -1814,10 +1802,30 @@ export default function NouvelleChambrePage() {
                           </div>
                         ))}
                       </div>
+                      </div>
                     </div>
                     )}
                     {showMakkahBlock && (
-                    <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg">🕋</span>
+                        <Label className="text-blue-700 font-medium text-sm">Hôtel à Makkah *</Label>
+                      </div>
+                      <Select
+                        value={formData.hotelMakkah}
+                        onValueChange={(v) => { setFormData((p) => ({ ...p, hotelMakkah: v })); setRoomMakkahId(""); }}
+                        disabled={!formData.programId}
+                      >
+                        <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
+                          <SelectValue placeholder={formData.programId ? "Sélectionner un hôtel à Makkah" : "Sélectionnez d'abord un programme"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {hotelsMakkah.map((h) => (
+                            <SelectItem key={h.id} value={h.id.toString()}>{h.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="p-3 bg-green-50 rounded-lg border border-green-200">
                       <div className="flex items-center gap-2 mb-2">
                         <Info className="h-4 w-4 text-green-700" />
                         <span className="text-xs font-medium text-green-700">
@@ -1870,6 +1878,7 @@ export default function NouvelleChambrePage() {
                           </div>
                         ))}
                       </div>
+                      </div>
                     </div>
                     )}
                     {hotelsAutreActifs.map((ph) => {
@@ -1883,11 +1892,16 @@ export default function NouvelleChambrePage() {
                         })
                         .sort((a, b) => a.id - b.id);
                       return (
-                        <div key={hotelId} className="mt-2 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                        <div key={hotelId} className="space-y-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-lg">🏨</span>
+                            <Label className="text-blue-700 font-medium text-sm">{ph.hotel.name} *</Label>
+                          </div>
+                          <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
                           <div className="flex items-center gap-2 mb-2">
                             <Info className="h-4 w-4 text-emerald-700" />
                             <span className="text-xs font-medium text-emerald-700">
-                              {ph.hotel.name} * — chambres disponibles (libres uniquement)
+                              Chambres disponibles (libres uniquement)
                             </span>
                           </div>
                           <div className="grid gap-2">
@@ -1905,12 +1919,7 @@ export default function NouvelleChambrePage() {
                                         : "border-gray-300 bg-white hover:border-emerald-300"
                                     }`}
                                     onClick={() =>
-                                      setRoomAutreIds((prev) => {
-                                        const next = { ...prev };
-                                        if (next[hotelId] === String(room.id)) delete next[hotelId];
-                                        else next[hotelId] = String(room.id);
-                                        return next;
-                                      })
+                                      setRoomAutreIds((prev) => ({ ...prev, [hotelId]: String(room.id) }))
                                     }
                                   >
                                     <div className="flex items-center justify-between mb-1">
@@ -1943,6 +1952,7 @@ export default function NouvelleChambrePage() {
                                 );
                               })
                             )}
+                          </div>
                           </div>
                         </div>
                       );

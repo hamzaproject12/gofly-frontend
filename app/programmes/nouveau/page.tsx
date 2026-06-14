@@ -1939,7 +1939,7 @@ export default function NouveauProgramme() {
                                 </label>
                                 {selected && (
                                   <>
-                                    <div className="mt-3 max-w-xs">
+                                    <div className="mt-3 max-w-xs mx-auto">
                                       <div className="text-xs text-emerald-700 mb-1 font-semibold text-center">Nb de nuits *</div>
                                       <Input
                                         type="number"

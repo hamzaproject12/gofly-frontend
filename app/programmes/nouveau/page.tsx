@@ -848,8 +848,15 @@ export default function NouveauProgramme() {
       ["Inclure avion dans le coût", simIncludeAvion ? "Oui" : "Non"],
       ["Inclure visa dans le coût", simIncludeVisa ? "Oui" : "Non"],
       ["Plan tarifaire", simPlan],
-      ["Jours Madina (simulation)", simJoursMadina || "(défaut formulaire)"],
-      ["Jours Makkah (simulation)", simJoursMakkah || "(défaut formulaire)"],
+      ...(formData.hotelsMadina.length > 0
+        ? [["Jours Madina (simulation)", simJoursMadina || "(défaut formulaire)"] as [string, string]]
+        : []),
+      ...(formData.hotelsMakkah.length > 0
+        ? [["Jours Makkah (simulation)", simJoursMakkah || "(défaut formulaire)"] as [string, string]]
+        : []),
+      ...(formData.hotelsAutre.length > 0
+        ? [["Hôtels Autre", `${formData.hotelsAutre.length} (nuits par hôtel)`] as [string, string]]
+        : []),
       ["Places agents", fmtNumFr(parseInt(simAgentPlaces || "0", 10) || 0)],
       ["Charge par place agent (DH)", fmtDhFr(parseNum(simAgentCostPerPlaceDH, 0))],
       ["Autres charges fixes (DH)", fmtDhFr(parseNum(simAutresChargesDH, 0))],
@@ -894,7 +901,7 @@ export default function NouveauProgramme() {
     // === INVENTAIRE HÔTELS ===
     const hotelRows: string[][] = []
     const pushHotelRows = (
-      city: "Madina" | "Makkah",
+      city: "Madina" | "Makkah" | "Autre",
       hotels: Array<{ name: string; chambres: ChambresConfig }>
     ) => {
       for (const hotel of hotels) {
@@ -921,6 +928,7 @@ export default function NouveauProgramme() {
     }
     pushHotelRows("Madina", formData.hotelsMadina)
     pushHotelRows("Makkah", formData.hotelsMakkah)
+    pushHotelRows("Autre", formData.hotelsAutre)
 
     if (hotelRows.length > 0) {
       sectionTitle("Inventaire hôtels et chambres")
@@ -1344,7 +1352,7 @@ export default function NouveauProgramme() {
                       Simulation de rentabilité (prévisionnel)
                     </a>
                     {" "}
-                    : sous les sections Hôtels Madina et Makkah (faites défiler), ou cliquez ici pour y aller.
+                    : sous les sections Hôtels (Madina, Makkah, Autre — faites défiler), ou cliquez ici pour y aller.
                   </span>
                 </CardDescription>
               </CardHeader>
@@ -2120,7 +2128,8 @@ export default function NouveauProgramme() {
                       <Info className="h-4 w-4 shrink-0 mt-0.5" />
                       <span>
                         Remplissez d&apos;abord le nom du programme, les détails financiers (exchange, jours, avion, visa),
-                        puis sélectionnez les hôtels Madina et Makkah avec au moins une chambre (nombre et prix en Riyal).
+                        puis sélectionnez au moins un hôtel (Madina, Makkah et/ou Autre) avec au moins une chambre
+                        (nombre et prix en Riyal). La simulation s&apos;adapte aux catégories réellement présentes dans le programme.
                         Ensuite, ajustez les hypothèses ci-dessous (même logique que « Nouvelle réservation » pour le prix).
                         Le total paiement prévu correspond aux voyageurs payants ; le total charges inclut le coût agence
                         (vol + hôtel + visa, sans marge) pour tous les voyageurs de la capacité simulée, plus les charges
@@ -2133,9 +2142,10 @@ export default function NouveauProgramme() {
                         <p className="font-semibold mb-2">Complétez le formulaire ci-dessus pour activer la simulation :</p>
                         <ul className="list-disc pl-5 space-y-1">
                           <li>Nom du programme</li>
-                          <li>Exchange, NB jours Madina et Makkah, prix avion (DH) et visa (Riyal)</li>
-                          <li>Au moins un hôtel à Madina et un à Makkah</li>
-                          <li>Pour chaque ville : au moins une ligne chambre avec nombre de chambres et prix (Riyal) renseignés</li>
+                          <li>Exchange, prix avion (DH) et visa (Riyal)</li>
+                          <li>Au moins un hôtel (Madina, Makkah et/ou Autre)</li>
+                          <li>NB jours pour chaque ville présente (et nb de nuits pour chaque hôtel Autre)</li>
+                          <li>Pour chaque hôtel sélectionné : au moins une ligne chambre avec nombre de chambres et prix (Riyal) renseignés</li>
                         </ul>
                       </div>
                     )}
@@ -2183,30 +2193,52 @@ export default function NouveauProgramme() {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="space-y-2">
-                            <Label className="text-violet-800 text-sm">Jours Madina / Makkah (simulation)</Label>
-                            <div className="flex gap-2">
-                              <Input
-                                type="number"
-                                min={0}
-                                disabled={!canRunSimulation}
-                                placeholder={formData.nbJoursMadina || "Madina"}
-                                value={simJoursMadina}
-                                onChange={(e) => setSimJoursMadina(e.target.value)}
-                                className="border-violet-200"
-                              />
-                              <Input
-                                type="number"
-                                min={0}
-                                disabled={!canRunSimulation}
-                                placeholder={formData.nbJoursMakkah || "Makkah"}
-                                value={simJoursMakkah}
-                                onChange={(e) => setSimJoursMakkah(e.target.value)}
-                                className="border-violet-200"
-                              />
+                          {(formData.hotelsMadina.length > 0 || formData.hotelsMakkah.length > 0) ? (
+                            <div className="space-y-2">
+                              <Label className="text-violet-800 text-sm">
+                                {formData.hotelsMadina.length > 0 && formData.hotelsMakkah.length > 0
+                                  ? "Jours Madina / Makkah (simulation)"
+                                  : formData.hotelsMadina.length > 0
+                                    ? "Jours Madina (simulation)"
+                                    : "Jours Makkah (simulation)"}
+                              </Label>
+                              <div className="flex gap-2">
+                                {formData.hotelsMadina.length > 0 && (
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    disabled={!canRunSimulation}
+                                    placeholder={formData.nbJoursMadina || "Madina"}
+                                    value={simJoursMadina}
+                                    onChange={(e) => setSimJoursMadina(e.target.value)}
+                                    className="border-violet-200"
+                                  />
+                                )}
+                                {formData.hotelsMakkah.length > 0 && (
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    disabled={!canRunSimulation}
+                                    placeholder={formData.nbJoursMakkah || "Makkah"}
+                                    value={simJoursMakkah}
+                                    onChange={(e) => setSimJoursMakkah(e.target.value)}
+                                    className="border-violet-200"
+                                  />
+                                )}
+                              </div>
+                              <p className="text-xs text-violet-700/80">
+                                Vide = reprend les champs « NB Jours » du formulaire.
+                                {formData.hotelsAutre.length > 0 && " Les nuits des hôtels Autre proviennent de leur configuration."}
+                              </p>
                             </div>
-                            <p className="text-xs text-violet-700/80">Vide = reprend les champs « NB Jours » du formulaire.</p>
-                          </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <Label className="text-violet-800 text-sm">Nuits hôtels Autre</Label>
+                              <p className="text-xs text-violet-700/80">
+                                Ce programme ne contient que des hôtels « Autre » : les nuits proviennent du nb de nuits saisi pour chaque hôtel.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -2393,8 +2425,10 @@ export default function NouveauProgramme() {
                         <p className="text-xs text-violet-600 pt-2">
                           {canRunSimulation ? (
                             <>
-                              Change utilisé : {simulationPreview.exchange} · Jours Madina / Makkah :{" "}
-                              {simulationPreview.joursMadinaEff} / {simulationPreview.joursMakkahEff}
+                              Change utilisé : {simulationPreview.exchange}
+                              {formData.hotelsMadina.length > 0 && ` · Jours Madina : ${simulationPreview.joursMadinaEff}`}
+                              {formData.hotelsMakkah.length > 0 && ` · Jours Makkah : ${simulationPreview.joursMakkahEff}`}
+                              {formData.hotelsAutre.length > 0 && ` · Hôtels Autre : ${formData.hotelsAutre.length}`}
                             </>
                           ) : (
                             "Renseignez les champs requis pour afficher le détail."
@@ -2409,7 +2443,7 @@ export default function NouveauProgramme() {
                           <thead>
                             <tr className="border-b border-violet-100 text-left text-violet-800">
                               <th className="p-2 font-medium">Type chambre</th>
-                              <th className="p-2 font-medium">Places (min Madina/Makkah)</th>
+                              <th className="p-2 font-medium">Places (capacité min.)</th>
                               <th className="p-2 font-medium">Prix / pers. (DH)</th>
                               <th className="p-2 font-medium">Sous-total (DH)</th>
                             </tr>
@@ -2429,7 +2463,7 @@ export default function NouveauProgramme() {
                     ) : (
                       <p className="mt-4 text-sm text-violet-700 bg-white/60 border border-violet-100 rounded-lg px-3 py-2">
                         {canRunSimulation
-                          ? "Aucune capacité simulée avec la configuration actuelle (vérifiez les types de chambre des deux côtés)."
+                          ? "Aucune capacité simulée avec la configuration actuelle (vérifiez les types de chambre des hôtels sélectionnés)."
                           : "Les montants et le tableau détaillé s’affichent une fois les prérequis remplis (voir encadré orange)."}
                       </p>
                     )}

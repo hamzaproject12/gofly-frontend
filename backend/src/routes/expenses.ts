@@ -23,7 +23,7 @@ function extractActorAgentIdFromToken(req: express.Request): number | null {
 // Get all expenses with filters and pagination
 router.get('/', async (req, res) => {
   try {
-    const { search, program, type, status, page = '1', limit = '10' } = req.query;
+    const { search, program, programId, type, status, page = '1', limit = '10' } = req.query;
 
     // Construire les filtres
     const where: any = {};
@@ -38,7 +38,9 @@ router.get('/', async (req, res) => {
     }
 
     // Filtre par programme
-    if (program && program !== 'tous') {
+    if (programId && programId !== '') {
+      where.programId = Number(programId);
+    } else if (program && program !== 'tous') {
       where.program = { name: program as string };
     }
 
@@ -160,7 +162,7 @@ router.get('/', async (req, res) => {
 // Get expense statistics
 router.get('/stats', async (req, res) => {
   try {
-    const { search, program, type } = req.query;
+    const { search, program, programId, type } = req.query;
 
     // Construire les filtres
     const where: any = {};
@@ -173,7 +175,9 @@ router.get('/stats', async (req, res) => {
       ];
     }
 
-    if (program && program !== 'tous') {
+    if (programId && programId !== '') {
+      where.programId = Number(programId);
+    } else if (program && program !== 'tous') {
       where.program = { name: program as string };
     }
 

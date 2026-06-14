@@ -120,6 +120,7 @@ router.get('/', async (req, res) => {
       page = 1,
       limit = 20,
       program,
+      programId,
       status,
       roomType,
       dateFrom,
@@ -136,12 +137,14 @@ router.get('/', async (req, res) => {
       isLeader: true
     };
     
-    if (program && program !== 'tous') {
+    if (programId && programId !== '') {
+      where.programId = Number(programId);
+    } else if (program && program !== 'tous') {
       where.program = {
         name: program
       };
     }
-    
+
     if (status && status !== 'all') {
       // Le statut "Urgent" n'existe pas en base, il est calculé dynamiquement
       // Donc on ne filtre pas par status quand c'est "Urgent"
@@ -233,15 +236,17 @@ router.get('/', async (req, res) => {
 // Get reservation statistics with dynamic filters
 router.get('/stats', async (req, res) => {
   try {
-    const { program, roomType, dateFrom, dateTo, status } = req.query;
+    const { program, programId, roomType, dateFrom, dateTo, status } = req.query;
     const DAYS_URGENCY_WINDOW = 18;
-    
+
     // Construire les filtres pour les stats
     const where: any = {
       isLeader: true
     };
-    
-    if (program && program !== 'tous') {
+
+    if (programId && programId !== '') {
+      where.programId = Number(programId);
+    } else if (program && program !== 'tous') {
       where.program = {
         name: program
       };

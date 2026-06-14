@@ -154,6 +154,12 @@ export default function ReservationsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [programmeFilter, setProgrammeFilter] = useState("tous")
+  // Id du programme issu de l'URL (?programme=<id>) — filtre prioritaire et robuste
+  const [urlProgramId, setUrlProgramId] = useState<string | null>(
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("programme")
+      : null
+  )
   const [statutFilter, setStatutFilter] = useState("all")
   const [chambreFilter, setChambreFilter] = useState("toutes")
   const [stats, setStats] = useState<Stats>({
@@ -204,6 +210,8 @@ export default function ReservationsPage() {
   };
 
   const handleProgrammeChange = (value: string) => {
+    // Sélection manuelle : on abandonne le filtre id de l'URL au profit du nom
+    setUrlProgramId(null);
     setProgrammeFilter(value.trim());
   };
 
@@ -357,6 +365,7 @@ export default function ReservationsPage() {
         page: page.toString(),
         limit: rowsPerPage.toString(),
         program: programmeFilter,
+        ...(urlProgramId && { programId: urlProgramId }),
         status: statutFilter,
         roomType: chambreFilter,
         ...(filters.dateFrom && { dateFrom: filters.dateFrom }),
@@ -364,6 +373,7 @@ export default function ReservationsPage() {
       });
       const statsParams = new URLSearchParams({
         program: programmeFilter,
+        ...(urlProgramId && { programId: urlProgramId }),
         status: statutFilter,
         roomType: chambreFilter,
         ...(filters.dateFrom && { dateFrom: filters.dateFrom }),
@@ -527,7 +537,7 @@ export default function ReservationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [programmeFilter, statutFilter, chambreFilter, filters.dateFrom, filters.dateTo, rowsPerPage]);
+  }, [programmeFilter, urlProgramId, statutFilter, chambreFilter, filters.dateFrom, filters.dateTo, rowsPerPage]);
 
   // Fonction de suppression de réservation (après fetchData)
   const handleDeleteReservation = useCallback(async (id: number) => {

@@ -67,6 +67,12 @@ export default function DepensesPage() {
   // États pour les filtres
   const [searchQuery, setSearchQuery] = useState("")
   const [programmeFilter, setProgrammeFilter] = useState("tous")
+  // Id du programme issu de l'URL (?programme=<id>) — filtre prioritaire et robuste
+  const [urlProgramId, setUrlProgramId] = useState<string | null>(
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("programme")
+      : null
+  )
   const [typeFilter, setTypeFilter] = useState("tous")
 
   const typesDepense = ["Tous", "Vol", "Hotel Madina", "Hotel Makkah", "Visa", "Autre"]
@@ -80,6 +86,7 @@ export default function DepensesPage() {
       // Construire les paramètres de requête
       const params = new URLSearchParams({
         program: programmeFilter,
+        ...(urlProgramId && { programId: urlProgramId }),
         type: typeFilter,
         page: '1',
         limit: '100' // Charger toutes les dépenses pour l'instant
@@ -109,7 +116,7 @@ export default function DepensesPage() {
     } finally {
       setLoading(false)
     }
-  }, [programmeFilter, typeFilter])
+  }, [programmeFilter, urlProgramId, typeFilter])
 
   // Charger les données au montage du composant
   useEffect(() => {
@@ -439,7 +446,7 @@ export default function DepensesPage() {
                     className="pl-10"
                   />
                 </div>
-                <Select value={programmeFilter} onValueChange={(value) => setProgrammeFilter(value)}>
+                <Select value={programmeFilter} onValueChange={(value) => { setUrlProgramId(null); setProgrammeFilter(value); }}>
                   <SelectTrigger>
                     <SelectValue placeholder="Tous les programmes" />
                   </SelectTrigger>

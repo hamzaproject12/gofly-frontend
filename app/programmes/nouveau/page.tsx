@@ -332,8 +332,6 @@ export default function NouveauProgramme() {
   const [simIncludeAvion, setSimIncludeAvion] = useState(true)
   const [simIncludeVisa, setSimIncludeVisa] = useState(true)
   const [simPlan, setSimPlan] = useState<"Économique" | "Normal" | "VIP">("Normal")
-  const [simJoursMadina, setSimJoursMadina] = useState("")
-  const [simJoursMakkah, setSimJoursMakkah] = useState("")
   /** Places réservées pour agents / staff : pas de paiement client, comptées en charges */
   const [simAgentPlaces, setSimAgentPlaces] = useState("")
   const [simAgentCostPerPlaceDH, setSimAgentCostPerPlaceDH] = useState("")
@@ -504,8 +502,8 @@ export default function NouveauProgramme() {
     const profitEconomique = parseNum(formData.profitEconomique, 0)
     const profitNormal = parseNum(formData.profitNormal, 0)
     const profitVIP = parseNum(formData.profitVIP, 0)
-    const jM = parseNum(simJoursMadina || formData.nbJoursMadina, 0)
-    const jK = parseNum(simJoursMakkah || formData.nbJoursMakkah, 0)
+    const jM = parseNum(formData.nbJoursMadina, 0)
+    const jK = parseNum(formData.nbJoursMakkah, 0)
 
     const byType: {
       typeKey: number
@@ -534,22 +532,26 @@ export default function NouveauProgramme() {
       const madinaPlacesT = placesByType(formData.hotelsMadina, t)
       const makkahPlacesT = placesByType(formData.hotelsMakkah, t)
 
-      // Hôtels « Autre » : séquence (le voyageur loge dans chacun) →
-      // capacité = min sur les hôtels Autre ; coût = somme par voyageur (Riyal).
-      let autrePlacesT = Infinity
-      let autreRiyalPerTraveler = 0
+      // Hôtels « Autre » : même logique que Madina/Makkah (les hôtels d'une même
+      // catégorie sont des alternatives) → capacité = somme des places ; coût par
+      // voyageur = moyenne pondérée (par places) de (prix chambre / nb pers × nuits),
+      // chaque hôtel Autre ayant son propre nb de nuits.
+      let autrePlacesT = 0
+      let autreCostWeighted = 0
       for (const h of formData.hotelsAutre) {
-        autrePlacesT = Math.min(autrePlacesT, placesByType([h], t))
+        const placesH = placesByType([h], t)
         const priceH = weightedAvgRoomPriceRiyal([h], t)
         const nights = parseNum(h.nbJours, 0)
-        if (priceH > 0 && t > 0) autreRiyalPerTraveler += (priceH / t) * nights
+        autrePlacesT += placesH
+        if (priceH > 0 && t > 0) autreCostWeighted += placesH * (priceH / t) * nights
       }
+      const autreRiyalPerTraveler = autrePlacesT > 0 ? autreCostWeighted / autrePlacesT : 0
 
       // Goulot d'étranglement = min des places parmi les catégories PRÉSENTES
       const presentPlaces: number[] = []
       if (hasMadina) presentPlaces.push(madinaPlacesT)
       if (hasMakkah) presentPlaces.push(makkahPlacesT)
-      if (hasAutre) presentPlaces.push(autrePlacesT === Infinity ? 0 : autrePlacesT)
+      if (hasAutre) presentPlaces.push(autrePlacesT)
       const paired = presentPlaces.length > 0 ? Math.min(...presentPlaces) : 0
       if (paired <= 0) continue
 
@@ -658,8 +660,6 @@ export default function NouveauProgramme() {
     simIncludeAvion,
     simIncludeVisa,
     simPlan,
-    simJoursMadina,
-    simJoursMakkah,
     simAgentPlaces,
     simAgentCostPerPlaceDH,
     simAutresChargesDH,
@@ -848,12 +848,6 @@ export default function NouveauProgramme() {
       ["Inclure avion dans le coût", simIncludeAvion ? "Oui" : "Non"],
       ["Inclure visa dans le coût", simIncludeVisa ? "Oui" : "Non"],
       ["Plan tarifaire", simPlan],
-      ...(formData.hotelsMadina.length > 0
-        ? [["Jours Madina (simulation)", simJoursMadina || "(défaut formulaire)"] as [string, string]]
-        : []),
-      ...(formData.hotelsMakkah.length > 0
-        ? [["Jours Makkah (simulation)", simJoursMakkah || "(défaut formulaire)"] as [string, string]]
-        : []),
       ...(formData.hotelsAutre.length > 0
         ? [["Hôtels Autre", `${formData.hotelsAutre.length} (nuits par hôtel)`] as [string, string]]
         : []),
@@ -1050,8 +1044,6 @@ export default function NouveauProgramme() {
     simIncludeAvion,
     simIncludeVisa,
     simPlan,
-    simJoursMadina,
-    simJoursMakkah,
     simAgentPlaces,
     simAgentCostPerPlaceDH,
     simAutresChargesDH,
@@ -2193,52 +2185,15 @@ export default function NouveauProgramme() {
                               </SelectContent>
                             </Select>
                           </div>
-                          {(formData.hotelsMadina.length > 0 || formData.hotelsMakkah.length > 0) ? (
-                            <div className="space-y-2">
-                              <Label className="text-violet-800 text-sm">
-                                {formData.hotelsMadina.length > 0 && formData.hotelsMakkah.length > 0
-                                  ? "Jours Madina / Makkah (simulation)"
-                                  : formData.hotelsMadina.length > 0
-                                    ? "Jours Madina (simulation)"
-                                    : "Jours Makkah (simulation)"}
-                              </Label>
-                              <div className="flex gap-2">
-                                {formData.hotelsMadina.length > 0 && (
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    disabled={!canRunSimulation}
-                                    placeholder={formData.nbJoursMadina || "Madina"}
-                                    value={simJoursMadina}
-                                    onChange={(e) => setSimJoursMadina(e.target.value)}
-                                    className="border-violet-200"
-                                  />
-                                )}
-                                {formData.hotelsMakkah.length > 0 && (
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    disabled={!canRunSimulation}
-                                    placeholder={formData.nbJoursMakkah || "Makkah"}
-                                    value={simJoursMakkah}
-                                    onChange={(e) => setSimJoursMakkah(e.target.value)}
-                                    className="border-violet-200"
-                                  />
-                                )}
-                              </div>
-                              <p className="text-xs text-violet-700/80">
-                                Vide = reprend les champs « NB Jours » du formulaire.
-                                {formData.hotelsAutre.length > 0 && " Les nuits des hôtels Autre proviennent de leur configuration."}
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              <Label className="text-violet-800 text-sm">Nuits hôtels Autre</Label>
-                              <p className="text-xs text-violet-700/80">
-                                Ce programme ne contient que des hôtels « Autre » : les nuits proviennent du nb de nuits saisi pour chaque hôtel.
-                              </p>
-                            </div>
-                          )}
+                          <div className="space-y-2">
+                            <Label className="text-violet-800 text-sm">Durées de séjour</Label>
+                            <p className="text-xs text-violet-700/80 leading-relaxed">
+                              La simulation utilise les durées déjà saisies dans le formulaire ci-dessus.
+                              {formData.hotelsMadina.length > 0 && ` Madina : ${formData.nbJoursMadina || "—"} nuit(s).`}
+                              {formData.hotelsMakkah.length > 0 && ` Makkah : ${formData.nbJoursMakkah || "—"} nuit(s).`}
+                              {formData.hotelsAutre.length > 0 && " Autre : nb de nuits saisi par hôtel."}
+                            </p>
+                          </div>
                         </div>
                       </div>
 

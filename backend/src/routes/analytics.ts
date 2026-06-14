@@ -42,42 +42,67 @@ router.get('/dashboard', async (req, res) => {
       _count: { id: true }
     })
 
-    const programDetails = await prisma.payment.groupBy({
-      by: ['reservationId'],
+    // 🐛 Correctif : agréger réellement PAR PROGRAMME (et non par réservation).
+    //    Un paiement peut être rattaché à un programme directement (payment.programId)
+    //    ou via sa réservation (reservation.programId) — même logique de repli que
+    //    le classement par agent ci-dessous.
+    const paymentsForProgramRanking = await prisma.payment.findMany({
       where: {
         ...paymentDateFilter,
-        reservation: programFilter
+        reservation: programFilter,
       },
-      _sum: { amount: true },
-      _count: { id: true },
-      orderBy: { _sum: { amount: 'desc' } },
-      take: 10
+      select: {
+        amount: true,
+        programId: true,
+        program: { select: { id: true, name: true } },
+        reservation: {
+          select: {
+            programId: true,
+            program: { select: { id: true, name: true } },
+          },
+        },
+      },
     })
 
-    const programRankingDetailed = await Promise.all(
-      programDetails.map(async (item) => {
-        if (item.reservationId == null) {
-          return {
-            programId: null as number | null,
-            programName: 'Paiement sans réservation',
-            totalAmount: item._sum.amount || 0,
-            countPayments: item._count.id,
-            avgAmount: item._count.id > 0 ? (item._sum.amount || 0) / item._count.id : 0,
-          }
-        }
-        const reservation = await prisma.reservation.findUnique({
-          where: { id: item.reservationId },
-          include: { program: true },
-        })
-        return {
-          programId: reservation?.programId,
-          programName: reservation?.program?.name || 'Programme inconnu',
-          totalAmount: item._sum.amount || 0,
-          countPayments: item._count.id,
-          avgAmount: item._count.id > 0 ? (item._sum.amount || 0) / item._count.id : 0,
-        }
-      })
-    )
+    const programAggregation = new Map<
+      string,
+      {
+        programId: number | null
+        programName: string
+        totalAmount: number
+        countPayments: number
+      }
+    >()
+
+    paymentsForProgramRanking.forEach((payment) => {
+      const resolvedProgramId =
+        payment.programId ?? payment.reservation?.programId ?? null
+      const resolvedProgramName =
+        payment.program?.name ||
+        payment.reservation?.program?.name ||
+        (resolvedProgramId == null ? 'Paiement sans programme' : 'Programme inconnu')
+
+      const key = resolvedProgramId == null ? 'none' : String(resolvedProgramId)
+      const current = programAggregation.get(key) || {
+        programId: resolvedProgramId,
+        programName: resolvedProgramName,
+        totalAmount: 0,
+        countPayments: 0,
+      }
+
+      current.totalAmount += payment.amount || 0
+      current.countPayments += 1
+      if (resolvedProgramName) current.programName = resolvedProgramName
+      programAggregation.set(key, current)
+    })
+
+    const programRankingDetailed = Array.from(programAggregation.values())
+      .map((program) => ({
+        ...program,
+        avgAmount: program.countPayments > 0 ? program.totalAmount / program.countPayments : 0,
+      }))
+      .sort((a, b) => b.totalAmount - a.totalAmount)
+      .slice(0, 10)
 
     // 👥 2. CLASSEMENT PAR AGENT (qui encaisse le plus)
     // Fallback important: si payment.agentId est null, utiliser reservation.agentId.
@@ -246,7 +271,7 @@ router.get('/dashboard', async (req, res) => {
         // 🏆 Classements
         programRanking: {
           summary: {
-            totalPrograms: programRankingDetailed.length,
+            totalPrograms: programAggregation.size,
             totalRevenue: programRanking._sum?.amount || 0,
             totalPayments: programRanking._count?.id || 0
           },

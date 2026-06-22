@@ -459,7 +459,7 @@ export default function SoldeCaissePage() {
   }
 
 
-  const { statistics, parMois, summary, parMethodePaiement, parTypeDepense, parAgent } = data
+  const { statistics, parMois, summary, parMethodePaiement, parTypeDepense } = data
   const { totalPaiements, totalDepenses, gainPrevu, soldeFinal, soldeFinalPrevu } = statistics || { totalPaiements: 0, totalDepenses: 0, gainPrevu: 0, soldeFinal: 0, soldeFinalPrevu: 0 }
   const { moisMaxBenefice } = summary || { moisMaxBenefice: { mois: "", solde: 0 } }
   const peakTimelinePayment = timelineData.reduce((max, item) => (item.paiements > max.paiements ? item : max), timelineData[0] || { day: 0, paiements: 0, depenses: 0, profit: 0, label: "" })
@@ -502,6 +502,17 @@ export default function SoldeCaissePage() {
   const programDisplayData = useMemo(
     () => (hasPeriodFilter ? programComparisonData : programComparisonData.slice(0, 4)),
     [hasPeriodFilter, programComparisonData]
+  )
+
+  // Totaux agrégés de la période sélectionnée (mode focus) — basés sur les
+  // statistiques filtrées par dates/programme, comme les cartes du résumé.
+  const periodActualData = useMemo(
+    () => [{ label: "Période", paiements: totalPaiements, depenses: totalDepenses }],
+    [totalPaiements, totalDepenses]
+  )
+  const periodExpectedData = useMemo(
+    () => [{ label: "Période", paiementsPrevus: gainPrevu, depenses: totalDepenses }],
+    [gainPrevu, totalDepenses]
   )
 
   const agentIndicativeData = useMemo(() => {
@@ -643,9 +654,9 @@ export default function SoldeCaissePage() {
       });
 
       lines.push("");
-      lines.push("Par agent,Agent,Total,Count");
-      (parAgent || []).forEach((item) => {
-        lines.push([toCsv("Par agent"), toCsv(item.agentName), toCsv(item.total), toCsv(item.count)].join(","));
+      lines.push("Par agent,Agent,Email,Total,Count");
+      (analyticsData?.agentRanking?.details || []).forEach((item) => {
+        lines.push([toCsv("Par agent"), toCsv(item.agentName), toCsv(item.agentEmail), toCsv(item.totalAmount), toCsv(item.countPayments)].join(","));
       });
 
       const csv = "\uFEFF" + lines.join("\n");
@@ -671,7 +682,7 @@ export default function SoldeCaissePage() {
     gainPrevu,
     moisMaxBenefice?.mois,
     moisMaxBenefice?.solde,
-    parAgent,
+    analyticsData,
     parMethodePaiement,
     parMois,
     parTypeDepense,
@@ -1007,6 +1018,102 @@ export default function SoldeCaissePage() {
             </p>
           </CardContent>
         </Card>
+
+        {datesReady && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-lg">Total Paiements vs Dépenses</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-72 p-1">
+                  <ChartContainer config={monthlyActualConfig} className="h-full w-full aspect-auto">
+                    <BarChart data={periodActualData} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tick={(props: any) => {
+                          const { x, y, payload } = props
+                          const label = String(payload?.value || "")
+                          const diff = totalPaiements - totalDepenses
+                          return (
+                            <g transform={`translate(${x},${y})`}>
+                              <text x={0} y={0} dy={10} textAnchor="middle" fill="#64748b" fontSize={11}>
+                                {label}
+                              </text>
+                              <text x={0} y={0} dy={25} textAnchor="middle" fill={diff >= 0 ? "#16a34a" : "#dc2626"} fontSize={12} fontWeight={700}>
+                                {formatSignedCurrency(diff)}
+                              </text>
+                            </g>
+                          )
+                        }}
+                        height={44}
+                      />
+                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value))} />
+                      <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
+                      <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Bar dataKey="paiements" fill="var(--color-paiements)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="depenses" fill="var(--color-depenses)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ChartContainer>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {formatDateLabel(appliedDateDebut)} → {formatDateLabel(appliedDateFin)} • Paiements {formatCurrency(totalPaiements)} • Dépenses {formatCurrency(totalDepenses)}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-lg">Total Paiements Prévus vs Dépenses</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-72 p-1">
+                  <ChartContainer config={monthlyExpectedConfig} className="h-full w-full aspect-auto">
+                    <BarChart data={periodExpectedData} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tick={(props: any) => {
+                          const { x, y, payload } = props
+                          const label = String(payload?.value || "")
+                          const diff = gainPrevu - totalDepenses
+                          return (
+                            <g transform={`translate(${x},${y})`}>
+                              <text x={0} y={0} dy={10} textAnchor="middle" fill="#64748b" fontSize={11}>
+                                {label}
+                              </text>
+                              <text x={0} y={0} dy={25} textAnchor="middle" fill={diff >= 0 ? "#16a34a" : "#dc2626"} fontSize={12} fontWeight={700}>
+                                {formatSignedCurrency(diff)}
+                              </text>
+                            </g>
+                          )
+                        }}
+                        height={44}
+                      />
+                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value))} />
+                      <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
+                      <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Bar dataKey="paiementsPrevus" fill="var(--color-paiementsPrevus)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="depenses" fill="var(--color-depenses)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ChartContainer>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Paiements prévus {formatCurrency(gainPrevu)} • Dépenses {formatCurrency(totalDepenses)}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {!datesReady && (
         <>

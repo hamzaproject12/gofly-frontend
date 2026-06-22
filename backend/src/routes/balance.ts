@@ -797,7 +797,7 @@ router.get('/charts/program-comparison', async (req, res) => {
     const selectedProgram = programme && programme !== 'tous' ? (programme as string) : null;
     const dataByProgram = new Map<string, { paiements: number; depenses: number; paiementsPrevus: number }>();
 
-    const [payments, expenses, reservations, fixedChargeExpenses] = await Promise.all([
+    const [payments, expenses, reservations] = await Promise.all([
       prisma.payment.findMany({
         where: {
           ...(Object.keys(dateFilter).length > 0 && { paymentDate: dateFilter }),
@@ -827,18 +827,6 @@ router.get('/charts/program-comparison', async (req, res) => {
           price: true,
           program: { select: { name: true } }
         }
-      }),
-      prisma.expense.findMany({
-        where: {
-          ...(Object.keys(dateFilter).length > 0 && { date: dateFilter }),
-          programId: null,
-          fixedChargeOccurrence: {
-            isNot: null
-          }
-        },
-        select: {
-          amount: true
-        }
       })
     ]);
 
@@ -866,23 +854,6 @@ router.get('/charts/program-comparison', async (req, res) => {
       const current = ensure(name);
       current.paiementsPrevus += r.price || 0;
     });
-
-    const fixedChargesTotal = fixedChargeExpenses.reduce((sum, item) => sum + (item.amount || 0), 0);
-    if (fixedChargesTotal > 0) {
-      if (selectedProgram) {
-        const current = ensure(selectedProgram);
-        current.depenses += fixedChargesTotal;
-      } else {
-        const programNames = Array.from(dataByProgram.keys());
-        if (programNames.length > 0) {
-          const share = fixedChargesTotal / programNames.length;
-          programNames.forEach((name) => {
-            const current = ensure(name);
-            current.depenses += share;
-          });
-        }
-      }
-    }
 
     const comparison = Array.from(dataByProgram.entries())
       .map(([programName, values]) => ({ programName, ...values }))

@@ -486,9 +486,10 @@ export default function SoldeCaissePage() {
     profitDiffs[0] || { day: 0, label: "", diff: 0 }
   )
 
-  // Quand aucun filtre de période n'est actif, on limite les 4 graphiques
-  // (par mois / par programme) aux 4 derniers éléments faute de place.
-  // Les calculs du résumé en haut restent toujours généraux.
+  // Sans plage de dates (mode vue d'ensemble) : « par mois » est limité aux 4
+  // mois les plus récents et « par programme » aux 4 premiers (les plus gros),
+  // faute de place. Avec une plage de dates remplie, ces graphiques sont masqués.
+  // Les totaux du résumé en haut restent toujours généraux.
   const hasPeriodFilter = datesReady
 
   const timelineDisplayData = timelineData
@@ -499,7 +500,7 @@ export default function SoldeCaissePage() {
   )
 
   const programDisplayData = useMemo(
-    () => (hasPeriodFilter ? programComparisonData : programComparisonData.slice(-4)),
+    () => (hasPeriodFilter ? programComparisonData : programComparisonData.slice(0, 4)),
     [hasPeriodFilter, programComparisonData]
   )
 
@@ -817,7 +818,7 @@ export default function SoldeCaissePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-3">
                 <Label htmlFor="programme" className="text-sm font-semibold text-gray-700">
                   🏢 Programme
@@ -833,21 +834,6 @@ export default function SoldeCaissePage() {
                         {programme.name}
                       </SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-3">
-                <Label htmlFor="periode" className="text-sm font-semibold text-gray-700">
-                  📊 Période
-                </Label>
-                <Select value={periodeFilter} onValueChange={(value) => setPeriodeFilter(value)}>
-                  <SelectTrigger id="periode" className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-11">
-                    <SelectValue placeholder="Par mois" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="mois">📅 Par mois</SelectItem>
-                    <SelectItem value="trimestre">📊 Par trimestre</SelectItem>
-                    <SelectItem value="annee">📈 Par année</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1022,6 +1008,8 @@ export default function SoldeCaissePage() {
           </CardContent>
         </Card>
 
+        {!datesReady && (
+        <>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <Card className="border-0 shadow-lg">
             <CardHeader>
@@ -1254,9 +1242,14 @@ export default function SoldeCaissePage() {
           </Card>
         </div>
 
+        </>
+        )}
+
         {/* 🏆 TABLEAUX & CLASSEMENTS */}
         {analyticsData && analyticsData.programRanking && analyticsData.agentRanking && (
           <>
+            {!datesReady && (
+            <>
             <div className="mb-8">
               <div className="flex items-center gap-3 mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">🏆 Tableaux & Classements</h2>
@@ -1349,6 +1342,9 @@ export default function SoldeCaissePage() {
                 </CardContent>
               </Card>
             </div>
+
+            </>
+            )}
 
             {/* 👥 Indicateurs Agents */}
             <div className="mb-8">

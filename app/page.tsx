@@ -140,8 +140,6 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'dashboard' | 'hotel-detail'>('dashboard');
-  // Direction d'affichage des places par chambre (à comparer puis figer)
-  const [roomDensity, setRoomDensity] = useState<'bar' | 'list' | 'dots'>('bar');
   const [collapsedPrograms, setCollapsedPrograms] = useState<Set<number>>(new Set());
 
   const toggleProgram = (programId: number) => {
@@ -398,107 +396,44 @@ export default function HomePage() {
       { totalPlaces: 0, placesRestantes: 0 }
     );
 
-  // ============================================================
-  // 3 directions d'affichage des places par chambre (à comparer)
-  // ============================================================
-
-  // Direction A — Barre d'occupation fine + chiffres inline (carte compacte)
-  const renderRoomCardBar = (room: Room) => {
-    const s = getRoomTypeStyle(room.roomType);
-    const pct = room.totalPlaces > 0 ? (room.placesOccupees / room.totalPlaces) * 100 : 0;
-    return (
-      <div key={room.id} className={`${s.bgColor} rounded-lg border ${s.borderColor} p-3 shadow-sm`}>
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-base">{getRoomTypeIcon(room.roomType)}</span>
-            <span className={`text-sm font-medium truncate ${s.textColor}`}>
-              {getRoomTypeLabel(room.roomType)} {getGenderIcon(room.gender)}
-            </span>
-          </div>
-          <Badge className={`shrink-0 text-xs ${s.badgeColor}`}>
-            {room.placesOccupees}/{room.totalPlaces}
-          </Badge>
-        </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-green-200">
-          <div className="h-full rounded-full bg-red-500 transition-all" style={{ width: `${pct}%` }} />
-        </div>
-        <p className={`mt-1.5 text-xs ${s.textColor}`}>
-          {room.placesRestantes} libre{room.placesRestantes > 1 ? 's' : ''} · {room.placesOccupees} occupé
-          {room.placesOccupees > 1 ? 's' : ''}
-        </p>
-      </div>
-    );
-  };
-
-  // Direction B — Lignes denses (pas de carte par chambre, une ligne par type)
-  const renderRoomRow = (room: Room) => {
-    const s = getRoomTypeStyle(room.roomType);
-    const pct = room.totalPlaces > 0 ? (room.placesOccupees / room.totalPlaces) * 100 : 0;
-    return (
-      <div key={room.id} className="flex items-center gap-3 px-3 py-2">
-        <span className="w-5 text-center text-base">{getRoomTypeIcon(room.roomType)}</span>
-        <span className={`w-28 shrink-0 truncate text-sm font-medium ${s.textColor}`}>
-          {getRoomTypeLabel(room.roomType)} {getGenderIcon(room.gender)}
-        </span>
-        <div className="h-2 flex-1 overflow-hidden rounded-full bg-green-200">
-          <div className="h-full rounded-full bg-red-500" style={{ width: `${pct}%` }} />
-        </div>
-        <span className="w-12 text-right text-sm font-semibold tabular-nums text-gray-700">
-          {room.placesOccupees}/{room.totalPlaces}
-        </span>
-        <span className="w-20 text-right text-xs text-gray-500">
-          {room.placesRestantes} libre{room.placesRestantes > 1 ? 's' : ''}
-        </span>
-      </div>
-    );
-  };
-
-  // Direction C — Pastilles miniatures + carte serrée (style actuel compacté)
+  // Affichage des places par chambre — pastilles compactes (chips à largeur du contenu)
   const renderRoomCardDots = (room: Room) => {
     const s = getRoomTypeStyle(room.roomType);
     const maxDots = 8;
     return (
-      <div key={room.id} className={`${s.bgColor} rounded-lg border ${s.borderColor} p-2.5 shadow-sm`}>
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-base">{getRoomTypeIcon(room.roomType)}</span>
-            <span className={`text-sm font-medium truncate ${s.textColor}`}>
-              {getRoomTypeLabel(room.roomType)} {getGenderIcon(room.gender)}
-            </span>
-          </div>
-          <Badge className={`shrink-0 text-xs ${s.badgeColor}`}>
-            {room.placesOccupees}/{room.totalPlaces}
-          </Badge>
-        </div>
-        <div className="flex flex-wrap items-center gap-1">
+      <div
+        key={room.id}
+        className={`${s.bgColor} inline-flex items-center gap-2 rounded-lg border ${s.borderColor} px-2.5 py-1.5 shadow-sm`}
+      >
+        <span className="text-sm leading-none">{getRoomTypeIcon(room.roomType)}</span>
+        <span className={`whitespace-nowrap text-xs font-semibold ${s.textColor}`}>
+          {getRoomTypeLabel(room.roomType)} {getGenderIcon(room.gender)}
+        </span>
+        <Badge className={`shrink-0 px-1.5 py-0 text-[10px] ${s.badgeColor}`}>
+          {room.placesOccupees}/{room.totalPlaces}
+        </Badge>
+        <div className="flex items-center gap-0.5">
           {room.visualPlaces.slice(0, maxDots).map((place, index) => (
             <div
               key={index}
-              className={`h-3 w-3 rounded-full ${place.isOccupied ? 'bg-red-500' : 'bg-green-500'}`}
+              className={`h-2.5 w-2.5 rounded-full ${place.isOccupied ? 'bg-red-500' : 'bg-green-500'}`}
               title={place.isOccupied ? 'Réservé' : 'Disponible'}
             />
           ))}
           {room.totalPlaces > maxDots && (
-            <span className={`text-xs ${s.textColor}`}>+{room.totalPlaces - maxDots}</span>
+            <span className={`text-[10px] font-medium ${s.textColor}`}>+{room.totalPlaces - maxDots}</span>
           )}
         </div>
       </div>
     );
   };
 
-  // Rend les chambres d'un hôtel selon la direction d'affichage sélectionnée
+  // Rend les chambres d'un hôtel : pastilles compactes qui se rangent côte à côte
   const renderRoomsForHotel = (rooms: Room[]) => {
     const sorted = [...rooms].sort(
       (a, b) => getRoomTypeOrder(a.roomType) - getRoomTypeOrder(b.roomType)
     );
-    if (roomDensity === 'list') {
-      return <div className="divide-y rounded-lg border bg-white">{sorted.map(renderRoomRow)}</div>;
-    }
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-        {sorted.map((room) => (roomDensity === 'bar' ? renderRoomCardBar(room) : renderRoomCardDots(room)))}
-      </div>
-    );
+    return <div className="flex flex-wrap gap-2">{sorted.map(renderRoomCardDots)}</div>;
   };
 
   if (loading) {
@@ -574,32 +509,6 @@ export default function HomePage() {
                   <span className="font-medium">Vue Types Chambres</span>
                 </Button>
               </div>
-
-              {/* Sélecteur d'affichage des places — temporaire, pour comparer les 3 directions */}
-              {viewMode === 'dashboard' && (
-                <div className="flex items-center gap-2">
-                  <span className="hidden text-sm font-medium text-gray-500 sm:inline">Affichage&nbsp;:</span>
-                  <div className="flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
-                    {([
-                      { key: 'bar', label: 'Barre' },
-                      { key: 'list', label: 'Liste' },
-                      { key: 'dots', label: 'Pastilles' },
-                    ] as const).map((opt) => (
-                      <button
-                        key={opt.key}
-                        onClick={() => setRoomDensity(opt.key)}
-                        className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
-                          roomDensity === opt.key
-                            ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow'
-                            : 'text-gray-600 hover:bg-gray-100'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>

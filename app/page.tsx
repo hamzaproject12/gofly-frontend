@@ -83,6 +83,57 @@ interface RoomAvailabilityData {
   };
 }
 
+// Configuration visuelle d'une ville (Madina / Makkah / Autre)
+interface CityConfig {
+  key: string;
+  label: string;
+  icon: string;
+  order: number;
+  headerGradient: string;
+  sectionBg: string;
+  sectionBorder: string;
+  accentText: string;
+}
+
+// En-tête coloré d'un bloc ville : icône, nom, nombre d'hôtels et places libres
+function CityHeader({
+  config,
+  hotelCount,
+  stats,
+}: {
+  config: CityConfig;
+  hotelCount: number;
+  stats: { totalPlaces: number; placesRestantes: number };
+}) {
+  return (
+    <div className={`flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r ${config.headerGradient}`}>
+      <div className="flex items-center gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/20 text-2xl shadow-inner ring-1 ring-white/30">
+          {config.icon}
+        </div>
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-bold leading-none tracking-tight text-white">{config.label}</h3>
+            <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-semibold text-white">
+              {hotelCount} hôtel{hotelCount > 1 ? 's' : ''}
+            </span>
+          </div>
+          <p className="mt-1 text-xs font-medium text-white/85">
+            {stats.placesRestantes} place{stats.placesRestantes > 1 ? 's' : ''} libre
+            {stats.placesRestantes > 1 ? 's' : ''} sur {stats.totalPlaces}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 rounded-xl bg-white/15 px-3 py-2 ring-1 ring-white/25">
+        <Bed className="h-4 w-4 text-white" />
+        <span className="text-sm font-bold tabular-nums text-white">
+          {stats.placesRestantes}/{stats.totalPlaces}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [roomData, setRoomData] = useState<RoomAvailabilityData | null>(null);
@@ -270,6 +321,80 @@ export default function HomePage() {
       default: return roomType;
     }
   };
+
+  // --- Regroupement des hôtels par ville (Madina / Makkah / Autre) ---
+  // Le backend renvoie hotelName au format "Nom de l'hôtel (Ville)"
+  const parseHotelCity = (hotelName: string): string => {
+    const match = hotelName.match(/\(([^)]+)\)\s*$/);
+    return match ? match[1].trim() : 'Autre';
+  };
+
+  // Nom de l'hôtel sans le suffixe "(Ville)" devenu redondant dans un bloc ville
+  const getHotelDisplayName = (hotelName: string): string => {
+    return hotelName.replace(/\s*\([^)]*\)\s*$/, '').trim() || hotelName;
+  };
+
+  const getCityConfig = (city: string): CityConfig => {
+    const c = city.toLowerCase();
+    if (c.includes('madina') || c.includes('médine') || c.includes('medine')) {
+      return {
+        key: 'Madina',
+        label: 'Madina',
+        icon: '🕌',
+        order: 1,
+        headerGradient: 'from-emerald-500 to-green-600',
+        sectionBg: 'bg-emerald-50/60',
+        sectionBorder: 'border-emerald-200',
+        accentText: 'text-emerald-600',
+      };
+    }
+    if (c.includes('makkah') || c.includes('makka') || c.includes('mecque') || c.includes('mecca')) {
+      return {
+        key: 'Makkah',
+        label: 'Makkah',
+        icon: '🕋',
+        order: 2,
+        headerGradient: 'from-blue-600 to-indigo-600',
+        sectionBg: 'bg-blue-50/60',
+        sectionBorder: 'border-blue-200',
+        accentText: 'text-blue-600',
+      };
+    }
+    return {
+      key: city || 'Autre',
+      label: city || 'Autre',
+      icon: '🏨',
+      order: 3,
+      headerGradient: 'from-slate-500 to-gray-600',
+      sectionBg: 'bg-slate-50/70',
+      sectionBorder: 'border-slate-200',
+      accentText: 'text-slate-600',
+    };
+  };
+
+  // Regroupe les hôtels d'un programme par ville, triés Madina → Makkah → Autre
+  const groupHotelsByCity = (hotels: HotelData[]) => {
+    const groups: Record<string, { config: CityConfig; hotels: HotelData[] }> = {};
+    hotels.forEach((hotel) => {
+      const config = getCityConfig(parseHotelCity(hotel.hotelName));
+      if (!groups[config.key]) groups[config.key] = { config, hotels: [] };
+      groups[config.key].hotels.push(hotel);
+    });
+    return Object.values(groups).sort((a, b) => a.config.order - b.config.order);
+  };
+
+  // Total des places (totales / restantes) pour un groupe d'hôtels d'une ville
+  const getCityStats = (hotels: HotelData[]) =>
+    hotels.reduce(
+      (acc, h) => {
+        h.rooms.forEach((r) => {
+          acc.totalPlaces += r.totalPlaces;
+          acc.placesRestantes += r.placesRestantes;
+        });
+        return acc;
+      },
+      { totalPlaces: 0, placesRestantes: 0 }
+    );
 
   if (loading) {
     return (
@@ -570,14 +695,27 @@ export default function HomePage() {
 
                 {!collapsedPrograms.has(program.id) && (
                 <CardContent className="p-6">
-                  <div className="space-y-4">
-                    {program.hotels.map((hotel, hotelIndex) => (
-                      <div key={hotelIndex} className="border rounded-lg p-4 bg-gray-50">
-                        <div className="flex items-center gap-2 mb-3">
-                          <MapPin className="h-5 w-5 text-blue-500" />
-                          <h3 className="font-semibold text-gray-900">{hotel.hotelName}</h3>
-                        </div>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                  <div className="space-y-5">
+                    {groupHotelsByCity(program.hotels).map((group) => {
+                      const cityStats = getCityStats(group.hotels);
+                      return (
+                        <div
+                          key={group.config.key}
+                          className={`overflow-hidden rounded-2xl border ${group.config.sectionBorder} ${group.config.sectionBg} shadow-sm`}
+                        >
+                          <CityHeader
+                            config={group.config}
+                            hotelCount={group.hotels.length}
+                            stats={cityStats}
+                          />
+                          <div className="space-y-4 p-3 sm:p-4">
+                            {group.hotels.map((hotel, hotelIndex) => (
+                              <div key={hotelIndex} className="rounded-xl border bg-white p-4 shadow-sm">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <MapPin className={`h-5 w-5 ${group.config.accentText}`} />
+                                  <h3 className="font-semibold text-gray-900">{getHotelDisplayName(hotel.hotelName)}</h3>
+                                </div>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                           {hotel.rooms
                             .sort((a, b) => getRoomTypeOrder(a.roomType) - getRoomTypeOrder(b.roomType))
                             .map((room) => {
@@ -622,9 +760,13 @@ export default function HomePage() {
                               </div>
                             );
                           })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </CardContent>
                 )}
@@ -740,8 +882,21 @@ export default function HomePage() {
 
                 {!collapsedPrograms.has(program.id) && (
                 <CardContent className="p-6">
-                  <div className="space-y-6">
-                    {program.hotels.map((hotel, hotelIndex) => {
+                  <div className="space-y-5">
+                    {groupHotelsByCity(program.hotels).map((group) => {
+                      const cityStats = getCityStats(group.hotels);
+                      return (
+                        <div
+                          key={group.config.key}
+                          className={`overflow-hidden rounded-2xl border ${group.config.sectionBorder} ${group.config.sectionBg} shadow-sm`}
+                        >
+                          <CityHeader
+                            config={group.config}
+                            hotelCount={group.hotels.length}
+                            stats={cityStats}
+                          />
+                          <div className="space-y-6 p-3 sm:p-4">
+                            {group.hotels.map((hotel, hotelIndex) => {
                       // Grouper les chambres par type seulement (fusionner tous les genres)
                       const roomsByType = hotel.rooms.reduce((acc, room) => {
                         const typeKey = room.roomType;
@@ -764,10 +919,10 @@ export default function HomePage() {
                       }, {} as any);
 
                       return (
-                        <div key={hotelIndex} className="border rounded-lg p-4 bg-gray-50">
+                        <div key={hotelIndex} className="rounded-xl border bg-white p-4 shadow-sm">
                           <div className="flex items-center gap-2 mb-4">
-                            <MapPin className="h-5 w-5 text-blue-500" />
-                            <h3 className="font-semibold text-gray-900 text-lg">{hotel.hotelName}</h3>
+                            <MapPin className={`h-5 w-5 ${group.config.accentText}`} />
+                            <h3 className="font-semibold text-gray-900 text-lg">{getHotelDisplayName(hotel.hotelName)}</h3>
                           </div>
                           
                           {/* Types de chambres en horizontal - Triés et sans séparation de genre */}
@@ -866,8 +1021,12 @@ export default function HomePage() {
                                   {Math.round((hotel.rooms.reduce((sum, room) => sum + room.placesOccupees, 0) / hotel.rooms.reduce((sum, room) => sum + room.totalPlaces, 0)) * 100)}%
                                 </p>
                                 <p className="text-gray-600">Taux occupation</p>
-          </div>
-        </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                              );
+                            })}
                           </div>
                         </div>
                       );

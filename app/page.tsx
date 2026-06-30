@@ -95,6 +95,17 @@ interface CityConfig {
   accentText: string;
 }
 
+// Liserés de couleur attribués aux cartes de programme pour les distinguer en un coup d'œil
+const PROGRAM_ACCENTS = [
+  'border-l-indigo-500',
+  'border-l-emerald-500',
+  'border-l-sky-500',
+  'border-l-violet-500',
+  'border-l-amber-500',
+  'border-l-rose-500',
+  'border-l-teal-500',
+];
+
 // En-tête coloré d'un bloc ville : icône, nom, nombre d'hôtels et places libres
 function CityHeader({
   config,
@@ -396,9 +407,13 @@ export default function HomePage() {
       { totalPlaces: 0, placesRestantes: 0 }
     );
 
+  // Liseré de couleur d'une carte programme (rotation sur la palette)
+  const getProgramAccentBorder = (index: number) =>
+    PROGRAM_ACCENTS[index % PROGRAM_ACCENTS.length];
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      <div className="min-h-screen flex items-center justify-center bg-slate-100">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Chargement de la disponibilité des chambres...</p>
@@ -409,7 +424,7 @@ export default function HomePage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      <div className="min-h-screen flex items-center justify-center bg-slate-100">
         <div className="text-center">
           <div className="text-red-500 text-6xl mb-4">❌</div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Erreur</h2>
@@ -426,7 +441,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-slate-100">
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {/* Header avec informations de l'agent */}
         <div className="mb-8">
@@ -473,112 +488,61 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Légende des types de chambres */}
-        <Card className="border-0 shadow-lg mb-6">
-          <CardHeader className="bg-gradient-to-r from-gray-50 to-blue-50">
-            <CardTitle className="flex items-center gap-2">
-              <span className="text-xl">🎨</span>
-              <span>Légende des Types de Chambres</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="flex items-center gap-3 p-3 bg-blue-50 border-2 border-blue-500 rounded-lg">
-                <span className="text-lg">🏠</span>
-                <div>
-                  <p className="font-medium text-blue-700">SINGLE</p>
-                  <p className="text-xs text-blue-600">1 personne</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-green-50 border-2 border-green-500 rounded-lg">
-                <span className="text-lg">🏘️</span>
-                <div>
-                  <p className="font-medium text-green-700">DOUBLE</p>
-                  <p className="text-xs text-green-600">2 personnes</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-purple-50 border-2 border-purple-500 rounded-lg">
-                <span className="text-lg">🏢</span>
-                <div>
-                  <p className="font-medium text-purple-700">TRIPLE</p>
-                  <p className="text-xs text-purple-600">3 personnes</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-orange-50 border-2 border-orange-500 rounded-lg">
-                <span className="text-lg">🏬</span>
-                <div>
-                  <p className="font-medium text-orange-700">QUAD</p>
-                  <p className="text-xs text-orange-600">4 personnes</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-red-50 border-2 border-red-500 rounded-lg">
-                <span className="text-lg">🏭</span>
-                <div>
-                  <p className="font-medium text-red-700">QUINT</p>
-                  <p className="text-xs text-red-600">5 personnes</p>
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 flex items-center justify-center gap-6 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-red-500 border-2 border-red-600"></div>
-                <span className="text-gray-600">Réservé</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-green-500 border-2 border-green-600"></div>
-                <span className="text-gray-600">Disponible</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Statistiques globales */}
         {roomData?.summary && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <Card className="border-0 shadow-lg">
+            <Card className="border border-slate-200 shadow-sm bg-white">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Programmes Actifs</p>
                     <p className="text-2xl font-bold text-indigo-600">{roomData.summary.totalPrograms}</p>
                   </div>
-                  <Calendar className="h-8 w-8 text-indigo-500" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50">
+                    <Calendar className="h-6 w-6 text-indigo-600" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-lg">
+            <Card className="border border-slate-200 shadow-sm bg-white">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Total Chambres</p>
                     <p className="text-2xl font-bold text-blue-600">{roomData.summary.totalRooms}</p>
                   </div>
-                  <Hotel className="h-8 w-8 text-blue-500" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50">
+                    <Hotel className="h-6 w-6 text-blue-600" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-lg">
+            <Card className="border border-slate-200 shadow-sm bg-white">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Places Occupées</p>
                     <p className="text-2xl font-bold text-green-600">{roomData.summary.totalOccupied}</p>
                   </div>
-                  <UserCheck className="h-8 w-8 text-green-500" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-50">
+                    <UserCheck className="h-6 w-6 text-green-600" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-lg">
+            <Card className="border border-slate-200 shadow-sm bg-white">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Places Disponibles</p>
                     <p className="text-2xl font-bold text-red-600">{roomData.summary.totalAvailable}</p>
                   </div>
-                  <UserX className="h-8 w-8 text-red-500" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50">
+                    <UserX className="h-6 w-6 text-red-600" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -589,8 +553,15 @@ export default function HomePage() {
         {viewMode === 'dashboard' ? (
           /* Vue Dashboard - Liste des programmes */
           <div className="space-y-6">
-            {roomData?.data.map((program) => (
-              <Card key={program.id} className={`border-0 shadow-lg ${program.isDeleted ? 'border-2 border-yellow-300 bg-yellow-50' : ''}`}>
+            {roomData?.data.map((program, programIndex) => (
+              <Card
+                key={program.id}
+                className={`overflow-hidden border border-slate-200 border-l-4 shadow-md transition-shadow hover:shadow-lg ${
+                  program.isDeleted
+                    ? 'border-l-yellow-400 bg-yellow-50'
+                    : `${getProgramAccentBorder(programIndex)} bg-white`
+                }`}
+              >
                 <CardHeader className={`${program.isDeleted ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' : 'bg-gradient-to-r from-indigo-50 to-blue-50'} py-3`}>
                   <div className="flex items-center justify-between flex-wrap gap-3">
                     {/* Nom du programme et date */}
@@ -776,8 +747,15 @@ export default function HomePage() {
         ) : (
           /* Vue Détail Hôtels - Programmes → Hôtels → Types de chambres horizontaux */
           <div className="space-y-6">
-            {roomData?.data.map((program) => (
-              <Card key={program.id} className={`border-0 shadow-lg ${program.isDeleted ? 'border-2 border-yellow-300 bg-yellow-50' : ''}`}>
+            {roomData?.data.map((program, programIndex) => (
+              <Card
+                key={program.id}
+                className={`overflow-hidden border border-slate-200 border-l-4 shadow-md transition-shadow hover:shadow-lg ${
+                  program.isDeleted
+                    ? 'border-l-yellow-400 bg-yellow-50'
+                    : `${getProgramAccentBorder(programIndex)} bg-white`
+                }`}
+              >
                 <CardHeader className={`${program.isDeleted ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' : 'bg-gradient-to-r from-indigo-50 to-blue-50'} py-3`}>
                   <div className="flex items-center justify-between flex-wrap gap-3">
                     {/* Nom du programme et date */}
@@ -1040,7 +1018,7 @@ export default function HomePage() {
         )}
 
         {roomData?.data.length === 0 && (
-          <Card className="border-0 shadow-lg">
+          <Card className="border border-slate-200 shadow-sm bg-white">
             <CardContent className="p-12 text-center">
               <div className="text-6xl mb-4">🏨</div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Aucun programme trouvé</h3>

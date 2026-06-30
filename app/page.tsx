@@ -396,46 +396,6 @@ export default function HomePage() {
       { totalPlaces: 0, placesRestantes: 0 }
     );
 
-  // Affichage des places par chambre — pastilles compactes (chips à largeur du contenu)
-  const renderRoomCardDots = (room: Room) => {
-    const s = getRoomTypeStyle(room.roomType);
-    const maxDots = 8;
-    return (
-      <div
-        key={room.id}
-        className={`${s.bgColor} inline-flex items-center gap-2 rounded-lg border ${s.borderColor} px-2.5 py-1.5 shadow-sm`}
-      >
-        <span className="text-sm leading-none">{getRoomTypeIcon(room.roomType)}</span>
-        <span className={`whitespace-nowrap text-xs font-semibold ${s.textColor}`}>
-          {getRoomTypeLabel(room.roomType)} {getGenderIcon(room.gender)}
-        </span>
-        <Badge className={`shrink-0 px-1.5 py-0 text-[10px] ${s.badgeColor}`}>
-          {room.placesOccupees}/{room.totalPlaces}
-        </Badge>
-        <div className="flex items-center gap-0.5">
-          {room.visualPlaces.slice(0, maxDots).map((place, index) => (
-            <div
-              key={index}
-              className={`h-2.5 w-2.5 rounded-full ${place.isOccupied ? 'bg-red-500' : 'bg-green-500'}`}
-              title={place.isOccupied ? 'Réservé' : 'Disponible'}
-            />
-          ))}
-          {room.totalPlaces > maxDots && (
-            <span className={`text-[10px] font-medium ${s.textColor}`}>+{room.totalPlaces - maxDots}</span>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // Rend les chambres d'un hôtel : pastilles compactes qui se rangent côte à côte
-  const renderRoomsForHotel = (rooms: Room[]) => {
-    const sorted = [...rooms].sort(
-      (a, b) => getRoomTypeOrder(a.roomType) - getRoomTypeOrder(b.roomType)
-    );
-    return <div className="flex flex-wrap gap-2">{sorted.map(renderRoomCardDots)}</div>;
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
@@ -479,7 +439,7 @@ export default function HomePage() {
                 Gestion des programmes Omra - Disponibilité des chambres
               </p>
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-3">
+            <div className="flex items-center gap-4">
               {/* Toggle des vues avec design amélioré */}
               <div className="flex bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-1 shadow-lg border border-blue-200">
                 <Button
@@ -755,7 +715,52 @@ export default function HomePage() {
                                   <MapPin className={`h-5 w-5 ${group.config.accentText}`} />
                                   <h3 className="font-semibold text-gray-900">{getHotelDisplayName(hotel.hotelName)}</h3>
                                 </div>
-                                {renderRoomsForHotel(hotel.rooms)}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                          {hotel.rooms
+                            .sort((a, b) => getRoomTypeOrder(a.roomType) - getRoomTypeOrder(b.roomType))
+                            .map((room) => {
+                            const roomStyle = getRoomTypeStyle(room.roomType);
+                            return (
+                              <div 
+                                key={room.id} 
+                                className={`${roomStyle.bgColor} rounded-lg p-4 border-2 ${roomStyle.borderColor} shadow-sm hover:shadow-md transition-shadow`}
+                              >
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg">{getRoomTypeIcon(room.roomType)}</span>
+                                    <span className={`font-medium ${roomStyle.textColor}`}>
+                                      {getRoomTypeLabel(room.roomType)} {getGenderIcon(room.gender)}
+                                    </span>
+                                  </div>
+                                  <Badge className={`text-xs ${roomStyle.badgeColor}`}>
+                                    {room.placesOccupees}/{room.totalPlaces}
+                                  </Badge>
+                                </div>
+                                
+                                {/* Affichage visuel des places */}
+                                <div className="flex items-center gap-1 mb-3">
+                                  {room.visualPlaces.map((place, index) => (
+                                    <div
+                                      key={index}
+                                  className={`w-6 h-6 rounded-full border-2 ${
+                                    place.isOccupied 
+                                      ? 'bg-red-500 border-red-600' 
+                                      : 'bg-green-500 border-green-600'
+                                  }`}
+                                  title={place.isOccupied ? 'Réservé' : 'Disponible'}
+                                    />
+                                  ))}
+                                </div>
+                                
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className={roomStyle.textColor}>
+                                    {room.placesOccupees} occupé{room.placesOccupees > 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                                </div>
                               </div>
                             ))}
                           </div>

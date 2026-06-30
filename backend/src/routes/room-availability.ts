@@ -18,6 +18,7 @@ router.get('/', async (req, res) => {
             program: true
           }
         },
+        hotelsAutre: true,
         reservations: {
           where: {
             status: {
@@ -46,6 +47,10 @@ router.get('/', async (req, res) => {
       const totalPrice = program.reservations.reduce((sum, res) => sum + (res.price || 0), 0)
       const totalPaid = program.reservations.reduce((sum, res) => sum + (res.paidAmount || 0), 0)
       const remainingAmount = totalPrice - totalPaid
+
+      // Durée du séjour = jours Madina + jours Makkah + jours des hôtels "Autre"
+      const dureeAutre = program.hotelsAutre.reduce((sum, h) => sum + (h.nbJours || 0), 0)
+      const dureeJours = program.nbJoursMadina + program.nbJoursMakkah + dureeAutre
 
       // Grouper les chambres par hôtel
       const roomsByHotel = program.rooms.reduce((acc, room) => {
@@ -80,6 +85,7 @@ router.get('/', async (req, res) => {
         id: program.id,
         name: program.name,
         created_at: program.created_at,
+        dureeJours,
         isDeleted: (program as any).isDeleted || false,
         deletedAt: (program as any).deletedAt || null,
         statistics: {

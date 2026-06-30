@@ -23,7 +23,8 @@ import {
   Percent,
   Calendar as CalendarIcon,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 
 interface Agent {
@@ -58,6 +59,7 @@ interface Program {
   id: number;
   name: string;
   created_at: string;
+  dureeJours?: number;
   statistics: {
     totalRooms: number;
     totalPlaces: number;
@@ -93,6 +95,7 @@ interface CityConfig {
   sectionBg: string;
   sectionBorder: string;
   accentText: string;
+  ringColor: string;
 }
 
 // Liserés de couleur attribués aux cartes de programme pour les distinguer en un coup d'œil
@@ -145,6 +148,55 @@ function CityHeader({
   );
 }
 
+// Donut circulaire de progression pour un type de chambre
+function RoomDonut({
+  occupied,
+  total,
+  color,
+  label,
+  subLabel,
+}: {
+  occupied: number;
+  total: number;
+  color: string;
+  label: string;
+  subLabel: string;
+}) {
+  const radius = 24;
+  const stroke = 5;
+  const circumference = 2 * Math.PI * radius;
+  const pct = total > 0 ? Math.min(occupied / total, 1) : 0;
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <div className="relative h-14 w-14">
+        <svg viewBox="0 0 56 56" className="h-14 w-14 -rotate-90">
+          <circle cx="28" cy="28" r={radius} fill="none" stroke="#e5e7eb" strokeWidth={stroke} />
+          <circle
+            cx="28"
+            cy="28"
+            r={radius}
+            fill="none"
+            stroke={color}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference * (1 - pct)}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-[11px] font-bold text-gray-800">
+            {occupied}/{total}
+          </span>
+        </div>
+      </div>
+      <div className="text-center leading-tight">
+        <p className="text-xs font-semibold text-gray-700">{label}</p>
+        <p className="text-[10px] text-gray-400">{subLabel}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [roomData, setRoomData] = useState<RoomAvailabilityData | null>(null);
@@ -152,6 +204,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'dashboard' | 'hotel-detail'>('dashboard');
   const [collapsedPrograms, setCollapsedPrograms] = useState<Set<number>>(new Set());
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
   const toggleProgram = (programId: number) => {
     setCollapsedPrograms((prev) => {
@@ -162,6 +215,19 @@ export default function HomePage() {
         newSet.add(programId);
       }
       return newSet;
+    });
+  };
+
+  // Expansion des lignes de la Vue Types Chambres (tableau)
+  const toggleRow = (programId: number) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(programId)) {
+        next.delete(programId);
+      } else {
+        next.add(programId);
+      }
+      return next;
     });
   };
 
@@ -357,6 +423,7 @@ export default function HomePage() {
         sectionBg: 'bg-emerald-50/60',
         sectionBorder: 'border-emerald-200',
         accentText: 'text-emerald-600',
+        ringColor: '#10b981',
       };
     }
     if (c.includes('makkah') || c.includes('makka') || c.includes('mecque') || c.includes('mecca')) {
@@ -369,6 +436,7 @@ export default function HomePage() {
         sectionBg: 'bg-blue-50/60',
         sectionBorder: 'border-blue-200',
         accentText: 'text-blue-600',
+        ringColor: '#3b82f6',
       };
     }
     return {
@@ -380,6 +448,7 @@ export default function HomePage() {
       sectionBg: 'bg-slate-50/70',
       sectionBorder: 'border-slate-200',
       accentText: 'text-slate-600',
+      ringColor: '#64748b',
     };
   };
 
@@ -410,6 +479,75 @@ export default function HomePage() {
   // Liseré de couleur d'une carte programme (rotation sur la palette)
   const getProgramAccentBorder = (index: number) =>
     PROGRAM_ACCENTS[index % PROGRAM_ACCENTS.length];
+
+  // Libellés courts pour les donuts de type de chambre
+  const getRoomTypeShortLabel = (t: string) => {
+    switch (t) {
+      case 'SINGLE': return 'Single';
+      case 'DOUBLE': return 'Double';
+      case 'TRIPLE': return 'Triple';
+      case 'QUAD': return 'Quad';
+      case 'QUINT': return 'Quintuple';
+      default: return t;
+    }
+  };
+
+  const getRoomTypePersons = (t: string) => {
+    switch (t) {
+      case 'SINGLE': return '(1 pers.)';
+      case 'DOUBLE': return '(2 pers.)';
+      case 'TRIPLE': return '(3 pers.)';
+      case 'QUAD': return '(4 pers.)';
+      case 'QUINT': return '(5 pers.)';
+      default: return '';
+    }
+  };
+
+  // Carte d'un hôtel avec donuts circulaires par type de chambre (Vue Types Chambres)
+  const HotelDonutCard = ({ hotel }: { hotel: HotelData }) => {
+    const cfg = getCityConfig(parseHotelCity(hotel.hotelName));
+    const byType = hotel.rooms.reduce((acc, r) => {
+      if (!acc[r.roomType]) acc[r.roomType] = { roomType: r.roomType, total: 0, occ: 0 };
+      acc[r.roomType].total += r.totalPlaces;
+      acc[r.roomType].occ += r.placesOccupees;
+      return acc;
+    }, {} as Record<string, { roomType: string; total: number; occ: number }>);
+    const types = Object.values(byType).sort(
+      (a, b) => getRoomTypeOrder(a.roomType) - getRoomTypeOrder(b.roomType)
+    );
+    const totalPlaces = hotel.rooms.reduce((s, r) => s + r.totalPlaces, 0);
+    const occPlaces = hotel.rooms.reduce((s, r) => s + r.placesOccupees, 0);
+    return (
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className={`flex items-center justify-between gap-3 bg-gradient-to-r ${cfg.headerGradient} px-4 py-3`}>
+          <div className="min-w-0">
+            <h5 className="truncate font-bold text-white">{getHotelDisplayName(hotel.hotelName)}</h5>
+            <p className="flex items-center gap-1 text-xs text-white/85">
+              <MapPin className="h-3 w-3" /> {cfg.label}
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-xl font-bold leading-none text-white">
+              {occPlaces}/{totalPlaces}
+            </p>
+            <p className="text-[11px] text-white/80">places</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-3 p-4 sm:grid-cols-5">
+          {types.map((t) => (
+            <RoomDonut
+              key={t.roomType}
+              occupied={t.occ}
+              total={t.total}
+              color={cfg.ringColor}
+              label={getRoomTypeShortLabel(t.roomType)}
+              subLabel={getRoomTypePersons(t.roomType)}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -745,276 +883,127 @@ export default function HomePage() {
             ))}
           </div>
         ) : (
-          /* Vue Détail Hôtels - Programmes → Hôtels → Types de chambres horizontaux */
-          <div className="space-y-6">
-            {roomData?.data.map((program, programIndex) => (
-              <Card
-                key={program.id}
-                className={`overflow-hidden border border-slate-200 border-l-4 shadow-md transition-shadow hover:shadow-lg ${
-                  program.isDeleted
-                    ? 'border-l-yellow-400 bg-yellow-50'
-                    : `${getProgramAccentBorder(programIndex)} bg-white`
-                }`}
-              >
-                <CardHeader className={`${program.isDeleted ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' : 'bg-gradient-to-r from-indigo-50 to-blue-50'} py-3`}>
-                  <div className="flex items-center justify-between flex-wrap gap-3">
-                    {/* Nom du programme et date */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">🎯</span>
-                      <div>
-                        {program.isDeleted && (
-                          <Badge className="bg-yellow-500 text-white text-xs mb-1">Supprimé</Badge>
-                        )}
-                        <h2 className={`text-lg font-bold ${program.isDeleted ? 'text-yellow-900' : 'text-gray-900'}`}>
-                          {program.name}
-                        </h2>
-                        <p className="text-xs text-gray-600 flex items-center gap-1">
-                          <CalendarIcon className="h-3 w-3" />
-                          {new Date(program.created_at).toLocaleDateString('fr-FR')}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Statistiques compactes en ligne */}
-                    <div className="flex items-center gap-3 flex-wrap">
-                      {/* Montant restant à payer */}
-                      {program.statistics.remainingAmount !== undefined && (
-                        <div className="flex items-center gap-2 bg-yellow-100 border border-yellow-300 rounded-lg px-3 py-1.5">
-                          <Wallet className="h-4 w-4 text-yellow-700" />
-                          <div>
-                            <p className="text-xs text-yellow-800 font-medium">Restant</p>
-                            <p className="text-sm font-bold text-yellow-900">
-                              {program.statistics.remainingAmount.toLocaleString('fr-FR', { 
-                                minimumFractionDigits: 0, 
-                                maximumFractionDigits: 0 
-                              })} DH
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Places disponibles */}
-                      <div className="flex items-center gap-2 bg-blue-100 border border-blue-300 rounded-lg px-3 py-1.5">
-                        <Users className="h-4 w-4 text-blue-700" />
-                        <div>
-                          <p className="text-xs text-blue-800 font-medium">Places</p>
-                          <p className="text-sm font-bold text-blue-900">
-                            {program.statistics.placesRestantes} / {program.statistics.totalPlaces}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Taux d'occupation */}
-                      <div className="flex items-center gap-2 bg-green-100 border border-green-300 rounded-lg px-3 py-1.5">
-                        <Percent className="h-4 w-4 text-green-700" />
-                        <div>
-                          <p className="text-xs text-green-800 font-medium">Occupation</p>
-                          <p className="text-sm font-bold text-green-900">
-                            {program.statistics.occupancyRate}%
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Bouton de réduction/développement */}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleProgram(program.id)}
-                        className="h-8 w-8 p-0 hover:bg-gray-200"
-                        aria-label={collapsedPrograms.has(program.id) ? "Développer le programme" : "Réduire le programme"}
-                      >
-                        {collapsedPrograms.has(program.id) ? (
-                          <ChevronDown className="h-5 w-5" />
-                        ) : (
-                          <ChevronUp className="h-5 w-5" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Barre de progression de l'occupation - juste sous les nom et stats */}
-                  {(() => {
-                    const rate = parseInt(program.statistics.occupancyRate);
-                    const { gradient, glow } = getOccupancyGradient(rate);
-                    return (
-                      <div className="w-full mt-3 mb-0 overflow-hidden rounded-full h-3 bg-slate-200/70 shadow-inner ring-1 ring-black/5"
-                           style={{
-                             backgroundImage: 'linear-gradient(90deg, rgba(100, 116, 139, 0.12) 1px, transparent 1px)',
-                             backgroundSize: '12px 100%'
-                           }}>
-                        <div
-                          className="h-full rounded-full transition-all duration-700 ease-out relative overflow-hidden"
-                          style={{
-                            width: `${rate}%`,
-                            backgroundImage: gradient,
-                            boxShadow: `0 1px 6px ${glow}`
-                          }}
-                        >
-                          {/* Reflet brillant en surface */}
-                          <div className="absolute inset-0 bg-gradient-to-b from-white/30 to-transparent" />
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </CardHeader>
-
-                {!collapsedPrograms.has(program.id) && (
-                <CardContent className="p-6">
-                  <div className="space-y-5">
-                    {groupHotelsByCity(program.hotels).map((group) => {
-                      const cityStats = getCityStats(group.hotels);
-                      return (
-                        <div
-                          key={group.config.key}
-                          className={`overflow-hidden rounded-2xl border ${group.config.sectionBorder} ${group.config.sectionBg} shadow-sm`}
-                        >
-                          <CityHeader
-                            config={group.config}
-                            hotelCount={group.hotels.length}
-                            stats={cityStats}
-                          />
-                          <div className="space-y-6 p-3 sm:p-4">
-                            {group.hotels.map((hotel, hotelIndex) => {
-                      // Grouper les chambres par type seulement (fusionner tous les genres)
-                      const roomsByType = hotel.rooms.reduce((acc, room) => {
-                        const typeKey = room.roomType;
-                        if (!acc[typeKey]) {
-                          acc[typeKey] = {
-                            roomType: room.roomType,
-                            rooms: [],
-                            totalPlaces: 0,
-                            placesOccupees: 0,
-                            placesRestantes: 0,
-                            totalReservations: 0
-                          };
-                        }
-                        acc[typeKey].rooms.push(room);
-                        acc[typeKey].totalPlaces += room.totalPlaces;
-                        acc[typeKey].placesOccupees += room.placesOccupees;
-                        acc[typeKey].placesRestantes += room.placesRestantes;
-                        acc[typeKey].totalReservations += room.placesOccupees; // Chaque place occupée = 1 réservation
-                        return acc;
-                      }, {} as any);
-
-                      return (
-                        <div key={hotelIndex} className="rounded-xl border bg-white p-4 shadow-sm">
-                          <div className="flex items-center gap-2 mb-4">
-                            <MapPin className={`h-5 w-5 ${group.config.accentText}`} />
-                            <h3 className="font-semibold text-gray-900 text-lg">{getHotelDisplayName(hotel.hotelName)}</h3>
-                          </div>
-                          
-                          {/* Types de chambres en horizontal - Triés et sans séparation de genre */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                            {Object.values(roomsByType)
-                              .sort((a: any, b: any) => getRoomTypeOrder(a.roomType) - getRoomTypeOrder(b.roomType))
-                              .map((roomType: any, typeIndex: number) => {
-                              const roomStyle = getRoomTypeStyle(roomType.roomType);
-                              return (
-                                <div key={typeIndex} className={`${roomStyle.bgColor} rounded-lg p-4 border-2 ${roomStyle.borderColor} shadow-sm hover:shadow-md transition-shadow`}>
-                                  {/* Header du type de chambre */}
-                                  <div className="text-center mb-3">
-                                    <span className="text-2xl">{getRoomTypeIcon(roomType.roomType)}</span>
-                                    <h4 className={`font-semibold ${roomStyle.textColor} mt-1`}>
-                                      {getRoomTypeLabel(roomType.roomType)}
-                                    </h4>
-                                  </div>
-                                  
-                                  {/* Statistiques */}
-                                  <div className="space-y-2 mb-3">
-                                    <div className="flex justify-between text-sm">
-                                      <span className={roomStyle.textColor}>Chambres:</span>
-                                      <span className={`font-medium ${roomStyle.textColor}`}>
-                                        {roomType.rooms.length}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                      <span className={roomStyle.textColor}>Réservations:</span>
-                                      <span className={`font-medium ${roomStyle.textColor}`}>
-                                        {roomType.totalReservations}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                      <span className={roomStyle.textColor}>Places libres:</span>
-                                      <span className={`font-medium ${roomStyle.textColor}`}>
-                                        {roomType.placesRestantes}
-                                      </span>
-                  </div>
-                </div>
-                                  
-                                  {/* Indicateur visuel global */}
-                                  <div className="mb-3">
-                                    <div className="flex justify-center gap-1 flex-wrap">
-                                      {Array.from({ length: Math.min(roomType.totalPlaces, 10) }, (_, index) => {
-                                        const isOccupied = index < roomType.placesOccupees;
-                                        return (
-                                          <div
-                                            key={index}
-                                            className={`w-4 h-4 rounded-full border ${
-                                              isOccupied 
-                                                ? 'bg-red-500 border-red-600' 
-                                                : 'bg-green-500 border-green-600'
-                                            }`}
-                                            title={isOccupied ? 'Réservé' : 'Disponible'}
-                                          />
-                                        );
-                                      })}
-                                      {roomType.totalPlaces > 10 && (
-                                        <span className={`text-xs ${roomStyle.textColor} ml-1`}>
-                                          +{roomType.totalPlaces - 10}
-                                        </span>
-              )}
+          /* Vue Types Chambres - Tableau de programmes expandable */
+          <Card className="overflow-hidden border border-slate-200 bg-white shadow-sm">
+            {/* Bandeau header */}
+            <div className="bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-5">
+              <h2 className="text-xl font-bold text-white sm:text-2xl">Vue d'ensemble des programmes</h2>
+              <p className="mt-1 text-sm text-white/85">
+                Cliquez sur un programme pour voir les détails des hôtels et la disponibilité des chambres
+              </p>
             </div>
-                                    <p className={`text-xs text-center mt-1 ${roomStyle.textColor}`}>
-                                      {roomType.placesOccupees}/{roomType.totalPlaces} places
-                                    </p>
-                                  </div>
-                                </div>
-                              );
-                            })}
+
+            {/* En-tête de colonnes (desktop) */}
+            <div className="hidden border-b border-emerald-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500 md:grid md:grid-cols-12 md:gap-3">
+              <div className="col-span-4 pl-7">Programme</div>
+              <div className="col-span-2 text-center">Durée</div>
+              <div className="col-span-2 text-center">Occupation</div>
+              <div className="col-span-2 text-center">Progression</div>
+              <div className="col-span-2 text-right">Finances</div>
+            </div>
+
+            {/* Lignes de programme */}
+            <div className="divide-y divide-slate-100">
+              {roomData?.data.map((program) => {
+                const isOpen = expandedRows.has(program.id);
+                const rate = parseInt(program.statistics.occupancyRate);
+                const { gradient } = getOccupancyGradient(rate);
+                return (
+                  <div key={program.id} className={program.isDeleted ? 'bg-yellow-50/60' : ''}>
+                    {/* Ligne cliquable */}
+                    <button
+                      type="button"
+                      onClick={() => toggleRow(program.id)}
+                      className="flex w-full flex-col gap-3 px-4 py-3.5 text-left transition-colors hover:bg-emerald-50/50 md:grid md:grid-cols-12 md:items-center md:gap-3"
+                    >
+                      {/* Programme */}
+                      <div className="col-span-4 flex items-center gap-2">
+                        <ChevronRight
+                          className={`h-5 w-5 shrink-0 text-emerald-600 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            {program.isDeleted && (
+                              <Badge className="bg-yellow-500 text-[10px] text-white">Supprimé</Badge>
+                            )}
+                            <p className="truncate font-bold text-gray-900">{program.name}</p>
                           </div>
-                          
-                          {/* Résumé de l'hôtel */}
-                          <div className="mt-4 p-3 bg-white rounded-lg border">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                              <div className="text-center">
-                                <p className="font-semibold text-gray-900">
-                                  {hotel.rooms.length}
-                                </p>
-                                <p className="text-gray-600">Chambres totales</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="font-semibold text-green-600">
-                                  {hotel.rooms.reduce((sum, room) => sum + room.placesOccupees, 0)}
-                                </p>
-                                <p className="text-gray-600">Réservations</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="font-semibold text-red-600">
-                                  {hotel.rooms.reduce((sum, room) => sum + room.placesRestantes, 0)}
-                                </p>
-                                <p className="text-gray-600">Places libres</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="font-semibold text-blue-600">
-                                  {Math.round((hotel.rooms.reduce((sum, room) => sum + room.placesOccupees, 0) / hotel.rooms.reduce((sum, room) => sum + room.totalPlaces, 0)) * 100)}%
-                                </p>
-                                <p className="text-gray-600">Taux occupation</p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                              );
-                            })}
-                          </div>
+                          <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-500">
+                            <CalendarIcon className="h-3 w-3" />
+                            {new Date(program.created_at).toLocaleDateString('fr-FR')}
+                          </p>
                         </div>
-                      );
-                    })}
+                      </div>
+
+                      {/* Durée */}
+                      <div className="col-span-2 flex items-center gap-2 md:justify-center">
+                        <span className="text-xs text-gray-400 md:hidden">Durée :</span>
+                        {program.dureeJours ? (
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                            {program.dureeJours} jours
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-400">—</span>
+                        )}
+                      </div>
+
+                      {/* Occupation */}
+                      <div className="col-span-2 flex items-center gap-2 md:flex-col md:items-center md:gap-0">
+                        <span className="text-xs text-gray-400 md:hidden">Occupation :</span>
+                        <p className="font-bold text-gray-900">
+                          {program.statistics.placesOccupees}/{program.statistics.totalPlaces}
+                        </p>
+                        <p className="text-xs text-gray-500">{program.statistics.occupancyRate}% occupé</p>
+                      </div>
+
+                      {/* Progression */}
+                      <div className="col-span-2 flex items-center gap-2 md:block">
+                        <span className="text-xs text-gray-400 md:hidden">Progression :</span>
+                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
+                          <div
+                            className="h-full rounded-full transition-all duration-700 ease-out"
+                            style={{ width: `${rate}%`, backgroundImage: gradient }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Finances */}
+                      <div className="col-span-2 flex items-center justify-between md:block md:text-right">
+                        <span className="text-xs text-gray-400 md:hidden">Solde restant :</span>
+                        <div>
+                          <p className="font-bold text-amber-600">
+                            {(program.statistics.remainingAmount ?? 0).toLocaleString('fr-FR', {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0,
+                            })}{' '}
+                            DH
+                          </p>
+                          <p className="text-xs text-gray-500">solde restant</p>
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Contenu déplié */}
+                    {isOpen && (
+                      <div className="bg-emerald-50/40 px-4 pb-5 pt-1">
+                        {program.hotels.length === 0 ? (
+                          <p className="py-4 text-center text-sm text-gray-500">
+                            Aucun hôtel pour ce programme.
+                          </p>
+                        ) : (
+                          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                            {program.hotels.map((hotel, hotelIndex) => (
+                              <HotelDonutCard key={hotelIndex} hotel={hotel} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </CardContent>
-                )}
-              </Card>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          </Card>
         )}
 
         {roomData?.data.length === 0 && (

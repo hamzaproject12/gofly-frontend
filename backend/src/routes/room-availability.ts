@@ -39,8 +39,15 @@ router.get('/', async (req, res) => {
     const programsWithAvailability = programs.map(program => {
       // Calculer les statistiques du programme
       const totalRooms = program.rooms.length
-      const totalPlaces = program.rooms.reduce((sum, room) => sum + room.nbrPlaceTotal, 0)
-      const totalPlacesRestantes = program.rooms.reduce((sum, room) => sum + room.nbrPlaceRestantes, 0)
+      // Somme brute des places sur toutes les chambres = places par VILLE cumulées.
+      // Un même pèlerin occupe 1 lit dans chaque ville (Madina + Makkah + ...),
+      // donc pour obtenir un nombre de PERSONNES il faut diviser par le nombre de villes.
+      const rawTotalPlaces = program.rooms.reduce((sum, room) => sum + room.nbrPlaceTotal, 0)
+      const rawPlacesRestantes = program.rooms.reduce((sum, room) => sum + room.nbrPlaceRestantes, 0)
+      const nbVilles = new Set(program.rooms.map(room => room.hotel.city)).size
+      const diviseur = nbVilles > 0 ? nbVilles : 1
+      const totalPlaces = Math.round(rawTotalPlaces / diviseur)
+      const totalPlacesRestantes = Math.round(rawPlacesRestantes / diviseur)
       const placesOccupees = totalPlaces - totalPlacesRestantes
 
       // Calculer le montant restant à payer pour le programme

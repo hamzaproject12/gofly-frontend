@@ -39,13 +39,24 @@ router.get('/', async (req, res) => {
     const programsWithAvailability = programs.map(program => {
       // Calculer les statistiques du programme
       const totalRooms = program.rooms.length
-      // Somme brute des places sur toutes les chambres = places par VILLE cumulées.
-      // Un même pèlerin occupe 1 lit dans chaque ville (Madina + Makkah + ...),
-      // donc pour obtenir un nombre de PERSONNES il faut diviser par le nombre de villes.
+      // Somme brute des places sur toutes les chambres. Un même pèlerin occupe un lit
+      // dans PLUSIEURS hôtels (1 à Madina + 1 à Makkah + 1 dans chaque hôtel "Autre"),
+      // donc cette somme compte chaque personne plusieurs fois. Pour obtenir un nombre
+      // de PERSONNES, on divise par le nombre d'étapes qu'un pèlerin occupe simultanément :
+      //  - Madina compte pour 1 étape même si le programme propose plusieurs hôtels Madina
+      //    (hôtels d'une même ville = ALTERNATIVES, les pèlerins s'y répartissent).
+      //  - Makkah : idem, 1 étape.
+      //  - Chaque hôtel "Autre" est une étape distincte (séjours SÉQUENTIELS : le pèlerin
+      //    loge dans tous les hôtels Autre — cf. boucle de booking + champ `ordre`).
       const rawTotalPlaces = program.rooms.reduce((sum, room) => sum + room.nbrPlaceTotal, 0)
       const rawPlacesRestantes = program.rooms.reduce((sum, room) => sum + room.nbrPlaceRestantes, 0)
-      const nbVilles = new Set(program.rooms.map(room => room.hotel.city)).size
-      const diviseur = nbVilles > 0 ? nbVilles : 1
+      const hasMadina = program.rooms.some(room => room.hotel.city === 'Madina')
+      const hasMakkah = program.rooms.some(room => room.hotel.city === 'Makkah')
+      const nbHotelsAutre = new Set(
+        program.rooms.filter(room => room.hotel.city === 'Autre').map(room => room.hotelId)
+      ).size
+      const nbEtapes = (hasMadina ? 1 : 0) + (hasMakkah ? 1 : 0) + nbHotelsAutre
+      const diviseur = nbEtapes > 0 ? nbEtapes : 1
       const totalPlaces = Math.round(rawTotalPlaces / diviseur)
       const totalPlacesRestantes = Math.round(rawPlacesRestantes / diviseur)
       const placesOccupees = totalPlaces - totalPlacesRestantes

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { notifyCreditsUpdated } from "@/app/components/CreditCounter";
 import { generatePaymentReceiptFile } from "@/lib/generateReceipt";
 import { BlockersTooltip } from "@/components/blockers-tooltip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1238,11 +1239,31 @@ export default function NouvelleChambrePage() {
       );
 
       if (!groupRes.ok) {
-        const err = await groupRes.json().catch(() => ({}));
+        const err = await groupRes.json().catch(() => ({} as any));
+        if (err?.code === "CREDITS_INSUFFISANTS") {
+          toast({
+            title: "Crédits insuffisants",
+            description: (
+              <span>
+                Crédits insuffisants : il vous reste {err.solde} crédit(s), ce dossier en
+                nécessite {err.requis}.{" "}
+                <Link href="/credits" className="underline font-semibold">
+                  Rechargez pour continuer.
+                </Link>
+              </span>
+            ),
+            variant: "destructive",
+          });
+          return;
+        }
         throw new Error(err.error || "Erreur création dossier chambre");
       }
 
       const groupData = await groupRes.json();
+
+      // Crédits consommés : rafraîchir immédiatement le compteur du header
+      notifyCreditsUpdated();
+
       const leaderId = Number(groupData.leaderId);
       const createdReservations = Array.isArray(groupData.reservations)
         ? groupData.reservations

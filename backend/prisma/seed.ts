@@ -1,8 +1,20 @@
 import { PrismaClient, RoomType, City } from '@prisma/client';
+import { ensureWallet } from '../src/services/creditService';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  // Wallet de crédits prépayés : singleton (findFirst-or-create).
+  // À la création uniquement : crédits de bienvenue (WELCOME_CREDITS, défaut 10)
+  // + ligne BONUS. Si le wallet existe déjà, ne modifie rien (idempotent).
+  const existingWallet = await prisma.wallet.findFirst();
+  if (!existingWallet) {
+    const wallet = await ensureWallet(prisma);
+    console.log('Wallet crédits créé, id:', wallet.id, '- solde initial (bienvenue):', wallet.balance);
+  } else {
+    console.log('Wallet crédits déjà présent, id:', existingWallet.id, '- solde:', existingWallet.balance, '(aucune modification)');
+  }
+
   // Création des hôtels
   // const hotels = await Promise.all([
   //   prisma.hotel.create({

@@ -8,14 +8,14 @@ interface Agent {
   id: number;
   nom: string;
   email: string;
-  role: 'ADMIN' | 'AGENT';
+  role: 'ADMIN' | 'AGENT' | 'SUPER_ADMIN';
   isActive: boolean;
   createdAt: string;
 }
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles: ('ADMIN' | 'AGENT')[];
+  allowedRoles: ('ADMIN' | 'AGENT' | 'SUPER_ADMIN')[];
   fallbackPath?: string;
 }
 

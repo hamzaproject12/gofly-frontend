@@ -396,8 +396,15 @@ export const createAgent = async (req: Request, res: Response) => {
 
     // Validation
     if (!nom || !email || !motDePasse) {
-      return res.status(400).json({ 
-        error: 'Nom, email et mot de passe sont requis' 
+      return res.status(400).json({
+        error: 'Nom, email et mot de passe sont requis'
+      });
+    }
+
+    // Le rôle SUPER_ADMIN (fournisseur du logiciel) n'est pas assignable via l'API
+    if (role !== 'ADMIN' && role !== 'AGENT') {
+      return res.status(400).json({
+        error: 'Rôle invalide : seuls ADMIN et AGENT sont autorisés'
       });
     }
 
@@ -407,8 +414,8 @@ export const createAgent = async (req: Request, res: Response) => {
     });
 
     if (existingAgent) {
-      return res.status(400).json({ 
-        error: 'Un agent avec cet email existe déjà' 
+      return res.status(400).json({
+        error: 'Un agent avec cet email existe déjà'
       });
     }
 
@@ -453,6 +460,13 @@ export const updateAgent = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { nom, email, role, isActive } = req.body;
+
+    // Le rôle SUPER_ADMIN (fournisseur du logiciel) n'est pas assignable via l'API
+    if (role !== undefined && role !== 'ADMIN' && role !== 'AGENT') {
+      return res.status(400).json({
+        error: 'Rôle invalide : seuls ADMIN et AGENT sont autorisés'
+      });
+    }
 
     // Check if agent exists
     const existingAgent = await prisma.agent.findUnique({

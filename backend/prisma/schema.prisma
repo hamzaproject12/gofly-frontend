@@ -10,6 +10,42 @@ datasource db {
 enum Role {
   ADMIN
   AGENT
+  SUPER_ADMIN
+}
+
+enum LedgerType {
+  ACHAT_PACK
+  CONSOMMATION
+  REMBOURSEMENT
+  AJUSTEMENT
+  BONUS
+}
+
+/// Portefeuille de crédits prépayés de l'agence (singleton : une seule ligne, 1 crédit = 1 pèlerin).
+model Wallet {
+  id        Int            @id @default(autoincrement())
+  balance   Int            @default(0)
+  updatedAt DateTime       @updatedAt @map("updated_at")
+  ledger    CreditLedger[]
+}
+
+/// Historique append-only des mouvements de crédits : jamais modifié ni supprimé.
+model CreditLedger {
+  id            Int        @id @default(autoincrement())
+  walletId      Int
+  type          LedgerType
+  amount        Int
+  balanceAfter  Int
+  reservationId Int?
+  packLabel     String?    @db.VarChar(100)
+  paymentRef    String?    @db.VarChar(200)
+  note          String?    @db.Text
+  createdBy     String     @db.VarChar(200)
+  createdAt     DateTime   @default(now()) @map("created_at")
+  wallet        Wallet     @relation(fields: [walletId], references: [id], onDelete: Restrict)
+
+  @@index([walletId, createdAt])
+  @@index([createdAt])
 }
 
 enum ReservationType {

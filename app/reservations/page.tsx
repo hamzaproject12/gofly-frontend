@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { api } from "@/lib/api"
+import { notifyCreditsUpdated } from "@/app/components/CreditCounter"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -553,6 +554,9 @@ export default function ReservationsPage() {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || "Erreur lors de la suppression de la réservation");
       }
+
+      // Remboursement éventuel (< 48h) : rafraîchir le compteur du header
+      notifyCreditsUpdated();
 
       toast({
         title: "Réservation supprimée",

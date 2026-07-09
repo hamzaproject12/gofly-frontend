@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { api } from "@/lib/api";
 import { siteConfig } from "@/lib/config";
 import { UNSAVED_LEAVE_PROMPT, useUnsavedChanges } from "./UnsavedChangesProvider";
+import CreditCounter from './CreditCounter';
 
 interface Agent {
   id: number;
   nom: string;
   email: string;
-  role: 'ADMIN' | 'AGENT';
+  role: 'ADMIN' | 'AGENT' | 'SUPER_ADMIN';
   isActive: boolean;
   createdAt: string;
 }
@@ -402,14 +403,19 @@ export default function AuthNav() {
               </button>
             </div>
 
+            {/* Compteur de crédits prépayés */}
+            <CreditCounter />
+
             {/* Role Indicator */}
             <div className="flex items-center space-x-2">
               <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                agent.role === 'ADMIN' 
-                  ? 'bg-red-100 text-red-700 border border-red-200' 
+                agent.role === 'SUPER_ADMIN'
+                  ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                  : agent.role === 'ADMIN'
+                  ? 'bg-red-100 text-red-700 border border-red-200'
                   : 'bg-blue-100 text-blue-700 border border-blue-200'
               }`}>
-                {agent.role === 'ADMIN' ? 'ADMINISTRATEUR' : 'AGENT'}
+                {agent.role === 'SUPER_ADMIN' ? 'SUPER ADMIN' : agent.role === 'ADMIN' ? 'ADMINISTRATEUR' : 'AGENT'}
               </div>
             </div>
 
@@ -436,7 +442,7 @@ export default function AuthNav() {
                     <div className="font-medium text-gray-900">{agent.nom}</div>
                     <div className="text-gray-500 text-xs">{agent.email}</div>
                     <div className="text-xs text-blue-600 font-medium mt-1">
-                      {agent.role === 'ADMIN' ? 'Administrateur' : 'Agent'}
+                      {agent.role === 'SUPER_ADMIN' ? 'Super administrateur' : agent.role === 'ADMIN' ? 'Administrateur' : 'Agent'}
                     </div>
                   </div>
                   <button

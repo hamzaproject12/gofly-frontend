@@ -16,6 +16,13 @@ import {
   type ReservationJournalRow,
 } from '../services/journalSuppressionService';
 import { parseHotelsAutre, type HotelAutreEntry } from '../services/hotelsAutreService';
+import {
+  debitCreditsInTx,
+  logConsumptionInTx,
+  refundCreditsInTx,
+  InsufficientCreditsError,
+  REFUND_WINDOW_MS,
+} from '../services/creditService';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -111,6 +118,34 @@ function extractAgentIdFromToken(req: express.Request): number | null {
     console.log('⚠️ Error extracting agentId from token:', error);
     return null;
   }
+}
+
+/** Libellé de l'auteur pour le ledger de crédits (email > nom > id > inconnu). */
+function extractActorLabelFromToken(req: express.Request): string {
+  try {
+    const authHeader = req.headers['authorization'];
+    let token = authHeader && authHeader.split(' ')[1];
+    if (!token) token = req.cookies?.authToken;
+    if (!token) return 'inconnu';
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    return (
+      decoded?.email ||
+      decoded?.nom ||
+      (decoded?.agentId != null ? `agent id=${decoded.agentId}` : 'inconnu')
+    );
+  } catch {
+    return 'inconnu';
+  }
+}
+
+/** Réponse HTTP métier pour un solde de crédits insuffisant (402, aucun dossier créé). */
+function sendInsufficientCredits(res: express.Response, err: InsufficientCreditsError) {
+  return res.status(402).json({
+    code: 'CREDITS_INSUFFISANTS',
+    solde: err.solde,
+    requis: err.requis,
+    error: `Crédits insuffisants : il vous reste ${err.solde} crédit(s), ce dossier en nécessite ${err.requis}.`,
+  });
 }
 
 // Get all reservations with pagination and advanced filters
@@ -395,9 +430,13 @@ router.post('/group', async (req, res) => {
     }
 
     const agentId = extractAgentIdFromToken(req);
+    const actorLabel = extractActorLabelFromToken(req);
     const groupSize = occupants.length;
 
     const result = await prisma.$transaction(async (tx) => {
+      // 1 crédit par pèlerin : débit conditionnel AVANT la création, dans la même transaction
+      const debit = await debitCreditsInTx(tx, groupSize);
+
       // Catégories réellement présentes uniquement
       const roomsToBook: { id: number; label: string }[] = [];
       if (roomMadinaId) roomsToBook.push({ id: Number(roomMadinaId), label: 'Madina' });
@@ -487,6 +526,15 @@ router.post('/group', async (req, res) => {
         )
       );
 
+      // Ligne CONSOMMATION (-groupSize) rattachée au dossier leader
+      await logConsumptionInTx(tx, {
+        walletId: debit.walletId,
+        n: groupSize,
+        balanceAfter: debit.balanceAfter,
+        reservationId: createdReservations[0].id,
+        createdBy: actorLabel,
+      });
+
       return { leaderId, reservations: createdReservations, groupId: normalizedGroupId };
     });
 
@@ -521,6 +569,9 @@ router.post('/group', async (req, res) => {
 
     res.status(201).json(result);
   } catch (error) {
+    if (error instanceof InsufficientCreditsError) {
+      return sendInsufficientCredits(res, error);
+    }
     console.error('Erreur création groupe réservation:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Erreur création groupe réservation' });
   }
@@ -616,12 +667,34 @@ router.post('/', async (req, res) => {
         roomSlot: roomSlot ? Number(roomSlot) : null
     };
 
-    const reservation = await prisma.reservation.create({
-      data: reservationCreateData,
-      include: {
-        program: true // Inclure le programme pour récupérer les deadlines
+    // Réservation LIT = 1 pèlerin = 1 crédit : débit conditionnel + création + ligne
+    // CONSOMMATION dans la MÊME transaction (solde insuffisant → aucun dossier créé).
+    const actorLabel = extractActorLabelFromToken(req);
+    let reservation;
+    try {
+      reservation = await prisma.$transaction(async (tx) => {
+        const debit = await debitCreditsInTx(tx, 1);
+        const created = await tx.reservation.create({
+          data: reservationCreateData,
+          include: {
+            program: true // Inclure le programme pour récupérer les deadlines
+          }
+        });
+        await logConsumptionInTx(tx, {
+          walletId: debit.walletId,
+          n: 1,
+          balanceAfter: debit.balanceAfter,
+          reservationId: created.id,
+          createdBy: actorLabel,
+        });
+        return created;
+      });
+    } catch (txError) {
+      if (txError instanceof InsufficientCreditsError) {
+        return sendInsufficientCredits(res, txError);
       }
-    });
+      throw txError;
+    }
     
     // Log de la réservation créée pour débogage
     console.log('✅ Réservation créée avec succès:');
@@ -1272,6 +1345,14 @@ router.delete('/:id', async (req, res) => {
     const { summary: journalSummary, detailText: journalDetail } =
       buildReservationDeletionDetail(fullRows);
 
+    // Remboursement automatique 48h : +1 crédit par pèlerin dont la réservation
+    // a été créée il y a moins de 48h (au-delà : aucun remboursement)
+    const nowMs = Date.now();
+    const refundableCount = fullRows.filter(
+      (r) => nowMs - new Date(r.created_at).getTime() < REFUND_WINDOW_MS
+    ).length;
+    const deleteActorLabel = extractActorLabelFromToken(req);
+
     // 1. Récupérer tous les fichiers liés à chaque réservation concernée
     const fichiers = await prisma.fichier.findMany({
       where: { reservationId: { in: reservationIdsToRemove } },
@@ -1332,6 +1413,14 @@ router.delete('/:id', async (req, res) => {
           isLeader: true,
         },
       });
+
+      // 6. Remboursement des crédits dans la même transaction (ligne REMBOURSEMENT +n)
+      if (refundableCount > 0) {
+        await refundCreditsInTx(tx, refundableCount, {
+          reservationId: reservationId,
+          createdBy: deleteActorLabel,
+        });
+      }
     });
 
     if (fullRows.length > 0) {

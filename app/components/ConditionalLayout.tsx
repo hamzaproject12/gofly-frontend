@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import AuthNav from './AuthNav';
+import CreditAlertBanner from './CreditAlertBanner';
 import ProtectedRoute from './ProtectedRoute';
 
 interface ConditionalLayoutProps {
@@ -31,6 +32,7 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
       {/* Contenu avec padding pour la navbar */}
       <div className="pt-20">
         <ProtectedRoute>
+          <CreditAlertBanner />
           {children}
         </ProtectedRoute>
       </div>

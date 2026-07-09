@@ -159,6 +159,11 @@ export const api = {
     exportReservationsAgency: '/api/export/reservations/agency',
     /** Charges fixes mensuelles (admin) */
     fixedCharges: '/api/fixed-charges',
+    /** Crédits prépayés (1 crédit = 1 pèlerin) */
+    creditsBalance: '/api/credits/balance',
+    creditsLedger: '/api/credits/ledger',
+    creditsRecharge: '/api/credits/recharge',
+    creditsAjustement: '/api/credits/ajustement',
     // Add other endpoints as needed
   }
 };

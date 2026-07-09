@@ -4,7 +4,7 @@ interface User {
   agentId: number;
   email: string;
   nom: string;
-  role: 'ADMIN' | 'AGENT';
+  role: 'ADMIN' | 'AGENT' | 'SUPER_ADMIN';
 }
 
 export function useAuth() {
@@ -35,12 +35,14 @@ export function useAuth() {
 
   const isAdmin = user?.role === 'ADMIN';
   const isAgent = user?.role === 'AGENT';
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
   return {
     user,
     loading,
     isAdmin,
     isAgent,
+    isSuperAdmin,
     isAuthenticated: !!user
   };
 }

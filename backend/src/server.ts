@@ -20,8 +20,10 @@ import adminRoutes from './routes/admin';
 import exportRoutes from './routes/export';
 import fixedChargesRoutes from './routes/fixed-charges';
 import journalSuppressionRoutes from './routes/journal-suppression';
+import creditsRoutes from './routes/credits';
 import cron from 'node-cron';
 import { generateFixedChargesForYearMonth, formatYearMonth } from './services/fixedChargeGenerator';
+import { ensureWallet } from './services/creditService';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -111,6 +113,7 @@ app.use('/api/analytics', analyticsRouter);
 app.use('/api/room-availability', roomAvailabilityRouter);
 app.use('/api/fixed-charges', fixedChargesRoutes);
 app.use('/api/journal-suppressions', journalSuppressionRoutes);
+app.use('/api/credits', creditsRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -173,6 +176,14 @@ app.listen(PORT, async () => {
   
   // Tester la connexion à la base de données
   await testDatabaseConnection();
+
+  // Garantir l'existence du Wallet de crédits (singleton)
+  try {
+    const wallet = await ensureWallet(prisma);
+    console.log(`💳 Wallet crédits prêt (id=${wallet.id}, solde=${wallet.balance})`);
+  } catch (err) {
+    console.error('❌ Initialisation du Wallet crédits échouée:', err);
+  }
   
   console.log('📋 Routes disponibles:');
   console.log('- /api/auth (login, register, logout, profile)');

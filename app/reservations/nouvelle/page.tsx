@@ -2,6 +2,7 @@
 
 import { useState, useRef, useMemo, useEffect } from "react"
 import { api } from "@/lib/api"
+import { notifyCreditsUpdated } from "@/app/components/CreditCounter"
 import { generatePaymentReceiptFile, downloadReceipt } from "@/lib/generateReceipt"
 import { BlockersTooltip } from "@/components/blockers-tooltip"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -1578,12 +1579,31 @@ export default function NouvelleReservation() {
       });
 
       if (!reservationResponse.ok) {
-        const errorData = await reservationResponse.json();
+        const errorData = await reservationResponse.json().catch(() => ({} as any));
+        if (errorData?.code === "CREDITS_INSUFFISANTS") {
+          toast({
+            title: "Crédits insuffisants",
+            description: (
+              <span>
+                Crédits insuffisants : il vous reste {errorData.solde} crédit(s), ce dossier en
+                nécessite {errorData.requis}.{" "}
+                <Link href="/credits" className="underline font-semibold">
+                  Rechargez pour continuer.
+                </Link>
+              </span>
+            ),
+            variant: "destructive",
+          });
+          return;
+        }
         throw new Error(errorData.error || "Erreur lors de la création de la réservation");
       }
 
       const reservation = await reservationResponse.json();
       const reservationId = reservation.id;
+
+      // Crédit consommé : rafraîchir immédiatement le compteur du header
+      notifyCreditsUpdated();
 
       // 2. Upload all files with the reservation ID
       const fileUploadPromises = [];

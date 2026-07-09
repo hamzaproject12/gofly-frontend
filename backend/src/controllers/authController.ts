@@ -364,10 +364,44 @@ export const requireAdmin = async (req: AuthRequest, res: Response, next: any) =
   }
 };
 
+// Middleware ADMIN ou SUPER_ADMIN (gestion des utilisateurs, journal).
+// Attache le rôle relu en base sur req.user.dbRole pour que les handlers
+// puissent distinguer un appelant SUPER_ADMIN d'un ADMIN.
+export const requireAdminOrSuperAdmin = async (req: AuthRequest, res: Response, next: any) => {
+  try {
+    const agentId = req.user?.agentId;
+
+    if (!agentId) {
+      return res.status(401).json({ error: 'Non authentifié' });
+    }
+
+    const agent = await prisma.agent.findUnique({
+      where: { id: agentId },
+      select: { role: true, isActive: true }
+    });
+
+    if (!agent || !agent.isActive || (agent.role !== 'ADMIN' && agent.role !== 'SUPER_ADMIN')) {
+      return res.status(403).json({ error: 'Accès refusé. Droits administrateur requis.' });
+    }
+
+    req.user.dbRole = agent.role;
+    next();
+  } catch (error) {
+    console.error('Admin check error:', error);
+    res.status(500).json({ error: 'Erreur de vérification des droits' });
+  }
+};
+
+// Le rôle SUPER_ADMIN (fournisseur) est invisible pour les ADMIN de l'agence.
+const isCallerSuperAdmin = (req: Request): boolean =>
+  (req as AuthRequest).user?.dbRole === 'SUPER_ADMIN';
+
 // Get all agents (Admin only)
 export const getAllAgents = async (req: AuthRequest, res: Response) => {
   try {
     const agents = await prisma.agent.findMany({
+      // Un ADMIN ne voit jamais les comptes SUPER_ADMIN (fournisseur)
+      where: isCallerSuperAdmin(req) ? undefined : { role: { not: 'SUPER_ADMIN' } },
       select: {
         id: true,
         nom: true,
@@ -401,8 +435,13 @@ export const createAgent = async (req: Request, res: Response) => {
       });
     }
 
-    // Le rôle SUPER_ADMIN (fournisseur du logiciel) n'est pas assignable via l'API
-    if (role !== 'ADMIN' && role !== 'AGENT') {
+    // Seul un SUPER_ADMIN connecté peut créer un autre SUPER_ADMIN (fournisseur)
+    if (role === 'SUPER_ADMIN' && !isCallerSuperAdmin(req)) {
+      return res.status(403).json({
+        error: 'Rôle invalide : seuls ADMIN et AGENT sont autorisés'
+      });
+    }
+    if (role !== 'ADMIN' && role !== 'AGENT' && role !== 'SUPER_ADMIN') {
       return res.status(400).json({
         error: 'Rôle invalide : seuls ADMIN et AGENT sont autorisés'
       });
@@ -429,7 +468,7 @@ export const createAgent = async (req: Request, res: Response) => {
         nom,
         email,
         motDePasse: hashedPassword,
-        role: role as 'ADMIN' | 'AGENT',
+        role: role as 'ADMIN' | 'AGENT' | 'SUPER_ADMIN',
         isActive: true
       },
       select: {
@@ -461,8 +500,13 @@ export const updateAgent = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { nom, email, role, isActive } = req.body;
 
-    // Le rôle SUPER_ADMIN (fournisseur du logiciel) n'est pas assignable via l'API
-    if (role !== undefined && role !== 'ADMIN' && role !== 'AGENT') {
+    // Seul un SUPER_ADMIN connecté peut assigner le rôle SUPER_ADMIN (fournisseur)
+    if (role === 'SUPER_ADMIN' && !isCallerSuperAdmin(req)) {
+      return res.status(403).json({
+        error: 'Rôle invalide : seuls ADMIN et AGENT sont autorisés'
+      });
+    }
+    if (role !== undefined && role !== 'ADMIN' && role !== 'AGENT' && role !== 'SUPER_ADMIN') {
       return res.status(400).json({
         error: 'Rôle invalide : seuls ADMIN et AGENT sont autorisés'
       });
@@ -475,6 +519,12 @@ export const updateAgent = async (req: Request, res: Response) => {
 
     if (!existingAgent) {
       return res.status(404).json({ error: 'Agent non trouvé' });
+    }
+
+    // Un compte SUPER_ADMIN est invisible et intouchable pour un ADMIN :
+    // réponse générique pour ne pas révéler son existence
+    if (existingAgent.role === 'SUPER_ADMIN' && !isCallerSuperAdmin(req)) {
+      return res.status(404).json({ error: 'Utilisateur introuvable' });
     }
 
     // Check if email is already taken by another agent
@@ -496,7 +546,7 @@ export const updateAgent = async (req: Request, res: Response) => {
       data: {
         ...(nom && { nom }),
         ...(email && { email }),
-        ...(role && { role: role as 'ADMIN' | 'AGENT' }),
+        ...(role && { role: role as 'ADMIN' | 'AGENT' | 'SUPER_ADMIN' }),
         ...(isActive !== undefined && { isActive })
       },
       select: {
@@ -536,6 +586,12 @@ export const deleteAgent = async (req: Request, res: Response) => {
 
     if (!existingAgent) {
       return res.status(404).json({ error: 'Agent non trouvé' });
+    }
+
+    // Un compte SUPER_ADMIN est invisible et intouchable pour un ADMIN :
+    // réponse générique pour ne pas révéler son existence
+    if (existingAgent.role === 'SUPER_ADMIN' && !isCallerSuperAdmin(req)) {
+      return res.status(404).json({ error: 'Utilisateur introuvable' });
     }
 
     // Check if trying to delete the last admin

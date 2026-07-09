@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import RoleProtectedRoute from '../../components/RoleProtectedRoute';
 import { api } from "@/lib/api";
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,17 +23,21 @@ import {
   UserX
 } from 'lucide-react';
 
+type AgentRole = 'ADMIN' | 'AGENT' | 'SUPER_ADMIN';
+
 interface Agent {
   id: number;
   nom: string;
   email: string;
-  role: 'ADMIN' | 'AGENT';
+  role: AgentRole;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 export default function GestionUtilisateursPage() {
+  // Seul un SUPER_ADMIN connecté peut voir/assigner le rôle SUPER_ADMIN (fournisseur)
+  const { isSuperAdmin } = useAuth();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -44,7 +49,7 @@ export default function GestionUtilisateursPage() {
     nom: '',
     email: '',
     motDePasse: '',
-    role: 'AGENT' as 'ADMIN' | 'AGENT'
+    role: 'AGENT' as AgentRole
   });
 
   useEffect(() => {
@@ -210,7 +215,7 @@ export default function GestionUtilisateursPage() {
   };
 
   return (
-    <RoleProtectedRoute allowedRoles={['ADMIN']}>
+    <RoleProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}>
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-8">
@@ -312,11 +317,14 @@ export default function GestionUtilisateursPage() {
                       <select
                             id="user-role"
                         value={formData.role}
-                        onChange={(e) => setFormData({ ...formData, role: e.target.value as 'ADMIN' | 'AGENT' })}
+                        onChange={(e) => setFormData({ ...formData, role: e.target.value as AgentRole })}
                             className="h-12 w-full text-base border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 shadow-sm bg-white px-3"
                       >
                         <option value="AGENT">Agent</option>
                         <option value="ADMIN">Admin</option>
+                        {isSuperAdmin && (
+                          <option value="SUPER_ADMIN">Super admin (fournisseur)</option>
+                        )}
                       </select>
                     </div>
                   </div>
@@ -384,8 +392,10 @@ export default function GestionUtilisateursPage() {
                           <Badge 
                             variant="secondary" 
                             className={`inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full ${
-                            agent.role === 'ADMIN' 
-                              ? 'bg-purple-100 text-purple-800' 
+                            agent.role === 'SUPER_ADMIN'
+                              ? 'bg-amber-100 text-amber-800'
+                              : agent.role === 'ADMIN'
+                              ? 'bg-purple-100 text-purple-800'
                               : 'bg-blue-100 text-blue-800'
                             } border-0`}
                           >

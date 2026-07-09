@@ -31,7 +31,9 @@ export function getJournalActorFromRequest(req: Request): {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as JwtPayload;
     const actorId = decoded.agentId ?? null;
     const actorRoleSnapshot =
-      decoded.role === 'ADMIN' || decoded.role === 'AGENT' ? decoded.role : 'UNKNOWN';
+      decoded.role === 'ADMIN' || decoded.role === 'AGENT' || decoded.role === 'SUPER_ADMIN'
+        ? decoded.role
+        : 'UNKNOWN';
     return { actorId, actorRoleSnapshot };
   } catch {
     return { actorId: null, actorRoleSnapshot: 'UNKNOWN' };
@@ -88,7 +90,9 @@ export async function logJournalSuppression(
     });
     if (agentFb) {
       const roleSnap =
-        agentFb.role === 'ADMIN' || agentFb.role === 'AGENT' ? agentFb.role : 'UNKNOWN';
+        agentFb.role === 'ADMIN' || agentFb.role === 'AGENT' || agentFb.role === 'SUPER_ADMIN'
+          ? agentFb.role
+          : 'UNKNOWN';
       resolved = { actorId: agentFb.id, actorRoleSnapshot: roleSnap, actorNom: agentFb.nom };
     }
   }

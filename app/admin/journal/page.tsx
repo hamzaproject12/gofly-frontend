@@ -184,7 +184,7 @@ export default function JournalSuppressionsPage() {
     n.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' DH';
 
   return (
-    <RoleProtectedRoute allowedRoles={['ADMIN']}>
+    <RoleProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}>
       <div
         className="min-h-screen bg-gradient-to-b from-slate-50 to-white pt-24 pb-16 px-4"
         data-skip-unsaved-dirty

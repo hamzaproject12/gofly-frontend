@@ -1,18 +1,19 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { 
-  requireAdmin, 
-  getAllAgents, 
-  createAgent, 
-  updateAgent, 
-  deleteAgent 
+import {
+  requireAdminOrSuperAdmin,
+  getAllAgents,
+  createAgent,
+  updateAgent,
+  deleteAgent
 } from '../controllers/authController';
 
 const router = Router();
 
 // All routes require authentication first, then admin privileges
+// (SUPER_ADMIN = fournisseur : accès complet, invisible pour les ADMIN)
 router.use(authenticateToken);
-router.use(requireAdmin);
+router.use(requireAdminOrSuperAdmin);
 
 // Get all agents
 router.get('/agents', getAllAgents);

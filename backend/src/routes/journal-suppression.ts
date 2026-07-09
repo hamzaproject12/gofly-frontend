@@ -1,13 +1,13 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
-import { requireAdmin } from '../controllers/authController';
+import { requireAdminOrSuperAdmin } from '../controllers/authController';
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
 router.use(authenticateToken);
-router.use(requireAdmin);
+router.use(requireAdminOrSuperAdmin);
 
 /** Jour calendaire en UTC (YYYY-MM-DD) → [début, fin] pour filtrer les DateTime. */
 function parseDayBoundsUTC(day: string): { start: Date; end: Date } | null {
@@ -38,11 +38,17 @@ router.get('/', async (req, res) => {
       action?: string;
       entityType?: string;
       createdAt?: { gte: Date; lte: Date };
+      actorRoleSnapshot?: { not: string };
     } = {};
     if (action) where.action = action;
     if (entityType) where.entityType = entityType;
     if (dayBounds) {
       where.createdAt = { gte: dayBounds.start, lte: dayBounds.end };
+    }
+    // Les entrées créées par le SUPER_ADMIN (fournisseur) sont invisibles pour les ADMIN
+    const callerRole = (req as { user?: { dbRole?: string } }).user?.dbRole;
+    if (callerRole !== 'SUPER_ADMIN') {
+      where.actorRoleSnapshot = { not: 'SUPER_ADMIN' };
     }
 
     const [items, total] = await Promise.all([

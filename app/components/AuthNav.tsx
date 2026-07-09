@@ -342,8 +342,8 @@ export default function AuthNav() {
               )}
             </div>
 
-            {/* Admin Dropdown - Admin only */}
-            {agent.role === 'ADMIN' && (
+            {/* Admin Dropdown - Admin only (le SUPER_ADMIN fournisseur y accède aussi) */}
+            {(agent.role === 'ADMIN' || agent.role === 'SUPER_ADMIN') && (
               <div className="relative dropdown-menu">
                 <button
                   onClick={() => {
@@ -568,8 +568,8 @@ export default function AuthNav() {
               )}
             </div>
 
-            {/* Admin Section - Admin only */}
-            {agent.role === 'ADMIN' && (
+            {/* Admin Section - Admin only (le SUPER_ADMIN fournisseur y accède aussi) */}
+            {(agent.role === 'ADMIN' || agent.role === 'SUPER_ADMIN') && (
               <div className="border-t border-gray-200 pt-2">
                 <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Administration

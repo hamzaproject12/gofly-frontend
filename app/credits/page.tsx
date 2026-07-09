@@ -213,7 +213,6 @@ function CreditsPageContent() {
                       <th className="py-2 pr-4">Type</th>
                       <th className="py-2 pr-4 text-right">Montant</th>
                       <th className="py-2 pr-4 text-right">Solde après</th>
-                      <th className="py-2 pr-4">Auteur</th>
                       <th className="py-2">Note</th>
                     </tr>
                   </thead>
@@ -238,7 +237,6 @@ function CreditsPageContent() {
                         <td className="py-2 pr-4 text-right font-medium text-gray-900">
                           {entry.balanceAfter}
                         </td>
-                        <td className="py-2 pr-4 text-gray-700">{entry.createdBy}</td>
                         <td className="py-2 text-gray-600">
                           {[
                             entry.packLabel,

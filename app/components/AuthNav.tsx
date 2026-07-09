@@ -415,7 +415,7 @@ export default function AuthNav() {
                   ? 'bg-red-100 text-red-700 border border-red-200'
                   : 'bg-blue-100 text-blue-700 border border-blue-200'
               }`}>
-                {agent.role === 'SUPER_ADMIN' ? 'SUPER ADMIN' : agent.role === 'ADMIN' ? 'ADMINISTRATEUR' : 'AGENT'}
+                {agent.role === 'SUPER_ADMIN' ? 'SUPER ADMIN' : agent.role === 'ADMIN' ? 'Admin' : 'AGENT'}
               </div>
             </div>
 

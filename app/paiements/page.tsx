@@ -82,7 +82,7 @@ const normalizePaymentMethod = (method: string | null | undefined): string => {
   if (!method) return ""
   const normalized = method
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .trim()
     .toLowerCase()
 
@@ -108,6 +108,14 @@ const getPaymentMethodLabel = (method: string): string => {
       return method
   }
 }
+
+// Recherche insensible aux accents / à la casse (même logique que la page Dépenses)
+const normalizeText = (value: string | null | undefined): string =>
+  (value || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim()
+    .toLowerCase()
 
 export default function PaiementsPage() {
   const [paiements, setPaiements] = useState<Payment[]>([])
@@ -157,14 +165,16 @@ export default function PaiementsPage() {
 
   // Filtrage des paiements
   const filteredPaiements = paiements.filter((paiement) => {
-    const q = searchTerm.toLowerCase().trim()
+    const q = normalizeText(searchTerm)
     const searchMatch =
       !q ||
-      (paiement.reservation &&
-        (paiement.reservation.firstName.toLowerCase().includes(q) ||
-          paiement.reservation.lastName.toLowerCase().includes(q) ||
-          paiement.reservation.phone.includes(searchTerm))) ||
-      (paiement.description && paiement.description.toLowerCase().includes(q))
+      normalizeText(paiement.reservation?.firstName).includes(q) ||
+      normalizeText(paiement.reservation?.lastName).includes(q) ||
+      normalizeText(paymentClientLabel(paiement)).includes(q) ||
+      (paiement.reservation?.phone ?? "").includes(searchTerm.trim()) ||
+      normalizeText(paiement.description).includes(q) ||
+      normalizeText(paymentProgramLabel(paiement)).includes(q) ||
+      normalizeText(paymentRowAgentLabel(paiement)).includes(q)
 
     const programMatch =
       programFilter === "tous" ||
@@ -357,7 +367,7 @@ export default function PaiementsPage() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Nom, prénom ou téléphone..."
+                    placeholder="Nom, prénom, téléphone, programme..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200"

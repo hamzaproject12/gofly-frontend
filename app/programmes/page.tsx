@@ -161,6 +161,15 @@ export default function ProgrammesPage() {
     target: ProgramStatusValue | null
   }>({ isOpen: false, programme: null, target: null })
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+
+  // Avertissement de clôture avec réservations non complètes (jamais bloquant)
+  const [closeWarning, setCloseWarning] = useState<{
+    isOpen: boolean
+    programme: ProgramOverview | null
+    incomplete: { id: number; name: string; reason: string }[]
+  }>({ isOpen: false, programme: null, incomplete: [] })
+  // Id du programme dont on vérifie les réservations avant clôture (spinner bouton)
+  const [checkingCloseId, setCheckingCloseId] = useState<number | null>(null)
   
   // États pour la confirmation de suppression
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
@@ -242,13 +251,12 @@ export default function ProgrammesPage() {
   }
 
   // Appliquer un changement de statut via PATCH /api/programs/:id/status
-  const handleStatusChangeConfirm = async () => {
-    if (!statusChange.programme || !statusChange.target) return
+  const performStatusChange = async (programme: ProgramOverview, target: ProgramStatusValue) => {
     setIsUpdatingStatus(true)
     try {
-      const response = await api.request(`/api/programs/${statusChange.programme.id}/status`, {
+      const response = await api.request(`/api/programs/${programme.id}/status`, {
         method: 'PATCH',
-        body: JSON.stringify({ status: statusChange.target }),
+        body: JSON.stringify({ status: target }),
       })
       if (!response.ok) {
         const err = await response.json().catch(() => ({}))
@@ -257,7 +265,7 @@ export default function ProgrammesPage() {
       const updated = await response.json()
       setProgrammes(prev =>
         prev.map(p =>
-          p.id === statusChange.programme!.id
+          p.id === programme.id
             ? {
                 ...p,
                 status: updated.status,
@@ -274,9 +282,10 @@ export default function ProgrammesPage() {
       }
       toast({
         title: 'Statut mis à jour',
-        description: `Programme « ${statusChange.programme.name} » ${labels[statusChange.target]}.`,
+        description: `Programme « ${programme.name} » ${labels[target]}.`,
       })
       setStatusChange({ isOpen: false, programme: null, target: null })
+      setCloseWarning({ isOpen: false, programme: null, incomplete: [] })
     } catch (e) {
       toast({
         title: 'Changement impossible',
@@ -285,6 +294,52 @@ export default function ProgrammesPage() {
       })
     } finally {
       setIsUpdatingStatus(false)
+    }
+  }
+
+  const handleStatusChangeConfirm = async () => {
+    if (!statusChange.programme || !statusChange.target) return
+    await performStatusChange(statusChange.programme, statusChange.target)
+  }
+
+  // Raison courte d'incomplétude d'une réservation (première pertinente)
+  const incompleteReason = (r: any): string => {
+    if (!r.statutPasseport) return 'passeport en attente'
+    if (!r.statutVisa) return 'visa en attente'
+    if (!r.statutHotel) return 'hôtel en attente'
+    if (!r.statutVol) return 'vol en attente'
+    if (typeof r.paidAmount === 'number' && typeof r.price === 'number' && r.paidAmount < r.price)
+      return 'paiement en attente'
+    return 'dossier incomplet'
+  }
+
+  // Clic « Clôturer » : vérifier d'abord les réservations non complètes du programme.
+  const handleCloturerClick = async (programme: ProgramOverview) => {
+    setCheckingCloseId(programme.id)
+    try {
+      const res = await api.request(`/api/reservations?programId=${programme.id}&limit=1000`)
+      if (!res.ok) throw new Error('fetch reservations failed')
+      const data = await res.json()
+      const list: any[] = Array.isArray(data?.reservations) ? data.reservations : []
+      const incomplete = list
+        .filter(r => r.status !== 'Complet')
+        .map(r => ({
+          id: r.id,
+          name: `${String(r.lastName || '').toUpperCase()} ${r.firstName || ''}`.trim(),
+          reason: incompleteReason(r),
+        }))
+
+      if (incomplete.length === 0) {
+        // Toutes complètes → confirmation de clôture habituelle
+        setStatusChange({ isOpen: true, programme, target: 'CLOTURE' })
+      } else {
+        setCloseWarning({ isOpen: true, programme, incomplete })
+      }
+    } catch {
+      // En cas d'échec de vérification, ne pas bloquer : proposer la confirmation standard
+      setStatusChange({ isOpen: true, programme, target: 'CLOTURE' })
+    } finally {
+      setCheckingCloseId(null)
     }
   }
 
@@ -1040,7 +1095,8 @@ export default function ProgrammesPage() {
                         size="sm"
                         className="border-yellow-200 text-yellow-700 hover:bg-yellow-50"
                       >
-                        Voir réservations
+                        <Users className="mr-1 h-4 w-4" />
+                        Voir les réservations
                         <ChevronRight className="ml-1 h-4 w-4" />
                       </Button>
                     </Link>
@@ -1076,12 +1132,11 @@ export default function ProgrammesPage() {
                       variant="outline"
                       size="sm"
                       className="border-orange-300 text-orange-700 hover:bg-orange-50"
-                      onClick={() =>
-                        setStatusChange({ isOpen: true, programme, target: 'CLOTURE' })
-                      }
+                      disabled={checkingCloseId === programme.id}
+                      onClick={() => handleCloturerClick(programme)}
                     >
                       <Lock className="h-4 w-4 mr-2" />
-                      Clôturer
+                      {checkingCloseId === programme.id ? 'Vérification…' : 'Clôturer'}
                     </Button>
                   )}
                   {isAdmin && programme.status === 'CLOTURE' && (
@@ -1260,6 +1315,60 @@ export default function ProgrammesPage() {
               disabled={isUpdatingStatus}
             >
               {isUpdatingStatus ? 'En cours…' : 'Confirmer'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Avertissement de clôture : réservations non complètes (informatif, jamais bloquant) */}
+      <AlertDialog
+        open={closeWarning.isOpen}
+        onOpenChange={(open) => {
+          if (!open && !isUpdatingStatus) {
+            setCloseWarning({ isOpen: false, programme: null, incomplete: [] })
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clôturer malgré des réservations non complètes ?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                {closeWarning.programme ? (
+                  <p className="mb-2">
+                    Le programme « {closeWarning.programme.name} » compte{' '}
+                    <strong>{closeWarning.incomplete.length}</strong> réservation
+                    {closeWarning.incomplete.length > 1 ? 's' : ''} non complète
+                    {closeWarning.incomplete.length > 1 ? 's' : ''}. Vous pourrez toujours encaisser
+                    les paiements et mettre à jour les statuts après la clôture.
+                  </p>
+                ) : null}
+                <div className="mt-2 max-h-56 overflow-y-auto rounded-md border border-gray-200 bg-gray-50 p-2">
+                  <ul className="space-y-1 text-sm">
+                    {closeWarning.incomplete.map((r) => (
+                      <li key={r.id} className="flex items-center justify-between gap-3">
+                        <span className="font-medium text-gray-800">{r.name}</span>
+                        <span className="text-xs text-orange-700 whitespace-nowrap">{r.reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUpdatingStatus}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                if (closeWarning.programme) {
+                  performStatusChange(closeWarning.programme, 'CLOTURE')
+                }
+              }}
+              disabled={isUpdatingStatus}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {isUpdatingStatus ? 'Clôture…' : 'Clôturer quand même'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

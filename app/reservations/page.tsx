@@ -34,6 +34,7 @@ import Link from "next/link"
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/useAuth"
+import ProgramStatusBanner from "@/components/ProgramStatusBanner"
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -387,9 +388,10 @@ export default function ReservationsPage() {
       
       const [reservationsRes, programsRes, statsRes] = await Promise.all([
         fetch(api.url(`/api/reservations?${params}`)),
-        // status=all : inclure les programmes clôturés/archivés dans le filtre
-        // pour pouvoir retrouver leurs anciens dossiers.
-        fetch(api.url(`${api.endpoints.programs}?status=all`)),
+        // Page réservations = le présent : le filtre « Programme » ne liste que les
+        // programmes ACTIF. Les dossiers d'un programme clôturé/archivé se consultent
+        // via le bouton « Voir les réservations » de la page programmes (deep-link programId).
+        fetch(api.url(`${api.endpoints.programs}?status=ACTIF`)),
         fetch(api.url(`/api/reservations/stats?${statsParams}`))
       ]);
 
@@ -772,6 +774,11 @@ export default function ReservationsPage() {
             </Link>
           </div>
         </div>
+
+        {/* Bandeau lecture seule : consultation d'un programme clôturé/archivé via deep-link */}
+        {urlProgramId && (
+          <ProgramStatusBanner status={sortedReservations[0]?.programStatus ?? null} />
+        )}
 
         {/* Statistiques */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -1172,10 +1179,14 @@ export default function ReservationsPage() {
                                   </button>
                                 </a>
                               </Link> */}
-                              {reservation.programStatus === 'ARCHIVE' ? (
+                              {reservation.programStatus && reservation.programStatus !== 'ACTIF' ? (
                                 <button
                                   type="button"
-                                  title="Programme archivé — lecture seule"
+                                  title={
+                                    reservation.programStatus === 'ARCHIVE'
+                                      ? 'Programme archivé — lecture seule'
+                                      : 'Programme clôturé — consultation en lecture seule'
+                                  }
                                   disabled
                                   className="rounded-full p-1.5 bg-gray-50 shadow border border-gray-200 cursor-not-allowed opacity-60"
                                 >

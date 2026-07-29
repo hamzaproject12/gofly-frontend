@@ -126,10 +126,19 @@ model FixedChargeOccurrence {
   @@unique([fixedChargeId, yearMonth])
 }
 
+enum ProgramStatus {
+  ACTIF
+  CLOTURE
+  ARCHIVE
+}
+
 model Program {
   id               Int                  @id @default(autoincrement())
   name             String               @db.VarChar(150)
   created_at       DateTime             @default(now()) @map("created_at")
+  status           ProgramStatus        @default(ACTIF)
+  dateCloture      DateTime?
+  dateArchivage    DateTime?
   visaDeadline     DateTime?
   hotelDeadline    DateTime?
   flightDeadline   DateTime?

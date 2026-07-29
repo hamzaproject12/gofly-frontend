@@ -29,10 +29,23 @@ import {
   AlertTriangle,
   Download,
   Bus,
+  Lock,
+  Archive,
+  RotateCcw,
 } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/hooks/useAuth"
 import { DeleteConfirmation } from "@/components/ui/delete-confirmation"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import RoleProtectedRoute from "../components/RoleProtectedRoute"
 import { useToast } from "@/hooks/use-toast"
 
@@ -112,6 +125,18 @@ interface ProgramOverview {
   };
   isDeleted?: boolean;
   deletedAt?: string | null;
+  status?: 'ACTIF' | 'CLOTURE' | 'ARCHIVE';
+  dateCloture?: string | null;
+  dateArchivage?: string | null;
+}
+
+type ProgramStatusValue = 'ACTIF' | 'CLOTURE' | 'ARCHIVE';
+
+// Badge de statut du cycle de vie : Actif (vert), Clôturé (orange), Archivé (gris)
+const STATUS_BADGE: Record<ProgramStatusValue, { label: string; className: string }> = {
+  ACTIF: { label: 'Actif', className: 'bg-green-100 text-green-800 border-green-200' },
+  CLOTURE: { label: 'Clôturé', className: 'bg-orange-100 text-orange-800 border-orange-200' },
+  ARCHIVE: { label: 'Archivé', className: 'bg-gray-200 text-gray-700 border-gray-300' },
 }
 
 export default function ProgrammesPage() {
@@ -123,9 +148,19 @@ export default function ProgrammesPage() {
   // États pour les filtres
   const [searchQuery, setSearchQuery] = useState("")
   const [programmeFilter, setProgrammeFilter] = useState("tous")
+  // Filtre de statut du cycle de vie (distinct de la corbeille isDeleted). Défaut : Actifs.
+  const [statusFilter, setStatusFilter] = useState<ProgramStatusValue | 'TOUS'>('ACTIF')
   const [programmes, setProgrammes] = useState<ProgramOverview[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Confirmation de changement de statut (Radix AlertDialog)
+  const [statusChange, setStatusChange] = useState<{
+    isOpen: boolean
+    programme: ProgramOverview | null
+    target: ProgramStatusValue | null
+  }>({ isOpen: false, programme: null, target: null })
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   
   // États pour la confirmation de suppression
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
@@ -187,9 +222,100 @@ export default function ProgrammesPage() {
     return searchMatch && programmeMatch
   })
   
-  // Séparer les programmes actifs et supprimés
+  // Séparer les programmes actifs et supprimés (axe corbeille, inchangé)
   const activeProgrammes = filteredProgrammes.filter(p => !p.isDeleted)
   const deletedProgrammes = filteredProgrammes.filter(p => p.isDeleted)
+
+  // Filtrage par statut de cycle de vie (parmi les non supprimés)
+  const visibleProgrammes = activeProgrammes.filter(p => {
+    const st = (p.status || 'ACTIF') as ProgramStatusValue
+    if (statusFilter === 'TOUS') return true
+    return st === statusFilter
+  })
+
+  // Compteurs par statut pour les onglets
+  const statusCounts = {
+    ACTIF: activeProgrammes.filter(p => (p.status || 'ACTIF') === 'ACTIF').length,
+    CLOTURE: activeProgrammes.filter(p => p.status === 'CLOTURE').length,
+    ARCHIVE: activeProgrammes.filter(p => p.status === 'ARCHIVE').length,
+    TOUS: activeProgrammes.length,
+  }
+
+  // Appliquer un changement de statut via PATCH /api/programs/:id/status
+  const handleStatusChangeConfirm = async () => {
+    if (!statusChange.programme || !statusChange.target) return
+    setIsUpdatingStatus(true)
+    try {
+      const response = await api.request(`/api/programs/${statusChange.programme.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: statusChange.target }),
+      })
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error || 'Erreur lors du changement de statut')
+      }
+      const updated = await response.json()
+      setProgrammes(prev =>
+        prev.map(p =>
+          p.id === statusChange.programme!.id
+            ? {
+                ...p,
+                status: updated.status,
+                dateCloture: updated.dateCloture ?? null,
+                dateArchivage: updated.dateArchivage ?? null,
+              }
+            : p
+        )
+      )
+      const labels: Record<ProgramStatusValue, string> = {
+        ACTIF: 'remis en actif',
+        CLOTURE: 'clôturé',
+        ARCHIVE: 'archivé',
+      }
+      toast({
+        title: 'Statut mis à jour',
+        description: `Programme « ${statusChange.programme.name} » ${labels[statusChange.target]}.`,
+      })
+      setStatusChange({ isOpen: false, programme: null, target: null })
+    } catch (e) {
+      toast({
+        title: 'Changement impossible',
+        description: e instanceof Error ? e.message : 'Erreur inconnue',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsUpdatingStatus(false)
+    }
+  }
+
+  // Texte de confirmation selon le SENS de la transition (réouverture vs fermeture)
+  const statusDialogText = (): { title: string; description: string } => {
+    const rank: Record<ProgramStatusValue, number> = { ACTIF: 0, CLOTURE: 1, ARCHIVE: 2 }
+    const current = (statusChange.programme?.status || 'ACTIF') as ProgramStatusValue
+    const target = statusChange.target
+    if (!target) return { title: '', description: '' }
+    const isReopen = rank[target] < rank[current]
+    if (isReopen) {
+      return {
+        title: 'Rouvrir ce programme ?',
+        description:
+          target === 'ACTIF'
+            ? 'Il repassera en actif et redeviendra entièrement modifiable.'
+            : 'Il repassera en clôturé : encaissements et statuts fournisseur redeviennent possibles.',
+      }
+    }
+    if (target === 'CLOTURE') {
+      return {
+        title: 'Clôturer ce programme ?',
+        description:
+          "Il sortira de vos programmes actifs. Vous pourrez encore encaisser les paiements en attente.",
+      }
+    }
+    return {
+      title: 'Archiver ce programme ?',
+      description: 'Il passera en lecture seule.',
+    }
+  }
   
   // Log pour debug
   console.log('🔍 Filtrage - Actifs:', activeProgrammes.length, 'Supprimés:', deletedProgrammes.length)
@@ -536,14 +662,57 @@ export default function ProgrammesPage() {
           </Card>
         </div>
 
-        {/* Liste des programmes actifs */}
+        {/* Onglets de statut du cycle de vie (distincts de la corbeille) */}
+        <div className="mb-6 flex flex-wrap gap-2">
+          {([
+            { key: 'ACTIF', label: 'Actifs' },
+            { key: 'CLOTURE', label: 'Clôturés' },
+            { key: 'ARCHIVE', label: 'Archivés' },
+            { key: 'TOUS', label: 'Tous' },
+          ] as const).map(({ key, label }) => (
+            <Button
+              key={key}
+              type="button"
+              variant={statusFilter === key ? 'default' : 'outline'}
+              size="sm"
+              className={
+                statusFilter === key
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : 'border-blue-200 text-blue-700 hover:bg-blue-50'
+              }
+              onClick={() => setStatusFilter(key)}
+            >
+              {label}
+              <span className="ml-2 rounded-full bg-white/25 px-2 py-0.5 text-xs">
+                {statusCounts[key]}
+              </span>
+            </Button>
+          ))}
+        </div>
+
+        {/* Liste des programmes (filtrés par statut) */}
         <div className="space-y-6">
-          {activeProgrammes.map((programme) => (
+          {visibleProgrammes.length === 0 && (
+            <Card className="border border-blue-100/80 shadow-sm">
+              <CardContent className="p-8 text-center text-gray-500">
+                Aucun programme dans cette vue.
+              </CardContent>
+            </Card>
+          )}
+          {visibleProgrammes.map((programme) => (
             <Card key={programme.id} className="overflow-hidden border border-blue-100/80 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all">
               <CardHeader className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-100 pb-4 border-b border-blue-100/60">
                 <div className="flex justify-between items-start gap-3 flex-wrap">
                   <div>
-                    <CardTitle className="text-xl text-blue-800">{programme.name}</CardTitle>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <CardTitle className="text-xl text-blue-800">{programme.name}</CardTitle>
+                      <Badge
+                        variant="outline"
+                        className={STATUS_BADGE[(programme.status || 'ACTIF') as ProgramStatusValue].className}
+                      >
+                        {STATUS_BADGE[(programme.status || 'ACTIF') as ProgramStatusValue].label}
+                      </Badge>
+                    </div>
                     <CardDescription className="mt-1">
                       Créé le {new Date(programme.created_at).toLocaleDateString("fr-FR")}
                     </CardDescription>
@@ -899,7 +1068,64 @@ export default function ProgrammesPage() {
                   </div>
                   
                 {/* Boutons d'action à droite */}
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                  {/* Actions de cycle de vie (Radix AlertDialog) */}
+                  {isAdmin && (programme.status || 'ACTIF') === 'ACTIF' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                      onClick={() =>
+                        setStatusChange({ isOpen: true, programme, target: 'CLOTURE' })
+                      }
+                    >
+                      <Lock className="h-4 w-4 mr-2" />
+                      Clôturer
+                    </Button>
+                  )}
+                  {isAdmin && programme.status === 'CLOTURE' && (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-gray-300 text-gray-700 hover:bg-gray-100"
+                        onClick={() =>
+                          setStatusChange({ isOpen: true, programme, target: 'ARCHIVE' })
+                        }
+                      >
+                        <Archive className="h-4 w-4 mr-2" />
+                        Archiver
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-green-300 text-green-700 hover:bg-green-50"
+                        onClick={() =>
+                          setStatusChange({ isOpen: true, programme, target: 'ACTIF' })
+                        }
+                      >
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        Rouvrir
+                      </Button>
+                    </>
+                  )}
+                  {isAdmin && programme.status === 'ARCHIVE' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-green-300 text-green-700 hover:bg-green-50"
+                      onClick={() =>
+                        setStatusChange({ isOpen: true, programme, target: 'CLOTURE' })
+                      }
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Rouvrir
+                    </Button>
+                  )}
                   {/* Éditer */}
                   {isAdmin && (
                     <Link href={`/programmes/modifier/${programme.id}`}>
@@ -1006,6 +1232,38 @@ export default function ProgrammesPage() {
           loading={isDeleting}
           isHardDelete={deleteConfirmation.isHardDelete}
         />
+
+      {/* Confirmation de changement de statut du cycle de vie */}
+      <AlertDialog
+        open={statusChange.isOpen}
+        onOpenChange={(open) => {
+          if (!open && !isUpdatingStatus) {
+            setStatusChange({ isOpen: false, programme: null, target: null })
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{statusDialogText().title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {statusChange.programme ? `Programme « ${statusChange.programme.name} ». ` : ''}
+              {statusDialogText().description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUpdatingStatus}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleStatusChangeConfirm()
+              }}
+              disabled={isUpdatingStatus}
+            >
+              {isUpdatingStatus ? 'En cours…' : 'Confirmer'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
     </>
     </RoleProtectedRoute>

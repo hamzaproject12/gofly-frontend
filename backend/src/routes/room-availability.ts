@@ -9,8 +9,13 @@ router.get('/', async (req, res) => {
   try {
     console.log('🏠 Fetching room availability data...')
 
-    // Récupérer tous les programmes avec leurs chambres et réservations
+    // Récupérer les programmes ACTIFS (non supprimés) avec leurs chambres et réservations.
+    // Les programmes clôturés/archivés ne doivent pas gonfler les places occupées du présent.
     const programs = await prisma.program.findMany({
+      where: {
+        isDeleted: false,
+        status: 'ACTIF'
+      },
       include: {
         rooms: {
           include: {

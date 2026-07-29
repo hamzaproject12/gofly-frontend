@@ -276,6 +276,13 @@ type AnalyticsData = {
 type Program = {
   id: number
   name: string
+  status?: 'ACTIF' | 'CLOTURE' | 'ARCHIVE'
+}
+
+// Suffixe de statut affiché à côté du nom dans le sélecteur de programme
+const PROGRAM_STATUS_SUFFIX: Record<'CLOTURE' | 'ARCHIVE', string> = {
+  CLOTURE: ' (clôturé)',
+  ARCHIVE: ' (archivé)',
 }
 
 // 🎯 API Balance optimisée - toutes les données viennent du backend
@@ -369,7 +376,8 @@ export default function SoldeCaissePage() {
       const [balanceResponse, analyticsResponse, programsResponse] = await Promise.all([
         fetch(api.url(`/api/balance?${params.toString()}`)),
         fetch(api.url(`/api/analytics/dashboard?${params.toString()}`)),
-        fetch(api.url(api.endpoints.programs))
+        // status=all : la comptabilité des programmes clôturés/archivés reste consultable ici.
+        fetch(api.url(`${api.endpoints.programs}?status=all`))
       ])
       
       if (!balanceResponse.ok) {
@@ -843,6 +851,9 @@ export default function SoldeCaissePage() {
                     {(programmes || []).map((programme) => (
                       <SelectItem key={programme.id} value={programme.name}>
                         {programme.name}
+                        {programme.status === 'CLOTURE' || programme.status === 'ARCHIVE'
+                          ? PROGRAM_STATUS_SUFFIX[programme.status]
+                          : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>

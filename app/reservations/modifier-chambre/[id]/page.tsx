@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react"
 import { api } from "@/lib/api"
 import { generatePaymentReceiptFile } from "@/lib/generateReceipt"
 import { BlockersTooltip } from "@/components/blockers-tooltip"
+import ProgramStatusBanner from "@/components/ProgramStatusBanner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -362,6 +363,8 @@ export default function EditReservation() {
   const [loading, setLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [programs, setPrograms] = useState<Program[]>([])
+  // Statut du cycle de vie du programme lié (bandeau lecture seule)
+  const [programStatus, setProgramStatus] = useState<"ACTIF" | "CLOTURE" | "ARCHIVE" | null>(null)
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string; type: string } | null>(null)
   const [showRoomGuide, setShowRoomGuide] = useState(false)
   // Lecture automatique du passeport (OCR) — comme sur Nouvelle Réservation
@@ -472,6 +475,7 @@ export default function EditReservation() {
           const reservationResponse = await fetch(api.url(`/api/reservations/${reservationId}`))
           const reservationData = await reservationResponse.json()
           setReservationData(reservationData)
+          setProgramStatus(reservationData.program?.status ?? null)
           setAccompagnants((reservationData.accompagnants || []).map((a: any) => ({
             id: a.id,
             firstName: a.firstName || '',
@@ -2135,6 +2139,7 @@ export default function EditReservation() {
               <p className="text-gray-600">Mise à jour des informations de la réservation #{reservationId}</p>
             </div>
           </div>
+          <ProgramStatusBanner status={programStatus} />
         </div>
 
         {/* Structure identique à Nouvelle Réservation */}

@@ -1,6 +1,8 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, ProgramStatus } from '@prisma/client';
 import { ProgramOverviewController } from '../controllers/programOverviewController';
+import { authenticateToken } from '../middleware/auth';
+import { requireAdminOrSuperAdmin } from '../controllers/authController';
 import {
   logJournalSuppression,
   logRoomsDeletedFromSnapshot,
@@ -15,12 +17,27 @@ const router = express.Router();
 const prisma = new PrismaClient();
 
 // Get all programs with their hotels (excluding soft deleted)
+// Filtre optionnel ?status : par défaut ACTIF seulement ; CLOTURE / ARCHIVE ciblés ;
+// 'all' pour tous les programmes non supprimés quel que soit le statut.
 router.get('/', async (req, res) => {
   try {
+    const statusParam = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const where: { isDeleted: boolean; status?: ProgramStatus } = { isDeleted: false };
+    if (statusParam === 'all') {
+      // aucun filtre de statut : tous les non supprimés
+    } else if (
+      statusParam === 'ACTIF' ||
+      statusParam === 'CLOTURE' ||
+      statusParam === 'ARCHIVE'
+    ) {
+      where.status = statusParam as ProgramStatus;
+    } else {
+      // Défaut : uniquement les programmes actifs
+      where.status = 'ACTIF';
+    }
+
     const programs = await prisma.program.findMany({
-      where: {
-        isDeleted: false
-      },
+      where,
       include: {
         hotelsMadina: { include: { hotel: true } },
         hotelsMakkah: { include: { hotel: true } },
@@ -1130,6 +1147,102 @@ router.delete('/:id/hard', async (req, res) => {
       error: 'Erreur lors de la suppression définitive du programme',
       details: error instanceof Error ? error.message : 'Erreur inconnue'
     });
+  }
+});
+
+// Transition de statut du cycle de vie (ACTIF / CLOTURE / ARCHIVE) — ADMIN ou SUPER_ADMIN.
+// Toutes les transitions sont autorisées dans les deux sens (réouverture permise).
+// Axe INDÉPENDANT de isDeleted (corbeille) : aucune donnée n'est supprimée, aucun crédit touché.
+const PROGRAM_STATUS_RANK: Record<ProgramStatus, number> = {
+  ACTIF: 0,
+  CLOTURE: 1,
+  ARCHIVE: 2,
+};
+
+router.patch('/:id/status', authenticateToken, requireAdminOrSuperAdmin, async (req, res) => {
+  try {
+    const programId = parseInt(req.params.id);
+    if (Number.isNaN(programId)) {
+      return res.status(400).json({ error: 'Identifiant de programme invalide' });
+    }
+
+    const { status } = req.body ?? {};
+    if (status !== 'ACTIF' && status !== 'CLOTURE' && status !== 'ARCHIVE') {
+      return res.status(400).json({
+        error: 'Statut invalide. Valeurs autorisées : ACTIF, CLOTURE, ARCHIVE.',
+      });
+    }
+    const nextStatus = status as ProgramStatus;
+
+    const program = await prisma.program.findFirst({
+      where: { id: programId, isDeleted: false },
+    });
+    if (!program) {
+      return res.status(404).json({ error: 'Programme non trouvé' });
+    }
+
+    const previousStatus = program.status;
+    if (previousStatus === nextStatus) {
+      return res.json(program);
+    }
+
+    // Dates de cycle de vie (cohérentes avec l'état cible)
+    const data: {
+      status: ProgramStatus;
+      dateCloture?: Date | null;
+      dateArchivage?: Date | null;
+    } = { status: nextStatus };
+    if (nextStatus === 'ACTIF') {
+      data.dateCloture = null;
+      data.dateArchivage = null;
+    } else if (nextStatus === 'CLOTURE') {
+      data.dateCloture = new Date();
+      data.dateArchivage = null;
+    } else {
+      // ARCHIVE : conserver dateCloture existante, marquer l'archivage
+      data.dateArchivage = new Date();
+    }
+
+    const updated = await prisma.program.update({
+      where: { id: programId },
+      data,
+    });
+
+    // Journalisation : code selon le sens de la transition
+    const isReopening = PROGRAM_STATUS_RANK[nextStatus] < PROGRAM_STATUS_RANK[previousStatus];
+    let action: string;
+    let summary: string;
+    if (isReopening) {
+      action = JOURNAL_ACTION.PROGRAM_REOPENED;
+      summary =
+        nextStatus === 'ACTIF'
+          ? `Programme « ${program.name} » rouvert (remis en actif)`
+          : `Programme « ${program.name} » rouvert (repassé en clôturé)`;
+    } else if (nextStatus === 'CLOTURE') {
+      action = JOURNAL_ACTION.PROGRAM_CLOSED;
+      summary = `Programme « ${program.name} » clôturé`;
+    } else {
+      action = JOURNAL_ACTION.PROGRAM_ARCHIVED;
+      summary = `Programme « ${program.name} » archivé`;
+    }
+
+    const detailText =
+      'CHANGEMENT DE STATUT DU PROGRAMME\n\n' +
+      `Programme : ${program.name}\n` +
+      `Statut : ${previousStatus} → ${nextStatus}\n`;
+
+    await logJournalSuppression(prisma, req, {
+      action,
+      entityType: 'Program',
+      entityId: programId,
+      summary,
+      detailText,
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Erreur lors du changement de statut du programme:', error);
+    res.status(500).json({ error: 'Erreur lors du changement de statut du programme' });
   }
 });
 

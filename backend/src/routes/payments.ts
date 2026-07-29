@@ -9,6 +9,11 @@ import {
   JOURNAL_ACTION,
   type ReservationJournalRow,
 } from '../services/journalSuppressionService';
+import {
+  getProgramLifecycle,
+  isWritable,
+  PROGRAMME_ARCHIVE_BODY,
+} from '../services/programStatusService';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -113,6 +118,14 @@ router.post('/', async (req, res) => {
         ? programIdParsed
         : reservation.programId
       : programIdParsed;
+
+    // Cycle de vie : paiement autorisé si programme ACTIF ou CLOTURE ; refusé si ARCHIVE.
+    if (resolvedProgramId != null) {
+      const lifecycle = await getProgramLifecycle(prisma, resolvedProgramId);
+      if (lifecycle && !isWritable(lifecycle.status)) {
+        return res.status(409).json(PROGRAMME_ARCHIVE_BODY);
+      }
+    }
 
     const actorAgentId = extractActorAgentIdFromToken(req);
     /** Agent du dossier en priorité, sinon l’utilisateur connecté qui enregistre le paiement */

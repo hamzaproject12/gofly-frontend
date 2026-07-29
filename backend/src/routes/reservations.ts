@@ -23,6 +23,13 @@ import {
   InsufficientCreditsError,
   REFUND_WINDOW_MS,
 } from '../services/creditService';
+import {
+  getProgramLifecycle,
+  isBookable,
+  isWritable,
+  PROGRAMME_NON_ACTIF_BODY,
+  PROGRAMME_ARCHIVE_BODY,
+} from '../services/programStatusService';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -173,11 +180,16 @@ router.get('/', async (req, res) => {
     };
     
     if (programId && programId !== '') {
+      // Programme précis sélectionné : on le retourne quel que soit son statut
+      // (permet de retrouver les anciens dossiers d'un programme clôturé/archivé).
       where.programId = Number(programId);
     } else if (program && program !== 'tous') {
       where.program = {
         name: program
       };
+    } else {
+      // Vue par défaut : uniquement les réservations des programmes ACTIF.
+      where.program = { status: 'ACTIF' };
     }
 
     if (status && status !== 'all') {
@@ -225,6 +237,7 @@ router.get('/', async (req, res) => {
           select: {
             id: true,
             name: true,
+            status: true,
             visaDeadline: true,
             hotelDeadline: true,
             flightDeadline: true,
@@ -285,10 +298,13 @@ router.get('/stats', async (req, res) => {
       where.program = {
         name: program
       };
+    } else {
+      // Cohérent avec la liste : par défaut, seules les réservations des programmes ACTIF.
+      where.program = { status: 'ACTIF' };
     }
-    
+
     applyRoomTypeQuery(where, roomType);
-    
+
     if (dateFrom || dateTo) {
       where.reservationDate = {};
       if (dateFrom) {
@@ -432,6 +448,16 @@ router.post('/group', async (req, res) => {
     const agentId = extractAgentIdFromToken(req);
     const actorLabel = extractActorLabelFromToken(req);
     const groupSize = occupants.length;
+
+    // Cycle de vie : refuser toute nouvelle réservation sur un programme non ACTIF.
+    // CRITIQUE : ce contrôle est AVANT le débit de crédit (aucun crédit consommé sur refus).
+    const lifecycle = await getProgramLifecycle(prisma, Number(common.programId));
+    if (!lifecycle) {
+      return res.status(404).json({ error: 'Programme introuvable' });
+    }
+    if (!isBookable(lifecycle.status)) {
+      return res.status(409).json(PROGRAMME_NON_ACTIF_BODY);
+    }
 
     const result = await prisma.$transaction(async (tx) => {
       // 1 crédit par pèlerin : débit conditionnel AVANT la création, dans la même transaction
@@ -667,6 +693,16 @@ router.post('/', async (req, res) => {
         roomSlot: roomSlot ? Number(roomSlot) : null
     };
 
+    // Cycle de vie : refuser toute nouvelle réservation sur un programme non ACTIF.
+    // CRITIQUE : ce contrôle est AVANT le débit de crédit (aucun crédit consommé sur refus).
+    const lifecycle = await getProgramLifecycle(prisma, Number(programId));
+    if (!lifecycle) {
+      return res.status(404).json({ error: 'Programme introuvable' });
+    }
+    if (!isBookable(lifecycle.status)) {
+      return res.status(409).json(PROGRAMME_NON_ACTIF_BODY);
+    }
+
     // Réservation LIT = 1 pèlerin = 1 crédit : débit conditionnel + création + ligne
     // CONSOMMATION dans la MÊME transaction (solde insuffisant → aucun dossier créé).
     const actorLabel = extractActorLabelFromToken(req);
@@ -820,6 +856,12 @@ router.put('/group/:leaderId', async (req, res) => {
       return res.status(404).json({ error: 'Réservation leader non trouvée' });
     }
 
+    // Cycle de vie : lecture seule si le programme est archivé.
+    const lifecycleGroup = await getProgramLifecycle(prisma, leaderBefore.programId);
+    if (lifecycleGroup && !isWritable(lifecycleGroup.status)) {
+      return res.status(409).json(PROGRAMME_ARCHIVE_BODY);
+    }
+
     const accIds = accompagnantsBody
       .map((a) => parseInt(a?.id))
       .filter((n) => !Number.isNaN(n));
@@ -967,6 +1009,12 @@ router.put('/:id', async (req, res) => {
     });
     if (!beforeSnapshot) {
       return res.status(404).json({ error: 'Réservation non trouvée' });
+    }
+
+    // Cycle de vie : lecture seule si le programme est archivé.
+    const lifecyclePut = await getProgramLifecycle(prisma, beforeSnapshot.programId);
+    if (lifecyclePut && !isWritable(lifecyclePut.status)) {
+      return res.status(409).json(PROGRAMME_ARCHIVE_BODY);
     }
 
     const currentReservation: any = {
@@ -1198,6 +1246,13 @@ router.patch('/:id', async (req, res) => {
     });
     if (!beforeSnapshotPatch) {
       return res.status(404).json({ error: 'Réservation non trouvée' });
+    }
+
+    // Cycle de vie : lecture seule si le programme est archivé (les MAJ statuts
+    // fournisseur restent autorisées sur ACTIF et CLOTURE).
+    const lifecyclePatch = await getProgramLifecycle(prisma, beforeSnapshotPatch.programId);
+    if (lifecyclePatch && !isWritable(lifecyclePatch.status)) {
+      return res.status(409).json(PROGRAMME_ARCHIVE_BODY);
     }
     const isAccompagnant = Boolean(beforeSnapshotPatch.parentId);
 

@@ -1,6 +1,11 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
+import {
+  getProgramLifecycle,
+  isWritable,
+  PROGRAMME_ARCHIVE_BODY,
+} from '../services/programStatusService';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -260,6 +265,14 @@ router.post('/', async (req, res) => {
     console.log('POST /api/expenses - body:', req.body);
     const { description, amount, date, type, fichierId, programId, reservationId } = req.body;
 
+    // Cycle de vie : dépense autorisée si programme ACTIF ou CLOTURE ; refusée si ARCHIVE.
+    if (programId) {
+      const lifecycle = await getProgramLifecycle(prisma, Number(programId));
+      if (lifecycle && !isWritable(lifecycle.status)) {
+        return res.status(409).json(PROGRAMME_ARCHIVE_BODY);
+      }
+    }
+
     let reservationAgentId: number | null = null;
     if (reservationId) {
       const r = await prisma.reservation.findUnique({
@@ -295,6 +308,20 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { description, amount, date, type, fichierId, programId, reservationId } = req.body;
+
+    // Cycle de vie : refuser la modification si le programme cible (nouveau ou
+    // existant) est archivé.
+    const existingExpense = await prisma.expense.findUnique({
+      where: { id: parseInt(req.params.id) },
+      select: { programId: true },
+    });
+    const targetProgramId = programId ? Number(programId) : existingExpense?.programId ?? null;
+    if (targetProgramId != null) {
+      const lifecycle = await getProgramLifecycle(prisma, targetProgramId);
+      if (lifecycle && !isWritable(lifecycle.status)) {
+        return res.status(409).json(PROGRAMME_ARCHIVE_BODY);
+      }
+    }
 
     const expense = await prisma.expense.update({
       where: { id: parseInt(req.params.id) },

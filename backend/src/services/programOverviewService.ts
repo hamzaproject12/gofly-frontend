@@ -91,6 +91,11 @@ export interface ProgramOverview {
   // Soft delete
   isDeleted?: boolean;
   deletedAt?: string | null;
+
+  // Cycle de vie (axe indépendant de isDeleted)
+  status: 'ACTIF' | 'CLOTURE' | 'ARCHIVE';
+  dateCloture?: string | null;
+  dateArchivage?: string | null;
 }
 
 export class ProgramOverviewService {
@@ -240,7 +245,11 @@ export class ProgramOverviewService {
         },
         
         isDeleted: program.isDeleted,
-        deletedAt: program.deletedAt?.toISOString() || null
+        deletedAt: program.deletedAt?.toISOString() || null,
+
+        status: program.status,
+        dateCloture: program.dateCloture?.toISOString() || null,
+        dateArchivage: program.dateArchivage?.toISOString() || null
       };
 
       return overview;

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, User, CreditCard, FileText, Sparkles, Hotel, ZoomIn, X } from "lucide-react";
 import Link from "next/link";
+import ProgramStatusBanner from "@/components/ProgramStatusBanner";
 
 // Ajout des types explicites
 interface ReservationDocument {
@@ -42,6 +43,7 @@ interface Reservation {
 
 export default function ReservationDetails() {
   const [reservation, setReservation] = useState<Reservation | null>(null);
+  const [programStatus, setProgramStatus] = useState<"ACTIF" | "CLOTURE" | "ARCHIVE" | null>(null);
   const [loading, setLoading] = useState(true);
   const [preview, setPreview] = useState<{ url: string; title: string } | null>(null);
 
@@ -59,6 +61,7 @@ export default function ReservationDetails() {
       fetch(api.url(`/api/reservations/${id}`))
         .then(res => res.json())
         .then(data => {
+          setProgramStatus(data.program?.status ?? null);
           setReservation({
             nom: data.lastName,
             prenom: data.firstName,
@@ -115,6 +118,7 @@ export default function ReservationDetails() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
+              <ProgramStatusBanner status={programStatus} />
               {/* Section 1: Informations Client */}
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
                 <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">

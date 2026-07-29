@@ -28,6 +28,7 @@ import {
   Hotel as HotelIcon,
   Plane,
   Download,
+  Lock,
 } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect, useCallback, useMemo } from "react"
@@ -91,6 +92,7 @@ type Reservation = {
 type Program = {
   id: number
   name: string
+  status?: 'ACTIF' | 'CLOTURE' | 'ARCHIVE'
 }
 
 type TransformedReservation = {
@@ -123,6 +125,8 @@ type TransformedReservation = {
   agentNom: string | null
   /** Pour tri par dernière modification */
   updatedAt: string
+  /** Statut du cycle de vie du programme lié (lecture seule si ARCHIVE) */
+  programStatus?: 'ACTIF' | 'CLOTURE' | 'ARCHIVE'
 }
 
 type Stats = {
@@ -383,7 +387,9 @@ export default function ReservationsPage() {
       
       const [reservationsRes, programsRes, statsRes] = await Promise.all([
         fetch(api.url(`/api/reservations?${params}`)),
-        fetch(api.url(api.endpoints.programs)),
+        // status=all : inclure les programmes clôturés/archivés dans le filtre
+        // pour pouvoir retrouver leurs anciens dossiers.
+        fetch(api.url(`${api.endpoints.programs}?status=all`)),
         fetch(api.url(`/api/reservations/stats?${statsParams}`))
       ]);
 
@@ -445,6 +451,7 @@ export default function ReservationsPage() {
             urgentDate: undefined,
             groupSize,
             typeReservation: reservation.typeReservation,
+            programStatus: reservation.program?.status,
             agentNom: reservation.agent?.nom ?? null,
             updatedAt:
               typeof reservation.updated_at === 'string'
@@ -457,8 +464,10 @@ export default function ReservationsPage() {
         let isUrgent = false;
         let urgentReason = undefined;
         let urgentDate = undefined;
+        // Cycle de vie : jamais d'urgence sur un programme non ACTIF (voyage terminé).
+        const programActif = !reservation.program?.status || reservation.program.status === 'ACTIF';
         // Passeport
-        if (!passportGroupOk && reservation.program?.passportDeadline) {
+        if (programActif && !passportGroupOk && reservation.program?.passportDeadline) {
           const date = new Date(reservation.program.passportDeadline);
           const diff = (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
           if (diff >= 0 && diff <= DAYS_URGENCY_WINDOW) {
@@ -468,7 +477,7 @@ export default function ReservationsPage() {
           }
         }
         // Visa
-        if (!isUrgent && !visaGroupOk && reservation.program?.visaDeadline) {
+        if (programActif && !isUrgent && !visaGroupOk && reservation.program?.visaDeadline) {
           const date = new Date(reservation.program.visaDeadline);
           const diff = (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
           if (diff >= 0 && diff <= DAYS_URGENCY_WINDOW) {
@@ -478,7 +487,7 @@ export default function ReservationsPage() {
           }
         }
         // Hôtel
-        if (!isUrgent && !hotelGroupOk && reservation.program?.hotelDeadline) {
+        if (programActif && !isUrgent && !hotelGroupOk && reservation.program?.hotelDeadline) {
           const date = new Date(reservation.program.hotelDeadline);
           const diff = (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
           if (diff >= 0 && diff <= DAYS_URGENCY_WINDOW) {
@@ -488,7 +497,7 @@ export default function ReservationsPage() {
           }
         }
         // Vol
-        if (!isUrgent && !flightGroupOk && reservation.program?.flightDeadline) {
+        if (programActif && !isUrgent && !flightGroupOk && reservation.program?.flightDeadline) {
           const date = new Date(reservation.program.flightDeadline);
           const diff = (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
           if (diff >= 0 && diff <= DAYS_URGENCY_WINDOW) {
@@ -523,6 +532,7 @@ export default function ReservationsPage() {
           urgentDate,
           groupSize,
           typeReservation: reservation.typeReservation,
+          programStatus: reservation.program?.status,
           agentNom: reservation.agent?.nom ?? null,
           updatedAt:
             typeof reservation.updated_at === 'string'
@@ -1162,20 +1172,31 @@ export default function ReservationsPage() {
                                   </button>
                                 </a>
                               </Link> */}
-                              <Link
-                                href={
-                                  reservation.typeReservation === "CHAMBRE_PRIVEE"
-                                    ? `/reservations/modifier-chambre/${reservation.id}`
-                                    : `/reservations/modifier-simple/${reservation.id}`
-                                }
-                                legacyBehavior
-                              >
-                                <a title="Modifier" className="group">
-                                  <button type="button" className="rounded-full p-1.5 bg-white shadow hover:bg-yellow-100 transition-all border border-yellow-200 group-hover:scale-110">
-                                    <Settings className="h-4 w-4 text-yellow-600 group-hover:text-yellow-800 transition-colors" />
-                                  </button>
-                                </a>
-                              </Link>
+                              {reservation.programStatus === 'ARCHIVE' ? (
+                                <button
+                                  type="button"
+                                  title="Programme archivé — lecture seule"
+                                  disabled
+                                  className="rounded-full p-1.5 bg-gray-50 shadow border border-gray-200 cursor-not-allowed opacity-60"
+                                >
+                                  <Lock className="h-4 w-4 text-gray-400" />
+                                </button>
+                              ) : (
+                                <Link
+                                  href={
+                                    reservation.typeReservation === "CHAMBRE_PRIVEE"
+                                      ? `/reservations/modifier-chambre/${reservation.id}`
+                                      : `/reservations/modifier-simple/${reservation.id}`
+                                  }
+                                  legacyBehavior
+                                >
+                                  <a title="Modifier" className="group">
+                                    <button type="button" className="rounded-full p-1.5 bg-white shadow hover:bg-yellow-100 transition-all border border-yellow-200 group-hover:scale-110">
+                                      <Settings className="h-4 w-4 text-yellow-600 group-hover:text-yellow-800 transition-colors" />
+                                    </button>
+                                  </a>
+                                </Link>
+                              )}
                               {isAdmin && (
                                 <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                                   <DialogTrigger asChild>

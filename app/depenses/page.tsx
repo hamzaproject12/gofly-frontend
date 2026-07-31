@@ -50,6 +50,18 @@ const normalizeText = (value: string | null | undefined) =>
 const formatMontant = (value: number | null | undefined) =>
   Math.round(Number(value) || 0).toLocaleString()
 
+// Format compact pour les cartes de statistiques : 468 000 -> 468k
+// (les grands nombres débordaient et masquaient l'affichage)
+const formatMontantCourt = (value: number | null | undefined) => {
+  const montant = Math.round(Number(value) || 0)
+  const abs = Math.abs(montant)
+  if (abs < 1000) return montant.toLocaleString()
+  const milliers = (montant / 1000).toLocaleString(undefined, {
+    maximumFractionDigits: 1,
+  })
+  return `${milliers}k`
+}
+
 export default function DepensesPage() {
   // Hook pour gérer l'authentification
   const { isAdmin, loading: authLoading } = useAuth()
@@ -342,7 +354,9 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-4">
                 <Receipt className="h-8 w-8 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{formatMontant(totalDepenses)} DH</div>
+                  <div className="text-2xl font-bold" title={`${formatMontant(totalDepenses)} DH`}>
+                    {formatMontantCourt(totalDepenses)} DH
+                  </div>
                   <div className="text-xs text-white/80">dépenses</div>
                 </div>
               </div>
@@ -359,7 +373,9 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-4">
                 <Plane className="h-8 w-8 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{formatMontant(depensesVol)} DH</div>
+                  <div className="text-2xl font-bold" title={`${formatMontant(depensesVol)} DH`}>
+                    {formatMontantCourt(depensesVol)} DH
+                  </div>
                   <div className="text-xs text-white/80">vol</div>
                 </div>
               </div>
@@ -376,7 +392,9 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-4">
                 <Building className="h-8 w-8 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{formatMontant(depensesHotelMadina)} DH</div>
+                  <div className="text-2xl font-bold" title={`${formatMontant(depensesHotelMadina)} DH`}>
+                    {formatMontantCourt(depensesHotelMadina)} DH
+                  </div>
                   <div className="text-xs text-white/80">Madina</div>
                 </div>
               </div>
@@ -393,7 +411,9 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-4">
                 <Building className="h-8 w-8 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{formatMontant(depensesHotelMakkah)} DH</div>
+                  <div className="text-2xl font-bold" title={`${formatMontant(depensesHotelMakkah)} DH`}>
+                    {formatMontantCourt(depensesHotelMakkah)} DH
+                  </div>
                   <div className="text-xs text-white/80">Makkah</div>
                 </div>
               </div>
@@ -410,7 +430,9 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-4">
                 <Receipt className="h-8 w-8 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{formatMontant(depensesVisa)} DH</div>
+                  <div className="text-2xl font-bold" title={`${formatMontant(depensesVisa)} DH`}>
+                    {formatMontantCourt(depensesVisa)} DH
+                  </div>
                   <div className="text-xs text-white/80">visa</div>
                 </div>
               </div>
@@ -427,7 +449,9 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-4">
                 <Receipt className="h-8 w-8 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{formatMontant(depensesAutre)} DH</div>
+                  <div className="text-2xl font-bold" title={`${formatMontant(depensesAutre)} DH`}>
+                    {formatMontantCourt(depensesAutre)} DH
+                  </div>
                   <div className="text-xs text-white/80">autre</div>
                 </div>
               </div>

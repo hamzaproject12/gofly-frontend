@@ -94,7 +94,9 @@ export default function DepensesPage() {
 
       const [expensesRes, programsRes, statsRes] = await Promise.all([
         fetch(api.url(`/api/expenses?${params}`)),
-        fetch(api.url(api.endpoints.programs)),
+        // status=all : le filtre doit permettre de retrouver les dépenses des
+        // programmes clôturés et archivés (consultation comptable).
+        fetch(api.url(`${api.endpoints.programs}?status=all`)),
         fetch(api.url(`/api/expenses/stats?${params}`))
       ])
 

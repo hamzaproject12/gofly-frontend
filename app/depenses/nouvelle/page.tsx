@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth"
 type Program = {
   id: number
   name: string
+  status?: 'ACTIF' | 'CLOTURE' | 'ARCHIVE'
 }
 
 export default function NouvelleDepensePage() {
@@ -38,10 +39,15 @@ export default function NouvelleDepensePage() {
   useEffect(() => {
     const fetchPrograms = async () => {
       try {
-        const response = await fetch(api.url(api.endpoints.programs))
+        // Les dépenses sont autorisées sur les programmes ACTIF et CLOTURE
+        // (un programme clôturé peut encore avoir des coûts à saisir).
+        // Les programmes ARCHIVE sont exclus : le backend les refuse (409).
+        const response = await fetch(api.url(`${api.endpoints.programs}?status=all`))
         if (response.ok) {
           const data = await response.json()
-          setProgrammes(data)
+          setProgrammes(
+            (Array.isArray(data) ? data : []).filter((p: Program) => p.status !== 'ARCHIVE')
+          )
         }
       } catch (error) {
         console.error('Error fetching programs:', error)
@@ -311,6 +317,9 @@ export default function NouvelleDepensePage() {
                               <Calendar className="h-4 w-4 text-blue-600" />
                             </div>
                             <span className="font-medium">{program.name}</span>
+                            {program.status === 'CLOTURE' && (
+                              <span className="text-xs text-orange-700">(clôturé)</span>
+                            )}
                           </div>
                         </SelectItem>
                       ))}

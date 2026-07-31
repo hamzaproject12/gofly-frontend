@@ -134,7 +134,9 @@ export default function PaiementsPage() {
       
       const [paymentsResponse, programsResponse] = await Promise.all([
         fetch(api.url('/api/payments')),
-        fetch(api.url(api.endpoints.programs))
+        // status=all : le filtre doit permettre de retrouver les paiements des
+        // programmes clôturés et archivés (consultation comptable).
+        fetch(api.url(`${api.endpoints.programs}?status=all`))
       ])
 
       if (!paymentsResponse.ok || !programsResponse.ok) {

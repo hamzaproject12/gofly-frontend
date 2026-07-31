@@ -25,6 +25,7 @@ import { useAuth } from "@/hooks/useAuth"
 type Program = {
   id: number
   name: string
+  status?: 'ACTIF' | 'CLOTURE' | 'ARCHIVE'
 }
 
 export default function NouveauPaiementPage() {
@@ -44,10 +45,15 @@ export default function NouveauPaiementPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const response = await fetch(api.url(api.endpoints.programs))
+        // Les paiements sont autorisés sur les programmes ACTIF et CLOTURE
+        // (encaissement d'un reliquat après la clôture).
+        // Les programmes ARCHIVE sont exclus : le backend les refuse (409).
+        const response = await fetch(api.url(`${api.endpoints.programs}?status=all`))
         if (response.ok) {
           const data = await response.json()
-          setProgrammes(Array.isArray(data) ? data : [])
+          setProgrammes(
+            (Array.isArray(data) ? data : []).filter((p: Program) => p.status !== 'ARCHIVE')
+          )
         }
       } catch (e) {
         console.error("Error fetching programs:", e)
@@ -277,6 +283,9 @@ export default function NouveauPaiementPage() {
                               <Calendar className="h-4 w-4 text-blue-600" />
                             </div>
                             <span className="font-medium">{program.name}</span>
+                            {program.status === 'CLOTURE' && (
+                              <span className="text-xs text-orange-700">(clôturé)</span>
+                            )}
                           </div>
                         </SelectItem>
                       ))}

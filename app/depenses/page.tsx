@@ -46,6 +46,10 @@ type Stats = {
 const normalizeText = (value: string | null | undefined) =>
   (value || "").trim().toLowerCase()
 
+// Montants affichés sans décimales (arrondi à l'unité) — demande métier
+const formatMontant = (value: number | null | undefined) =>
+  Math.round(Number(value) || 0).toLocaleString()
+
 export default function DepensesPage() {
   // Hook pour gérer l'authentification
   const { isAdmin, loading: authLoading } = useAuth()
@@ -338,7 +342,7 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-4">
                 <Receipt className="h-8 w-8 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{totalDepenses.toLocaleString()} DH</div>
+                  <div className="text-2xl font-bold">{formatMontant(totalDepenses)} DH</div>
                   <div className="text-xs text-white/80">dépenses</div>
                 </div>
               </div>
@@ -355,7 +359,7 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-4">
                 <Plane className="h-8 w-8 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{depensesVol.toLocaleString()} DH</div>
+                  <div className="text-2xl font-bold">{formatMontant(depensesVol)} DH</div>
                   <div className="text-xs text-white/80">vol</div>
                 </div>
               </div>
@@ -372,7 +376,7 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-4">
                 <Building className="h-8 w-8 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{depensesHotelMadina.toLocaleString()} DH</div>
+                  <div className="text-2xl font-bold">{formatMontant(depensesHotelMadina)} DH</div>
                   <div className="text-xs text-white/80">Madina</div>
                 </div>
               </div>
@@ -389,7 +393,7 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-4">
                 <Building className="h-8 w-8 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{depensesHotelMakkah.toLocaleString()} DH</div>
+                  <div className="text-2xl font-bold">{formatMontant(depensesHotelMakkah)} DH</div>
                   <div className="text-xs text-white/80">Makkah</div>
                 </div>
               </div>
@@ -406,7 +410,7 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-4">
                 <Receipt className="h-8 w-8 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{depensesVisa.toLocaleString()} DH</div>
+                  <div className="text-2xl font-bold">{formatMontant(depensesVisa)} DH</div>
                   <div className="text-xs text-white/80">visa</div>
                 </div>
               </div>
@@ -423,7 +427,7 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-4">
                 <Receipt className="h-8 w-8 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{depensesAutre.toLocaleString()} DH</div>
+                  <div className="text-2xl font-bold">{formatMontant(depensesAutre)} DH</div>
                   <div className="text-xs text-white/80">autre</div>
                 </div>
               </div>
@@ -560,7 +564,7 @@ export default function DepensesPage() {
                                 Total
                               </span>
                               <span className="font-bold text-xl text-blue-900">
-                                {displayTotal.toLocaleString()} DH
+                                {formatMontant(displayTotal)} DH
                               </span>
                             </div>
 
@@ -590,10 +594,9 @@ export default function DepensesPage() {
                                   className={getTypeColor(type)}
                                 >
                                   {type}:{" "}
-                                  {(
-                                    group.sums[type as keyof typeof group.sums] ||
-                                    0
-                                  ).toLocaleString()}{" "}
+                                  {formatMontant(
+                                    group.sums[type as keyof typeof group.sums]
+                                  )}{" "}
                                   DH
                                 </Badge>
                               )
@@ -634,7 +637,7 @@ export default function DepensesPage() {
                                     </div>
                                     <div className="text-right">
                                       <span className="font-bold text-blue-900">
-                                        {depense.montant.toLocaleString()} DH
+                                        {formatMontant(depense.montant)} DH
                                       </span>
                                     </div>
                                   </div>

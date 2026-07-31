@@ -54,6 +54,21 @@ type Payment = {
   } | null
 }
 
+// Montants affichés sans décimales (arrondi à l'unité) — demande métier
+const formatMontant = (value: number | null | undefined) =>
+  Math.round(Number(value) || 0).toLocaleString("fr-FR")
+
+// Format compact pour les cartes de statistiques : à partir de 7 chiffres
+// (>= 1 000 000) le montant est affiché en milliers pour ne pas déborder.
+const formatMontantCourt = (value: number | null | undefined) => {
+  const montant = Math.round(Number(value) || 0)
+  if (Math.abs(montant) < 1_000_000) return montant.toLocaleString("fr-FR")
+  const milliers = (montant / 1000).toLocaleString("fr-FR", {
+    maximumFractionDigits: 1,
+  })
+  return `${milliers}k`
+}
+
 function paymentRowAgentLabel(p: Payment): string {
   return p.agent?.nom ?? p.reservation?.agent?.nom ?? "—"
 }
@@ -298,7 +313,9 @@ export default function PaiementsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-blue-100 text-sm font-medium">Total Paiements</p>
-                  <p className="text-2xl font-bold">{totalPaiements.toLocaleString()} DH</p>
+                  <p className="text-2xl font-bold" title={`${formatMontant(totalPaiements)} DH`}>
+                    {formatMontantCourt(totalPaiements)} DH
+                  </p>
                 </div>
                 <DollarSign className="h-8 w-8 text-blue-200" />
               </div>
@@ -310,7 +327,9 @@ export default function PaiementsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-green-100 text-sm font-medium">Carte</p>
-                  <p className="text-2xl font-bold">{paiementsParCarte.toLocaleString()} DH</p>
+                  <p className="text-2xl font-bold" title={`${formatMontant(paiementsParCarte)} DH`}>
+                    {formatMontantCourt(paiementsParCarte)} DH
+                  </p>
                 </div>
                 <CreditCard className="h-8 w-8 text-green-200" />
               </div>
@@ -322,7 +341,9 @@ export default function PaiementsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-purple-100 text-sm font-medium">Espèces</p>
-                  <p className="text-2xl font-bold">{paiementsParEspeces.toLocaleString()} DH</p>
+                  <p className="text-2xl font-bold" title={`${formatMontant(paiementsParEspeces)} DH`}>
+                    {formatMontantCourt(paiementsParEspeces)} DH
+                  </p>
                 </div>
                 <DollarSign className="h-8 w-8 text-purple-200" />
               </div>
@@ -334,7 +355,9 @@ export default function PaiementsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-orange-100 text-sm font-medium">Virement</p>
-                  <p className="text-2xl font-bold">{paiementsParVirement.toLocaleString()} DH</p>
+                  <p className="text-2xl font-bold" title={`${formatMontant(paiementsParVirement)} DH`}>
+                    {formatMontantCourt(paiementsParVirement)} DH
+                  </p>
                 </div>
                 <FileText className="h-8 w-8 text-orange-200" />
               </div>
@@ -346,7 +369,9 @@ export default function PaiementsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-red-100 text-sm font-medium">Chèque</p>
-                  <p className="text-2xl font-bold">{paiementsParCheque.toLocaleString()} DH</p>
+                  <p className="text-2xl font-bold" title={`${formatMontant(paiementsParCheque)} DH`}>
+                    {formatMontantCourt(paiementsParCheque)} DH
+                  </p>
                 </div>
                 <Receipt className="h-8 w-8 text-red-200" />
               </div>
@@ -485,7 +510,7 @@ export default function PaiementsPage() {
                       Agent: {paymentRowAgentLabel(paiement)}
                     </span>
                     <span className="font-semibold text-gray-900 whitespace-nowrap ml-auto sm:ml-0">
-                      {paiement.amount.toLocaleString("fr-FR")} DH
+                      {formatMontant(paiement.amount)} DH
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0 w-full sm:w-auto sm:ml-auto justify-end">
                       {paiement.fichier && (

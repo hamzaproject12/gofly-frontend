@@ -32,6 +32,7 @@ import {
   Lock,
   Archive,
   RotateCcw,
+  Percent,
 } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/hooks/useAuth"
@@ -137,6 +138,88 @@ const STATUS_BADGE: Record<ProgramStatusValue, { label: string; className: strin
   ACTIF: { label: 'Actif', className: 'bg-green-100 text-green-800 border-green-200' },
   CLOTURE: { label: 'Clôturé', className: 'bg-orange-100 text-orange-800 border-orange-200' },
   ARCHIVE: { label: 'Archivé', className: 'bg-gray-200 text-gray-700 border-gray-300' },
+}
+
+// Liserés de couleur attribués aux cartes de programme pour les distinguer en un coup d'œil
+const PROGRAM_ACCENTS = [
+  'border-l-indigo-500',
+  'border-l-emerald-500',
+  'border-l-sky-500',
+  'border-l-violet-500',
+  'border-l-amber-500',
+  'border-l-rose-500',
+  'border-l-teal-500',
+]
+
+const getProgramAccentBorder = (index: number) => PROGRAM_ACCENTS[index % PROGRAM_ACCENTS.length]
+
+// Dégradé de la barre de remplissage selon le taux (identique au Dashboard)
+const getOccupancyGradient = (rate: number) => {
+  if (rate >= 80) {
+    // Presque complet → vert émeraude (objectif atteint)
+    return {
+      gradient: 'linear-gradient(90deg, #10b981 0%, #22c55e 100%)',
+      glow: 'rgba(16, 185, 129, 0.45)',
+    }
+  }
+  if (rate >= 40) {
+    // En progression → bleu / indigo (couleurs du header)
+    return {
+      gradient: 'linear-gradient(90deg, #6366f1 0%, #3b82f6 50%, #0ea5e9 100%)',
+      glow: 'rgba(99, 102, 241, 0.4)',
+    }
+  }
+  // Faible remplissage → ambre (à remplir)
+  return {
+    gradient: 'linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%)',
+    glow: 'rgba(245, 158, 11, 0.4)',
+  }
+}
+
+// Barre de progression du remplissage d'un programme (réservations / places totales),
+// même rendu que la barre d'occupation du Dashboard.
+function ReservationProgressBar({
+  occupied,
+  total,
+}: {
+  occupied: number
+  total: number
+}) {
+  const rate = total > 0 ? Math.min(Math.round((occupied / total) * 100), 100) : 0
+  const { gradient, glow } = getOccupancyGradient(rate)
+  return (
+    <div className="mt-4">
+      <div className="mb-1.5 flex items-center justify-between text-xs font-medium">
+        <span className="flex items-center gap-1.5 text-blue-800">
+          <Users className="h-3.5 w-3.5" />
+          {occupied} réservation{occupied > 1 ? 's' : ''} sur {total} place{total > 1 ? 's' : ''}
+        </span>
+        <span className="flex items-center gap-1 tabular-nums text-blue-700">
+          <Percent className="h-3.5 w-3.5" />
+          {rate}% rempli
+        </span>
+      </div>
+      <div
+        className="h-3 w-full overflow-hidden rounded-full bg-slate-200/70 shadow-inner ring-1 ring-black/5"
+        style={{
+          backgroundImage: 'linear-gradient(90deg, rgba(100, 116, 139, 0.12) 1px, transparent 1px)',
+          backgroundSize: '12px 100%',
+        }}
+      >
+        <div
+          className="relative h-full overflow-hidden rounded-full transition-all duration-700 ease-out"
+          style={{
+            width: `${rate}%`,
+            backgroundImage: gradient,
+            boxShadow: `0 1px 6px ${glow}`,
+          }}
+        >
+          {/* Reflet brillant en surface */}
+          <div className="absolute inset-0 bg-gradient-to-b from-white/30 to-transparent" />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function ProgrammesPage() {
@@ -531,30 +614,33 @@ export default function ProgrammesPage() {
     const availablePercentage = data.total > 0 ? (data.available / data.total) * 100 : 0;
     
     return (
-      <div className="flex justify-between items-center animate-fadeInUp" style={{ animationDelay: `${index * 100}ms` }}>
+      <div
+        className="flex justify-between items-center gap-3 rounded-lg px-1 py-0.5 transition-colors hover:bg-blue-50/60 animate-fadeInUp"
+        style={{ animationDelay: `${index * 100}ms` }}
+      >
         <span className="text-sm font-medium text-gray-700">{roomType}</span>
         <div className="flex items-center gap-3">
-          <div className="w-32 bg-gray-200 rounded-full h-3 overflow-hidden">
+          <div className="w-32 bg-slate-200 rounded-full h-3 overflow-hidden shadow-inner ring-1 ring-black/5">
             <div className="h-full flex">
-              <div 
+              <div
                 className="bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-1000 ease-out"
                 style={{ width: `${occupiedPercentage}%` }}
               ></div>
-              <div 
+              <div
                 className="bg-gradient-to-r from-green-400 to-green-500 transition-all duration-1000 ease-out"
                 style={{ width: `${availablePercentage}%` }}
               ></div>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs tabular-nums">
             <div className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-              <span className="text-blue-700 font-medium">{data.occupied}</span>
+              <span className="text-blue-700 font-semibold">{data.occupied}</span>
             </div>
             <span className="text-gray-400">/</span>
             <div className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <span className="text-green-700 font-medium">{data.available}</span>
+              <span className="text-green-700 font-semibold">{data.available}</span>
             </div>
             <span className="text-gray-500">({data.total})</span>
           </div>
@@ -613,31 +699,38 @@ export default function ProgrammesPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* En-tête */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Gestion des Programmes</h1>
-            <p className="text-gray-500 mt-1">Créez et gérez vos programmes de voyage Omra</p>
+        <div className="mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 shadow-lg">
+          <div className="flex flex-col gap-4 px-6 py-6 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/20 ring-1 ring-white/30">
+                <Calendar className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-white">Gestion des Programmes</h1>
+                <p className="mt-1 text-sm text-white/85">Créez et gérez vos programmes de voyage Omra</p>
+              </div>
+            </div>
+            {isAdmin && (
+              <Link href="/programmes/nouveau">
+                <Button className="bg-white text-blue-700 shadow-md transition-all hover:bg-blue-50 hover:shadow-lg">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nouveau Programme
+                </Button>
+              </Link>
+            )}
           </div>
-          {isAdmin && (
-            <Link href="/programmes/nouveau">
-              <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transition-all">
-                <Plus className="mr-2 h-4 w-4" />
-                Nouveau Programme
-              </Button>
-            </Link>
-          )}
         </div>
 
         {/* Filtres et recherche */}
-        <Card className="mb-6 border-none shadow-lg overflow-hidden">
+        <Card className="mb-6 overflow-hidden border border-slate-200 shadow-sm">
           <CardContent className="p-4">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
                 <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Search className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
                   <Input
                     placeholder="Rechercher un programme..."
-                    className="pl-10 border-2 focus:border-blue-500 h-12"
+                    className="h-12 rounded-xl border-slate-200 bg-slate-50/70 pl-10 transition-colors focus:border-blue-500 focus:bg-white"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
@@ -645,7 +738,7 @@ export default function ProgrammesPage() {
               </div>
               <div className="w-full md:w-64">
                 <Select value={programmeFilter} onValueChange={(value) => setProgrammeFilter(value)}>
-                  <SelectTrigger className="border-2 border-blue-200 text-blue-700 hover:bg-blue-50 h-12">
+                  <SelectTrigger className="h-12 rounded-xl border-slate-200 bg-slate-50/70 text-blue-700 transition-colors hover:bg-blue-50">
                     <Filter className="mr-2 h-4 w-4" />
                     <SelectValue placeholder="Tous les programmes" />
                   </SelectTrigger>
@@ -664,61 +757,61 @@ export default function ProgrammesPage() {
 
         {/* Statistiques */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card className="bg-white shadow-md border-none hover:shadow-lg transition-shadow">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="bg-yellow-100 p-3 rounded-full">
-                <Calendar className="h-6 w-6 text-yellow-600" />
-              </div>
+          <Card className="border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+            <CardContent className="flex items-center justify-between p-5">
               <div>
-                <p className="text-sm text-gray-500">Total Programmes</p>
-                <p className="text-2xl font-bold">{filteredProgrammes.length}</p>
+                <p className="text-sm font-medium text-gray-600">Total Programmes</p>
+                <p className="mt-1 text-2xl font-bold text-indigo-600">{filteredProgrammes.length}</p>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50">
+                <Calendar className="h-6 w-6 text-indigo-600" />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-md border-none hover:shadow-lg transition-shadow">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="bg-blue-100 p-3 rounded-full">
-                <Users className="h-6 w-6 text-blue-600" />
-              </div>
+          <Card className="border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+            <CardContent className="flex items-center justify-between p-5">
               <div>
-                <p className="text-sm text-gray-500">Total Réservations</p>
-                <p className="text-2xl font-bold">
+                <p className="text-sm font-medium text-gray-600">Total Réservations</p>
+                <p className="mt-1 text-2xl font-bold text-blue-600">
                   {filteredProgrammes.reduce((sum, p) => sum + (p.reservationsByRoom?.total?.occupied || 0), 0)}
                 </p>
               </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50">
+                <Users className="h-6 w-6 text-blue-600" />
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-md border-none hover:shadow-lg transition-shadow">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="bg-green-100 p-3 rounded-full">
-                <Wallet className="h-6 w-6 text-green-600" />
-              </div>
+          <Card className="border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+            <CardContent className="flex items-center justify-between p-5">
               <div>
-                <p className="text-sm text-gray-500">Revenus Total</p>
-                <p className="text-2xl font-bold">
+                <p className="text-sm font-medium text-gray-600">Revenus Total</p>
+                <p className="mt-1 text-2xl font-bold text-green-600">
                   {filteredProgrammes.reduce((sum, p) => sum + (p.totalRevenue || 0), 0).toLocaleString()} DH
                 </p>
               </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-50">
+                <Wallet className="h-6 w-6 text-green-600" />
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-md border-none hover:shadow-lg transition-shadow">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="bg-yellow-100 p-3 rounded-full">
-                <Building className="h-6 w-6 text-yellow-600" />
-              </div>
+          <Card className="border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+            <CardContent className="flex items-center justify-between p-5">
               <div>
-                <p className="text-sm text-gray-500">Hôtels Partenaires</p>
-                <p className="text-2xl font-bold">8</p>
+                <p className="text-sm font-medium text-gray-600">Hôtels Partenaires</p>
+                <p className="mt-1 text-2xl font-bold text-amber-600">8</p>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50">
+                <Building className="h-6 w-6 text-amber-600" />
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Onglets de statut du cycle de vie (distincts de la corbeille) */}
-        <div className="mb-6 flex flex-wrap gap-2">
+        <div className="mb-6 inline-flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
           {([
             { key: 'ACTIF', label: 'Actifs' },
             { key: 'CLOTURE', label: 'Clôturés' },
@@ -728,17 +821,21 @@ export default function ProgrammesPage() {
             <Button
               key={key}
               type="button"
-              variant={statusFilter === key ? 'default' : 'outline'}
+              variant="ghost"
               size="sm"
               className={
                 statusFilter === key
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                  : 'border-blue-200 text-blue-700 hover:bg-blue-50'
+                  ? 'rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm hover:from-blue-700 hover:to-indigo-700 hover:text-white'
+                  : 'rounded-lg text-gray-600 hover:bg-blue-50 hover:text-blue-700'
               }
               onClick={() => setStatusFilter(key)}
             >
               {label}
-              <span className="ml-2 rounded-full bg-white/25 px-2 py-0.5 text-xs">
+              <span
+                className={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${
+                  statusFilter === key ? 'bg-white/25 text-white' : 'bg-slate-100 text-gray-600'
+                }`}
+              >
                 {statusCounts[key]}
               </span>
             </Button>
@@ -748,49 +845,90 @@ export default function ProgrammesPage() {
         {/* Liste des programmes (filtrés par statut) */}
         <div className="space-y-6">
           {visibleProgrammes.length === 0 && (
-            <Card className="border border-blue-100/80 shadow-sm">
-              <CardContent className="p-8 text-center text-gray-500">
-                Aucun programme dans cette vue.
+            <Card className="border border-slate-200 shadow-sm">
+              <CardContent className="p-12 text-center">
+                <div className="mb-4 text-6xl">🗓️</div>
+                <h3 className="mb-1 text-lg font-semibold text-gray-900">Aucun programme dans cette vue</h3>
+                <p className="text-sm text-gray-500">Changez de filtre ou créez un nouveau programme.</p>
               </CardContent>
             </Card>
           )}
-          {visibleProgrammes.map((programme) => (
-            <Card key={programme.id} className="overflow-hidden border border-blue-100/80 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all">
-              <CardHeader className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-100 pb-4 border-b border-blue-100/60">
+          {visibleProgrammes.map((programme, programmeIndex) => (
+            <Card
+              key={programme.id}
+              className={`overflow-hidden border border-slate-200 border-l-4 ${getProgramAccentBorder(programmeIndex)} shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all`}
+            >
+              <CardHeader className="bg-gradient-to-r from-slate-50 via-blue-50 to-indigo-50 pb-4 border-b border-blue-100/60">
                 <div className="flex justify-between items-start gap-3 flex-wrap">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <CardTitle className="text-xl text-blue-800">{programme.name}</CardTitle>
-                      <Badge
-                        variant="outline"
-                        className={STATUS_BADGE[(programme.status || 'ACTIF') as ProgramStatusValue].className}
-                      >
-                        {STATUS_BADGE[(programme.status || 'ACTIF') as ProgramStatusValue].label}
-                      </Badge>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-xl shadow-sm ring-1 ring-blue-100">
+                      🎯
                     </div>
-                    <CardDescription className="mt-1">
-                      Créé le {new Date(programme.created_at).toLocaleDateString("fr-FR")}
-                    </CardDescription>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <CardTitle className="text-xl text-blue-800">{programme.name}</CardTitle>
+                        <Badge
+                          variant="outline"
+                          className={STATUS_BADGE[(programme.status || 'ACTIF') as ProgramStatusValue].className}
+                        >
+                          {STATUS_BADGE[(programme.status || 'ACTIF') as ProgramStatusValue].label}
+                        </Badge>
+                      </div>
+                      <CardDescription className="mt-1 flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5" />
+                        Créé le {new Date(programme.created_at).toLocaleDateString("fr-FR")}
+                      </CardDescription>
+                    </div>
                   </div>
-                  <div className="text-right flex flex-col items-end gap-2">
-                    <div className="text-2xl font-bold text-yellow-600">
-                      {(programme.totalRevenue || 0).toLocaleString()} DH
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-100/70 px-3 py-1.5">
+                      <Users className="h-4 w-4 text-blue-700" />
+                      <div>
+                        <p className="text-xs font-medium text-blue-800">Réservations</p>
+                        <p className="text-sm font-bold tabular-nums text-blue-900">
+                          {programme.reservationsByRoom?.total?.occupied || 0} /{" "}
+                          {programme.reservationsByRoom?.total?.total || 0}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-sm text-blue-700">{programme.reservationsByRoom?.total?.occupied || 0} réservations</p>
+                    <div className="flex items-center gap-2 rounded-lg border border-yellow-300 bg-yellow-100/70 px-3 py-1.5">
+                      <Wallet className="h-4 w-4 text-yellow-700" />
+                      <div>
+                        <p className="text-xs font-medium text-yellow-800">Revenus</p>
+                        <p className="text-sm font-bold tabular-nums text-yellow-900">
+                          {(programme.totalRevenue || 0).toLocaleString()} DH
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
+
+                {/* Barre de progression des réservations (même rendu que le Dashboard) */}
+                <ReservationProgressBar
+                  occupied={programme.reservationsByRoom?.total?.occupied || 0}
+                  total={programme.reservationsByRoom?.total?.total || 0}
+                />
               </CardHeader>
               <CardContent className="p-0">
                 <Tabs defaultValue="details" className="w-full">
-                  <TabsList className="w-full justify-start bg-gradient-to-r from-slate-50 to-blue-50 px-6 pt-2 border-b border-blue-100">
-                    <TabsTrigger value="details" className="data-[state=active]:bg-white">
+                  <TabsList className="h-auto w-full justify-start rounded-none border-b border-blue-100 bg-gradient-to-r from-slate-50 to-blue-50 px-6 pb-0 pt-2">
+                    <TabsTrigger
+                      value="details"
+                      className="rounded-b-none border-b-2 border-transparent px-4 pb-2.5 text-gray-600 data-[state=active]:border-blue-600 data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-none"
+                    >
                       Détails
                     </TabsTrigger>
-                    <TabsTrigger value="reservations" className="data-[state=active]:bg-white">
+                    <TabsTrigger
+                      value="reservations"
+                      className="rounded-b-none border-b-2 border-transparent px-4 pb-2.5 text-gray-600 data-[state=active]:border-blue-600 data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-none"
+                    >
                       Réservations
                     </TabsTrigger>
                     {isAdmin && (
-                      <TabsTrigger value="finances" className="data-[state=active]:bg-white">
+                      <TabsTrigger
+                        value="finances"
+                        className="rounded-b-none border-b-2 border-transparent px-4 pb-2.5 text-gray-600 data-[state=active]:border-blue-600 data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-none"
+                      >
                         Finances
                       </TabsTrigger>
                     )}
@@ -1072,7 +1210,7 @@ export default function ProgrammesPage() {
                   )}
                 </Tabs>
 
-                <div className="p-6 pt-0 flex justify-between items-center">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
                   {/* Boutons à gauche */}
                   <div className="flex flex-wrap gap-2">
                     {/* Boutons commentés temporairement */}

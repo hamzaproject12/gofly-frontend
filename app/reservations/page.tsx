@@ -750,12 +750,12 @@ export default function ReservationsPage() {
       className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100"
     >
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         {/* En-tête */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Gestion des Réservations</h1>
-            <p className="text-gray-500 mt-1">Gérez et suivez toutes vos réservations Omra</p>
+            <h1 className="text-xl font-bold text-gray-900">Gestion des Réservations</h1>
+            <p className="text-sm text-gray-500">Gérez et suivez toutes vos réservations Omra</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href="/reservations/nouvelle">
@@ -781,74 +781,74 @@ export default function ReservationsPage() {
         )}
 
         {/* Statistiques */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 text-white transform hover:scale-105 transition-all duration-300">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-12 -translate-x-12"></div>
-            <CardContent className="relative p-6">
-              <div className="flex items-center justify-between mb-4">
-                <Users className="h-8 w-8 text-white/90" />
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-12 translate-x-12"></div>
+            <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full translate-y-8 -translate-x-8"></div>
+            <CardContent className="relative p-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <Users className="h-6 w-6 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{stats.total}</div>
+                  <div className="text-xl font-bold leading-tight">{stats.total}</div>
                   <div className="text-xs text-white/80">réservations</div>
                 </div>
               </div>
               <div>
-                <h3 className="font-semibold text-lg">Total Réservations</h3>
+                <h3 className="font-semibold text-sm leading-tight">Total Réservations</h3>
                 <p className="text-xs text-white/80">Filtres appliqués</p>
               </div>
             </CardContent>
           </Card>
 
           <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-green-500 via-green-600 to-green-700 text-white transform hover:scale-105 transition-all duration-300">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-12 -translate-x-12"></div>
-            <CardContent className="relative p-6">
-              <div className="flex items-center justify-between mb-4">
-                <CheckCircle className="h-8 w-8 text-white/90" />
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-12 translate-x-12"></div>
+            <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full translate-y-8 -translate-x-8"></div>
+            <CardContent className="relative p-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <CheckCircle className="h-6 w-6 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{stats.complete}</div>
+                  <div className="text-xl font-bold leading-tight">{stats.complete}</div>
                   <div className="text-xs text-white/80">complètes</div>
                 </div>
               </div>
               <div>
-                <h3 className="font-semibold text-lg">Complètes</h3>
+                <h3 className="font-semibold text-sm leading-tight">Complètes</h3>
                 <p className="text-xs text-white/80">Filtres appliqués</p>
               </div>
             </CardContent>
           </Card>
 
           <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-yellow-500 via-yellow-600 to-yellow-700 text-white transform hover:scale-105 transition-all duration-300">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-12 -translate-x-12"></div>
-            <CardContent className="relative p-6">
-              <div className="flex items-center justify-between mb-4">
-                <AlertCircle className="h-8 w-8 text-white/90" />
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-12 translate-x-12"></div>
+            <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full translate-y-8 -translate-x-8"></div>
+            <CardContent className="relative p-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <AlertCircle className="h-6 w-6 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{stats.incomplete}</div>
+                  <div className="text-xl font-bold leading-tight">{stats.incomplete}</div>
                   <div className="text-xs text-white/80">incomplètes</div>
                 </div>
               </div>
               <div>
-                <h3 className="font-semibold text-lg">Incomplètes</h3>
+                <h3 className="font-semibold text-sm leading-tight">Incomplètes</h3>
                 <p className="text-xs text-white/80">Filtres appliqués</p>
               </div>
             </CardContent>
           </Card>
 
           <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-red-500 via-red-600 to-red-700 text-white transform hover:scale-105 transition-all duration-300">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-12 -translate-x-12"></div>
-            <CardContent className="relative p-6">
-              <div className="flex items-center justify-between mb-4">
-                <AlertTriangle className="h-8 w-8 text-white/90" />
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-12 translate-x-12"></div>
+            <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full translate-y-8 -translate-x-8"></div>
+            <CardContent className="relative p-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <AlertTriangle className="h-6 w-6 text-white/90" />
                 <div className="text-right">
-                  <div className="text-2xl font-bold">{stats.urgent}</div>
+                  <div className="text-xl font-bold leading-tight">{stats.urgent}</div>
                   <div className="text-xs text-white/80">urgentes</div>
                 </div>
               </div>
               <div>
-                <h3 className="font-semibold text-lg">Urgentes</h3>
+                <h3 className="font-semibold text-sm leading-tight">Urgentes</h3>
                 <p className="text-xs text-white/80">Filtres appliqués</p>
               </div>
             </CardContent>
@@ -856,25 +856,25 @@ export default function ReservationsPage() {
         </div>
 
         {/* Filtres */}
-        <Card className="mb-8 border-none shadow-lg overflow-hidden bg-white/95 backdrop-blur">
-          <CardContent className="p-4 md:p-5">
-            <form onSubmit={handleFilterChange} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-10 gap-3 lg:gap-4 items-end">
+        <Card className="mb-4 border-none shadow-lg overflow-hidden bg-white/95 backdrop-blur">
+          <CardContent className="p-3">
+            <form onSubmit={handleFilterChange} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-10 gap-2 lg:gap-3 items-end">
               <div className="relative xl:col-span-3 min-w-0">
-                <span className="mb-1.5 block text-xs font-semibold text-gray-600">Recherche</span>
+                <span className="mb-1 block text-xs font-semibold text-gray-600">Recherche</span>
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
                   type="text"
                   placeholder="Rechercher par nom, téléphone, programme..."
                   value={filters.search}
                   onChange={(e) => handleSearch(e.target.value)}
-                  className="pl-10 h-11 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                  className="pl-10 h-9 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40"
                 />
               </div>
 
               <div className="xl:col-span-2 min-w-0">
-                <span className="mb-1.5 block text-xs font-semibold text-gray-600">Programme</span>
+                <span className="mb-1 block text-xs font-semibold text-gray-600">Programme</span>
                 <Select value={programmeFilter} onValueChange={handleProgrammeChange}>
-                <SelectTrigger className="h-11 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40 pl-3">
+                <SelectTrigger className="h-9 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40 pl-3">
                   <SelectValue placeholder="Programme" />
                 </SelectTrigger>
                 <SelectContent>
@@ -889,9 +889,9 @@ export default function ReservationsPage() {
               </div>
 
               <div className="xl:col-span-2 min-w-0">
-                <span className="mb-1.5 block text-xs font-semibold text-gray-600">Statut</span>
+                <span className="mb-1 block text-xs font-semibold text-gray-600">Statut</span>
                 <Select value={statutFilter} onValueChange={handleStatutChange}>
-                <SelectTrigger className="h-11 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40">
+                <SelectTrigger className="h-9 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40">
                   <SelectValue placeholder="Statut" />
                 </SelectTrigger>
                 <SelectContent>
@@ -904,9 +904,9 @@ export default function ReservationsPage() {
               </div>
 
               <div className="xl:col-span-2 min-w-0">
-                <span className="mb-1.5 block text-xs font-semibold text-gray-600">Chambre</span>
+                <span className="mb-1 block text-xs font-semibold text-gray-600">Chambre</span>
                 <Select value={chambreFilter} onValueChange={handleChambreChange}>
-                  <SelectTrigger className="h-11 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40">
+                  <SelectTrigger className="h-9 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40">
                     <SelectValue placeholder="Toutes les chambres" />
                   </SelectTrigger>
                   <SelectContent>
@@ -921,7 +921,7 @@ export default function ReservationsPage() {
                 </Select>
               </div>
               <div className="xl:col-span-1 min-w-0">
-                <span className="mb-1.5 block text-xs font-semibold text-gray-600">Lignes</span>
+                <span className="mb-1 block text-xs font-semibold text-gray-600">Lignes</span>
                 <Select
                   value={rowsPerPage.toString()}
                   onValueChange={(value) => {
@@ -929,7 +929,7 @@ export default function ReservationsPage() {
                     setCurrentPage(1);
                   }}
                 >
-                  <SelectTrigger className="h-11 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40 min-w-[110px]">
+                  <SelectTrigger className="h-9 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40 min-w-[110px]">
                     <SelectValue placeholder="10/page" />
                   </SelectTrigger>
                   <SelectContent>
@@ -945,9 +945,9 @@ export default function ReservationsPage() {
 
         {/* Liste des Réservations */}
         <Card className="border-none shadow-lg overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 pb-2">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 py-2 px-4">
             <div className="flex items-center justify-between gap-3">
-              <CardTitle className="text-blue-800 flex items-center gap-2 text-lg">
+              <CardTitle className="text-blue-800 flex items-center gap-2 text-base">
                 <Users className="h-5 w-5 text-blue-600" />
                 Liste des Réservations
               </CardTitle>
@@ -961,9 +961,9 @@ export default function ReservationsPage() {
                     </DialogDescription>
                   </DialogHeader>
                   <div className="py-4">
-                    <span className="mb-1.5 block text-xs font-semibold text-gray-600">Programme</span>
+                    <span className="mb-1 block text-xs font-semibold text-gray-600">Programme</span>
                     <Select value={selectedExportProgram} onValueChange={setSelectedExportProgram}>
-                      <SelectTrigger className="h-11 rounded-lg border border-slate-300 bg-white">
+                      <SelectTrigger className="h-9 rounded-lg border border-slate-300 bg-white">
                         <SelectValue placeholder="Programme" />
                       </SelectTrigger>
                       <SelectContent>
@@ -995,7 +995,7 @@ export default function ReservationsPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-10 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 shrink-0 whitespace-nowrap"
+                className="h-8 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 shrink-0 whitespace-nowrap"
                 disabled={exporting}
                 onClick={() => {
                   setSelectedExportProgram(programmeFilter);
@@ -1018,11 +1018,11 @@ export default function ReservationsPage() {
                 // Détermine la classe de fond selon le statut
                 const urgentBg = reservation.statut === "Urgent" ? "bg-red-50" : "";
                 return (
-                  <div key={reservation.id} className="mx-2 mb-3">
-                    <div className={`relative group transition-all duration-300 rounded-xl shadow border hover:scale-[1.01] hover:shadow-xl ${getRowColor(reservation)} ${urgentBg}`}> 
+                  <div key={reservation.id} className="mx-2 mb-2">
+                    <div className={`relative group transition-all duration-300 rounded-xl shadow border hover:scale-[1.01] hover:shadow-xl ${getRowColor(reservation)} ${urgentBg}`}>
                       {/* Premier niveau : NOM, PROGRAMME, TYPE DE CHAMBRE, NUMERO, STATUT */}
-                      <div className="flex flex-col md:flex-row md:items-center gap-2 p-3 border-b border-blue-100">
-                        <div className="flex-1 flex flex-col md:flex-row md:items-center gap-3 min-w-[180px]">
+                      <div className="flex flex-col md:flex-row md:items-center gap-1.5 px-3 py-1.5 border-b border-blue-100">
+                        <div className="flex-1 flex flex-col md:flex-row md:items-center gap-2 min-w-[180px]">
                           <span className="font-bold text-xl text-blue-900 tracking-tight uppercase">{reservation.nom} {reservation.prenom}</span>
                           {reservation.typeReservation === "CHAMBRE_PRIVEE" ? (
                             <span
@@ -1037,14 +1037,14 @@ export default function ReservationsPage() {
                               Groupe: {reservation.groupSize} pers.
                             </span>
                           ) : null}
-                          <span className="inline-flex items-center gap-1 text-base font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-1">
-                            <Calendar className="h-5 w-5 text-blue-400" /> {reservation.programme}
+                          <span className="inline-flex items-center gap-1 text-base font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
+                            <Calendar className="h-4 w-4 text-blue-400" /> {reservation.programme}
                           </span>
-                          <span className="inline-flex items-center gap-1 text-base font-semibold text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-3 py-1">
-                            <Users className="h-5 w-5 text-yellow-400" /> {mapRoomTypeToPersons(reservation.chambre)}
+                          <span className="inline-flex items-center gap-1 text-base font-semibold text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-2 py-0.5">
+                            <Users className="h-4 w-4 text-yellow-400" /> {mapRoomTypeToPersons(reservation.chambre)}
                           </span>
-                          <span className="inline-flex items-center gap-1 text-base font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded px-3 py-1">
-                            <FileText className="h-5 w-5 text-purple-400" /> {reservation.telephone}
+                          <span className="inline-flex items-center gap-1 text-base font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded px-2 py-0.5">
+                            <FileText className="h-4 w-4 text-purple-400" /> {reservation.telephone}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 ml-auto">
@@ -1053,7 +1053,7 @@ export default function ReservationsPage() {
                             const resteAPayer = reservation.prixEngage - reservation.paiementRecu;
                             if (resteAPayer > 0) {
                               return (
-                                <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-800 border border-orange-200 rounded px-3 py-1 text-lg font-bold">
+                                <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-800 border border-orange-200 rounded px-2 py-0.5 text-lg font-bold">
                                   <Wallet className="h-4 w-4" />
                                   -{resteAPayer.toLocaleString()} DH
                                 </span>
@@ -1063,17 +1063,17 @@ export default function ReservationsPage() {
                           })()}
                           
                           {reservation.statut === "Complet" && (
-                            <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 border border-green-200 rounded px-4 py-1 text-lg font-bold">
+                            <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 border border-green-200 rounded px-3 py-0.5 text-lg font-bold">
                               <CheckCircle className="h-5 w-5" /> Complet
                             </span>
                           )}
                           {reservation.statut === "Incomplet" && (
-                            <span className="inline-flex items-center gap-1 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded px-4 py-1 text-lg font-bold">
+                            <span className="inline-flex items-center gap-1 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded px-3 py-0.5 text-lg font-bold">
                               <AlertCircle className="h-5 w-5" /> Incomplet
                             </span>
                           )}
                           {reservation.statut === "Urgent" && (
-                            <span className="inline-flex items-center gap-2 bg-red-100 text-red-800 border border-red-200 rounded px-4 py-1 text-lg font-bold">
+                            <span className="inline-flex items-center gap-2 bg-red-100 text-red-800 border border-red-200 rounded px-3 py-0.5 text-lg font-bold">
                               <AlertTriangle className="h-5 w-5 animate-bounce text-red-600" />
                               Urgent
                               {urgentInfo && (
@@ -1087,22 +1087,22 @@ export default function ReservationsPage() {
                         </div>
                       </div>
                       {/* Deuxième niveau : hôtels, paiement, statuts attachements */}
-                      <div className="flex flex-col md:flex-row md:items-center gap-2 px-3 py-2">
+                      <div className="flex flex-col md:flex-row md:items-center gap-2 px-3 py-1.5">
                         <div className="flex-1 grid grid-cols-1 md:grid-cols-[18%_32%_32%_18%] gap-2 text-sm items-stretch">
                           {/* Colonne 1 : Hôtels avec description */}
                           <div className="flex flex-col items-start justify-between h-full px-1">
                             <div>
-                              <div className="text-xs text-blue-700 font-semibold mb-1">Hôtel Madina</div>
-                              <div className="flex items-center gap-1 mb-2">
-                                <span className="text-blue-700 text-lg"><span role='img' aria-label='madina'>🕌</span></span>
+                              <div className="text-xs text-blue-700 font-semibold">Hôtel Madina</div>
+                              <div className="flex items-center gap-1 mb-1">
+                                <span className="text-blue-700 text-base"><span role='img' aria-label='madina'>🕌</span></span>
                                 <span className="font-semibold text-gray-900">{hotels.find(h => h.id.toString() === reservation.hotelMadina)?.name || reservation.hotelMadina}</span>
                               </div>
-                              <div className="text-xs text-blue-700 font-semibold mb-1">Hôtel Makkah</div>
+                              <div className="text-xs text-blue-700 font-semibold">Hôtel Makkah</div>
                               <div className="flex items-center gap-1">
-                                <span className="text-blue-700 text-lg"><span role='img' aria-label='makkah'>🕋</span></span>
+                                <span className="text-blue-700 text-base"><span role='img' aria-label='makkah'>🕋</span></span>
                                 <span className="font-semibold text-gray-900">{hotels.find(h => h.id.toString() === reservation.hotelMakkah)?.name || reservation.hotelMakkah}</span>
                               </div>
-                              <div className="flex items-center gap-1.5 text-sm text-gray-800 mt-2">
+                              <div className="flex items-center gap-1.5 text-sm text-gray-800 mt-1">
                                 <User className="h-3.5 w-3.5 text-slate-500 shrink-0" aria-hidden />
                                 <span className="font-medium">{reservation.agentNom ?? "—"}</span>
                               </div>
@@ -1115,9 +1115,9 @@ export default function ReservationsPage() {
                                 <span className="text-xs text-gray-700 font-semibold mb-0.5">Passeport</span>
                                 <span title="Passeport">
                                   {reservation.passeport ? (
-                                    <CheckCircle className="w-6 h-6 text-green-600 hover:scale-110 hover:shadow-lg transition-all duration-200" />
+                                    <CheckCircle className="w-5 h-5 text-green-600 hover:scale-110 hover:shadow-lg transition-all duration-200" />
                                   ) : (
-                                    <AlertCircle className="w-6 h-6 text-red-500 hover:scale-110 hover:shadow-lg transition-all duration-200" />
+                                    <AlertCircle className="w-5 h-5 text-red-500 hover:scale-110 hover:shadow-lg transition-all duration-200" />
                                   )}
                                 </span>
                               </div>
@@ -1125,9 +1125,9 @@ export default function ReservationsPage() {
                                 <span className="text-xs text-gray-700 font-semibold mb-0.5">Visa</span>
                                 <span title="Visa">
                                   {reservation.visa ? (
-                                    <CheckCircle className="w-6 h-6 text-green-600 hover:scale-110 hover:shadow-lg transition-all duration-200" />
+                                    <CheckCircle className="w-5 h-5 text-green-600 hover:scale-110 hover:shadow-lg transition-all duration-200" />
                                   ) : (
-                                    <AlertCircle className="w-6 h-6 text-red-500 hover:scale-110 hover:shadow-lg transition-all duration-200" />
+                                    <AlertCircle className="w-5 h-5 text-red-500 hover:scale-110 hover:shadow-lg transition-all duration-200" />
                                   )}
                                 </span>
                               </div>
@@ -1135,9 +1135,9 @@ export default function ReservationsPage() {
                                 <span className="text-xs text-gray-700 font-semibold mb-0.5">Vol</span>
                                 <span title="Vol">
                                   {reservation.billetAvion ? (
-                                    <CheckCircle className="w-6 h-6 text-green-600 hover:scale-110 hover:shadow-lg transition-all duration-200" />
+                                    <CheckCircle className="w-5 h-5 text-green-600 hover:scale-110 hover:shadow-lg transition-all duration-200" />
                                   ) : (
-                                    <AlertCircle className="w-6 h-6 text-red-500 hover:scale-110 hover:shadow-lg transition-all duration-200" />
+                                    <AlertCircle className="w-5 h-5 text-red-500 hover:scale-110 hover:shadow-lg transition-all duration-200" />
                                   )}
                                 </span>
                               </div>
@@ -1145,9 +1145,9 @@ export default function ReservationsPage() {
                                 <span className="text-xs text-gray-700 font-semibold mb-0.5">Hôtel</span>
                                 <span title="Hôtel">
                                   {reservation.reservationHotel ? (
-                                    <CheckCircle className="w-6 h-6 text-green-600 hover:scale-110 hover:shadow-lg transition-all duration-200" />
+                                    <CheckCircle className="w-5 h-5 text-green-600 hover:scale-110 hover:shadow-lg transition-all duration-200" />
                                   ) : (
-                                    <AlertCircle className="w-6 h-6 text-red-500 hover:scale-110 hover:shadow-lg transition-all duration-200" />
+                                    <AlertCircle className="w-5 h-5 text-red-500 hover:scale-110 hover:shadow-lg transition-all duration-200" />
                                   )}
                                 </span>
                               </div>
@@ -1156,8 +1156,8 @@ export default function ReservationsPage() {
                           </div>
                           {/* Colonne 3 : Paiement */}
                           <div className="flex flex-col items-start justify-between h-full px-1">
-                            <div className="text-xs text-green-700 font-semibold mb-1">Paiement</div>
-                            <div className="w-full bg-gray-200 rounded-full h-2 mt-1 mb-2">
+                            <div className="text-xs text-green-700 font-semibold">Paiement</div>
+                            <div className="w-full bg-gray-200 rounded-full h-2 my-1">
                               <div
                                 className={`h-2 rounded-full ${reservation.paiementRecu >= reservation.prixEngage ? 'bg-green-500' : reservation.paiementRecu > 0 ? 'bg-yellow-400' : 'bg-red-400'}`}
                                 style={{ width: `${Math.min(100, (reservation.paiementRecu / reservation.prixEngage) * 100)}%` }}
@@ -1258,7 +1258,7 @@ export default function ReservationsPage() {
             
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
+              <div className="flex items-center justify-between px-4 py-2 border-t border-gray-200 bg-gray-50">
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <span>Affichage de {((currentPage - 1) * rowsPerPage) + 1} à {Math.min(currentPage * rowsPerPage, totalReservations)} sur {totalReservations} réservations</span>
                 </div>
@@ -1293,7 +1293,7 @@ export default function ReservationsPage() {
                           variant={currentPage === pageNum ? "default" : "outline"}
                           size="sm"
                           onClick={() => handlePageChange(pageNum)}
-                          className="w-10 h-10"
+                          className="w-8 h-8"
                         >
                           {pageNum}
                         </Button>

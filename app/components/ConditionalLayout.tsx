@@ -30,7 +30,7 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
       </div>
       
       {/* Contenu avec padding pour la navbar */}
-      <div className="pt-20">
+      <div className="pt-14">
         <ProtectedRoute>
           <CreditAlertBanner />
           {children}

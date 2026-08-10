@@ -721,13 +721,13 @@ export default function SoldeCaissePage() {
       <RoleProtectedRoute allowedRoles={['ADMIN']}>
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
           <Card className="max-w-md mx-auto">
-            <CardHeader>
+            <CardHeader className="px-4 py-3">
               <CardTitle className="text-red-600 flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 Erreur
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 pb-4 pt-0">
               <p className="text-gray-600 mb-4">{error}</p>
               <Button onClick={fetchData} className="w-full">
                 Réessayer
@@ -744,12 +744,12 @@ export default function SoldeCaissePage() {
       {/* Page d'analyse en lecture seule : ses filtres ne doivent pas
           déclencher l'alerte "modifications non enregistrées". */}
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100" data-skip-unsaved-dirty>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         {/* En-tête */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Calcul du Solde de Caisse</h1>
-            <p className="text-gray-500 mt-1">Analysez les paiements et dépenses pour calculer le solde</p>
+            <h1 className="text-xl font-bold text-gray-900">Calcul du Solde de Caisse</h1>
+            <p className="text-sm text-gray-500">Analysez les paiements et dépenses pour calculer le solde</p>
           </div>
           <Button
             onClick={handleExportData}
@@ -762,63 +762,63 @@ export default function SoldeCaissePage() {
         </div>
 
         {/* 1️⃣ RÉSUMÉ GLOBAL (Header) */}
-        <div className="mb-8">
-          <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-8 text-white shadow-2xl">
-            <div className="flex items-center justify-between mb-6">
+        <div className="mb-4">
+          <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-4 text-white shadow-2xl">
+            <div className="flex items-center justify-between mb-3">
                 <div>
-                <h1 className="text-3xl font-bold mb-2">💰 Calcul du Solde de Caisse</h1>
-                <p className="text-slate-300">État financier en temps réel</p>
+                <h1 className="text-2xl font-bold leading-tight">💰 Calcul du Solde de Caisse</h1>
+                <p className="text-sm text-slate-300">État financier en temps réel</p>
               </div>
               <div className="text-right">
-                <div className={`text-4xl font-bold ${soldeFinal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                <div className={`text-3xl font-bold leading-tight ${soldeFinal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {formatNumberWithDots(soldeFinal)} DH
                 </div>
                 <p className="text-slate-300 text-sm">Solde Final</p>
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               {/* Total Paiements */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3">
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Total Paiements</p>
-                    <p className="text-2xl font-bold text-green-400">{formatNumberWithDots(totalPaiements)} DH</p>
+                    <p className="text-xl font-bold leading-tight text-green-400">{formatNumberWithDots(totalPaiements)} DH</p>
                 </div>
-                  <CreditCard className="h-8 w-8 text-green-400" />
+                  <CreditCard className="h-6 w-6 text-green-400" />
                 </div>
               </div>
 
               {/* Total Paiement Prévu */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3">
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Total Paiement Prévu</p>
-                    <p className="text-2xl font-bold text-yellow-400">{formatNumberWithDots(gainPrevu)} DH</p>
+                    <p className="text-xl font-bold leading-tight text-yellow-400">{formatNumberWithDots(gainPrevu)} DH</p>
                 </div>
-                  <DollarSign className="h-8 w-8 text-yellow-400" />
+                  <DollarSign className="h-6 w-6 text-yellow-400" />
                 </div>
               </div>
 
               {/* Total Dépenses */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3">
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Total Dépenses</p>
-                    <p className="text-2xl font-bold text-red-400">{formatNumberWithDots(Math.abs(totalDepenses))} DH</p>
+                    <p className="text-xl font-bold leading-tight text-red-400">{formatNumberWithDots(Math.abs(totalDepenses))} DH</p>
                 </div>
-                  <FileText className="h-8 w-8 text-red-400" />
+                  <FileText className="h-6 w-6 text-red-400" />
                 </div>
               </div>
 
               {/* Solde Final Prévu */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3">
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Solde Final Prévu</p>
-                    <p className="text-2xl font-bold text-blue-400">{formatNumberWithDots(soldeFinalPrevu)} DH</p>
+                    <p className="text-xl font-bold leading-tight text-blue-400">{formatNumberWithDots(soldeFinalPrevu)} DH</p>
                 </div>
-                  <TrendingUp className="h-8 w-8 text-blue-400" />
+                  <TrendingUp className="h-6 w-6 text-blue-400" />
                 </div>
               </div>
             </div>
@@ -826,24 +826,24 @@ export default function SoldeCaissePage() {
         </div>
 
         {/* 2️⃣ FILTRES */}
-        <Card className="mb-8 border-0 shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center gap-3">
-              <Filter className="h-6 w-6 text-blue-600" />
+        <Card className="mb-4 border-0 shadow-lg">
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Filter className="h-5 w-5 text-blue-600" />
               <span>Filtres d'analyse</span>
               <Badge variant="secondary" className="ml-auto">
                 Analyse ciblée
               </Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="space-y-3">
+          <CardContent className="px-4 pb-4 pt-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="space-y-1">
                 <Label htmlFor="programme" className="text-sm font-semibold text-gray-700">
                   🏢 Programme
                 </Label>
                 <Select value={programmeFilter} onValueChange={(value) => setProgrammeFilter(value)}>
-                  <SelectTrigger id="programme" className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-11">
+                  <SelectTrigger id="programme" className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-9">
                     <SelectValue placeholder="Tous les programmes" />
                   </SelectTrigger>
                   <SelectContent>
@@ -859,7 +859,7 @@ export default function SoldeCaissePage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-1">
                 <Label htmlFor="dateDebut" className="text-sm font-semibold text-gray-700">
                   📆 De
                 </Label>
@@ -869,10 +869,10 @@ export default function SoldeCaissePage() {
                   value={dateDebut}
                   max={dateFin || undefined}
                   onChange={(e) => setDateDebut(e.target.value)}
-                  className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-11"
+                  className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-9"
                 />
               </div>
-              <div className="space-y-3">
+              <div className="space-y-1">
                 <Label htmlFor="dateFin" className="text-sm font-semibold text-gray-700">
                   📆 À
                 </Label>
@@ -882,7 +882,7 @@ export default function SoldeCaissePage() {
                   value={dateFin}
                   min={dateDebut || undefined}
                   onChange={(e) => setDateFin(e.target.value)}
-                  className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-11"
+                  className="border-2 border-gray-200 focus:border-blue-500 rounded-lg h-9"
                 />
               </div>
             </div>
@@ -906,9 +906,9 @@ export default function SoldeCaissePage() {
 
 
         {/* 3️⃣ GRAPHIQUES */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">📊 Visualisation des Tendances</h2>
+        <div className="mb-4">
+          <div className="flex items-center gap-3 mb-3">
+            <h2 className="text-xl font-bold text-gray-800">📊 Visualisation des Tendances</h2>
             <Badge variant="outline" className="text-blue-600 border-blue-200">
               Données en temps réel
             </Badge>
@@ -916,13 +916,13 @@ export default function SoldeCaissePage() {
         </div>
 
         <Card className="border-0 shadow-lg mb-6">
-          <CardHeader>
+          <CardHeader className="px-4 py-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-indigo-500" />
               Paiements vs Dépenses vs Profit (du premier au dernier mouvement)
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-4 pt-0">
             <div className="h-80 p-2">
               {chartsLoading ? (
                 <div className="flex items-center justify-center h-full">
@@ -1031,12 +1031,12 @@ export default function SoldeCaissePage() {
         </Card>
 
         {datesReady && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-3">
             <Card className="border-0 shadow-lg">
-              <CardHeader>
+              <CardHeader className="px-4 py-3">
                 <CardTitle className="text-lg">Total Paiements vs Dépenses</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-4 pb-4 pt-0">
                 <div className="h-72 p-1">
                   <ChartContainer config={monthlyActualConfig} className="h-full w-full aspect-auto">
                     <BarChart data={periodActualData} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
@@ -1079,10 +1079,10 @@ export default function SoldeCaissePage() {
             </Card>
 
             <Card className="border-0 shadow-lg">
-              <CardHeader>
+              <CardHeader className="px-4 py-3">
                 <CardTitle className="text-lg">Total Paiements Prévus vs Dépenses</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-4 pb-4 pt-0">
                 <div className="h-72 p-1">
                   <ChartContainer config={monthlyExpectedConfig} className="h-full w-full aspect-auto">
                     <BarChart data={periodExpectedData} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
@@ -1128,12 +1128,12 @@ export default function SoldeCaissePage() {
 
         {!datesReady && (
         <>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-3">
           <Card className="border-0 shadow-lg">
-            <CardHeader>
+            <CardHeader className="px-4 py-3">
               <CardTitle className="text-lg">Total Paiements vs Dépenses (par mois)</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 pb-4 pt-0">
               <div className="h-72 p-1">
                 {chartsLoading ? (
                   <div className="flex items-center justify-center h-full">
@@ -1185,10 +1185,10 @@ export default function SoldeCaissePage() {
           </Card>
 
           <Card className="border-0 shadow-lg">
-            <CardHeader>
+            <CardHeader className="px-4 py-3">
               <CardTitle className="text-lg">Total Paiements Prévus vs Dépenses (par mois)</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 pb-4 pt-0">
               <div className="h-72 p-1">
                 {chartsLoading ? (
                   <div className="flex items-center justify-center h-full">
@@ -1241,12 +1241,12 @@ export default function SoldeCaissePage() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
           <Card className="border-0 shadow-lg">
-            <CardHeader>
+            <CardHeader className="px-4 py-3">
               <CardTitle className="text-lg">Total Paiements vs Dépenses (par programme)</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 pb-4 pt-0">
               <div className="h-72 p-1">
                 {chartsLoading ? (
                   <div className="flex items-center justify-center h-full">
@@ -1301,10 +1301,10 @@ export default function SoldeCaissePage() {
           </Card>
 
           <Card className="border-0 shadow-lg">
-            <CardHeader>
+            <CardHeader className="px-4 py-3">
               <CardTitle className="text-lg">Total Paiements Prévus vs Dépenses (par programme)</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 pb-4 pt-0">
               <div className="h-72 p-1">
                 {chartsLoading ? (
                   <div className="flex items-center justify-center h-full">
@@ -1368,19 +1368,19 @@ export default function SoldeCaissePage() {
           <>
             {!datesReady && (
             <>
-            <div className="mb-8">
-              <div className="flex items-center gap-3 mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">🏆 Tableaux & Classements</h2>
+            <div className="mb-4">
+              <div className="flex items-center gap-3 mb-3">
+                <h2 className="text-xl font-bold text-gray-800">🏆 Tableaux & Classements</h2>
                 <Badge variant="outline" className="text-purple-600 border-purple-200">
                   Analyses décisionnelles
                 </Badge>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
               {/* 🏆 Classement par Programme */}
               <Card className="border-0 shadow-lg">
-                <CardHeader>
+                <CardHeader className="px-4 py-3">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Trophy className="h-5 w-5 text-yellow-500" />
                     Classement Programmes
@@ -1389,8 +1389,8 @@ export default function SoldeCaissePage() {
                     </Badge>
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
+                <CardContent className="px-4 pb-4 pt-0">
+                  <div className="space-y-1">
                     {(analyticsData.programRanking?.details || []).slice(0, 5).map((program, index) => (
                       <div key={program.programId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div className="flex items-center gap-3">
@@ -1418,7 +1418,7 @@ export default function SoldeCaissePage() {
 
               {/* 👥 Classement par Agent */}
         <Card className="border-0 shadow-lg">
-          <CardHeader>
+          <CardHeader className="px-4 py-3">
               <CardTitle className="text-lg flex items-center gap-2">
                     <Award className="h-5 w-5 text-blue-500" />
                     Top Agents
@@ -1427,8 +1427,8 @@ export default function SoldeCaissePage() {
                     </Badge>
               </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
+                <CardContent className="px-4 pb-4 pt-0">
+                  <div className="space-y-1">
                     {(() => {
                       console.log('🔍 Debug - Rendering agent ranking, details:', analyticsData.agentRanking?.details)
                       return (analyticsData.agentRanking?.details || []).slice(0, 5)
@@ -1465,19 +1465,19 @@ export default function SoldeCaissePage() {
             )}
 
             {/* 👥 Indicateurs Agents */}
-            <div className="mb-8">
-              <div className="flex items-center gap-3 mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">👥 Indicateurs Agents</h2>
+            <div className="mb-4">
+              <div className="flex items-center gap-3 mb-3">
+                <h2 className="text-xl font-bold text-gray-800">👥 Indicateurs Agents</h2>
                 <Badge variant="outline" className="text-blue-600 border-blue-200">
                   Graphes indicatifs
                 </Badge>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                 <Card className="border-0 shadow-lg">
-                  <CardHeader>
+                  <CardHeader className="px-4 py-3">
                     <CardTitle className="text-base">Encaissement par agent</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="px-4 pb-4 pt-0">
                     <div className="h-64">
                       {agentIndicativeData.length > 0 ? (
                         <ChartContainer config={agentsAmountConfig} className="h-full w-full aspect-auto">
@@ -1497,10 +1497,10 @@ export default function SoldeCaissePage() {
                 </Card>
 
                 <Card className="border-0 shadow-lg">
-                  <CardHeader>
+                  <CardHeader className="px-4 py-3">
                     <CardTitle className="text-base">Transactions par agent</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="px-4 pb-4 pt-0">
                     <div className="h-64">
                       {agentIndicativeData.length > 0 ? (
                         <ChartContainer config={agentsCountConfig} className="h-full w-full aspect-auto">
@@ -1520,10 +1520,10 @@ export default function SoldeCaissePage() {
                 </Card>
 
                 <Card className="border-0 shadow-lg">
-                  <CardHeader>
+                  <CardHeader className="px-4 py-3">
                     <CardTitle className="text-base">Répartition encaissement agents</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="px-4 pb-4 pt-0">
                     <div className="h-64">
                       {agentIndicativeData.length > 0 ? (
                         <ChartContainer config={{ totalAmount: { label: "Encaissement", color: "#2563eb" } }} className="h-full w-full aspect-auto">
@@ -1586,10 +1586,10 @@ export default function SoldeCaissePage() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <Card>
-                    <CardHeader>
+                    <CardHeader className="px-4 py-3">
                       <CardTitle className="text-base">Paiements ({timelineDayDetails.paiements.length})</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="px-4 pb-4 pt-0">
                       {timelineDayDetails.paiements.length === 0 ? (
                         <p className="text-sm text-muted-foreground">Aucun paiement ce jour.</p>
                       ) : (
@@ -1611,10 +1611,10 @@ export default function SoldeCaissePage() {
                   </Card>
 
                   <Card>
-                    <CardHeader>
+                    <CardHeader className="px-4 py-3">
                       <CardTitle className="text-base">Dépenses ({timelineDayDetails.depenses.length})</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="px-4 pb-4 pt-0">
                       {timelineDayDetails.depenses.length === 0 ? (
                         <p className="text-sm text-muted-foreground">Aucune dépense ce jour.</p>
                       ) : (

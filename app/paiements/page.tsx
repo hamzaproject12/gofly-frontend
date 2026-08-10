@@ -294,10 +294,10 @@ export default function PaiementsPage() {
       data-skip-unsaved-dirty
       className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         {/* En-tête */}
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Gestion des Paiements</h1>
+        <div className="flex justify-between items-center mb-3">
+          <h1 className="text-xl font-bold text-gray-900">Gestion des Paiements</h1>
           <Button asChild>
             <Link href="/paiements/nouveau">
               <Plus className="mr-2 h-4 w-4" />
@@ -307,89 +307,89 @@ export default function PaiementsPage() {
         </div>
 
         {/* Statistiques */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
           <Card className="border-none shadow-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-            <CardContent className="p-6">
+            <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-blue-100 text-sm font-medium">Total Paiements</p>
-                  <p className="text-2xl font-bold" title={`${formatMontant(totalPaiements)} DH`}>
+                  <p className="text-xl font-bold leading-tight" title={`${formatMontant(totalPaiements)} DH`}>
                     {formatMontantCourt(totalPaiements)} DH
                   </p>
                 </div>
-                <DollarSign className="h-8 w-8 text-blue-200" />
+                <DollarSign className="h-6 w-6 text-blue-200" />
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-none shadow-lg bg-gradient-to-br from-green-500 to-green-600 text-white">
-            <CardContent className="p-6">
+            <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-green-100 text-sm font-medium">Carte</p>
-                  <p className="text-2xl font-bold" title={`${formatMontant(paiementsParCarte)} DH`}>
+                  <p className="text-xl font-bold leading-tight" title={`${formatMontant(paiementsParCarte)} DH`}>
                     {formatMontantCourt(paiementsParCarte)} DH
                   </p>
                 </div>
-                <CreditCard className="h-8 w-8 text-green-200" />
+                <CreditCard className="h-6 w-6 text-green-200" />
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-none shadow-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white">
-            <CardContent className="p-6">
+            <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-purple-100 text-sm font-medium">Espèces</p>
-                  <p className="text-2xl font-bold" title={`${formatMontant(paiementsParEspeces)} DH`}>
+                  <p className="text-xl font-bold leading-tight" title={`${formatMontant(paiementsParEspeces)} DH`}>
                     {formatMontantCourt(paiementsParEspeces)} DH
                   </p>
                 </div>
-                <DollarSign className="h-8 w-8 text-purple-200" />
+                <DollarSign className="h-6 w-6 text-purple-200" />
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-none shadow-lg bg-gradient-to-br from-orange-500 to-orange-600 text-white">
-            <CardContent className="p-6">
+            <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-orange-100 text-sm font-medium">Virement</p>
-                  <p className="text-2xl font-bold" title={`${formatMontant(paiementsParVirement)} DH`}>
+                  <p className="text-xl font-bold leading-tight" title={`${formatMontant(paiementsParVirement)} DH`}>
                     {formatMontantCourt(paiementsParVirement)} DH
                   </p>
                 </div>
-                <FileText className="h-8 w-8 text-orange-200" />
+                <FileText className="h-6 w-6 text-orange-200" />
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-none shadow-lg bg-gradient-to-br from-red-500 to-red-600 text-white">
-            <CardContent className="p-6">
+            <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-red-100 text-sm font-medium">Chèque</p>
-                  <p className="text-2xl font-bold" title={`${formatMontant(paiementsParCheque)} DH`}>
+                  <p className="text-xl font-bold leading-tight" title={`${formatMontant(paiementsParCheque)} DH`}>
                     {formatMontantCourt(paiementsParCheque)} DH
                   </p>
                 </div>
-                <Receipt className="h-8 w-8 text-red-200" />
+                <Receipt className="h-6 w-6 text-red-200" />
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Filtres */}
-        <Card className="mb-8 border-none shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-gray-800">
-              <Filter className="h-5 w-5" />
+        <Card className="mb-4 border-none shadow-lg">
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="flex items-center gap-2 text-base text-gray-800">
+              <Filter className="h-4 w-4" />
               Filtres
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
+          <CardContent className="px-4 pb-3 pt-0">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">Recherche</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -402,7 +402,7 @@ export default function PaiementsPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">Programme</label>
                 <Select value={programFilter} onValueChange={setProgramFilter}>
                   <SelectTrigger className="border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
@@ -419,7 +419,7 @@ export default function PaiementsPage() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">Méthode de paiement</label>
                 <Select value={methodFilter} onValueChange={setMethodFilter}>
                   <SelectTrigger className="border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
@@ -440,13 +440,13 @@ export default function PaiementsPage() {
 
         {/* Liste des paiements */}
         <Card className="border-none shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-gray-800">
-              <CreditCard className="h-5 w-5" />
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="flex items-center gap-2 text-base text-gray-800">
+              <CreditCard className="h-4 w-4" />
               Liste des Paiements ({sortedFilteredPaiements.length}) — plus récents en haut
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-4 pt-0">
             {sortedFilteredPaiements.length === 0 ? (
               <div className="text-center py-12">
                 <CreditCard className="h-16 w-16 text-gray-300 mx-auto mb-4" />
@@ -470,11 +470,11 @@ export default function PaiementsPage() {
                 )}
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {sortedFilteredPaiements.map((paiement) => (
                   <div
                     key={paiement.id}
-                    className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all text-sm"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all text-sm"
                   >
                     <span className="text-gray-500 whitespace-nowrap shrink-0 tabular-nums" title="Date du paiement">
                       <Calendar className="h-3.5 w-3.5 inline mr-1 -mt-0.5 opacity-70" />

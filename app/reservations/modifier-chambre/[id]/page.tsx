@@ -2144,7 +2144,7 @@ export default function EditReservation() {
 
         {/* Structure identique à Nouvelle Réservation */}
         <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
-                <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-20 z-40 shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-14 z-40 shadow-lg">
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <CardTitle className="text-xl flex items-center gap-3 flex-wrap">
                       <Sparkles className="h-6 w-6" />

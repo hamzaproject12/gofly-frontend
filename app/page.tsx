@@ -120,25 +120,25 @@ function CityHeader({
   stats: { totalPlaces: number; placesRestantes: number };
 }) {
   return (
-    <div className={`flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r ${config.headerGradient}`}>
-      <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/20 text-2xl shadow-inner ring-1 ring-white/30">
+    <div className={`flex items-center justify-between gap-3 px-3 py-1.5 bg-gradient-to-r ${config.headerGradient}`}>
+      <div className="flex items-center gap-2">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 text-lg shadow-inner ring-1 ring-white/30">
           {config.icon}
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-lg font-bold leading-none tracking-tight text-white">{config.label}</h3>
+            <h3 className="text-base font-bold leading-none tracking-tight text-white">{config.label}</h3>
             <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-semibold text-white">
               {hotelCount} hôtel{hotelCount > 1 ? 's' : ''}
             </span>
           </div>
-          <p className="mt-1 text-xs font-medium text-white/85">
+          <p className="mt-0.5 text-xs font-medium leading-tight text-white/85">
             {stats.placesRestantes} place{stats.placesRestantes > 1 ? 's' : ''} libre
             {stats.placesRestantes > 1 ? 's' : ''} sur {stats.totalPlaces}
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-2 rounded-xl bg-white/15 px-3 py-2 ring-1 ring-white/25">
+      <div className="flex items-center gap-2 rounded-lg bg-white/15 px-2 py-1 ring-1 ring-white/25">
         <Bed className="h-4 w-4 text-white" />
         <span className="text-sm font-bold tabular-nums text-white">
           {stats.placesRestantes}/{stats.totalPlaces}
@@ -167,9 +167,9 @@ function RoomDonut({
   const circumference = 2 * Math.PI * radius;
   const pct = total > 0 ? Math.min(occupied / total, 1) : 0;
   return (
-    <div className="flex flex-col items-center gap-1.5">
-      <div className="relative h-14 w-14">
-        <svg viewBox="0 0 56 56" className="h-14 w-14 -rotate-90">
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative h-12 w-12">
+        <svg viewBox="0 0 56 56" className="h-12 w-12 -rotate-90">
           <circle cx="28" cy="28" r={radius} fill="none" stroke="#e5e7eb" strokeWidth={stroke} />
           <circle
             cx="28"
@@ -519,7 +519,7 @@ export default function HomePage() {
     const occPlaces = hotel.rooms.reduce((s, r) => s + r.placesOccupees, 0);
     return (
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className={`flex items-center justify-between gap-3 bg-gradient-to-r ${cfg.headerGradient} px-4 py-3`}>
+        <div className={`flex items-center justify-between gap-3 bg-gradient-to-r ${cfg.headerGradient} px-3 py-2`}>
           <div className="min-w-0">
             <h5 className="truncate font-bold text-white">{getHotelDisplayName(hotel.hotelName)}</h5>
             <p className="flex items-center gap-1 text-xs text-white/85">
@@ -533,7 +533,7 @@ export default function HomePage() {
             <p className="text-[11px] text-white/80">places</p>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-3 p-4 sm:grid-cols-5">
+        <div className="grid grid-cols-3 gap-2 p-3 sm:grid-cols-5">
           {types.map((t) => (
             <RoomDonut
               key={t.roomType}
@@ -580,15 +580,15 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-slate-100">
-      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
         {/* Header avec informations de l'agent */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
+        <div className="mb-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              <h1 className="text-2xl font-bold text-gray-900 leading-tight">
                 🏨 {siteConfig.name} Dashboard
               </h1>
-              <p className="text-lg text-gray-600">
+              <p className="text-sm text-gray-600">
                 Gestion des programmes Omra - Disponibilité des chambres
               </p>
             </div>
@@ -599,7 +599,7 @@ export default function HomePage() {
                   variant={viewMode === 'dashboard' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('dashboard')}
-                  className={`flex items-center gap-2 px-4 py-2 transition-all duration-200 ${
+                  className={`flex items-center gap-2 px-3 py-1.5 h-8 transition-all duration-200 ${
                     viewMode === 'dashboard' 
                       ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:from-blue-700 hover:to-indigo-700' 
                       : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
@@ -612,7 +612,7 @@ export default function HomePage() {
                   variant={viewMode === 'hotel-detail' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('hotel-detail')}
-                  className={`flex items-center gap-2 px-4 py-2 transition-all duration-200 ${
+                  className={`flex items-center gap-2 px-3 py-1.5 h-8 transition-all duration-200 ${
                     viewMode === 'hotel-detail' 
                       ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:from-blue-700 hover:to-indigo-700' 
                       : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
@@ -628,58 +628,58 @@ export default function HomePage() {
 
         {/* Statistiques globales */}
         {roomData?.summary && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             <Card className="border border-slate-200 shadow-sm bg-white">
-              <CardContent className="p-6">
+              <CardContent className="p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Programmes Actifs</p>
-                    <p className="text-2xl font-bold text-indigo-600">{roomData.summary.totalPrograms}</p>
+                    <p className="text-xl font-bold leading-tight text-indigo-600">{roomData.summary.totalPrograms}</p>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50">
-                    <Calendar className="h-6 w-6 text-indigo-600" />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50">
+                    <Calendar className="h-5 w-5 text-indigo-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border border-slate-200 shadow-sm bg-white">
-              <CardContent className="p-6">
+              <CardContent className="p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Total Chambres</p>
-                    <p className="text-2xl font-bold text-blue-600">{roomData.summary.totalRooms}</p>
+                    <p className="text-xl font-bold leading-tight text-blue-600">{roomData.summary.totalRooms}</p>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50">
-                    <Hotel className="h-6 w-6 text-blue-600" />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50">
+                    <Hotel className="h-5 w-5 text-blue-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border border-slate-200 shadow-sm bg-white">
-              <CardContent className="p-6">
+              <CardContent className="p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Places Occupées</p>
-                    <p className="text-2xl font-bold text-green-600">{roomData.summary.totalOccupied}</p>
+                    <p className="text-xl font-bold leading-tight text-green-600">{roomData.summary.totalOccupied}</p>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-50">
-                    <UserCheck className="h-6 w-6 text-green-600" />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-50">
+                    <UserCheck className="h-5 w-5 text-green-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border border-slate-200 shadow-sm bg-white">
-              <CardContent className="p-6">
+              <CardContent className="p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Places Disponibles</p>
-                    <p className="text-2xl font-bold text-red-600">{roomData.summary.totalAvailable}</p>
+                    <p className="text-xl font-bold leading-tight text-red-600">{roomData.summary.totalAvailable}</p>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50">
-                    <UserX className="h-6 w-6 text-red-600" />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50">
+                    <UserX className="h-5 w-5 text-red-600" />
                   </div>
                 </div>
               </CardContent>
@@ -690,7 +690,7 @@ export default function HomePage() {
         {/* Contenu conditionnel selon la vue */}
         {viewMode === 'dashboard' ? (
           /* Vue Dashboard - Liste des programmes */
-          <div className="space-y-6">
+          <div className="space-y-3">
             {roomData?.data.map((program, programIndex) => (
               <Card
                 key={program.id}
@@ -700,11 +700,11 @@ export default function HomePage() {
                     : `${getProgramAccentBorder(programIndex)} bg-white`
                 }`}
               >
-                <CardHeader className={`${program.isDeleted ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' : 'bg-gradient-to-r from-indigo-50 to-blue-50'} py-3`}>
-                  <div className="flex items-center justify-between flex-wrap gap-3">
+                <CardHeader className={`${program.isDeleted ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' : 'bg-gradient-to-r from-indigo-50 to-blue-50'} py-2 px-4`}>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     {/* Nom du programme et date */}
                     <div className="flex items-center gap-2">
-                      <span className="text-xl">🎯</span>
+                      <span className="text-lg">🎯</span>
                       <div>
                         {program.isDeleted && (
                           <Badge className="bg-yellow-500 text-white text-xs mb-1">Supprimé</Badge>
@@ -723,7 +723,7 @@ export default function HomePage() {
                     <div className="flex items-center gap-3 flex-wrap">
                       {/* Montant restant à payer */}
                       {program.statistics.remainingAmount !== undefined && (
-                        <div className="flex items-center gap-2 bg-yellow-100 border border-yellow-300 rounded-lg px-3 py-1.5">
+                        <div className="flex items-center gap-2 bg-yellow-100 border border-yellow-300 rounded-lg px-2 py-1">
                           <Wallet className="h-4 w-4 text-yellow-700" />
                           <div>
                             <p className="text-xs text-yellow-800 font-medium">Restant</p>
@@ -738,7 +738,7 @@ export default function HomePage() {
                       )}
 
                       {/* Places disponibles */}
-                      <div className="flex items-center gap-2 bg-blue-100 border border-blue-300 rounded-lg px-3 py-1.5">
+                      <div className="flex items-center gap-2 bg-blue-100 border border-blue-300 rounded-lg px-2 py-1">
                         <Users className="h-4 w-4 text-blue-700" />
                         <div>
                           <p className="text-xs text-blue-800 font-medium">Places</p>
@@ -749,7 +749,7 @@ export default function HomePage() {
                       </div>
 
                       {/* Taux d'occupation */}
-                      <div className="flex items-center gap-2 bg-green-100 border border-green-300 rounded-lg px-3 py-1.5">
+                      <div className="flex items-center gap-2 bg-green-100 border border-green-300 rounded-lg px-2 py-1">
                         <Percent className="h-4 w-4 text-green-700" />
                         <div>
                           <p className="text-xs text-green-800 font-medium">Occupation</p>
@@ -781,7 +781,7 @@ export default function HomePage() {
                     const rate = parseInt(program.statistics.occupancyRate);
                     const { gradient, glow } = getOccupancyGradient(rate);
                     return (
-                      <div className="w-full mt-3 mb-0 overflow-hidden rounded-full h-3 bg-slate-200/70 shadow-inner ring-1 ring-black/5"
+                      <div className="w-full mt-2 mb-0 overflow-hidden rounded-full h-2 bg-slate-200/70 shadow-inner ring-1 ring-black/5"
                            style={{
                              backgroundImage: 'linear-gradient(90deg, rgba(100, 116, 139, 0.12) 1px, transparent 1px)',
                              backgroundSize: '12px 100%'
@@ -803,8 +803,8 @@ export default function HomePage() {
                 </CardHeader>
 
                 {!collapsedPrograms.has(program.id) && (
-                <CardContent className="p-6">
-                  <div className="space-y-5">
+                <CardContent className="p-3">
+                  <div className="space-y-3">
                     {groupHotelsByCity(program.hotels).map((group) => {
                       const cityStats = getCityStats(group.hotels);
                       return (
@@ -817,14 +817,14 @@ export default function HomePage() {
                             hotelCount={group.hotels.length}
                             stats={cityStats}
                           />
-                          <div className="space-y-4 p-3 sm:p-4">
+                          <div className="space-y-2 p-2 sm:p-3">
                             {group.hotels.map((hotel, hotelIndex) => (
-                              <div key={hotelIndex} className="rounded-xl border bg-white p-4 shadow-sm">
-                                <div className="flex items-center gap-2 mb-3">
-                                  <MapPin className={`h-5 w-5 ${group.config.accentText}`} />
+                              <div key={hotelIndex} className="rounded-xl border bg-white p-3 shadow-sm">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <MapPin className={`h-4 w-4 ${group.config.accentText}`} />
                                   <h3 className="font-semibold text-gray-900">{getHotelDisplayName(hotel.hotelName)}</h3>
                                 </div>
-                                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-2">
                           {hotel.rooms
                             .sort((a, b) => getRoomTypeOrder(a.roomType) - getRoomTypeOrder(b.roomType))
                             .map((room) => {
@@ -832,11 +832,11 @@ export default function HomePage() {
                             return (
                               <div 
                                 key={room.id} 
-                                className={`${roomStyle.bgColor} rounded-lg p-4 border-2 ${roomStyle.borderColor} shadow-sm hover:shadow-md transition-shadow`}
+                                className={`${roomStyle.bgColor} rounded-lg p-2 border-2 ${roomStyle.borderColor} shadow-sm hover:shadow-md transition-shadow`}
                               >
-                                <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center justify-between mb-1.5">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-lg">{getRoomTypeIcon(room.roomType)}</span>
+                                    <span className="text-base">{getRoomTypeIcon(room.roomType)}</span>
                                     <span className={`font-medium ${roomStyle.textColor}`}>
                                       {getRoomTypeLabel(room.roomType)} {getGenderIcon(room.gender)}
                                     </span>
@@ -847,11 +847,11 @@ export default function HomePage() {
                                 </div>
                                 
                                 {/* Affichage visuel des places */}
-                                <div className="flex items-center gap-1 mb-3">
+                                <div className="flex flex-wrap items-center gap-1 mb-1.5">
                                   {room.visualPlaces.map((place, index) => (
                                     <div
                                       key={index}
-                                  className={`w-6 h-6 rounded-full border-2 ${
+                                  className={`w-4 h-4 rounded-full border-2 ${
                                     place.isOccupied 
                                       ? 'bg-red-500 border-red-600' 
                                       : 'bg-green-500 border-green-600'
@@ -886,9 +886,9 @@ export default function HomePage() {
           /* Vue Types Chambres - Tableau de programmes expandable */
           <Card className="overflow-hidden border border-slate-200 bg-white shadow-sm">
             {/* Bandeau header */}
-            <div className="bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-5">
-              <h2 className="text-xl font-bold text-white sm:text-2xl">Vue d'ensemble des programmes</h2>
-              <p className="mt-1 text-sm text-white/85">
+            <div className="bg-gradient-to-r from-emerald-500 to-green-600 px-4 py-3">
+              <h2 className="text-lg font-bold text-white sm:text-xl">Vue d'ensemble des programmes</h2>
+              <p className="mt-0.5 text-sm leading-tight text-white/85">
                 Cliquez sur un programme pour voir les détails des hôtels et la disponibilité des chambres
               </p>
             </div>
@@ -914,7 +914,7 @@ export default function HomePage() {
                     <button
                       type="button"
                       onClick={() => toggleRow(program.id)}
-                      className="flex w-full flex-col gap-3 px-4 py-3.5 text-left transition-colors hover:bg-emerald-50/50 md:grid md:grid-cols-12 md:items-center md:gap-3"
+                      className="flex w-full flex-col gap-2 px-4 py-2 text-left transition-colors hover:bg-emerald-50/50 md:grid md:grid-cols-12 md:items-center md:gap-3"
                     >
                       {/* Programme */}
                       <div className="col-span-4 flex items-center gap-2">
@@ -985,13 +985,13 @@ export default function HomePage() {
 
                     {/* Contenu déplié */}
                     {isOpen && (
-                      <div className="bg-emerald-50/40 px-4 pb-5 pt-1">
+                      <div className="bg-emerald-50/40 px-3 pb-3 pt-1">
                         {program.hotels.length === 0 ? (
-                          <p className="py-4 text-center text-sm text-gray-500">
+                          <p className="py-3 text-center text-sm text-gray-500">
                             Aucun hôtel pour ce programme.
                           </p>
                         ) : (
-                          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                             {program.hotels.map((hotel, hotelIndex) => (
                               <HotelDonutCard key={hotelIndex} hotel={hotel} />
                             ))}
@@ -1008,8 +1008,8 @@ export default function HomePage() {
 
         {roomData?.data.length === 0 && (
           <Card className="border border-slate-200 shadow-sm bg-white">
-            <CardContent className="p-12 text-center">
-              <div className="text-6xl mb-4">🏨</div>
+            <CardContent className="p-8 text-center">
+              <div className="text-5xl mb-3">🏨</div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Aucun programme trouvé</h3>
               <p className="text-gray-600">Aucun programme avec des chambres n'est disponible pour le moment.</p>
             </CardContent>

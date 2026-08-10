@@ -105,7 +105,7 @@ export default function AuthNav() {
         data-skip-unsaved-dirty
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-20">
+          <div className="flex justify-between h-14">
             <div className="flex items-center">
               <h1 className="text-xl font-semibold text-gray-900">{siteConfig.name}</h1>
             </div>
@@ -125,7 +125,7 @@ export default function AuthNav() {
         data-skip-unsaved-dirty
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-20">
+          <div className="flex justify-between h-14">
             <div className="flex items-center">
               <h1 className="text-xl font-semibold text-gray-900">{siteConfig.name}</h1>
             </div>
@@ -155,17 +155,17 @@ export default function AuthNav() {
       data-skip-unsaved-dirty
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-20">
+        <div className="flex justify-between items-center h-14">
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 flex items-center justify-center">
-                <img src={siteConfig.logo} alt={`Logo ${siteConfig.name}`} className="h-10 w-10 object-contain rounded-xl" />
+            <div className="flex items-center space-x-2">
+              <div className="w-9 h-9 flex items-center justify-center">
+                <img src={siteConfig.logo} alt={`Logo ${siteConfig.name}`} className="h-9 w-9 object-contain rounded-xl" />
               </div>
-              <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-700 to-blue-900 bg-clip-text text-transparent">
+              <div className="leading-tight">
+                <h1 className="text-lg font-bold leading-tight bg-gradient-to-r from-blue-700 to-blue-900 bg-clip-text text-transparent">
                   {siteConfig.name}
                 </h1>
-                <p className="text-xs text-gray-500">Gestion Omra</p>
+                <p className="text-[11px] leading-tight text-gray-500">Gestion Omra</p>
               </div>
             </div>
           </div>
@@ -174,7 +174,7 @@ export default function AuthNav() {
           <div className="hidden md:flex items-center space-x-1">
             {/* Dashboard - Direct link */}
             <Link href="/">
-              <button className="font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all rounded-xl px-4 py-2 flex items-center">
+              <button className="font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all rounded-xl px-3 py-1.5 flex items-center">
                 <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
@@ -191,7 +191,7 @@ export default function AuthNav() {
                   setShowFinancesMenu(false);
                   setShowAdminMenu(false);
                 }}
-                className="font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all rounded-xl px-4 py-2 flex items-center"
+                className="font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all rounded-xl px-3 py-1.5 flex items-center"
               >
                 <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -278,7 +278,7 @@ export default function AuthNav() {
                   setShowCommercialMenu(false);
                   setShowAdminMenu(false);
                 }}
-                className="font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all rounded-xl px-4 py-2 flex items-center"
+                className="font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all rounded-xl px-3 py-1.5 flex items-center"
               >
                 <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
@@ -351,7 +351,7 @@ export default function AuthNav() {
                     setShowCommercialMenu(false);
                     setShowFinancesMenu(false);
                   }}
-                  className="font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all rounded-xl px-4 py-2 flex items-center"
+                  className="font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all rounded-xl px-3 py-1.5 flex items-center"
                 >
                   <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -423,9 +423,9 @@ export default function AuthNav() {
             <div className="relative dropdown-menu">
               <button
                 onClick={() => setShowProfile(!showProfile)}
-                className="flex items-center text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 p-2 hover:bg-blue-50 transition-all"
+                className="flex items-center text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 p-1.5 hover:bg-blue-50 transition-all"
               >
-                <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-600 to-blue-800 flex items-center justify-center">
+                <div className="h-7 w-7 rounded-full bg-gradient-to-r from-blue-600 to-blue-800 flex items-center justify-center">
                   <span className="text-white font-medium text-sm">
                     {agent.nom.charAt(0).toUpperCase()}
                   </span>

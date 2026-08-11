@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { api } from "@/lib/api"
-import { formatNombre, formatMontant, formatMontantSigne, formatDateFr } from "@/lib/format"
+import { formatNombre, formatMontant, formatMontantSigne, formatDateFr, classeTailleMontant } from "@/lib/format"
 import RoleProtectedRoute from "../components/RoleProtectedRoute"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -758,13 +758,13 @@ export default function SoldeCaissePage() {
         {/* 1️⃣ RÉSUMÉ GLOBAL (Header) */}
         <div className="mb-4">
           <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-4 text-white shadow-2xl">
-            <div className="flex items-center justify-between mb-3">
-                <div>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div className="min-w-0">
                 <h1 className="text-2xl font-bold leading-tight">💰 Calcul du Solde de Caisse</h1>
                 <p className="text-sm text-slate-300">État financier en temps réel</p>
               </div>
-              <div className="text-right">
-                <div className={`text-3xl font-bold leading-tight ${soldeFinal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <div className="text-right min-w-0">
+                <div className={`${classeTailleMontant(soldeFinal, 'text-3xl')} font-bold leading-tight tabular-nums ${soldeFinal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {formatMontant(soldeFinal)}
                 </div>
                 <p className="text-slate-300 text-sm">Solde Final</p>
@@ -777,7 +777,7 @@ export default function SoldeCaissePage() {
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Total Paiements</p>
-                    <p className="text-xl font-bold leading-tight text-green-400">{formatMontant(totalPaiements)}</p>
+                    <p className={`${classeTailleMontant(totalPaiements)} font-bold leading-tight tabular-nums text-green-400`}>{formatMontant(totalPaiements)}</p>
                 </div>
                   <CreditCard className="h-6 w-6 text-green-400" />
                 </div>
@@ -788,7 +788,7 @@ export default function SoldeCaissePage() {
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Total Paiement Prévu</p>
-                    <p className="text-xl font-bold leading-tight text-yellow-400">{formatMontant(gainPrevu)}</p>
+                    <p className={`${classeTailleMontant(gainPrevu)} font-bold leading-tight tabular-nums text-yellow-400`}>{formatMontant(gainPrevu)}</p>
                 </div>
                   <DollarSign className="h-6 w-6 text-yellow-400" />
                 </div>
@@ -799,7 +799,7 @@ export default function SoldeCaissePage() {
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Total Dépenses</p>
-                    <p className="text-xl font-bold leading-tight text-red-400">{formatMontant(Math.abs(totalDepenses))}</p>
+                    <p className={`${classeTailleMontant(Math.abs(totalDepenses))} font-bold leading-tight tabular-nums text-red-400`}>{formatMontant(Math.abs(totalDepenses))}</p>
                 </div>
                   <FileText className="h-6 w-6 text-red-400" />
                 </div>
@@ -810,7 +810,7 @@ export default function SoldeCaissePage() {
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Solde Final Prévu</p>
-                    <p className="text-xl font-bold leading-tight text-blue-400">{formatMontant(soldeFinalPrevu)}</p>
+                    <p className={`${classeTailleMontant(soldeFinalPrevu)} font-bold leading-tight tabular-nums text-blue-400`}>{formatMontant(soldeFinalPrevu)}</p>
                 </div>
                   <TrendingUp className="h-6 w-6 text-blue-400" />
                 </div>

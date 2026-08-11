@@ -10,7 +10,7 @@ import { Plus, Search, Plane, Building, Receipt, Bell, Settings, Calendar, Users
 import Link from "next/link"
 import { api } from "@/lib/api"
 import { useAuth } from "@/hooks/useAuth"
-import { formatMontant, formatDateFr } from "@/lib/format"
+import { formatMontant, formatDateFr, classeTailleMontant } from "@/lib/format"
 
 // Types
 type Expense = {
@@ -338,8 +338,8 @@ export default function DepensesPage() {
             <CardContent className="relative p-3">
               <div className="flex items-center justify-between mb-1.5">
                 <Receipt className="h-6 w-6 text-white/90" />
-                <div className="text-right">
-                  <div className="text-xl font-bold leading-tight" title={formatMontant(totalDepenses)}>
+                <div className="text-right min-w-0">
+                  <div className={`${classeTailleMontant(totalDepenses)} font-bold leading-tight tabular-nums`} title={formatMontant(totalDepenses)}>
                     {formatMontant(totalDepenses)}
                   </div>
                   <div className="text-xs text-white/80">dépenses</div>
@@ -357,8 +357,8 @@ export default function DepensesPage() {
             <CardContent className="relative p-3">
               <div className="flex items-center justify-between mb-1.5">
                 <Plane className="h-6 w-6 text-white/90" />
-                <div className="text-right">
-                  <div className="text-xl font-bold leading-tight" title={formatMontant(depensesVol)}>
+                <div className="text-right min-w-0">
+                  <div className={`${classeTailleMontant(depensesVol)} font-bold leading-tight tabular-nums`} title={formatMontant(depensesVol)}>
                     {formatMontant(depensesVol)}
                   </div>
                   <div className="text-xs text-white/80">vol</div>
@@ -376,8 +376,8 @@ export default function DepensesPage() {
             <CardContent className="relative p-3">
               <div className="flex items-center justify-between mb-1.5">
                 <Building className="h-6 w-6 text-white/90" />
-                <div className="text-right">
-                  <div className="text-xl font-bold leading-tight" title={formatMontant(depensesHotelMadina)}>
+                <div className="text-right min-w-0">
+                  <div className={`${classeTailleMontant(depensesHotelMadina)} font-bold leading-tight tabular-nums`} title={formatMontant(depensesHotelMadina)}>
                     {formatMontant(depensesHotelMadina)}
                   </div>
                   <div className="text-xs text-white/80">Madina</div>
@@ -395,8 +395,8 @@ export default function DepensesPage() {
             <CardContent className="relative p-3">
               <div className="flex items-center justify-between mb-1.5">
                 <Building className="h-6 w-6 text-white/90" />
-                <div className="text-right">
-                  <div className="text-xl font-bold leading-tight" title={formatMontant(depensesHotelMakkah)}>
+                <div className="text-right min-w-0">
+                  <div className={`${classeTailleMontant(depensesHotelMakkah)} font-bold leading-tight tabular-nums`} title={formatMontant(depensesHotelMakkah)}>
                     {formatMontant(depensesHotelMakkah)}
                   </div>
                   <div className="text-xs text-white/80">Makkah</div>
@@ -414,8 +414,8 @@ export default function DepensesPage() {
             <CardContent className="relative p-3">
               <div className="flex items-center justify-between mb-1.5">
                 <Receipt className="h-6 w-6 text-white/90" />
-                <div className="text-right">
-                  <div className="text-xl font-bold leading-tight" title={formatMontant(depensesVisa)}>
+                <div className="text-right min-w-0">
+                  <div className={`${classeTailleMontant(depensesVisa)} font-bold leading-tight tabular-nums`} title={formatMontant(depensesVisa)}>
                     {formatMontant(depensesVisa)}
                   </div>
                   <div className="text-xs text-white/80">visa</div>
@@ -433,8 +433,8 @@ export default function DepensesPage() {
             <CardContent className="relative p-3">
               <div className="flex items-center justify-between mb-1.5">
                 <Receipt className="h-6 w-6 text-white/90" />
-                <div className="text-right">
-                  <div className="text-xl font-bold leading-tight" title={formatMontant(depensesAutre)}>
+                <div className="text-right min-w-0">
+                  <div className={`${classeTailleMontant(depensesAutre)} font-bold leading-tight tabular-nums`} title={formatMontant(depensesAutre)}>
                     {formatMontant(depensesAutre)}
                   </div>
                   <div className="text-xs text-white/80">autre</div>

@@ -6,6 +6,10 @@ const config: Config = {
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    // lib/ produit des classes utilitaires (classeTailleMontant dans
+    // lib/format.ts) : sans ce glob, le JIT ne les voit pas et ne les genere
+    // que si elles apparaissent par hasard ailleurs dans le projet.
+    "./lib/**/*.{js,ts,jsx,tsx,mdx}",
     "*.{js,ts,jsx,tsx,mdx}"
   ],
   theme: {

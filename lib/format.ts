@@ -16,6 +16,11 @@ const SEPARATEUR_MILLIERS = " "
 // n'existant pas dans ces contextes, l'espace insécable n'y apporte rien.
 const SEPARATEUR_MILLIERS_ASCII = " "
 const DEVISE = "DH"
+// Espace SÉCABLE avant la devise : les chiffres restent soudés entre eux, mais
+// "DH" peut passer à la ligne si la carte est trop étroite. Sans ce point de
+// coupure, un montant à 9 chiffres deborderait la carte et pousserait la grille
+// (scroll horizontal) au lieu de simplement prendre deux lignes.
+const SEPARATEUR_DEVISE = " "
 
 /** Convertit une valeur quelconque en nombre fini, 0 par défaut. */
 function toNombre(value: number | string | null | undefined): number {
@@ -65,7 +70,32 @@ export function formatMontantAscii(value: number | string | null | undefined): s
  * Ex. 1177639 -> "1 177 639 DH"
  */
 export function formatMontant(value: number | string | null | undefined): string {
-  return `${formatNombre(value)}${SEPARATEUR_MILLIERS}${DEVISE}`
+  return `${formatNombre(value)}${SEPARATEUR_DEVISE}${DEVISE}`
+}
+
+/**
+ * Classe Tailwind de taille de police adaptée à la longueur du montant, pour
+ * les cartes de statistiques à largeur fixe. Le montant reste TOUJOURS affiché
+ * en entier (jamais de "k") : c'est la police qui cède, pas le chiffre.
+ *
+ * @param base taille utilisée tant que le montant tient confortablement
+ */
+export function classeTailleMontant(
+  value: number | string | null | undefined,
+  base: "text-xl" | "text-2xl" | "text-3xl" = "text-xl"
+): string {
+  const longueur = formatNombre(value).length
+  const echelle = ["text-xs", "text-sm", "text-base", "text-lg", "text-xl", "text-2xl", "text-3xl"]
+  const depart = echelle.indexOf(base)
+
+  // 1 cran de moins a partir de 9 caracteres ("12 345 678"), 2 crans a partir
+  // de 12 ("123 456 789 012"), 3 au-dela.
+  let crans = 0
+  if (longueur >= 15) crans = 3
+  else if (longueur >= 12) crans = 2
+  else if (longueur >= 9) crans = 1
+
+  return echelle[Math.max(0, depart - crans)]
 }
 
 /**

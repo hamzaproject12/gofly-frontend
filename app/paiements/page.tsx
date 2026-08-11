@@ -22,7 +22,7 @@ import {
   X
 } from "lucide-react"
 import Link from "next/link"
-import { formatMontant, formatDateHeureFr } from "@/lib/format"
+import { formatMontant, formatDateHeureFr, classeTailleMontant } from "@/lib/format"
 
 type Payment = {
   id: number
@@ -296,70 +296,70 @@ export default function PaiementsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
           <Card className="border-none shadow-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white">
             <CardContent className="p-3">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
                   <p className="text-blue-100 text-sm font-medium">Total Paiements</p>
-                  <p className="text-xl font-bold leading-tight" title={formatMontant(totalPaiements)}>
+                  <p className={`${classeTailleMontant(totalPaiements)} font-bold leading-tight tabular-nums`} title={formatMontant(totalPaiements)}>
                     {formatMontant(totalPaiements)}
                   </p>
                 </div>
-                <DollarSign className="h-6 w-6 text-blue-200" />
+                <DollarSign className="h-6 w-6 text-blue-200" shrink-0 />
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-none shadow-lg bg-gradient-to-br from-green-500 to-green-600 text-white">
             <CardContent className="p-3">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
                   <p className="text-green-100 text-sm font-medium">Carte</p>
-                  <p className="text-xl font-bold leading-tight" title={formatMontant(paiementsParCarte)}>
+                  <p className={`${classeTailleMontant(paiementsParCarte)} font-bold leading-tight tabular-nums`} title={formatMontant(paiementsParCarte)}>
                     {formatMontant(paiementsParCarte)}
                   </p>
                 </div>
-                <CreditCard className="h-6 w-6 text-green-200" />
+                <CreditCard className="h-6 w-6 text-green-200" shrink-0 />
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-none shadow-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white">
             <CardContent className="p-3">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
                   <p className="text-purple-100 text-sm font-medium">Espèces</p>
-                  <p className="text-xl font-bold leading-tight" title={formatMontant(paiementsParEspeces)}>
+                  <p className={`${classeTailleMontant(paiementsParEspeces)} font-bold leading-tight tabular-nums`} title={formatMontant(paiementsParEspeces)}>
                     {formatMontant(paiementsParEspeces)}
                   </p>
                 </div>
-                <DollarSign className="h-6 w-6 text-purple-200" />
+                <DollarSign className="h-6 w-6 text-purple-200" shrink-0 />
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-none shadow-lg bg-gradient-to-br from-orange-500 to-orange-600 text-white">
             <CardContent className="p-3">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
                   <p className="text-orange-100 text-sm font-medium">Virement</p>
-                  <p className="text-xl font-bold leading-tight" title={formatMontant(paiementsParVirement)}>
+                  <p className={`${classeTailleMontant(paiementsParVirement)} font-bold leading-tight tabular-nums`} title={formatMontant(paiementsParVirement)}>
                     {formatMontant(paiementsParVirement)}
                   </p>
                 </div>
-                <FileText className="h-6 w-6 text-orange-200" />
+                <FileText className="h-6 w-6 text-orange-200" shrink-0 />
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-none shadow-lg bg-gradient-to-br from-red-500 to-red-600 text-white">
             <CardContent className="p-3">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
                   <p className="text-red-100 text-sm font-medium">Chèque</p>
-                  <p className="text-xl font-bold leading-tight" title={formatMontant(paiementsParCheque)}>
+                  <p className={`${classeTailleMontant(paiementsParCheque)} font-bold leading-tight tabular-nums`} title={formatMontant(paiementsParCheque)}>
                     {formatMontant(paiementsParCheque)}
                   </p>
                 </div>
-                <Receipt className="h-6 w-6 text-red-200" />
+                <Receipt className="h-6 w-6 text-red-200" shrink-0 />
               </div>
             </CardContent>
           </Card>

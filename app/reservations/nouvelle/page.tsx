@@ -2,6 +2,7 @@
 
 import { useState, useRef, useMemo, useEffect } from "react"
 import { api } from "@/lib/api"
+import { formatMontant } from "@/lib/format"
 import { notifyCreditsUpdated } from "@/app/components/CreditCounter"
 import { generatePaymentReceiptFile, downloadReceipt } from "@/lib/generateReceipt"
 import { BlockersTooltip } from "@/components/blockers-tooltip"
@@ -1085,9 +1086,7 @@ export default function NouvelleReservation() {
         if (canCapToRemaining && numericValue > allowedMax) {
           toast({
             title: "Montant dépasse le prix suggéré",
-            description: `Le total des paiements ne doit pas dépasser ${prixSuggere.toLocaleString(
-              "fr-FR"
-            )} DH.`,
+            description: `Le total des paiements ne doit pas dépasser ${formatMontant(prixSuggere)}.`,
             variant: "destructive",
           });
         }
@@ -1497,11 +1496,7 @@ export default function NouvelleReservation() {
     if (suggestedPrice > 0 && paidAmount > suggestedPrice) {
       toast({
         title: "Montant de paiements invalide",
-        description: `Le total des paiements (${paidAmount.toLocaleString(
-          "fr-FR"
-        )} DH) dépasse le prix suggéré (${suggestedPrice.toLocaleString(
-          "fr-FR"
-        )} DH).`,
+        description: `Le total des paiements (${formatMontant(paidAmount)}) dépasse le prix suggéré (${formatMontant(suggestedPrice)}).`,
         variant: "destructive",
       });
       setIsSubmitting(false);
@@ -1993,8 +1988,8 @@ export default function NouvelleReservation() {
                       <span className={`text-sm font-medium ${activeTheme.colors.text}`}>Prix:</span>
                       <span className={`text-lg font-bold ${activeTheme.colors.textActive}`}>
                         {formData.prix
-                          ? parseInt(formData.prix, 10).toLocaleString('fr-FR')
-                          : Math.round(calculatePrice).toLocaleString('fr-FR')} DH
+                          ? formatMontant(parseInt(formData.prix, 10))
+                          : formatMontant(calculatePrice)}
                       </span>
                     </div>
                   )}
@@ -3073,13 +3068,13 @@ export default function NouvelleReservation() {
                   <span className={`font-bold ${activeTheme.colors.textActive} text-lg`}>
                     {(() => {
                       if (prixMode === 'proposition' && prixPropose !== null && prixPropose >= calculatePrice) {
-                        return Math.max(0, Math.round(prixPropose)).toLocaleString('fr-FR');
+                        return formatMontant(Math.max(0, Math.round(prixPropose)));
                       } else if (prixMode === 'reduction') {
-                        return Math.max(0, Math.round(calculatePrice - reduction)).toLocaleString('fr-FR');
+                        return formatMontant(Math.max(0, Math.round(calculatePrice - reduction)));
                       } else {
-                        return Math.max(0, Math.round(calculatePrice)).toLocaleString('fr-FR');
+                        return formatMontant(Math.max(0, Math.round(calculatePrice)));
                       }
-                    })()} DH
+                    })()}
                   </span>
                   
                   {/* Toggle pour Réduction/Proposition */}

@@ -1,4 +1,5 @@
 import { siteConfig } from "@/lib/config";
+import { formatMontantAscii } from "@/lib/format";
 
 export interface PaymentReceiptData {
   /** Nom de famille du client */
@@ -336,8 +337,7 @@ export async function generatePaymentReceiptFile(data: PaymentReceiptData): Prom
       ctx.font = "bold 22px Arial";
       ctx.fillText(truncate(value || "—", colW), x, y + 28);
     };
-    const fmtDH = (n?: number) =>
-      n === undefined ? "" : `${(Number(n) || 0).toLocaleString("fr-FR")} DH`;
+    const fmtDH = (n?: number) => (n === undefined ? "" : formatMontantAscii(n));
 
     drawCell(col1X, cursorY + 92, "Type de chambre", roomTypeLabel(data.typeChambre));
     drawCell(col2X, cursorY + 92, "Genre", data.genre || "");
@@ -379,7 +379,7 @@ export async function generatePaymentReceiptFile(data: PaymentReceiptData): Prom
   ctx.textAlign = "right";
   ctx.fillStyle = "#c2410e";
   ctx.font = "bold 52px Arial";
-  ctx.fillText(`${montant.toLocaleString("fr-FR")} DH`, M + contentW - 40, cursorY + 82);
+  ctx.fillText(formatMontantAscii(montant), M + contentW - 40, cursorY + 82);
   ctx.textAlign = "left";
   cursorY += amtH + 46;
 

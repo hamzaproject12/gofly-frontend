@@ -10,6 +10,7 @@ import { Plus, Search, Plane, Building, Receipt, Bell, Settings, Calendar, Users
 import Link from "next/link"
 import { api } from "@/lib/api"
 import { useAuth } from "@/hooks/useAuth"
+import { formatMontant, formatDateFr } from "@/lib/format"
 
 // Types
 type Expense = {
@@ -45,22 +46,6 @@ type Stats = {
 
 const normalizeText = (value: string | null | undefined) =>
   (value || "").trim().toLowerCase()
-
-// Montants affichés sans décimales (arrondi à l'unité) — demande métier
-const formatMontant = (value: number | null | undefined) =>
-  Math.round(Number(value) || 0).toLocaleString()
-
-// Format compact pour les cartes de statistiques : 468 000 -> 468k
-// (les grands nombres débordaient et masquaient l'affichage)
-const formatMontantCourt = (value: number | null | undefined) => {
-  const montant = Math.round(Number(value) || 0)
-  const abs = Math.abs(montant)
-  if (abs < 1000) return montant.toLocaleString()
-  const milliers = (montant / 1000).toLocaleString(undefined, {
-    maximumFractionDigits: 1,
-  })
-  return `${milliers}k`
-}
 
 export default function DepensesPage() {
   // Hook pour gérer l'authentification
@@ -354,8 +339,8 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-1.5">
                 <Receipt className="h-6 w-6 text-white/90" />
                 <div className="text-right">
-                  <div className="text-xl font-bold leading-tight" title={`${formatMontant(totalDepenses)} DH`}>
-                    {formatMontantCourt(totalDepenses)} DH
+                  <div className="text-xl font-bold leading-tight" title={formatMontant(totalDepenses)}>
+                    {formatMontant(totalDepenses)}
                   </div>
                   <div className="text-xs text-white/80">dépenses</div>
                 </div>
@@ -373,8 +358,8 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-1.5">
                 <Plane className="h-6 w-6 text-white/90" />
                 <div className="text-right">
-                  <div className="text-xl font-bold leading-tight" title={`${formatMontant(depensesVol)} DH`}>
-                    {formatMontantCourt(depensesVol)} DH
+                  <div className="text-xl font-bold leading-tight" title={formatMontant(depensesVol)}>
+                    {formatMontant(depensesVol)}
                   </div>
                   <div className="text-xs text-white/80">vol</div>
                 </div>
@@ -392,8 +377,8 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-1.5">
                 <Building className="h-6 w-6 text-white/90" />
                 <div className="text-right">
-                  <div className="text-xl font-bold leading-tight" title={`${formatMontant(depensesHotelMadina)} DH`}>
-                    {formatMontantCourt(depensesHotelMadina)} DH
+                  <div className="text-xl font-bold leading-tight" title={formatMontant(depensesHotelMadina)}>
+                    {formatMontant(depensesHotelMadina)}
                   </div>
                   <div className="text-xs text-white/80">Madina</div>
                 </div>
@@ -411,8 +396,8 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-1.5">
                 <Building className="h-6 w-6 text-white/90" />
                 <div className="text-right">
-                  <div className="text-xl font-bold leading-tight" title={`${formatMontant(depensesHotelMakkah)} DH`}>
-                    {formatMontantCourt(depensesHotelMakkah)} DH
+                  <div className="text-xl font-bold leading-tight" title={formatMontant(depensesHotelMakkah)}>
+                    {formatMontant(depensesHotelMakkah)}
                   </div>
                   <div className="text-xs text-white/80">Makkah</div>
                 </div>
@@ -430,8 +415,8 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-1.5">
                 <Receipt className="h-6 w-6 text-white/90" />
                 <div className="text-right">
-                  <div className="text-xl font-bold leading-tight" title={`${formatMontant(depensesVisa)} DH`}>
-                    {formatMontantCourt(depensesVisa)} DH
+                  <div className="text-xl font-bold leading-tight" title={formatMontant(depensesVisa)}>
+                    {formatMontant(depensesVisa)}
                   </div>
                   <div className="text-xs text-white/80">visa</div>
                 </div>
@@ -449,8 +434,8 @@ export default function DepensesPage() {
               <div className="flex items-center justify-between mb-1.5">
                 <Receipt className="h-6 w-6 text-white/90" />
                 <div className="text-right">
-                  <div className="text-xl font-bold leading-tight" title={`${formatMontant(depensesAutre)} DH`}>
-                    {formatMontantCourt(depensesAutre)} DH
+                  <div className="text-xl font-bold leading-tight" title={formatMontant(depensesAutre)}>
+                    {formatMontant(depensesAutre)}
                   </div>
                   <div className="text-xs text-white/80">autre</div>
                 </div>
@@ -562,9 +547,7 @@ export default function DepensesPage() {
                             <div className="flex items-center gap-2 min-w-[140px]">
                               <Calendar className="h-5 w-5 text-blue-400" />
                               <span className="font-medium text-gray-700">
-                                {new Date(group.date).toLocaleDateString(
-                                  "fr-FR"
-                                )}
+                                {formatDateFr(group.date)}
                               </span>
                             </div>
 
@@ -588,7 +571,7 @@ export default function DepensesPage() {
                                 Total
                               </span>
                               <span className="font-bold text-xl text-blue-900">
-                                {formatMontant(displayTotal)} DH
+                                {formatMontant(displayTotal)}
                               </span>
                             </div>
 
@@ -620,8 +603,7 @@ export default function DepensesPage() {
                                   {type}:{" "}
                                   {formatMontant(
                                     group.sums[type as keyof typeof group.sums]
-                                  )}{" "}
-                                  DH
+                                  )}
                                 </Badge>
                               )
                             )}
@@ -650,9 +632,7 @@ export default function DepensesPage() {
                                           {depense.type}
                                         </span>
                                         <span className="text-xs text-gray-500">
-                                          {new Date(depense.date).toLocaleDateString(
-                                            "fr-FR"
-                                          )}
+                                          {formatDateFr(depense.date)}
                                         </span>
                                       </div>
                                       <div className="mt-1 text-gray-900 font-medium text-sm break-words">
@@ -661,7 +641,7 @@ export default function DepensesPage() {
                                     </div>
                                     <div className="text-right">
                                       <span className="font-bold text-blue-900">
-                                        {formatMontant(depense.montant)} DH
+                                        {formatMontant(depense.montant)}
                                       </span>
                                     </div>
                                   </div>

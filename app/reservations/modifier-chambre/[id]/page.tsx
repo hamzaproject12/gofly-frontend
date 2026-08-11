@@ -3,6 +3,7 @@
 import { useState, useRef, useMemo, useEffect } from "react"
 import { Loader2 } from "lucide-react"
 import { api } from "@/lib/api"
+import { formatMontant } from "@/lib/format"
 import { generatePaymentReceiptFile } from "@/lib/generateReceipt"
 import { BlockersTooltip } from "@/components/blockers-tooltip"
 import ProgramStatusBanner from "@/components/ProgramStatusBanner"
@@ -728,9 +729,7 @@ export default function EditReservation() {
     if (Number.isFinite(totalPrice) && totalPrice > 0 && totalPaiements > totalPrice) {
       toast({
         title: "Montant de paiements invalide",
-        description: `Le total des paiements (${totalPaiements.toLocaleString(
-          "fr-FR"
-        )} DH) dépasse le prix suggéré (${totalPrice.toLocaleString("fr-FR")} DH).`,
+        description: `Le total des paiements (${formatMontant(totalPaiements)}) dépasse le prix suggéré (${formatMontant(totalPrice)}).`,
         variant: "destructive",
       });
       return;
@@ -1390,9 +1389,7 @@ export default function EditReservation() {
           if (canCapToRemaining && numericValue > allowedMax) {
             toast({
               title: "Montant dépasse le prix suggéré",
-              description: `Le total des paiements ne doit pas dépasser ${totalPrice.toLocaleString(
-                "fr-FR"
-              )} DH.`,
+              description: `Le total des paiements ne doit pas dépasser ${formatMontant(totalPrice)}.`,
               variant: "destructive",
             });
           }
@@ -2170,11 +2167,7 @@ export default function EditReservation() {
                           </span>
                         </div>
                         <span className="text-lg font-bold text-white tabular-nums sm:ml-1">
-                          {totalPrice.toLocaleString("fr-FR", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}{" "}
-                          DH
+                          {formatMontant(totalPrice)}
                         </span>
                       </div>
                       <div
@@ -2204,11 +2197,7 @@ export default function EditReservation() {
                           </span>
                         </div>
                         <span className="text-lg font-bold tabular-nums text-white sm:ml-1">
-                          {remainingAmount.toLocaleString("fr-FR", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}{" "}
-                          DH
+                          {formatMontant(remainingAmount)}
                         </span>
                         {remainingAmount <= 0 && (
                           <span className="text-[10px] sm:text-xs font-medium text-green-100/90 sm:ml-2">

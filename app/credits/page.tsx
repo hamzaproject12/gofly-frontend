@@ -5,6 +5,7 @@ import Link from 'next/link';
 import RoleProtectedRoute from '../components/RoleProtectedRoute';
 import { api } from '@/lib/api';
 import { creditsConfig } from '@/lib/config';
+import { formatMontant, formatDateHeureFr } from '@/lib/format';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -47,15 +48,7 @@ const TYPE_BADGE_CLASSES: Record<LedgerEntry['type'], string> = {
   BONUS: 'bg-sky-100 text-sky-700 border-sky-200',
 };
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+const formatDate = formatDateHeureFr;
 
 function CreditsPageContent() {
   const { isSuperAdmin } = useAuth();
@@ -106,7 +99,7 @@ function CreditsPageContent() {
 
   const whatsappHref = (packLabel: string, credits: number) => {
     const prixDh = credits * creditsConfig.prixCreditDh;
-    const message = `Bonjour, je souhaite recharger mon compte GoFly avec le ${packLabel} (${credits} crédits, ${prixDh.toLocaleString('fr-FR')} DH). Merci.`;
+    const message = `Bonjour, je souhaite recharger mon compte GoFly avec le ${packLabel} (${credits} crédits, ${formatMontant(prixDh)}). Merci.`;
     return `https://wa.me/${creditsConfig.whatsappNumber}?text=${encodeURIComponent(message)}`;
   };
 
@@ -168,7 +161,7 @@ function CreditsPageContent() {
                   <p className="text-3xl font-bold text-blue-700 mt-1">{pack.credits}</p>
                   <p className="text-xs text-gray-500">crédits</p>
                   <p className="text-sm font-medium text-gray-700 mt-2">
-                    {(pack.credits * creditsConfig.prixCreditDh).toLocaleString('fr-FR')} DH
+                    {formatMontant(pack.credits * creditsConfig.prixCreditDh)}
                   </p>
                   <a
                     href={whatsappHref(pack.label, pack.credits)}

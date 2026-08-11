@@ -3,6 +3,7 @@
 import { useState, useRef, useMemo, useEffect } from "react"
 import { Loader2 } from "lucide-react"
 import { api } from "@/lib/api"
+import { formatMontant } from "@/lib/format"
 import { generatePaymentReceiptFile } from "@/lib/generateReceipt"
 import { BlockersTooltip } from "@/components/blockers-tooltip"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -1973,11 +1974,7 @@ export default function EditReservation() {
                           </span>
                         </div>
                         <span className="text-lg font-bold text-white tabular-nums sm:ml-1">
-                          {totalPrice.toLocaleString("fr-FR", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}{" "}
-                          DH
+                          {formatMontant(totalPrice)}
                         </span>
                       </div>
                       <div
@@ -2007,11 +2004,7 @@ export default function EditReservation() {
                           </span>
                         </div>
                         <span className="text-lg font-bold tabular-nums text-white sm:ml-1">
-                          {remainingAmount.toLocaleString("fr-FR", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}{" "}
-                          DH
+                          {formatMontant(remainingAmount)}
                         </span>
                         {remainingAmount <= 0 && (
                           <span className="text-[10px] sm:text-xs font-medium text-green-100/90 sm:ml-2">
@@ -2153,6 +2146,7 @@ export default function EditReservation() {
                         <Label className="text-blue-700 font-medium text-sm">Date de réservation *</Label>
                         <Input
                           type="date"
+                          lang="fr-FR"
                           value={formData.dateReservation}
                           onChange={(e) =>
                             setFormData({ ...formData, dateReservation: e.target.value })

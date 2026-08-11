@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { api } from "@/lib/api"
+import { formatMontant, formatNombreAscii, formatMontantAscii } from "@/lib/format"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -116,19 +117,12 @@ function hasRoomsWithoutPrice(hotel: { chambres: ChambresConfig }): boolean {
   return false
 }
 
-// Format manuel (pas de toLocaleString : ICU/navigateur insere un espace
-// insecable U+00A0 ou fine U+202F que la fonte Helvetica de jsPDF rend en "/").
-// Ici on garantit une espace ASCII normale (U+0020) comme separateur de milliers.
-const fmtNumFr = (n: number, decimals = 0): string => {
-  const safe = Number.isFinite(n) ? n : 0
-  const fixed = Math.abs(safe).toFixed(decimals)
-  const [intPart, decPart] = fixed.split(".")
-  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, " ")
-  const sign = safe < 0 ? "-" : ""
-  return sign + grouped + (decPart ? "," + decPart : "")
-}
+// Export PDF : espace ASCII obligatoire comme separateur de milliers, la fonte
+// Helvetica de jsPDF rendant U+00A0 / U+202F en "/". Le formatage a l'ecran
+// passe lui par formatMontant (espace insecable).
+const fmtNumFr = (n: number, decimals = 0): string => formatNombreAscii(n, decimals)
 
-const fmtDhFr = (n: number): string => `${fmtNumFr(Math.round(n))} DH`
+const fmtDhFr = (n: number): string => formatMontantAscii(n)
 
 async function loadImageAsDataUrl(
   url: string
@@ -2270,7 +2264,7 @@ export default function NouveauProgramme() {
                           <p className="text-xs text-violet-700">Total paiement prévu</p>
                           <p className="text-xl font-bold text-violet-950">
                             {canRunSimulation
-                              ? `${Math.round(simulationPreview.revenueAfterAgentsDh).toLocaleString("fr-FR")} DH`
+                              ? `${formatMontant(simulationPreview.revenueAfterAgentsDh)}`
                               : "—"}
                           </p>
                           <p className="text-[11px] text-violet-600 mt-1 leading-snug">
@@ -2281,7 +2275,7 @@ export default function NouveauProgramme() {
                           <p className="text-xs text-violet-700">Total charges</p>
                           <p className="text-xl font-bold text-violet-950">
                             {canRunSimulation
-                              ? `${Math.round(simulationPreview.totalChargesDh).toLocaleString("fr-FR")} DH`
+                              ? `${formatMontant(simulationPreview.totalChargesDh)}`
                               : "—"}
                           </p>
                           <p className="text-[11px] text-violet-600 mt-1 leading-snug">
@@ -2300,7 +2294,7 @@ export default function NouveauProgramme() {
                             }`}
                           >
                             {canRunSimulation
-                              ? `${Math.round(simulationPreview.resultatPrevDh).toLocaleString("fr-FR")} DH`
+                              ? `${formatMontant(simulationPreview.resultatPrevDh)}`
                               : "—"}
                           </p>
                           <p className="text-[11px] text-violet-600 mt-1 leading-snug">
@@ -2325,7 +2319,7 @@ export default function NouveauProgramme() {
                           <span>Réf. CA si capacité pleine et tous payants</span>
                           <span className="font-medium">
                             {canRunSimulation
-                              ? `${Math.round(simulationPreview.revenueIfAllPayDh).toLocaleString("fr-FR")} DH`
+                              ? `${formatMontant(simulationPreview.revenueIfAllPayDh)}`
                               : "—"}
                           </span>
                         </div>
@@ -2333,7 +2327,7 @@ export default function NouveauProgramme() {
                           <span>Coût agence vol (tous les voyageurs)</span>
                           <span className="font-medium">
                             {canRunSimulation
-                              ? `${Math.round(simulationPreview.costVolAllTravelersDh).toLocaleString("fr-FR")} DH`
+                              ? `${formatMontant(simulationPreview.costVolAllTravelersDh)}`
                               : "—"}
                           </span>
                         </div>
@@ -2341,7 +2335,7 @@ export default function NouveauProgramme() {
                           <span>Coût agence hôtel (tous les voyageurs)</span>
                           <span className="font-medium">
                             {canRunSimulation
-                              ? `${Math.round(simulationPreview.costHotelsAllTravelersDh).toLocaleString("fr-FR")} DH`
+                              ? `${formatMontant(simulationPreview.costHotelsAllTravelersDh)}`
                               : "—"}
                           </span>
                         </div>
@@ -2349,7 +2343,7 @@ export default function NouveauProgramme() {
                           <span>Coût agence visa (tous les voyageurs)</span>
                           <span className="font-medium">
                             {canRunSimulation
-                              ? `${Math.round(simulationPreview.costVisaAllTravelersDh).toLocaleString("fr-FR")} DH`
+                              ? `${formatMontant(simulationPreview.costVisaAllTravelersDh)}`
                               : "—"}
                           </span>
                         </div>
@@ -2357,7 +2351,7 @@ export default function NouveauProgramme() {
                           <span>Charges agents (saisies)</span>
                           <span className="font-medium">
                             {canRunSimulation
-                              ? `${Math.round(simulationPreview.agentChargesTotalDh).toLocaleString("fr-FR")} DH`
+                              ? `${formatMontant(simulationPreview.agentChargesTotalDh)}`
                               : "—"}
                           </span>
                         </div>
@@ -2365,7 +2359,7 @@ export default function NouveauProgramme() {
                           <span>Autres charges (saisies)</span>
                           <span className="font-medium">
                             {canRunSimulation
-                              ? `${Math.round(simulationPreview.autresChargesDh).toLocaleString("fr-FR")} DH`
+                              ? `${formatMontant(simulationPreview.autresChargesDh)}`
                               : "—"}
                           </span>
                         </div>
@@ -2373,7 +2367,7 @@ export default function NouveauProgramme() {
                           <span>Total charges</span>
                           <span>
                             {canRunSimulation
-                              ? `${Math.round(simulationPreview.totalChargesDh).toLocaleString("fr-FR")} DH`
+                              ? `${formatMontant(simulationPreview.totalChargesDh)}`
                               : "—"}
                           </span>
                         </div>
@@ -2408,8 +2402,8 @@ export default function NouveauProgramme() {
                               <tr key={row.typeKey} className="border-b border-violet-50">
                                 <td className="p-2">{row.label}</td>
                                 <td className="p-2">{row.places}</td>
-                                <td className="p-2">{row.unitDh.toLocaleString("fr-FR")}</td>
-                                <td className="p-2 font-medium">{Math.round(row.subtotalDh).toLocaleString("fr-FR")}</td>
+                                <td className="p-2">{formatMontant(row.unitDh)}</td>
+                                <td className="p-2 font-medium">{formatMontant(Math.round(row.subtotalDh))}</td>
                               </tr>
                             ))}
                           </tbody>

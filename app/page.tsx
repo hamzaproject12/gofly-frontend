@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { api } from '@/lib/api';
 import { siteConfig } from '@/lib/config';
+import { formatMontant, formatDateFr } from '@/lib/format';
 import { 
   Hotel, 
   Users, 
@@ -714,7 +715,7 @@ export default function HomePage() {
                         </h2>
                         <p className="text-xs text-gray-600 flex items-center gap-1">
                           <CalendarIcon className="h-3 w-3" />
-                          {new Date(program.created_at).toLocaleDateString('fr-FR')}
+                          {formatDateFr(program.created_at)}
                         </p>
                       </div>
                     </div>
@@ -728,10 +729,7 @@ export default function HomePage() {
                           <div>
                             <p className="text-xs text-yellow-800 font-medium">Restant</p>
                             <p className="text-sm font-bold text-yellow-900">
-                              {program.statistics.remainingAmount.toLocaleString('fr-FR', { 
-                                minimumFractionDigits: 0, 
-                                maximumFractionDigits: 0 
-                              })} DH
+                              {formatMontant(program.statistics.remainingAmount)}
                             </p>
                           </div>
                         </div>
@@ -930,7 +928,7 @@ export default function HomePage() {
                           </div>
                           <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-500">
                             <CalendarIcon className="h-3 w-3" />
-                            {new Date(program.created_at).toLocaleDateString('fr-FR')}
+                            {formatDateFr(program.created_at)}
                           </p>
                         </div>
                       </div>
@@ -972,11 +970,7 @@ export default function HomePage() {
                         <span className="text-xs text-gray-400 md:hidden">Solde restant :</span>
                         <div>
                           <p className="font-bold text-amber-600">
-                            {(program.statistics.remainingAmount ?? 0).toLocaleString('fr-FR', {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            })}{' '}
-                            DH
+                            {formatMontant(program.statistics.remainingAmount ?? 0)}
                           </p>
                           <p className="text-xs text-gray-500">solde restant</p>
                         </div>

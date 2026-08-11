@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { api } from "@/lib/api"
+import { formatNombre, formatMontant, formatMontantSigne, formatDateFr } from "@/lib/format"
 import RoleProtectedRoute from "../components/RoleProtectedRoute"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -287,21 +288,14 @@ const PROGRAM_STATUS_SUFFIX: Record<'CLOTURE' | 'ARCHIVE', string> = {
 
 // 🎯 API Balance optimisée - toutes les données viennent du backend
 
-// Fonction helper pour formater les nombres avec des points comme séparateurs de milliers
-const formatNumberWithDots = (num: number): string => {
-  return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-};
-
-const formatCurrency = (num: number) => `${formatNumberWithDots(num)} DH`
-const formatSignedCurrency = (num: number) =>
-  `${num >= 0 ? "+" : "-"}${formatNumberWithDots(Math.abs(num))} DH`
-const formatAxisTick = (value: number) => `${Math.round(value / 1000)}k`
-const formatDateLabel = (isoDate?: string) => {
-  if (!isoDate) return ""
-  const [y, m, d] = isoDate.split("-")
-  if (!y || !m || !d) return isoDate
-  return `${d}/${m}/${y}`
-}
+// Formatage centralisé (lib/format) : un montant s'affiche toujours en entier,
+// jamais abrégé, avec le même séparateur que sur les autres pages.
+const formatCurrency = formatMontant
+const formatSignedCurrency = formatMontantSigne
+// Graduations d'axe : nombre complet sans devise, pour ne pas répéter "DH"
+// sur chaque graduation.
+const formatAxisTick = (value: number) => formatNombre(value)
+const formatDateLabel = formatDateFr
 
 const timelineChartConfig: ChartConfig = {
   paiements: { label: "Paiements", color: "#16a34a" },
@@ -771,7 +765,7 @@ export default function SoldeCaissePage() {
               </div>
               <div className="text-right">
                 <div className={`text-3xl font-bold leading-tight ${soldeFinal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {formatNumberWithDots(soldeFinal)} DH
+                  {formatMontant(soldeFinal)}
                 </div>
                 <p className="text-slate-300 text-sm">Solde Final</p>
               </div>
@@ -783,7 +777,7 @@ export default function SoldeCaissePage() {
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Total Paiements</p>
-                    <p className="text-xl font-bold leading-tight text-green-400">{formatNumberWithDots(totalPaiements)} DH</p>
+                    <p className="text-xl font-bold leading-tight text-green-400">{formatMontant(totalPaiements)}</p>
                 </div>
                   <CreditCard className="h-6 w-6 text-green-400" />
                 </div>
@@ -794,7 +788,7 @@ export default function SoldeCaissePage() {
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Total Paiement Prévu</p>
-                    <p className="text-xl font-bold leading-tight text-yellow-400">{formatNumberWithDots(gainPrevu)} DH</p>
+                    <p className="text-xl font-bold leading-tight text-yellow-400">{formatMontant(gainPrevu)}</p>
                 </div>
                   <DollarSign className="h-6 w-6 text-yellow-400" />
                 </div>
@@ -805,7 +799,7 @@ export default function SoldeCaissePage() {
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Total Dépenses</p>
-                    <p className="text-xl font-bold leading-tight text-red-400">{formatNumberWithDots(Math.abs(totalDepenses))} DH</p>
+                    <p className="text-xl font-bold leading-tight text-red-400">{formatMontant(Math.abs(totalDepenses))}</p>
                 </div>
                   <FileText className="h-6 w-6 text-red-400" />
                 </div>
@@ -816,7 +810,7 @@ export default function SoldeCaissePage() {
               <div className="flex items-center justify-between">
                 <div>
                     <p className="text-slate-300 text-sm">Solde Final Prévu</p>
-                    <p className="text-xl font-bold leading-tight text-blue-400">{formatNumberWithDots(soldeFinalPrevu)} DH</p>
+                    <p className="text-xl font-bold leading-tight text-blue-400">{formatMontant(soldeFinalPrevu)}</p>
                 </div>
                   <TrendingUp className="h-6 w-6 text-blue-400" />
                 </div>
@@ -866,6 +860,7 @@ export default function SoldeCaissePage() {
                 <Input
                   id="dateDebut"
                   type="date"
+                  lang="fr-FR"
                   value={dateDebut}
                   max={dateFin || undefined}
                   onChange={(e) => setDateDebut(e.target.value)}
@@ -879,6 +874,7 @@ export default function SoldeCaissePage() {
                 <Input
                   id="dateFin"
                   type="date"
+                  lang="fr-FR"
                   value={dateFin}
                   min={dateDebut || undefined}
                   onChange={(e) => setDateFin(e.target.value)}
@@ -952,6 +948,7 @@ export default function SoldeCaissePage() {
                       <YAxis
                         tickLine={false}
                         axisLine={false}
+                        width={72}
                         tickFormatter={(value) => formatAxisTick(Number(value))}
                       />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
@@ -1063,7 +1060,7 @@ export default function SoldeCaissePage() {
                         }}
                         height={44}
                       />
-                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value))} />
+                      <YAxis tickLine={false} axisLine={false} width={72} tickFormatter={(value) => formatAxisTick(Number(value))} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
                       <ChartLegend content={<ChartLegendContent />} />
@@ -1109,7 +1106,7 @@ export default function SoldeCaissePage() {
                         }}
                         height={44}
                       />
-                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value))} />
+                      <YAxis tickLine={false} axisLine={false} width={72} tickFormatter={(value) => formatAxisTick(Number(value))} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
                       <ChartLegend content={<ChartLegendContent />} />
@@ -1165,7 +1162,7 @@ export default function SoldeCaissePage() {
                         }}
                         height={44}
                       />
-                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value))} />
+                      <YAxis tickLine={false} axisLine={false} width={72} tickFormatter={(value) => formatAxisTick(Number(value))} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip
                         cursor={false}
@@ -1220,7 +1217,7 @@ export default function SoldeCaissePage() {
                         }}
                         height={44}
                       />
-                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value))} />
+                      <YAxis tickLine={false} axisLine={false} width={72} tickFormatter={(value) => formatAxisTick(Number(value))} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip
                         cursor={false}
@@ -1282,7 +1279,7 @@ export default function SoldeCaissePage() {
                           )
                         }}
                       />
-                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value))} />
+                      <YAxis tickLine={false} axisLine={false} width={72} tickFormatter={(value) => formatAxisTick(Number(value))} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip
                         cursor={false}
@@ -1340,7 +1337,7 @@ export default function SoldeCaissePage() {
                           )
                         }}
                       />
-                      <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisTick(Number(value))} />
+                      <YAxis tickLine={false} axisLine={false} width={72} tickFormatter={(value) => formatAxisTick(Number(value))} />
                       <ReferenceLine y={0} stroke="#64748b" strokeDasharray="4 4" />
                       <ChartTooltip
                         cursor={false}
@@ -1407,8 +1404,8 @@ export default function SoldeCaissePage() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-green-600">{program.totalAmount.toLocaleString()} DH</p>
-                          <p className="text-sm text-gray-500">Moy: {program.avgAmount.toLocaleString()} DH</p>
+                          <p className="font-bold text-green-600">{formatMontant(program.totalAmount)}</p>
+                          <p className="text-sm text-gray-500">Moy: {formatMontant(program.avgAmount)}</p>
           </div>
         </div>
                     ))}
@@ -1450,8 +1447,8 @@ export default function SoldeCaissePage() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-green-600">{agent.totalAmount.toLocaleString()} DH</p>
-                          <p className="text-sm text-gray-500">Moy: {agent.avgAmount.toLocaleString()} DH</p>
+                          <p className="font-bold text-green-600">{formatMontant(agent.totalAmount)}</p>
+                          <p className="text-sm text-gray-500">Moy: {formatMontant(agent.avgAmount)}</p>
                         </div>
                       </div>
                       )
@@ -1484,7 +1481,7 @@ export default function SoldeCaissePage() {
                           <BarChart data={agentIndicativeData} margin={{ left: 8, right: 8, top: 8, bottom: 24 }}>
                             <CartesianGrid vertical={false} />
                             <XAxis dataKey="agentName" tickLine={false} axisLine={false} angle={-20} textAnchor="end" interval={0} height={52} />
-                            <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
+                            <YAxis tickLine={false} axisLine={false} width={72} tickFormatter={(value) => formatAxisTick(Number(value))} />
                             <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
                             <Bar dataKey="totalAmount" fill="var(--color-totalAmount)" radius={[4, 4, 0, 0]} />
                           </BarChart>

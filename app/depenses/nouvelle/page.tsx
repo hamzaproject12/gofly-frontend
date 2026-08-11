@@ -338,6 +338,7 @@ export default function NouvelleDepensePage() {
                   <Input
                     id="date"
                     type="date"
+                    lang="fr-FR"
                     required
                     value={formData.date}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}

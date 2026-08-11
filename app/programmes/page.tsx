@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { api } from "@/lib/api"
+import { formatMontant, formatDateFr } from "@/lib/format"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -788,7 +789,7 @@ export default function ProgrammesPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Revenus Total</p>
                 <p className="text-xl font-bold leading-tight text-green-600">
-                  {filteredProgrammes.reduce((sum, p) => sum + (p.totalRevenue || 0), 0).toLocaleString()} DH
+                  {formatMontant(filteredProgrammes.reduce((sum, p) => sum + (p.totalRevenue || 0), 0))}
                 </p>
               </div>
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-50">
@@ -876,7 +877,7 @@ export default function ProgrammesPage() {
                       </div>
                       <CardDescription className="flex items-center gap-1.5">
                         <Calendar className="h-3.5 w-3.5" />
-                        Créé le {new Date(programme.created_at).toLocaleDateString("fr-FR")}
+                        Créé le {formatDateFr(programme.created_at)}
                       </CardDescription>
                     </div>
                   </div>
@@ -896,7 +897,7 @@ export default function ProgrammesPage() {
                       <div>
                         <p className="text-xs font-medium text-yellow-800">Revenus</p>
                         <p className="text-sm font-bold tabular-nums text-yellow-900">
-                          {(programme.totalRevenue || 0).toLocaleString()} DH
+                          {formatMontant(programme.totalRevenue || 0)}
                         </p>
                       </div>
                     </div>
@@ -1037,7 +1038,7 @@ export default function ProgrammesPage() {
                               </Badge>
                               {programme.visaDeadline && (
                               <p className="text-xs text-gray-500 mt-1">
-                                  {new Date(programme.visaDeadline).toLocaleDateString("fr-FR")}
+                                  {formatDateFr(programme.visaDeadline)}
                               </p>
                               )}
                             </div>
@@ -1053,7 +1054,7 @@ export default function ProgrammesPage() {
                               </Badge>
                               {programme.hotelDeadline && (
                               <p className="text-xs text-gray-500 mt-1">
-                                  {new Date(programme.hotelDeadline).toLocaleDateString("fr-FR")}
+                                  {formatDateFr(programme.hotelDeadline)}
                               </p>
                               )}
                             </div>
@@ -1069,7 +1070,7 @@ export default function ProgrammesPage() {
                               </Badge>
                               {programme.flightDeadline && (
                               <p className="text-xs text-gray-500 mt-1">
-                                  {new Date(programme.flightDeadline).toLocaleDateString("fr-FR")}
+                                  {formatDateFr(programme.flightDeadline)}
                               </p>
                               )}
                             </div>
@@ -1132,7 +1133,7 @@ export default function ProgrammesPage() {
                             <div className="text-center p-2 bg-green-50 rounded-lg">
                               <p className="text-sm text-gray-500">Montant</p>
                               <p className="text-xl font-bold text-green-700">
-                                {(programme.totalRevenue || 0).toLocaleString()} DH
+                                {formatMontant(programme.totalRevenue || 0)}
                               </p>
                             </div>
                           </div>
@@ -1148,7 +1149,7 @@ export default function ProgrammesPage() {
                           <div className="bg-gradient-to-br from-white to-green-50/30 p-3 rounded-lg shadow-sm border border-green-100">
                             <h4 className="text-sm font-medium text-gray-500 mb-2">Revenus</h4>
                             <p className="text-xl font-bold leading-tight text-green-600">
-                              {(programme.totalRevenue || 0).toLocaleString()} DH
+                              {formatMontant(programme.totalRevenue || 0)}
                             </p>
                             <p className="text-xs text-gray-500">Total des paiements</p>
                           </div>
@@ -1156,7 +1157,7 @@ export default function ProgrammesPage() {
                           <div className="bg-gradient-to-br from-white to-red-50/30 p-3 rounded-lg shadow-sm border border-red-100">
                             <h4 className="text-sm font-medium text-gray-500 mb-2">Dépenses</h4>
                             <p className="text-xl font-bold leading-tight text-red-600">
-                              {(programme.totalExpenses || 0).toLocaleString()} DH
+                              {formatMontant(programme.totalExpenses || 0)}
                             </p>
                             <p className="text-xs text-gray-500">Total des coûts</p>
                           </div>
@@ -1164,7 +1165,7 @@ export default function ProgrammesPage() {
                           <div className="bg-gradient-to-br from-white to-blue-50/30 p-3 rounded-lg shadow-sm border border-blue-100">
                             <h4 className="text-sm font-medium text-gray-500 mb-2">Bénéfice</h4>
                             <p className="text-xl font-bold leading-tight text-blue-600">
-                              {(programme.netProfit || 0).toLocaleString()} DH
+                              {formatMontant(programme.netProfit || 0)}
                             </p>
                             <p className="text-xs text-gray-500">Revenus - Dépenses</p>
                           </div>
@@ -1199,7 +1200,7 @@ export default function ProgrammesPage() {
                                       }}
                                     ></div>
                                   </div>
-                                  <span className="text-sm font-medium">{depense.montant.toLocaleString()} DH</span>
+                                  <span className="text-sm font-medium">{formatMontant(depense.montant)}</span>
                                 </div>
                               </div>
                             ))}
@@ -1380,17 +1381,17 @@ export default function ProgrammesPage() {
                           <CardTitle className="text-xl text-yellow-800">{programme.name}</CardTitle>
                         </div>
                         <CardDescription className="mt-1">
-                          Créé le {new Date(programme.created_at).toLocaleDateString("fr-FR")}
+                          Créé le {formatDateFr(programme.created_at)}
                           {programme.deletedAt && (
                             <span className="ml-2 text-orange-700">
-                              - Supprimé le {new Date(programme.deletedAt).toLocaleDateString("fr-FR")}
+                              - Supprimé le {formatDateFr(programme.deletedAt)}
                             </span>
                           )}
                         </CardDescription>
                       </div>
                       <div className="text-right">
                         <div className="text-2xl font-bold text-yellow-700">
-                          {(programme.totalRevenue || 0).toLocaleString()} DH
+                          {formatMontant(programme.totalRevenue || 0)}
                         </div>
                         <p className="text-sm text-yellow-800">{programme.reservationsByRoom?.total?.occupied || 0} réservations</p>
                       </div>

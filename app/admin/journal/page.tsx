@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import RoleProtectedRoute from '../../components/RoleProtectedRoute';
 import { api } from '@/lib/api';
+import { formatMontant, formatDateHeureFr } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -180,8 +181,7 @@ export default function JournalSuppressionsPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
-  const formatMoney = (n: number) =>
-    n.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' DH';
+  const formatMoney = formatMontant;
 
   return (
     <RoleProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}>
@@ -210,6 +210,7 @@ export default function JournalSuppressionsPage() {
             <Input
               id="journal-day"
               type="date"
+              lang="fr-FR"
               value={filterDay}
               onChange={(e) => {
                 setFilterDay(e.target.value);
@@ -292,7 +293,7 @@ export default function JournalSuppressionsPage() {
                       {items.map((row) => (
                         <tr key={row.id} className="border-b border-gray-100 hover:bg-slate-50/80">
                           <td className="py-3 pr-4 whitespace-nowrap text-gray-800">
-                            {new Date(row.createdAt).toLocaleString('fr-FR')}
+                            {formatDateHeureFr(row.createdAt)}
                           </td>
                           <td className="py-3 pr-4">
                             <Badge variant="outline" className="font-normal">
@@ -473,7 +474,7 @@ export default function JournalSuppressionsPage() {
               <div className="space-y-3 overflow-hidden flex flex-col min-h-0">
                 <div className="flex flex-wrap gap-2 text-sm text-gray-600">
                   <Badge>{ACTION_LABELS[selected.action] || selected.action}</Badge>
-                  <span>{new Date(selected.createdAt).toLocaleString('fr-FR')}</span>
+                  <span>{formatDateHeureFr(selected.createdAt)}</span>
                 </div>
                 <div className="text-sm space-y-1">
                   <div>

@@ -22,6 +22,7 @@ import {
   X
 } from "lucide-react"
 import Link from "next/link"
+import { formatMontant, formatDateHeureFr } from "@/lib/format"
 
 type Payment = {
   id: number
@@ -52,21 +53,6 @@ type Payment = {
     }
     agent?: { id: number; nom: string } | null
   } | null
-}
-
-// Montants affichés sans décimales (arrondi à l'unité) — demande métier
-const formatMontant = (value: number | null | undefined) =>
-  Math.round(Number(value) || 0).toLocaleString("fr-FR")
-
-// Format compact pour les cartes de statistiques : à partir de 7 chiffres
-// (>= 1 000 000) le montant est affiché en milliers pour ne pas déborder.
-const formatMontantCourt = (value: number | null | undefined) => {
-  const montant = Math.round(Number(value) || 0)
-  if (Math.abs(montant) < 1_000_000) return montant.toLocaleString("fr-FR")
-  const milliers = (montant / 1000).toLocaleString("fr-FR", {
-    maximumFractionDigits: 1,
-  })
-  return `${milliers}k`
 }
 
 function paymentRowAgentLabel(p: Payment): string {
@@ -313,8 +299,8 @@ export default function PaiementsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-blue-100 text-sm font-medium">Total Paiements</p>
-                  <p className="text-xl font-bold leading-tight" title={`${formatMontant(totalPaiements)} DH`}>
-                    {formatMontantCourt(totalPaiements)} DH
+                  <p className="text-xl font-bold leading-tight" title={formatMontant(totalPaiements)}>
+                    {formatMontant(totalPaiements)}
                   </p>
                 </div>
                 <DollarSign className="h-6 w-6 text-blue-200" />
@@ -327,8 +313,8 @@ export default function PaiementsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-green-100 text-sm font-medium">Carte</p>
-                  <p className="text-xl font-bold leading-tight" title={`${formatMontant(paiementsParCarte)} DH`}>
-                    {formatMontantCourt(paiementsParCarte)} DH
+                  <p className="text-xl font-bold leading-tight" title={formatMontant(paiementsParCarte)}>
+                    {formatMontant(paiementsParCarte)}
                   </p>
                 </div>
                 <CreditCard className="h-6 w-6 text-green-200" />
@@ -341,8 +327,8 @@ export default function PaiementsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-purple-100 text-sm font-medium">Espèces</p>
-                  <p className="text-xl font-bold leading-tight" title={`${formatMontant(paiementsParEspeces)} DH`}>
-                    {formatMontantCourt(paiementsParEspeces)} DH
+                  <p className="text-xl font-bold leading-tight" title={formatMontant(paiementsParEspeces)}>
+                    {formatMontant(paiementsParEspeces)}
                   </p>
                 </div>
                 <DollarSign className="h-6 w-6 text-purple-200" />
@@ -355,8 +341,8 @@ export default function PaiementsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-orange-100 text-sm font-medium">Virement</p>
-                  <p className="text-xl font-bold leading-tight" title={`${formatMontant(paiementsParVirement)} DH`}>
-                    {formatMontantCourt(paiementsParVirement)} DH
+                  <p className="text-xl font-bold leading-tight" title={formatMontant(paiementsParVirement)}>
+                    {formatMontant(paiementsParVirement)}
                   </p>
                 </div>
                 <FileText className="h-6 w-6 text-orange-200" />
@@ -369,8 +355,8 @@ export default function PaiementsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-red-100 text-sm font-medium">Chèque</p>
-                  <p className="text-xl font-bold leading-tight" title={`${formatMontant(paiementsParCheque)} DH`}>
-                    {formatMontantCourt(paiementsParCheque)} DH
+                  <p className="text-xl font-bold leading-tight" title={formatMontant(paiementsParCheque)}>
+                    {formatMontant(paiementsParCheque)}
                   </p>
                 </div>
                 <Receipt className="h-6 w-6 text-red-200" />
@@ -478,13 +464,7 @@ export default function PaiementsPage() {
                   >
                     <span className="text-gray-500 whitespace-nowrap shrink-0 tabular-nums" title="Date du paiement">
                       <Calendar className="h-3.5 w-3.5 inline mr-1 -mt-0.5 opacity-70" />
-                      {new Date(paiement.paymentDate).toLocaleString("fr-FR", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatDateHeureFr(paiement.paymentDate)}
                     </span>
                     <span className="hidden sm:inline text-gray-300">|</span>
                     <span
@@ -510,7 +490,7 @@ export default function PaiementsPage() {
                       Agent: {paymentRowAgentLabel(paiement)}
                     </span>
                     <span className="font-semibold text-gray-900 whitespace-nowrap ml-auto sm:ml-0">
-                      {formatMontant(paiement.amount)} DH
+                      {formatMontant(paiement.amount)}
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0 w-full sm:w-auto sm:ml-auto justify-end">
                       {paiement.fichier && (

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import RoleProtectedRoute from '../components/RoleProtectedRoute';
 import { api } from '@/lib/api';
+import { formatMontant } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -328,8 +329,7 @@ export default function ChargesFixesPage() {
                       <TableCell className="font-medium">{row.label}</TableCell>
                       <TableCell>{CATEGORY_LABELS[row.category]}</TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {row.amount.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}{' '}
-                        MAD
+                        {formatMontant(row.amount)}
                       </TableCell>
                       <TableCell className="text-sm text-gray-600">
                         {row.agent?.nom ?? '—'}
@@ -403,7 +403,7 @@ export default function ChargesFixesPage() {
                       </TableCell>
                       <TableCell>{CATEGORY_LABELS[o.fixedCharge.category]}</TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {o.amount.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}
+                        {formatMontant(o.amount)}
                       </TableCell>
                       <TableCell className="text-sm text-blue-600">#{o.expense.id}</TableCell>
                     </TableRow>

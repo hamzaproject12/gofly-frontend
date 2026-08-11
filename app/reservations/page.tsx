@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { api } from "@/lib/api"
+import { formatMontant, formatDateFr } from "@/lib/format"
 import { notifyCreditsUpdated } from "@/app/components/CreditCounter"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -1053,9 +1054,9 @@ export default function ReservationsPage() {
                             const resteAPayer = reservation.prixEngage - reservation.paiementRecu;
                             if (resteAPayer > 0) {
                               return (
-                                <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-800 border border-orange-200 rounded px-2 py-0.5 text-lg font-bold">
-                                  <Wallet className="h-4 w-4" />
-                                  -{resteAPayer.toLocaleString()} DH
+                                <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-800 border border-orange-200 rounded px-2 py-0.5 text-base font-bold whitespace-nowrap">
+                                  <Wallet className="h-4 w-4 shrink-0" />
+                                  Reste : {formatMontant(resteAPayer)}
                                 </span>
                               );
                             }
@@ -1164,8 +1165,8 @@ export default function ReservationsPage() {
                               ></div>
                             </div>
                             <div className="flex justify-between items-center w-full">
-                              <span className="font-bold text-gray-800 text-base">{reservation.paiementRecu.toLocaleString()} DH</span>
-                              <span className="text-xs text-gray-500">/ {reservation.prixEngage.toLocaleString()} DH</span>
+                              <span className="font-bold text-gray-800 text-base">{formatMontant(reservation.paiementRecu)}</span>
+                              <span className="text-xs text-gray-500">/ {formatMontant(reservation.prixEngage)}</span>
                               <span className={`ml-2 text-xs font-semibold ${reservation.paiementRecu >= reservation.prixEngage ? 'text-green-600' : reservation.paiementRecu > 0 ? 'text-yellow-600' : 'text-red-600'}`}>{Math.round((reservation.paiementRecu / reservation.prixEngage) * 100)}%</span>
                             </div>
                           </div>

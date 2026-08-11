@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api"
+import { formatMontant } from "@/lib/format";
 import { notifyCreditsUpdated } from "@/app/components/CreditCounter";
 import { generatePaymentReceiptFile } from "@/lib/generateReceipt";
 import { BlockersTooltip } from "@/components/blockers-tooltip";
@@ -774,9 +775,7 @@ export default function NouvelleChambrePage() {
         if (canCapToRemaining && numericValue > allowedMax) {
           toast({
             title: "Montant dépasse le prix suggéré",
-            description: `Le total des paiements ne doit pas dépasser ${prixSuggere.toLocaleString(
-              "fr-FR"
-            )} DH.`,
+            description: `Le total des paiements ne doit pas dépasser ${formatMontant(prixSuggere)}.`,
             variant: "destructive",
           });
         }
@@ -1161,11 +1160,7 @@ export default function NouvelleChambrePage() {
     if (suggestedPrice > 0 && totalPayments > suggestedPrice) {
       toast({
         title: "Montant de paiements invalide",
-        description: `Le total des paiements (${totalPayments.toLocaleString(
-          "fr-FR"
-        )} DH) dépasse le prix suggéré (${suggestedPrice.toLocaleString(
-          "fr-FR"
-        )} DH).`,
+        description: `Le total des paiements (${formatMontant(totalPayments)}) dépasse le prix suggéré (${formatMontant(suggestedPrice)}).`,
         variant: "destructive",
       });
       return;
@@ -1501,9 +1496,8 @@ export default function NouvelleChambrePage() {
                     </span>
                     <span className="text-lg font-bold text-emerald-900">
                       {formData.prix
-                        ? parseInt(formData.prix, 10).toLocaleString("fr-FR")
-                        : calculatePrice.toLocaleString("fr-FR")}{" "}
-                      DH
+                        ? formatMontant(parseInt(formData.prix, 10))
+                        : formatMontant(calculatePrice)}
                     </span>
                   </div>
                 )}
@@ -2713,7 +2707,7 @@ export default function NouvelleChambrePage() {
                   <Wallet className="h-4 w-4 text-emerald-800" />
                   <span className="text-sm font-medium text-emerald-700">Total:</span>
                   <span className="font-bold text-emerald-900 text-lg">
-                    {(Number(formData.prix || 0) || 0).toLocaleString("fr-FR")} DH
+                    {formatMontant(Number(formData.prix || 0) || 0)}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-gray-300">

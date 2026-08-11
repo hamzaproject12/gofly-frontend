@@ -5,6 +5,7 @@ import RoleProtectedRoute from '../../components/RoleProtectedRoute';
 import { notifyCreditsUpdated } from '../../components/CreditCounter';
 import { api } from '@/lib/api';
 import { creditsConfig } from '@/lib/config';
+import { formatMontant } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -190,7 +191,7 @@ function RechargePageContent() {
                       onClick={() => selectPack(pack.label, pack.credits)}
                     >
                       {pack.label} ({pack.credits} crédits —{' '}
-                      {(pack.credits * creditsConfig.prixCreditDh).toLocaleString('fr-FR')} DH)
+                      {formatMontant(pack.credits * creditsConfig.prixCreditDh)})
                     </Button>
                   ))}
                 </div>

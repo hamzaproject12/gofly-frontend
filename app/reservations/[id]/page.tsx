@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { formatMontant } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -202,7 +203,7 @@ export default function ReservationDetails() {
                           </div>
                           <div className="md:col-span-3 space-y-2">
                             <span className="text-orange-700 font-medium text-sm">Montant (DH)</span>
-                            <div className="h-10 border-2 border-orange-200 rounded-lg flex items-center px-3 bg-white">{paiement.montant?.toLocaleString() || 0} DH</div>
+                            <div className="h-10 border-2 border-orange-200 rounded-lg flex items-center px-3 bg-white">{formatMontant(paiement.montant)}</div>
                           </div>
                           <div className="md:col-span-3 space-y-2">
                             <span className="text-orange-700 font-medium text-sm">Date</span>

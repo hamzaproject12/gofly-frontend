@@ -24,7 +24,7 @@ router.post('/agents', createAgent);
 // Update agent
 router.put('/agents/:id', updateAgent);
 
-// Delete agent (soft delete)
+// Delete agent (suppression définitive)
 router.delete('/agents/:id', deleteAgent);
 
 export default router;

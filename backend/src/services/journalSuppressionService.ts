@@ -16,6 +16,7 @@ export const JOURNAL_ACTION = {
   PROGRAM_REOPENED: 'PROGRAM_REOPENED',
   FIXED_CHARGE_DELETED: 'FIXED_CHARGE_DELETED',
   AGENT_DEACTIVATED: 'AGENT_DEACTIVATED',
+  AGENT_DELETED: 'AGENT_DELETED',
 } as const;
 
 export type JournalActionCode = (typeof JOURNAL_ACTION)[keyof typeof JOURNAL_ACTION];
@@ -593,5 +594,37 @@ export function buildAgentDeactivationDetail(
   let text = 'DÉSACTIVATION D\'UN AGENT\n\n';
   text += `Agent concerné : ${target.nom} (${target.role})\n`;
   text += `Désactivé par : ${actorLabel}\n`;
+  return { summary, detailText: text };
+}
+
+/**
+ * Suppression définitive d'un agent : le compte disparaît de la base, seules
+ * ces informations subsistent. Les dossiers/paiements/dépenses liés sont
+ * conservés mais perdent leur lien vers l'agent (champ « Agent » vidé).
+ */
+export function buildAgentDeletionDetail(
+  target: Agent,
+  actorLabel: string,
+  counts: {
+    reservationCount: number;
+    paymentCount: number;
+    expenseCount: number;
+    fixedChargeCount: number;
+    journalCount: number;
+  }
+): { summary: string; detailText: string } {
+  const summary = `Suppression définitive agent « ${target.nom} »`;
+  let text = 'SUPPRESSION DÉFINITIVE D\'UN AGENT\n\n';
+  text += `Agent concerné : ${target.nom} (${target.role})\n`;
+  text += `Email : ${target.email ?? 'non renseigné'}\n`;
+  text += `Compte actif avant suppression : ${target.isActive ? 'oui' : 'non'}\n`;
+  text += `Créé le : ${target.createdAt.toLocaleDateString('fr-FR')}\n`;
+  text += `Supprimé par : ${actorLabel}\n\n`;
+  text += 'Éléments conservés mais détachés de cet agent :\n';
+  text += `- Réservations : ${counts.reservationCount}\n`;
+  text += `- Paiements : ${counts.paymentCount}\n`;
+  text += `- Dépenses : ${counts.expenseCount}\n`;
+  text += `- Charges fixes : ${counts.fixedChargeCount}\n`;
+  text += `- Entrées de journal signées par cet agent : ${counts.journalCount} (le nom reste affiché)\n`;
   return { summary, detailText: text };
 }

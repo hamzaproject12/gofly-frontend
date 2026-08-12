@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import ConditionalLayout from './components/ConditionalLayout'
 import { UnsavedChangesProvider } from './components/UnsavedChangesProvider'
+import { Toaster } from '@/components/ui/toaster'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -31,6 +32,8 @@ export default function RootLayout({
           <ConditionalLayout>
             {children}
           </ConditionalLayout>
+          {/* Sans ce point de montage, tous les appels useToast() de l'app restaient invisibles */}
+          <Toaster />
         </UnsavedChangesProvider>
       </body>
     </html>

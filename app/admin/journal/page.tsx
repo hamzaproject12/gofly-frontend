@@ -119,6 +119,7 @@ const ACTION_LABELS: Record<string, string> = {
   PROGRAM_UPDATED: 'Programme / chambres modifiés',
   FIXED_CHARGE_DELETED: 'Charge fixe supprimée',
   AGENT_DEACTIVATED: 'Agent désactivé',
+  AGENT_DELETED: 'Utilisateur supprimé définitivement',
 };
 
 export default function JournalSuppressionsPage() {

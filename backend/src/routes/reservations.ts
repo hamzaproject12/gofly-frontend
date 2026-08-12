@@ -285,7 +285,7 @@ router.get('/', async (req, res) => {
 router.get('/stats', async (req, res) => {
   try {
     const { program, programId, roomType, dateFrom, dateTo, status } = req.query;
-    const DAYS_URGENCY_WINDOW = 18;
+    const DAYS_URGENCY_WINDOW = 7;
 
     // Construire les filtres pour les stats
     const where: any = {

@@ -198,7 +198,7 @@ export default function ReservationsPage() {
     search: ''
   });
   
-  const DAYS_URGENCY_WINDOW = 18;
+  const DAYS_URGENCY_WINDOW = 7;
 
   // Fonction pour mapper les types de chambre en nombre de personnes
   const mapRoomTypeToPersons = (roomType: string): string => {

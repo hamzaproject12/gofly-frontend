@@ -9,7 +9,7 @@ const router = Router();
 
 
 /** Aligné sur la page Gestion des Réservations (app/reservations/page.tsx) */
-const DAYS_URGENCY_WINDOW = 18;
+const DAYS_URGENCY_WINDOW = 7;
 
 type LeaderForUrgency = {
   status: string;

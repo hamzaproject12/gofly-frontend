@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { api } from '@/lib/api';
 import { siteConfig } from '@/lib/config';
 import { formatMontant, formatDateFr } from '@/lib/format';
+import { auMoins, type AgentRole } from '@/lib/roles';
 import { 
   Hotel, 
   Users, 
@@ -32,7 +33,7 @@ interface Agent {
   id: number;
   nom: string;
   email: string;
-  role: 'ADMIN' | 'AGENT';
+  role: AgentRole;
   isActive: boolean;
   createdAt: string;
 }
@@ -254,7 +255,7 @@ export default function HomePage() {
         // Filtrer et trier les programmes après avoir reçu l'agent
         if (roomResponse.ok) {
           const roomData = await roomResponse.json();
-          const isAdmin = profileData.agent?.role === 'ADMIN';
+          const isAdmin = auMoins(profileData.agent?.role, 'ADMIN');
           
           // Filtrer les programmes supprimés si pas admin
           let filteredPrograms = isAdmin 

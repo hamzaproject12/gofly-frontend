@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import {
-  requireAdminOrSuperAdmin,
+  requireGestionUtilisateurs,
   getAllAgents,
   createAgent,
   updateAgent,
@@ -10,10 +10,11 @@ import {
 
 const router = Router();
 
-// All routes require authentication first, then admin privileges
-// (SUPER_ADMIN = fournisseur : accès complet, invisible pour les ADMIN)
+// La gestion des comptes est réservée au GERANT (patron de l'agence) et au
+// SUPER_ADMIN (fournisseur). Un ADMIN pilote l'exploitation mais ne peut ni
+// créer un compte ni réinitialiser le mot de passe de qui que ce soit.
 router.use(authenticateToken);
-router.use(requireAdminOrSuperAdmin);
+router.use(requireGestionUtilisateurs);
 
 // Get all agents
 router.get('/agents', getAllAgents);

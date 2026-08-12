@@ -6,12 +6,13 @@ import { api } from "@/lib/api";
 import { siteConfig } from "@/lib/config";
 import { UNSAVED_LEAVE_PROMPT, useUnsavedChanges } from "./UnsavedChangesProvider";
 import CreditCounter from './CreditCounter';
+import { ROLE_LABELS, auMoins, type AgentRole } from '@/lib/roles';
 
 interface Agent {
   id: number;
   nom: string;
   email: string;
-  role: 'ADMIN' | 'AGENT' | 'SUPER_ADMIN';
+  role: AgentRole;
   isActive: boolean;
   createdAt: string;
 }
@@ -224,7 +225,7 @@ export default function AuthNav() {
                     </svg>
                     Nouvelle Chambre
                   </Link>
-                  {agent.role === 'ADMIN' && (
+                  {auMoins(agent.role, 'ADMIN') && (
                     <Link
                       href="/programmes/nouveau"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
@@ -291,7 +292,7 @@ export default function AuthNav() {
               {showFinancesMenu && (
                 <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 dropdown-menu">
                   {/* Admin only - Dépenses */}
-                  {agent.role === 'ADMIN' && (
+                  {auMoins(agent.role, 'ADMIN') && (
                     <Link
                       href="/depenses"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
@@ -303,7 +304,7 @@ export default function AuthNav() {
                       Dépenses
                     </Link>
                   )}
-                  {agent.role === 'ADMIN' && (
+                  {auMoins(agent.role, 'ADMIN') && (
                     <Link
                       href="/charges-fixes"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
@@ -326,7 +327,7 @@ export default function AuthNav() {
                     Paiements
                   </Link>
                   {/* Admin only - Solde Caisse */}
-                  {agent.role === 'ADMIN' && (
+                  {auMoins(agent.role, 'ADMIN') && (
                     <Link
                       href="/solde"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
@@ -343,7 +344,7 @@ export default function AuthNav() {
             </div>
 
             {/* Admin Dropdown - Admin only (le SUPER_ADMIN fournisseur y accède aussi) */}
-            {(agent.role === 'ADMIN' || agent.role === 'SUPER_ADMIN') && (
+            {auMoins(agent.role, 'ADMIN') && (
               <div className="relative dropdown-menu">
                 <button
                   onClick={() => {
@@ -364,16 +365,19 @@ export default function AuthNav() {
                 </button>
                 {showAdminMenu && (
                   <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 dropdown-menu">
-                    <Link
-                      href="/admin/utilisateurs"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                      onClick={() => setShowAdminMenu(false)}
-                    >
-                      <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                      </svg>
-                      Gestion Utilisateurs
-                    </Link>
+                    {/* Gestion des comptes : gérant et fournisseur uniquement */}
+                    {auMoins(agent.role, 'GERANT') && (
+                      <Link
+                        href="/admin/utilisateurs"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                        onClick={() => setShowAdminMenu(false)}
+                      >
+                        <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                        </svg>
+                        Gestion Utilisateurs
+                      </Link>
+                    )}
                     <Link
                       href="/admin/journal"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
@@ -415,7 +419,7 @@ export default function AuthNav() {
                   ? 'bg-red-100 text-red-700 border border-red-200'
                   : 'bg-blue-100 text-blue-700 border border-blue-200'
               }`}>
-                {agent.role === 'SUPER_ADMIN' ? 'SUPER ADMIN' : agent.role === 'ADMIN' ? 'Admin' : 'AGENT'}
+                {ROLE_LABELS[agent.role]}
               </div>
             </div>
 
@@ -442,9 +446,21 @@ export default function AuthNav() {
                     <div className="font-medium text-gray-900">{agent.nom}</div>
                     <div className="text-gray-500 text-xs">{agent.email}</div>
                     <div className="text-xs text-blue-600 font-medium mt-1">
-                      {agent.role === 'SUPER_ADMIN' ? 'Super administrateur' : agent.role === 'ADMIN' ? 'Administrateur' : 'Agent'}
+                      {ROLE_LABELS[agent.role]}
                     </div>
                   </div>
+                  {/* Chaque utilisateur change son propre mot de passe ici : le
+                      gérant n'a pas à être sollicité pour une rotation ordinaire. */}
+                  <Link
+                    href="/mon-compte"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    onClick={() => setShowProfile(false)}
+                  >
+                    <svg className="h-4 w-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    Mon compte
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -493,7 +509,7 @@ export default function AuthNav() {
               >
                 Nouvelle Chambre
               </Link>
-              {agent.role === 'ADMIN' && (
+              {auMoins(agent.role, 'ADMIN') && (
                 <Link
                   href="/programmes/nouveau"
                   className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
@@ -531,7 +547,7 @@ export default function AuthNav() {
                 Finances
               </div>
               {/* Admin only - Dépenses */}
-              {agent.role === 'ADMIN' && (
+              {auMoins(agent.role, 'ADMIN') && (
                 <Link
                   href="/depenses"
                   className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
@@ -540,7 +556,7 @@ export default function AuthNav() {
                   Dépenses
                 </Link>
               )}
-              {agent.role === 'ADMIN' && (
+              {auMoins(agent.role, 'ADMIN') && (
                 <Link
                   href="/charges-fixes"
                   className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
@@ -557,7 +573,7 @@ export default function AuthNav() {
                 Paiements
               </Link>
               {/* Admin only - Solde Caisse */}
-              {agent.role === 'ADMIN' && (
+              {auMoins(agent.role, 'ADMIN') && (
                 <Link
                   href="/solde"
                   className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
@@ -569,18 +585,20 @@ export default function AuthNav() {
             </div>
 
             {/* Admin Section - Admin only (le SUPER_ADMIN fournisseur y accède aussi) */}
-            {(agent.role === 'ADMIN' || agent.role === 'SUPER_ADMIN') && (
+            {auMoins(agent.role, 'ADMIN') && (
               <div className="border-t border-gray-200 pt-2">
                 <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Administration
                 </div>
-                <Link
-                  href="/admin/utilisateurs"
-                  className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
-                  onClick={() => setShowMobileMenu(false)}
-                >
-                  Gestion Utilisateurs
-                </Link>
+                {auMoins(agent.role, 'GERANT') && (
+                  <Link
+                    href="/admin/utilisateurs"
+                    className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"
+                    onClick={() => setShowMobileMenu(false)}
+                  >
+                    Gestion Utilisateurs
+                  </Link>
+                )}
                 <Link
                   href="/admin/journal"
                   className="text-gray-700 hover:text-gray-900 block px-6 py-2 rounded-md text-base font-medium"

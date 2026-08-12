@@ -185,7 +185,7 @@ export default function JournalSuppressionsPage() {
   const formatMoney = formatMontant;
 
   return (
-    <RoleProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}>
+    <RoleProtectedRoute minRole="ADMIN">
       <div
         className="min-h-screen bg-gradient-to-b from-slate-50 to-white pt-24 pb-16 px-4"
         data-skip-unsaved-dirty

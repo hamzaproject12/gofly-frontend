@@ -699,7 +699,7 @@ export default function SoldeCaissePage() {
 
   if (loading) {
     return (
-      <RoleProtectedRoute allowedRoles={['ADMIN']}>
+      <RoleProtectedRoute minRole="ADMIN">
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
@@ -712,7 +712,7 @@ export default function SoldeCaissePage() {
 
   if (error) {
     return (
-      <RoleProtectedRoute allowedRoles={['ADMIN']}>
+      <RoleProtectedRoute minRole="ADMIN">
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
           <Card className="max-w-md mx-auto">
             <CardHeader className="px-4 py-3">
@@ -734,7 +734,7 @@ export default function SoldeCaissePage() {
   }
 
   return (
-    <RoleProtectedRoute allowedRoles={['ADMIN']}>
+    <RoleProtectedRoute minRole="ADMIN">
       {/* Page d'analyse en lecture seule : ses filtres ne doivent pas
           déclencher l'alerte "modifications non enregistrées". */}
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100" data-skip-unsaved-dirty>

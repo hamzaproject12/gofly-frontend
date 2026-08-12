@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { api } from "@/lib/api";
+import type { AgentRole } from '@/lib/roles';
 
 interface Agent {
   id: number;
   nom: string;
   email: string;
-  role: 'ADMIN' | 'AGENT';
+  role: AgentRole;
   isActive: boolean;
   createdAt: string;
 }

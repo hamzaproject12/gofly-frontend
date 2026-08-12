@@ -3,26 +3,35 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from "@/lib/api";
+import { auMoins, type AgentRole } from '@/lib/roles';
 
 interface Agent {
   id: number;
   nom: string;
   email: string;
-  role: 'ADMIN' | 'AGENT' | 'SUPER_ADMIN';
+  role: AgentRole;
   isActive: boolean;
   createdAt: string;
 }
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles: ('ADMIN' | 'AGENT' | 'SUPER_ADMIN')[];
+  /**
+   * Rang minimal requis — à préférer à `allowedRoles` : les droits sont
+   * hiérarchiques, et une liste explicite s'oublie à chaque ajout de rôle
+   * (un gérant se retrouverait bloqué là où ses propres admins passent).
+   */
+  minRole?: AgentRole;
+  /** Liste fermée, pour les rares pages réservées à un rôle précis. */
+  allowedRoles?: AgentRole[];
   fallbackPath?: string;
 }
 
-export default function RoleProtectedRoute({ 
-  children, 
-  allowedRoles, 
-  fallbackPath = '/' 
+export default function RoleProtectedRoute({
+  children,
+  minRole,
+  allowedRoles,
+  fallbackPath = '/'
 }: RoleProtectedRouteProps) {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,7 +102,11 @@ export default function RoleProtectedRoute({
     );
   }
 
-  if (!allowedRoles.includes(agent.role)) {
+  const accesAutorise = minRole
+    ? auMoins(agent.role, minRole)
+    : (allowedRoles ?? []).includes(agent.role);
+
+  if (!accesAutorise) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">

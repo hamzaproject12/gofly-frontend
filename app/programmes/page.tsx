@@ -679,7 +679,7 @@ export default function ProgrammesPage() {
   }
 
   return (
-    <RoleProtectedRoute allowedRoles={['ADMIN']} fallbackPath="/reservations">
+    <RoleProtectedRoute minRole="ADMIN" fallbackPath="/reservations">
       <>
         <style jsx>{`
         @keyframes fadeInUp {

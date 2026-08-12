@@ -282,7 +282,7 @@ function CreditsPageContent() {
 
 export default function CreditsPage() {
   return (
-    <RoleProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}>
+    <RoleProtectedRoute minRole="ADMIN">
       <CreditsPageContent />
     </RoleProtectedRoute>
   );

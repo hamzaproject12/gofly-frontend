@@ -6,6 +6,14 @@ import { api } from "@/lib/api";
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { formatDateFr } from '@/lib/format';
+import {
+  ROLE_BADGE_CLASSES,
+  ROLE_DESCRIPTIONS,
+  ROLE_LABELS,
+  peutAgirSur,
+  rolesAttribuablesPar,
+  type AgentRole,
+} from '@/lib/roles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,8 +51,6 @@ import {
   Search,
 } from 'lucide-react';
 
-type AgentRole = 'ADMIN' | 'AGENT' | 'SUPER_ADMIN';
-
 interface Agent {
   id: number;
   nom: string;
@@ -55,19 +61,6 @@ interface Agent {
   updatedAt: string;
 }
 
-/** L'UI est en français : les codes de rôle de la base ne sont jamais affichés bruts. */
-const ROLE_LABELS: Record<AgentRole, string> = {
-  SUPER_ADMIN: 'Super admin',
-  ADMIN: 'Administrateur',
-  AGENT: 'Agent',
-};
-
-const ROLE_BADGE_CLASSES: Record<AgentRole, string> = {
-  SUPER_ADMIN: 'bg-amber-100 text-amber-800',
-  ADMIN: 'bg-purple-100 text-purple-800',
-  AGENT: 'bg-blue-100 text-blue-800',
-};
-
 /** Aligné sur la règle serveur (authController.MOT_DE_PASSE_MIN). */
 const MOT_DE_PASSE_MIN = 8;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -75,9 +68,12 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMPTY_FORM = { nom: '', email: '', motDePasse: '', role: 'AGENT' as AgentRole };
 
 export default function GestionUtilisateursPage() {
-  // Seul un SUPER_ADMIN connecté peut voir/assigner le rôle SUPER_ADMIN (fournisseur)
-  const { isSuperAdmin, user } = useAuth();
+  // Les rôles proposés et les actions possibles découlent du rang de l'appelant
+  // (voir lib/roles.ts). Le serveur applique la même règle, seule qui fasse foi.
+  const { user } = useAuth();
   const { toast } = useToast();
+  const monRole = user?.role;
+  const rolesAttribuables = useMemo(() => rolesAttribuablesPar(monRole), [monRole]);
 
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -341,24 +337,37 @@ export default function GestionUtilisateursPage() {
 
   const renderActions = (agent: Agent) => {
     const estSoiMeme = user?.agentId === agent.id;
+    // On n'agit que sur un rang strictement inférieur : deux gérants sont pairs.
+    const rangSuffisant = peutAgirSur(monRole, agent.role);
+    const motifRangInsuffisant = `${ROLE_LABELS[agent.role]} : compte de rang égal ou supérieur au vôtre, vous ne pouvez pas le modifier`;
 
     return (
       <div className="flex flex-wrap items-center gap-2">
         <Button
           onClick={() => startEdit(agent)}
+          disabled={!rangSuffisant}
+          title={
+            estSoiMeme
+              ? 'Passez par « Mon compte » pour modifier vos propres informations'
+              : rangSuffisant
+              ? 'Modifier ce compte'
+              : motifRangInsuffisant
+          }
           variant="outline"
           size="sm"
-          className="h-8 px-3 text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300 rounded-lg font-medium transition-all duration-200"
+          className="h-8 px-3 text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300 rounded-lg font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Edit className="h-3 w-3 mr-1" />
           Modifier
         </Button>
         <Button
           onClick={() => handleToggleActive(agent)}
-          disabled={submitting || estSoiMeme}
+          disabled={submitting || estSoiMeme || !rangSuffisant}
           title={
             estSoiMeme
               ? 'Vous ne pouvez pas désactiver votre propre compte'
+              : !rangSuffisant
+              ? motifRangInsuffisant
               : agent.isActive
               ? 'Bloquer la connexion en conservant l\'historique'
               : 'Rétablir la connexion'
@@ -385,10 +394,12 @@ export default function GestionUtilisateursPage() {
         </Button>
         <Button
           onClick={() => setAgentToDelete(agent)}
-          disabled={estSoiMeme}
+          disabled={estSoiMeme || !rangSuffisant}
           title={
             estSoiMeme
               ? 'Vous ne pouvez pas supprimer votre propre compte'
+              : !rangSuffisant
+              ? motifRangInsuffisant
               : 'Supprimer définitivement cet utilisateur'
           }
           variant="outline"
@@ -425,12 +436,15 @@ export default function GestionUtilisateursPage() {
   );
 
   return (
-    <RoleProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}>
+    <RoleProtectedRoute minRole="GERANT">
       <div className="min-h-screen bg-gray-50 py-4">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
           <div className="mb-4">
             <h1 className="text-2xl font-bold text-gray-900">Gestion des Utilisateurs</h1>
-            <p className="mt-1 text-sm text-gray-600">Gérez les comptes utilisateurs et leurs rôles</p>
+            <p className="mt-1 text-sm text-gray-600">
+              Réservée au gérant : les administrateurs pilotent l&apos;exploitation mais ne peuvent
+              ni créer un compte ni changer le mot de passe d&apos;un collègue.
+            </p>
           </div>
 
           {error && (
@@ -568,15 +582,16 @@ export default function GestionUtilisateursPage() {
                               <SelectValue placeholder="Choisir un rôle" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="AGENT">{ROLE_LABELS.AGENT}</SelectItem>
-                              <SelectItem value="ADMIN">{ROLE_LABELS.ADMIN}</SelectItem>
-                              {isSuperAdmin && (
-                                <SelectItem value="SUPER_ADMIN">
-                                  {ROLE_LABELS.SUPER_ADMIN} (fournisseur)
+                              {rolesAttribuables.map((role) => (
+                                <SelectItem key={role} value={role}>
+                                  {ROLE_LABELS[role]}
                                 </SelectItem>
-                              )}
+                              ))}
                             </SelectContent>
                           </Select>
+                          <p className="text-xs text-gray-500">
+                            {ROLE_DESCRIPTIONS[formData.role]}
+                          </p>
                         </div>
                       </div>
 
@@ -640,11 +655,11 @@ export default function GestionUtilisateursPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Tous les rôles</SelectItem>
-                      <SelectItem value="AGENT">{ROLE_LABELS.AGENT}</SelectItem>
-                      <SelectItem value="ADMIN">{ROLE_LABELS.ADMIN}</SelectItem>
-                      {isSuperAdmin && (
-                        <SelectItem value="SUPER_ADMIN">{ROLE_LABELS.SUPER_ADMIN}</SelectItem>
-                      )}
+                      {rolesAttribuables.map((role) => (
+                        <SelectItem key={role} value={role}>
+                          {ROLE_LABELS[role]}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

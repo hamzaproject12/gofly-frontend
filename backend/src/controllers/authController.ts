@@ -1,7 +1,15 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt, { SignOptions } from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Role } from '@prisma/client';
+import {
+  RANG_ROLE,
+  auMoins,
+  peutAgirSur,
+  peutAttribuerRole,
+  peutVoir,
+  rolesVisiblesPar,
+} from '../services/roleService';
 import {
   logJournalSuppression,
   buildAgentDeactivationDetail,
@@ -350,8 +358,19 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
     }
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ 
-        error: 'Mot de passe actuel et nouveau mot de passe requis' 
+      return res.status(400).json({
+        error: 'Mot de passe actuel et nouveau mot de passe requis'
+      });
+    }
+
+    const erreurMotDePasse = validerMotDePasse(String(newPassword));
+    if (erreurMotDePasse) {
+      return res.status(400).json({ error: erreurMotDePasse });
+    }
+
+    if (String(newPassword) === String(currentPassword)) {
+      return res.status(400).json({
+        error: 'Le nouveau mot de passe doit être différent de l\'actuel'
       });
     }
 
@@ -395,35 +414,14 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
 
 // ===== ADMIN FUNCTIONS =====
 
-// Middleware to check if user is admin
-export const requireAdmin = async (req: AuthRequest, res: Response, next: any) => {
-  try {
-    const agentId = req.user?.agentId;
-    
-    if (!agentId) {
-      return res.status(401).json({ error: 'Non authentifié' });
-    }
-
-    const agent = await prisma.agent.findUnique({
-      where: { id: agentId },
-      select: { role: true, isActive: true }
-    });
-
-    if (!agent || agent.role !== 'ADMIN' || !agent.isActive) {
-      return res.status(403).json({ error: 'Accès refusé. Droits administrateur requis.' });
-    }
-
-    next();
-  } catch (error) {
-    console.error('Admin check error:', error);
-    res.status(500).json({ error: 'Erreur de vérification des droits' });
-  }
-};
-
-// Middleware ADMIN ou SUPER_ADMIN (gestion des utilisateurs, journal).
-// Attache le rôle relu en base sur req.user.dbRole pour que les handlers
-// puissent distinguer un appelant SUPER_ADMIN d'un ADMIN.
-export const requireAdminOrSuperAdmin = async (req: AuthRequest, res: Response, next: any) => {
+/**
+ * Fabrique de middleware : exige un rôle d'au moins `minimum`, relu en base.
+ *
+ * Le rôle porté par le JWT ne suffit pas — il peut dater d'avant une
+ * rétrogradation ou une désactivation. Le rôle relu est attaché à
+ * `req.user.dbRole`, seule source de vérité pour les handlers.
+ */
+const requireRang = (minimum: Role) => async (req: AuthRequest, res: Response, next: any) => {
   try {
     const agentId = req.user?.agentId;
 
@@ -436,28 +434,42 @@ export const requireAdminOrSuperAdmin = async (req: AuthRequest, res: Response, 
       select: { role: true, isActive: true }
     });
 
-    if (!agent || !agent.isActive || (agent.role !== 'ADMIN' && agent.role !== 'SUPER_ADMIN')) {
-      return res.status(403).json({ error: 'Accès refusé. Droits administrateur requis.' });
+    if (!agent || !agent.isActive || !auMoins(agent.role, minimum)) {
+      return res.status(403).json({ error: 'Accès refusé. Droits insuffisants.' });
     }
 
     req.user.dbRole = agent.role;
     next();
   } catch (error) {
-    console.error('Admin check error:', error);
+    console.error('Role check error:', error);
     res.status(500).json({ error: 'Erreur de vérification des droits' });
   }
 };
 
-// Le rôle SUPER_ADMIN (fournisseur) est invisible pour les ADMIN de l'agence.
-const isCallerSuperAdmin = (req: Request): boolean =>
-  (req as AuthRequest).user?.dbRole === 'SUPER_ADMIN';
+/** Exploitation de l'agence : ADMIN, GERANT ou SUPER_ADMIN. */
+export const requireAdmin = requireRang('ADMIN');
+
+/** Alias historique de `requireAdmin` — même règle (rang ADMIN minimum). */
+export const requireAdminOrSuperAdmin = requireAdmin;
+
+/**
+ * Gestion des comptes : réservée au GERANT (patron) et au SUPER_ADMIN.
+ * Un ADMIN pilote l'exploitation mais ne touche jamais aux utilisateurs.
+ */
+export const requireGestionUtilisateurs = requireRang('GERANT');
+
+/** Rôle de l'appelant relu en base par `requireRang`. */
+const callerRole = (req: Request): Role =>
+  ((req as AuthRequest).user?.dbRole as Role) ?? 'AGENT';
+
 
 // Get all agents (Admin only)
 export const getAllAgents = async (req: AuthRequest, res: Response) => {
   try {
     const agents = await prisma.agent.findMany({
-      // Un ADMIN ne voit jamais les comptes SUPER_ADMIN (fournisseur)
-      where: isCallerSuperAdmin(req) ? undefined : { role: { not: 'SUPER_ADMIN' } },
+      // On ne voit que les comptes de rang inférieur ou égal au sien : le
+      // fournisseur (SUPER_ADMIN) reste invisible pour l'agence.
+      where: { role: { in: rolesVisiblesPar(callerRole(req)) } },
       select: {
         id: true,
         nom: true,
@@ -507,15 +519,15 @@ export const createAgent = async (req: Request, res: Response) => {
       return res.status(400).json({ error: erreurMotDePasse });
     }
 
-    // Seul un SUPER_ADMIN connecté peut créer un autre SUPER_ADMIN (fournisseur)
-    if (role === 'SUPER_ADMIN' && !isCallerSuperAdmin(req)) {
-      return res.status(403).json({
-        error: 'Rôle invalide : seuls ADMIN et AGENT sont autorisés'
-      });
+    if (!(role in RANG_ROLE)) {
+      return res.status(400).json({ error: 'Rôle invalide' });
     }
-    if (role !== 'ADMIN' && role !== 'AGENT' && role !== 'SUPER_ADMIN') {
-      return res.status(400).json({
-        error: 'Rôle invalide : seuls ADMIN et AGENT sont autorisés'
+
+    // On n'attribue qu'un rôle de rang inférieur ou égal au sien : un gérant
+    // peut nommer un autre gérant, jamais un super admin (fournisseur).
+    if (!peutAttribuerRole(callerRole(req), role as Role)) {
+      return res.status(403).json({
+        error: 'Vous ne pouvez pas attribuer un rôle supérieur au vôtre'
       });
     }
 
@@ -577,15 +589,14 @@ export const updateAgent = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Identifiant utilisateur invalide' });
     }
 
-    // Seul un SUPER_ADMIN connecté peut assigner le rôle SUPER_ADMIN (fournisseur)
-    if (role === 'SUPER_ADMIN' && !isCallerSuperAdmin(req)) {
-      return res.status(403).json({
-        error: 'Rôle invalide : seuls ADMIN et AGENT sont autorisés'
-      });
+    if (role !== undefined && !(role in RANG_ROLE)) {
+      return res.status(400).json({ error: 'Rôle invalide' });
     }
-    if (role !== undefined && role !== 'ADMIN' && role !== 'AGENT' && role !== 'SUPER_ADMIN') {
-      return res.status(400).json({
-        error: 'Rôle invalide : seuls ADMIN et AGENT sont autorisés'
+
+    // On n'attribue qu'un rôle de rang inférieur ou égal au sien
+    if (role !== undefined && !peutAttribuerRole(callerRole(req), role as Role)) {
+      return res.status(403).json({
+        error: 'Vous ne pouvez pas attribuer un rôle supérieur au vôtre'
       });
     }
 
@@ -598,16 +609,23 @@ export const updateAgent = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Agent non trouvé' });
     }
 
-    // Un compte SUPER_ADMIN est invisible et intouchable pour un ADMIN :
-    // réponse générique pour ne pas révéler son existence
-    if (existingAgent.role === 'SUPER_ADMIN' && !isCallerSuperAdmin(req)) {
+    // Un compte invisible reste introuvable : ne pas révéler son existence
+    if (!peutVoir(callerRole(req), existingAgent.role)) {
       return res.status(404).json({ error: 'Utilisateur introuvable' });
+    }
+
+    // On n'agit que sur un compte de rang strictement inférieur : deux gérants
+    // sont pairs et ne peuvent ni se modifier ni se réinitialiser le mot de passe.
+    if (!peutAgirSur(callerRole(req), existingAgent.role)) {
+      return res.status(403).json({
+        error: 'Vous ne pouvez pas modifier un compte de rang égal ou supérieur au vôtre'
+      });
     }
 
     const desactivation = isActive === false && existingAgent.isActive;
     const changementDeRole = role !== undefined && role !== existingAgent.role;
 
-    // On ne modifie ni son propre rôle ni son propre statut : sinon un admin
+    // On ne modifie ni son propre rôle ni son propre statut : sinon un compte
     // peut se retirer ses droits et perdre l'accès à l'administration.
     const callerId = (req as AuthRequest).user?.agentId;
     if (callerId === agentId && (desactivation || changementDeRole)) {
@@ -616,23 +634,23 @@ export const updateAgent = async (req: Request, res: Response) => {
       });
     }
 
-    // Le dernier administrateur actif ne peut être ni désactivé ni rétrogradé :
-    // l'agence se retrouverait sans aucun accès à l'administration.
-    const perteDesDroitsAdmin =
-      existingAgent.role === 'ADMIN' &&
+    // Le dernier gérant actif ne peut être ni désactivé ni rétrogradé : plus
+    // personne ne pourrait créer de compte ni réinitialiser un mot de passe.
+    const perteDuDernierGerant =
+      existingAgent.role === 'GERANT' &&
       existingAgent.isActive &&
-      (desactivation || (changementDeRole && role !== 'ADMIN' && role !== 'SUPER_ADMIN'));
+      (desactivation || (changementDeRole && !auMoins(role as Role, 'GERANT')));
 
-    if (perteDesDroitsAdmin) {
-      const adminCount = await prisma.agent.count({
-        where: { role: 'ADMIN', isActive: true }
+    if (perteDuDernierGerant) {
+      const gerantCount = await prisma.agent.count({
+        where: { role: 'GERANT', isActive: true }
       });
 
-      if (adminCount <= 1) {
+      if (gerantCount <= 1) {
         return res.status(400).json({
           error: desactivation
-            ? 'Impossible de désactiver le dernier administrateur actif'
-            : 'Impossible de retirer le rôle du dernier administrateur actif'
+            ? 'Impossible de désactiver le dernier gérant actif'
+            : 'Impossible de retirer le rôle du dernier gérant actif'
         });
       }
     }
@@ -759,24 +777,31 @@ export const deleteAgent = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Agent non trouvé' });
     }
 
-    // Un compte SUPER_ADMIN est invisible et intouchable pour un ADMIN :
-    // réponse générique pour ne pas révéler son existence
-    if (existingAgent.role === 'SUPER_ADMIN' && !isCallerSuperAdmin(req)) {
+    // Un compte invisible reste introuvable : ne pas révéler son existence
+    if (!peutVoir(callerRole(req), existingAgent.role)) {
       return res.status(404).json({ error: 'Utilisateur introuvable' });
     }
 
-    // Ne jamais supprimer le dernier administrateur actif (perte d'accès à l'agence)
-    if (existingAgent.role === 'ADMIN' && existingAgent.isActive) {
-      const adminCount = await prisma.agent.count({
+    // On ne supprime qu'un compte de rang strictement inférieur au sien
+    if (!peutAgirSur(callerRole(req), existingAgent.role)) {
+      return res.status(403).json({
+        error: 'Vous ne pouvez pas supprimer un compte de rang égal ou supérieur au vôtre'
+      });
+    }
+
+    // Ne jamais supprimer le dernier gérant actif : plus personne ne pourrait
+    // créer de compte ni réinitialiser un mot de passe.
+    if (existingAgent.role === 'GERANT' && existingAgent.isActive) {
+      const gerantCount = await prisma.agent.count({
         where: {
-          role: 'ADMIN',
+          role: 'GERANT',
           isActive: true
         }
       });
 
-      if (adminCount <= 1) {
+      if (gerantCount <= 1) {
         return res.status(400).json({
-          error: 'Impossible de supprimer le dernier administrateur actif'
+          error: 'Impossible de supprimer le dernier gérant actif'
         });
       }
     }

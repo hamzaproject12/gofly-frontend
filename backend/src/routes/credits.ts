@@ -59,7 +59,7 @@ router.get('/balance', async (_req, res) => {
 });
 
 // GET /api/credits/ledger — ADMIN et SUPER_ADMIN, paginé, plus récent en premier
-router.get('/ledger', requireRoles('ADMIN', 'SUPER_ADMIN'), async (req, res) => {
+router.get('/ledger', requireRoles('ADMIN', 'GERANT', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 25));

@@ -7,9 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// Hiérarchie : AGENT < ADMIN < GERANT < SUPER_ADMIN.
+/// Les règles associées sont centralisées dans src/services/roleService.ts.
 enum Role {
   ADMIN
   AGENT
+  GERANT
   SUPER_ADMIN
 }
 

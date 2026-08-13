@@ -3,6 +3,7 @@
 import { useState, useRef, useMemo, useEffect } from "react"
 import { api } from "@/lib/api"
 import { formatMontant } from "@/lib/format"
+import { estPrixValide, normaliserPrix, plafonnerReduction } from "@/lib/prix"
 import { notifyCreditsUpdated } from "@/app/components/CreditCounter"
 import { generatePaymentReceiptFile, downloadReceipt } from "@/lib/generateReceipt"
 import { BlockersTooltip } from "@/components/blockers-tooltip"
@@ -960,7 +961,8 @@ export default function NouvelleReservation() {
       formData.nom !== "" &&
       formData.prenom !== "" &&
       PHONE_REGEX.test((formData.telephone || "").trim()) &&
-      formData.prix !== "";
+      // 0 DH est un prix valide (accompagnateur non facturé / réduction totale).
+      estPrixValide(formData.prix);
 
     // Si le document passeport est joint, le n° de passeport devient obligatoire
     const passportNumberOk =
@@ -981,7 +983,7 @@ export default function NouvelleReservation() {
     if (!formData.prenom?.trim()) reasons.push("Le prénom n'est pas saisi");
     if (!formData.telephone?.trim()) reasons.push("Le téléphone n'est pas saisi");
     else if (!PHONE_REGEX.test(formData.telephone.trim())) reasons.push("Le téléphone n'est pas valide");
-    if (!formData.prix) reasons.push("Le prix n'est pas généré");
+    if (!estPrixValide(formData.prix)) reasons.push("Le prix n'est pas généré");
     if (documents.passport && !PASSPORT_REGEX.test((formData.passportNumber || "").trim())) {
       reasons.push("Le n° de passeport est invalide (2 lettres + 7 chiffres)");
     }
@@ -1003,7 +1005,7 @@ export default function NouvelleReservation() {
       formData.nom !== "" &&
       formData.prenom !== "" &&
       formData.telephone !== "" &&
-      formData.prix !== ""
+      estPrixValide(formData.prix)
     )
   }, [formData])
 
@@ -1353,7 +1355,7 @@ export default function NouvelleReservation() {
   // sont pas remplis, on ne peut ni ajouter de paiement ni générer de reçu.
   const getReservationBlockers = (): string[] => {
     const reasons: string[] = [];
-    if (!formData.prix) reasons.push("Le prix n'est pas généré");
+    if (!estPrixValide(formData.prix)) reasons.push("Le prix n'est pas généré");
     if (!formData.programme?.trim()) reasons.push("Le programme n'est pas sélectionné");
     if (!formData.typeChambre) reasons.push("Le type de chambre n'est pas sélectionné");
     if (!formData.gender) reasons.push("Le genre n'est pas sélectionné");
@@ -1547,7 +1549,8 @@ export default function NouvelleReservation() {
           gender: formData.gender,
           hotelMadina: hotelsMadina.find(h => h.id.toString() === formData.hotelMadina)?.name || formData.hotelMadina,
           hotelMakkah: hotelsMakkah.find(h => h.id.toString() === formData.hotelMakkah)?.name || formData.hotelMakkah,
-          price: parseInt(formData.prix, 10),
+          // 0 DH est un prix valide ; jamais NaN ni négatif (cf. lib/prix.ts).
+          price: normaliserPrix(formData.prix) ?? 0,
           reduction: reduction || 0,
           reservationDate: formData.dateReservation,
           status: reservationStatus,
@@ -3126,7 +3129,9 @@ export default function NouvelleReservation() {
                       value={reduction === 0 ? '' : reduction}
                       onChange={(e) => {
                         const value = e.target.value === '' ? 0 : parseInt(e.target.value) || 0;
-                        setReduction(Math.min(value, calculatePrice));
+                        // Bornée à [0, prix calculé] : au maximum le prix devient
+                        // 0 DH, jamais un prix négatif.
+                        setReduction(plafonnerReduction(value, calculatePrice));
                       }}
                       onFocus={(e) => {
                         if (e.target.value === '0') {
@@ -3142,9 +3147,14 @@ export default function NouvelleReservation() {
                       placeholder="0"
                     />
                     <span className="text-sm text-red-600 font-medium">DH</span>
+                    {calculatePrice > 0 && reduction >= calculatePrice && (
+                      <span className="text-xs font-semibold text-red-700">
+                        Réduction maximale atteinte — prix final 0 DH
+                      </span>
+                    )}
                   </div>
                 )}
-                
+
                 {/* Box de proposition - affiché seulement si mode proposition est activé */}
                 {prixMode === 'proposition' && (
                   <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-lg border border-green-200">

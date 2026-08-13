@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api"
 import { formatMontant } from "@/lib/format";
+import { estPrixValide, normaliserPrix, plafonnerReduction } from "@/lib/prix";
 import { notifyCreditsUpdated } from "@/app/components/CreditCounter";
 import { generatePaymentReceiptFile } from "@/lib/generateReceipt";
 import { BlockersTooltip } from "@/components/blockers-tooltip";
@@ -858,7 +859,7 @@ export default function NouvelleChambrePage() {
   const getReservationBlockers = (): string[] => {
     const leader = occupants[0];
     const reasons: string[] = [];
-    if (!formData.prix) reasons.push("Le prix n'est pas généré");
+    if (!estPrixValide(formData.prix)) reasons.push("Le prix n'est pas généré");
     if (!formData.programme?.trim()) reasons.push("Le programme n'est pas sélectionné");
     if (!formData.typeChambre) reasons.push("Le type de chambre n'est pas sélectionné");
     if (!leader?.lastName?.trim()) reasons.push("Le nom du chef de dossier n'est pas saisi");
@@ -1014,10 +1015,9 @@ export default function NouvelleChambrePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [programInfo, formData.typeChambre, formData.gender, familyMixed, autreActive, roomAutreIds]);
 
-  const prixGenere =
-    calculatePrice > 0 &&
-    String(formData.prix || "").trim() !== "" &&
-    Number(formData.prix) > 0;
+  // Un prix de 0 DH est VALIDE (accompagnateur non facturé, réduction égale au
+  // prix calculé) : seul un prix absent, illisible ou négatif bloque.
+  const prixGenere = estPrixValide(formData.prix);
 
   /** Obligatoire pour enregistrer : chef Nom/Prénom/téléphone + chaque accompagnant Nom/Prénom (passeports / fichiers optionnels) */
   const identitiesMinimumOk =
@@ -1174,9 +1174,10 @@ export default function NouvelleChambrePage() {
         supplierStatus.statutVisa &&
         supplierStatus.statutHotel &&
         supplierStatus.statutVol;
-      const roomPrice = Number(formData.prix) || 0;
+      const roomPrice = normaliserPrix(formData.prix) ?? 0;
       const roomPaid = Number(paidAmount || totalPayments || 0);
-      const isPaid = roomPrice > 0 && roomPaid >= roomPrice;
+      // Un dossier à 0 DH (accompagnateur non facturé) est soldé d'emblée.
+      const isPaid = roomPaid >= roomPrice;
       const reservationStatus = allDocsAttached && isPaid ? "Complet" : "Incomplet";
 
       // Snapshot des hôtels Autre actifs et sélectionnés : [{ hotelId, roomId, hotelName }]
@@ -1210,7 +1211,7 @@ export default function NouvelleChambrePage() {
             roomMakkahId: roomMakkahId ? Number(roomMakkahId) : null,
             roomAutreIds: autreSnapshot.map((e) => e.roomId),
             reservationDate: formData.dateReservation,
-            leaderPrice: Number(formData.prix),
+            leaderPrice: roomPrice,
             leaderPaidAmount: Number(paidAmount || totalPayments || 0),
             occupants: leaderOccupants,
             common: {
@@ -2754,12 +2755,19 @@ export default function NouvelleChambrePage() {
                       onChange={(e) => {
                         const value =
                           e.target.value === "" ? 0 : parseInt(e.target.value, 10) || 0;
-                        setReduction(Math.min(value, calculatePrice));
+                        // Bornée à [0, prix calculé] : au maximum le prix
+                        // devient 0 DH, jamais un prix négatif.
+                        setReduction(plafonnerReduction(value, calculatePrice));
                       }}
                       className="w-24 h-7 text-sm border border-red-300 focus:border-red-500 rounded text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       placeholder="0"
                     />
                     <span className="text-sm text-red-600 font-medium">DH</span>
+                    {calculatePrice > 0 && reduction >= calculatePrice && (
+                      <span className="text-xs font-semibold text-red-700">
+                        Réduction maximale atteinte — prix final 0 DH
+                      </span>
+                    )}
                   </div>
                 )}
                 {prixMode === "proposition" && (

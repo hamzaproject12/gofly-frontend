@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { api } from "@/lib/api"
 import { formatMontant, formatDateFr } from "@/lib/format"
+import { pourcentagePaye } from "@/lib/prix"
 import { notifyCreditsUpdated } from "@/app/components/CreditCounter"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -673,7 +674,8 @@ export default function ReservationsPage() {
   }
 
   const getPaiementStatus = (recu: number, engage: number) => {
-    const pourcentage = (recu / engage) * 100
+    // Un dossier à 0 DH (accompagnateur non facturé) est soldé : pas de division par zéro.
+    const pourcentage = pourcentagePaye(recu, engage)
 
     if (pourcentage >= 100) {
       return (
@@ -1016,15 +1018,54 @@ export default function ReservationsPage() {
                 if (reservation.statut === "Urgent" && reservation.urgentReason && reservation.urgentDate) {
                   urgentInfo = { date: reservation.urgentDate, label: reservation.urgentReason };
                 }
+                // L'étape qui DÉCLENCHE l'urgence, projetée sur les libellés de la
+                // rangée d'icônes ("Billet" y est affiché sous le libellé "Vol").
+                const etapeUrgente = urgentInfo
+                  ? (urgentInfo.label === "Billet" ? "Vol" : urgentInfo.label)
+                  : null;
+                const echeanceCourte = urgentInfo ? format(urgentInfo.date, "dd/MM") : "";
+                const echeanceLongue = urgentInfo ? format(urgentInfo.date, "dd/MM/yyyy") : "";
                 // Détermine la classe de fond selon le statut
                 const urgentBg = reservation.statut === "Urgent" ? "bg-red-50" : "";
+                // Zone paiement : un dossier à 0 DH (accompagnateur non facturé)
+                // est soldé — jamais de division par zéro ni de NaN affiché.
+                const prixEngage = Number(reservation.prixEngage) || 0;
+                const paiementRecu = Number(reservation.paiementRecu) || 0;
+                const resteAPayer = Math.max(0, prixEngage - paiementRecu);
+                const partPayee = pourcentagePaye(paiementRecu, prixEngage);
+                const paiementSolde = paiementRecu >= prixEngage;
+                const couleurPaiement = paiementSolde
+                  ? "text-green-600"
+                  : paiementRecu > 0
+                    ? "text-yellow-600"
+                    : "text-red-600";
+                const couleurBarre = paiementSolde
+                  ? "bg-green-500"
+                  : paiementRecu > 0
+                    ? "bg-yellow-400"
+                    : "bg-red-400";
+                // Rangée d'étapes : ordre inchangé (Passeport, Visa, Vol, Hôtel).
+                const etapes = [
+                  { label: "Passeport", ok: reservation.passeport },
+                  { label: "Visa", ok: reservation.visa },
+                  { label: "Vol", ok: reservation.billetAvion },
+                  { label: "Hôtel", ok: reservation.reservationHotel },
+                ];
                 return (
                   <div key={reservation.id} className="mx-2 mb-2">
                     <div className={`relative group transition-all duration-300 rounded-xl shadow border hover:scale-[1.01] hover:shadow-xl ${getRowColor(reservation)} ${urgentBg}`}>
-                      {/* Premier niveau : NOM, PROGRAMME, TYPE DE CHAMBRE, NUMERO, STATUT */}
-                      <div className="flex flex-col md:flex-row md:items-center gap-1.5 px-3 py-1.5 border-b border-blue-100">
-                        <div className="flex-1 flex flex-col md:flex-row md:items-center gap-2 min-w-[180px]">
-                          <span className="font-bold text-xl text-blue-900 tracking-tight uppercase">{reservation.nom} {reservation.prenom}</span>
+                      {/* Premier niveau : IDENTITÉ SEULE (nom, type, programme, personnes,
+                          téléphone) + badge de statut compact. Le reste à payer vit dans la
+                          zone paiement, la raison de l'urgence dans la rangée d'étapes : la
+                          ligne d'en-tête garde ainsi la même hauteur, urgente ou non. */}
+                      <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 px-3 py-1.5 border-b border-blue-100">
+                        <div className="flex-1 min-w-0 flex flex-wrap md:flex-nowrap items-center gap-2">
+                          <span
+                            className="font-bold text-xl text-blue-900 tracking-tight uppercase whitespace-nowrap truncate min-w-0 max-w-[18rem]"
+                            title={`${reservation.nom} ${reservation.prenom}`}
+                          >
+                            {reservation.nom} {reservation.prenom}
+                          </span>
                           {reservation.typeReservation === "CHAMBRE_PRIVEE" ? (
                             <span
                               className="inline-flex items-center gap-1.5 shrink-0 rounded-full border border-emerald-400/70 bg-gradient-to-r from-emerald-50 to-emerald-100/90 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-emerald-900 shadow-sm ring-1 ring-emerald-200/60"
@@ -1034,55 +1075,44 @@ export default function ReservationsPage() {
                               Chambre
                             </span>
                           ) : reservation.groupSize > 1 ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1">
+                            <span className="inline-flex items-center gap-1 shrink-0 whitespace-nowrap text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1">
                               Groupe: {reservation.groupSize} pers.
                             </span>
                           ) : null}
-                          <span className="inline-flex items-center gap-1 text-base font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5">
-                            <Calendar className="h-4 w-4 text-blue-400" /> {reservation.programme}
+                          <span
+                            className="inline-flex items-center gap-1 min-w-0 max-w-[14rem] text-base font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5"
+                            title={reservation.programme}
+                          >
+                            <Calendar className="h-4 w-4 shrink-0 text-blue-400" />
+                            <span className="whitespace-nowrap truncate">{reservation.programme}</span>
                           </span>
-                          <span className="inline-flex items-center gap-1 text-base font-semibold text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-2 py-0.5">
+                          <span className="inline-flex items-center gap-1 shrink-0 whitespace-nowrap text-base font-semibold text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-2 py-0.5">
                             <Users className="h-4 w-4 text-yellow-400" /> {mapRoomTypeToPersons(reservation.chambre)}
                           </span>
-                          <span className="inline-flex items-center gap-1 text-base font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded px-2 py-0.5">
+                          <span className="inline-flex items-center gap-1 shrink-0 whitespace-nowrap text-base font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded px-2 py-0.5">
                             <FileText className="h-4 w-4 text-purple-400" /> {reservation.telephone}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 ml-auto">
-                          {/* Afficher le reste à payer seulement si le statut n'est pas "Complet" */}
-                          {reservation.statut !== "Complet" && (() => {
-                            const resteAPayer = reservation.prixEngage - reservation.paiementRecu;
-                            if (resteAPayer > 0) {
-                              return (
-                                <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-800 border border-orange-200 rounded px-2 py-0.5 text-base font-bold whitespace-nowrap">
-                                  <Wallet className="h-4 w-4 shrink-0" />
-                                  Reste : {formatMontant(resteAPayer)}
-                                </span>
-                              );
-                            }
-                            return null;
-                          })()}
-                          
+                        {/* Badge de statut compact : une seule ligne dans les trois cas. */}
+                        <div className="flex items-center gap-2 ml-auto shrink-0">
                           {reservation.statut === "Complet" && (
-                            <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 border border-green-200 rounded px-3 py-0.5 text-lg font-bold">
-                              <CheckCircle className="h-5 w-5" /> Complet
+                            <span className="inline-flex items-center gap-1 whitespace-nowrap bg-green-100 text-green-800 border border-green-200 rounded px-2 py-0.5 text-sm font-bold">
+                              <CheckCircle className="h-4 w-4 shrink-0" /> Complet
                             </span>
                           )}
                           {reservation.statut === "Incomplet" && (
-                            <span className="inline-flex items-center gap-1 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded px-3 py-0.5 text-lg font-bold">
-                              <AlertCircle className="h-5 w-5" /> Incomplet
+                            <span className="inline-flex items-center gap-1 whitespace-nowrap bg-yellow-50 text-yellow-800 border border-yellow-200 rounded px-2 py-0.5 text-sm font-bold">
+                              <AlertCircle className="h-4 w-4 shrink-0" /> Incomplet
                             </span>
                           )}
                           {reservation.statut === "Urgent" && (
-                            <span className="inline-flex items-center gap-2 bg-red-100 text-red-800 border border-red-200 rounded px-3 py-0.5 text-lg font-bold">
-                              <AlertTriangle className="h-5 w-5 animate-bounce text-red-600" />
+                            <span
+                              className="inline-flex items-center gap-1 whitespace-nowrap bg-red-100 text-red-800 border border-red-200 rounded px-2 py-0.5 text-sm font-bold"
+                              title={urgentInfo ? `Urgent — ${urgentInfo.label} : échéance le ${echeanceLongue}` : "Urgent"}
+                            >
+                              <AlertTriangle className="h-4 w-4 shrink-0 animate-bounce text-red-600" />
                               Urgent
-                              {urgentInfo && (
-                                <span className="ml-2 text-xs font-semibold text-red-700 flex flex-col items-start">
-                                  <span>Échéance : {format(urgentInfo.date, 'dd/MM/yyyy')}</span>
-                                  <span>Raison : {urgentInfo.label}</span>
-                                </span>
-                              )}
+                              {urgentInfo && <span className="font-semibold">— {echeanceCourte}</span>}
                             </span>
                           )}
                         </div>
@@ -1109,50 +1139,35 @@ export default function ReservationsPage() {
                               </div>
                             </div>
                           </div>
-                          {/* Colonne 2 : Statuts documents */}
+                          {/* Colonne 2 : Statuts documents. L'étape qui déclenche l'urgence
+                              est cerclée de rouge et porte sa date d'échéance : c'est ici que
+                              se lit désormais la raison de l'urgence. La ligne de date est
+                              toujours réservée, pour que toutes les cartes aient la même hauteur. */}
                           <div className="flex flex-col items-center justify-center h-full px-1">
                             <div className="grid grid-cols-4 gap-0 w-full justify-items-center">
-                              <div className="flex flex-col items-center">
-                                <span className="text-xs text-gray-700 font-semibold mb-0.5">Passeport</span>
-                                <span title="Passeport">
-                                  {reservation.passeport ? (
-                                    <CheckCircle className="w-5 h-5 text-green-600 hover:scale-110 hover:shadow-lg transition-all duration-200" />
-                                  ) : (
-                                    <AlertCircle className="w-5 h-5 text-red-500 hover:scale-110 hover:shadow-lg transition-all duration-200" />
-                                  )}
-                                </span>
-                              </div>
-                              <div className="flex flex-col items-center">
-                                <span className="text-xs text-gray-700 font-semibold mb-0.5">Visa</span>
-                                <span title="Visa">
-                                  {reservation.visa ? (
-                                    <CheckCircle className="w-5 h-5 text-green-600 hover:scale-110 hover:shadow-lg transition-all duration-200" />
-                                  ) : (
-                                    <AlertCircle className="w-5 h-5 text-red-500 hover:scale-110 hover:shadow-lg transition-all duration-200" />
-                                  )}
-                                </span>
-                              </div>
-                              <div className="flex flex-col items-center">
-                                <span className="text-xs text-gray-700 font-semibold mb-0.5">Vol</span>
-                                <span title="Vol">
-                                  {reservation.billetAvion ? (
-                                    <CheckCircle className="w-5 h-5 text-green-600 hover:scale-110 hover:shadow-lg transition-all duration-200" />
-                                  ) : (
-                                    <AlertCircle className="w-5 h-5 text-red-500 hover:scale-110 hover:shadow-lg transition-all duration-200" />
-                                  )}
-                                </span>
-                              </div>
-                              <div className="flex flex-col items-center">
-                                <span className="text-xs text-gray-700 font-semibold mb-0.5">Hôtel</span>
-                                <span title="Hôtel">
-                                  {reservation.reservationHotel ? (
-                                    <CheckCircle className="w-5 h-5 text-green-600 hover:scale-110 hover:shadow-lg transition-all duration-200" />
-                                  ) : (
-                                    <AlertCircle className="w-5 h-5 text-red-500 hover:scale-110 hover:shadow-lg transition-all duration-200" />
-                                  )}
-                                </span>
-                              </div>
-                              
+                              {etapes.map((etape) => {
+                                const declencheUrgence = etape.label === etapeUrgente;
+                                return (
+                                  <div key={etape.label} className="flex flex-col items-center">
+                                    <span className={`text-xs font-semibold mb-0.5 ${declencheUrgence ? "text-red-700" : "text-gray-700"}`}>
+                                      {etape.label}
+                                    </span>
+                                    <span
+                                      title={declencheUrgence ? `${etape.label} — échéance le ${echeanceLongue}` : etape.label}
+                                      className={`inline-flex rounded-full p-0.5 ${declencheUrgence ? "bg-red-100 ring-2 ring-red-500" : ""}`}
+                                    >
+                                      {etape.ok ? (
+                                        <CheckCircle className="w-5 h-5 text-green-600 hover:scale-110 hover:shadow-lg transition-all duration-200" />
+                                      ) : (
+                                        <AlertCircle className="w-5 h-5 text-red-500 hover:scale-110 hover:shadow-lg transition-all duration-200" />
+                                      )}
+                                    </span>
+                                    <span className={`h-3.5 mt-0.5 text-[10px] leading-[0.875rem] font-bold whitespace-nowrap ${declencheUrgence ? "text-red-700" : "text-transparent"}`}>
+                                      {declencheUrgence ? echeanceCourte : " "}
+                                    </span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                           {/* Colonne 3 : Paiement */}
@@ -1160,14 +1175,22 @@ export default function ReservationsPage() {
                             <div className="text-xs text-green-700 font-semibold">Paiement</div>
                             <div className="w-full bg-gray-200 rounded-full h-2 my-1">
                               <div
-                                className={`h-2 rounded-full ${reservation.paiementRecu >= reservation.prixEngage ? 'bg-green-500' : reservation.paiementRecu > 0 ? 'bg-yellow-400' : 'bg-red-400'}`}
-                                style={{ width: `${Math.min(100, (reservation.paiementRecu / reservation.prixEngage) * 100)}%` }}
+                                className={`h-2 rounded-full ${couleurBarre}`}
+                                style={{ width: `${partPayee}%` }}
                               ></div>
                             </div>
-                            <div className="flex justify-between items-center w-full">
-                              <span className="font-bold text-gray-800 text-base">{formatMontant(reservation.paiementRecu)}</span>
-                              <span className="text-xs text-gray-500">/ {formatMontant(reservation.prixEngage)}</span>
-                              <span className={`ml-2 text-xs font-semibold ${reservation.paiementRecu >= reservation.prixEngage ? 'text-green-600' : reservation.paiementRecu > 0 ? 'text-yellow-600' : 'text-red-600'}`}>{Math.round((reservation.paiementRecu / reservation.prixEngage) * 100)}%</span>
+                            {/* Montants + reste à payer : le reste est une donnée de paiement,
+                                il ne remonte plus dans la ligne d'identité. */}
+                            <div className="flex flex-wrap justify-between items-center gap-x-2 w-full">
+                              <span className="font-bold text-gray-800 text-base whitespace-nowrap">{formatMontant(paiementRecu)}</span>
+                              <span className="text-xs text-gray-500 whitespace-nowrap">/ {formatMontant(prixEngage)}</span>
+                              <span className={`text-xs font-semibold ${couleurPaiement}`}>{partPayee}%</span>
+                              {resteAPayer > 0 && (
+                                <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-bold text-orange-800">
+                                  <Wallet className="h-3.5 w-3.5 shrink-0" />
+                                  Reste : {formatMontant(resteAPayer)}
+                                </span>
+                              )}
                             </div>
                           </div>
                           {/* Colonne 4 : Actions (boutons) */}

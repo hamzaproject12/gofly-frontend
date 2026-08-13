@@ -4,6 +4,7 @@ import { useState, useRef, useMemo, useEffect } from "react"
 import { Loader2 } from "lucide-react"
 import { api } from "@/lib/api"
 import { formatMontant } from "@/lib/format"
+import { estPrixValide } from "@/lib/prix"
 import { generatePaymentReceiptFile } from "@/lib/generateReceipt"
 import { BlockersTooltip } from "@/components/blockers-tooltip"
 import ProgramStatusBanner from "@/components/ProgramStatusBanner"
@@ -1526,7 +1527,7 @@ export default function EditReservation() {
   // sont pas remplis, on ne peut ni ajouter de paiement ni générer de reçu.
   const getReservationBlockers = (): string[] => {
     const reasons: string[] = [];
-    if (!formData.prix) reasons.push("Le prix n'est pas généré");
+    if (!estPrixValide(formData.prix)) reasons.push("Le prix n'est pas généré");
     if (!formData.programme?.trim()) reasons.push("Le programme n'est pas sélectionné");
     if (!formData.typeChambre) reasons.push("Le type de chambre n'est pas sélectionné");
     if (!formData.gender) reasons.push("Le genre n'est pas sélectionné");
@@ -1671,7 +1672,7 @@ export default function EditReservation() {
     // Le formulaire est valide si :
     // 1. Les paiements sont valides (ou il n'y a pas de paiements)
     // 2. ET (il y a des changements OU le formulaire de base est valide)
-    const baseFormValid = formData.prix && formData.programId && formData.typeChambre && formData.gender;
+    const baseFormValid = estPrixValide(formData.prix) && formData.programId && formData.typeChambre && formData.gender;
     // Si le document passeport est joint (nouveau ou existant), le n° devient obligatoire
     const hasPassportDoc = !!documents.passport || !!getDocumentUrl("passport");
     const passportNumberOk =

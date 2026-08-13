@@ -50,6 +50,23 @@ function applyRoomTypeQuery(where: Record<string, unknown>, roomType: unknown) {
   }
 }
 
+/**
+ * Prix de réservation normalisé, ou null si la valeur n'est pas exploitable.
+ *
+ * Règle métier : **0 DH est un prix VALIDE** (accompagnateur/encadrant qui
+ * voyage avec le groupe sans être facturé, ou réduction égale au prix calculé).
+ * Seuls un prix absent, non numérique ou strictement négatif sont refusés — ne
+ * jamais réintroduire de test « falsy » (`if (!price)`) ici.
+ */
+function normalizePrice(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const n = typeof value === 'number' ? value : Number(String(value).trim());
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n);
+}
+
+const PRIX_INVALIDE_MESSAGE = 'Prix invalide : le prix doit être un nombre positif ou nul (0 DH est autorisé).';
+
 // Fonction helper pour calculer le nombre de places selon le type de chambre
 function getPlacesByRoomType(roomType: string): number {
   // Chaque réservation décrémente de 1 place
@@ -444,6 +461,11 @@ router.post('/group', async (req, res) => {
     if (!roomMadinaId && !roomMakkahId && roomAutreIdList.length === 0) {
       return res.status(400).json({ error: 'Au moins une chambre (Madina, Makkah ou Autre) est obligatoire pour chambre privée.' });
     }
+    // 0 DH est accepté ; un prix absent, illisible ou négatif est refusé.
+    const normalizedLeaderPrice = normalizePrice(leaderPrice);
+    if (normalizedLeaderPrice === null) {
+      return res.status(400).json({ error: PRIX_INVALIDE_MESSAGE });
+    }
 
     const agentId = extractAgentIdFromToken(req);
     const actorLabel = extractActorLabelFromToken(req);
@@ -522,7 +544,7 @@ router.post('/group', async (req, res) => {
             statutVisa: Boolean(common.statutVisa),
             statutHotel: Boolean(common.statutHotel),
             statutVol: Boolean(common.statutVol),
-            price: i === 0 ? Number(leaderPrice) : 0,
+            price: i === 0 ? normalizedLeaderPrice : 0,
             paidAmount: i === 0 ? Number(leaderPaidAmount) : 0,
             reduction: i === 0 ? Number(common.reduction || 0) : 0,
             plan: common.plan || 'Normal',
@@ -647,9 +669,15 @@ router.post('/', async (req, res) => {
     // Hôtels « Autre » : tableau [{ hotelId, roomId, hotelName }] (optionnel)
     const hotelsAutreEntries: HotelAutreEntry[] = parseHotelsAutre(hotelsAutre);
     
+    // 0 DH est accepté ; un prix absent, illisible ou négatif est refusé.
+    const normalizedPrice = normalizePrice(price);
+    if (normalizedPrice === null) {
+      return res.status(400).json({ error: PRIX_INVALIDE_MESSAGE });
+    }
+
     // Extraire l'agentId du token JWT
     const agentId = extractAgentIdFromToken(req);
-    
+
     // Log des données reçues pour débogage
     console.log('🔍 Données reçues pour création de réservation:');
     console.log('- agentId:', agentId, 'Type:', typeof agentId);
@@ -674,7 +702,7 @@ router.post('/', async (req, res) => {
         hotelMadina,
         hotelMakkah,
         hotelsAutre: hotelsAutreEntries.length > 0 ? hotelsAutreEntries : undefined,
-        price: parseFloat(price),
+        price: normalizedPrice,
         reduction: reduction ? parseFloat(reduction) : 0,
         reservationDate: new Date(reservationDate),
         status,
@@ -820,7 +848,12 @@ function buildReservationUpdateData(
       const entries = parseHotelsAutre(body.hotelsAutre);
       updateData.hotelsAutre = entries.length > 0 ? entries : null;
     }
-    if (body.price !== undefined) updateData.price = body.price;
+    if (body.price !== undefined) {
+      // 0 DH est un prix valide ; un prix illisible ou négatif est ignoré
+      // plutôt qu'écrit en base (l'ancien prix est conservé).
+      const normalizedPrice = normalizePrice(body.price);
+      if (normalizedPrice !== null) updateData.price = normalizedPrice;
+    }
   }
   if (body.reservationDate !== undefined) updateData.reservationDate = new Date(body.reservationDate);
   if (body.statutPasseport !== undefined) updateData.statutPasseport = body.statutPasseport;
@@ -1055,7 +1088,14 @@ router.put('/:id', async (req, res) => {
         const entries = parseHotelsAutre(hotelsAutre);
         updateData.hotelsAutre = entries.length > 0 ? entries : null;
       }
-      if (price !== undefined) updateData.price = price;
+      if (price !== undefined) {
+        // 0 DH est accepté ; on refuse un prix illisible ou négatif.
+        const normalizedPrice = normalizePrice(price);
+        if (normalizedPrice === null) {
+          return res.status(400).json({ error: PRIX_INVALIDE_MESSAGE });
+        }
+        updateData.price = normalizedPrice;
+      }
     }
     if (reservationDate !== undefined) updateData.reservationDate = new Date(reservationDate);
     

@@ -41,6 +41,7 @@ import {
   ShieldCheck,
   Crown,
   Download,
+  AlertTriangle,
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/components/ui/use-toast"
@@ -953,6 +954,19 @@ export default function NouvelleReservation() {
     });
   }, [paiements]);
 
+  // Le montant saisi dans un paiement est plafonné au prix COURANT du dossier.
+  // Une réduction appliquée APRÈS la saisie abaisse ce prix : le total des
+  // paiements peut alors le dépasser. L'enregistrement était refusé au clic
+  // (toast seul, souvent masqué par la barre fixe) alors que le bouton
+  // paraissait actif — on remonte donc la condition dans les bloqueurs.
+  const totalPaiementsSaisis = paiements.reduce(
+    (total, p) => total + (Number(p.montant) || 0),
+    0
+  );
+  const prixDossier = normaliserPrix(formData.prix) ?? 0;
+  const paiementsDepassentPrix =
+    estPrixValide(formData.prix) && totalPaiementsSaisis > prixDossier;
+
   const isFormValid = useMemo(() => {
     const baseFieldsValid =
       formData.programme !== "" &&
@@ -969,8 +983,14 @@ export default function NouvelleReservation() {
       !documents.passport ||
       PASSPORT_REGEX.test((formData.passportNumber || "").trim());
 
-    return baseFieldsValid && passportNumberOk && arePaymentsValid && hotelsComplets;
-  }, [formData, documents.passport, arePaymentsValid, hotelsComplets]);
+    return (
+      baseFieldsValid &&
+      passportNumberOk &&
+      arePaymentsValid &&
+      !paiementsDepassentPrix &&
+      hotelsComplets
+    );
+  }, [formData, documents.passport, arePaymentsValid, paiementsDepassentPrix, hotelsComplets]);
 
   // Raisons pour lesquelles la réservation ne peut pas encore être enregistrée
   // (miroir de isFormValid + contrainte du prix proposé).
@@ -988,6 +1008,11 @@ export default function NouvelleReservation() {
       reasons.push("Le n° de passeport est invalide (2 lettres + 7 chiffres)");
     }
     if (!arePaymentsValid) reasons.push("Un paiement est incomplet (mode et montant requis)");
+    if (paiementsDepassentPrix) {
+      reasons.push(
+        `Le total des paiements (${formatMontant(totalPaiementsSaisis)}) dépasse le prix du dossier (${formatMontant(prixDossier)}) : diminuez la réduction ou les paiements`
+      );
+    }
     // Chaque hôtel actif (non désactivé dans « Éditer ») doit avoir une chambre choisie.
     reasons.push(...hotelsRequisManquants);
     if (prixMode === 'proposition' && prixPropose !== null && prixPropose < calculatePrice) {
@@ -1494,11 +1519,12 @@ export default function NouvelleReservation() {
 
     // Calculer la somme des montants des paiements juste avant l'insertion
     const paidAmount = paiements.reduce((total, p) => total + (Number(p.montant) || 0), 0);
-    const suggestedPrice = Number(formData.prix) || 0;
-    if (suggestedPrice > 0 && paidAmount > suggestedPrice) {
+    // Prix 0 DH inclus : un dossier offert ne peut pas non plus encaisser un paiement.
+    const suggestedPrice = normaliserPrix(formData.prix) ?? 0;
+    if (paidAmount > suggestedPrice) {
       toast({
         title: "Montant de paiements invalide",
-        description: `Le total des paiements (${formatMontant(paidAmount)}) dépasse le prix suggéré (${formatMontant(suggestedPrice)}).`,
+        description: `Le total des paiements (${formatMontant(paidAmount)}) dépasse le prix du dossier (${formatMontant(suggestedPrice)}). Diminuez la réduction ou les paiements.`,
         variant: "destructive",
       });
       setIsSubmitting(false);
@@ -3178,8 +3204,21 @@ export default function NouvelleReservation() {
                     <span className="text-sm text-green-600 font-medium">DH</span>
                   </div>
                 )}
+
+                {/* Le prix est passé sous le total déjà encaissé (réduction appliquée
+                    après la saisie des paiements) : l'enregistrement reste bloqué tant
+                    que l'écart n'est pas corrigé, autant le dire ici. */}
+                {paiementsDepassentPrix && (
+                  <div className="flex items-center gap-2 bg-red-100 px-3 py-2 rounded-lg border border-red-300 text-red-800">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span className="text-xs font-semibold">
+                      Paiements déjà saisis : {formatMontant(totalPaiementsSaisis)} &gt; prix{" "}
+                      {formatMontant(prixDossier)} — diminuez la réduction ou les paiements.
+                    </span>
+                  </div>
+                )}
               </div>
-              
+
               {/* Bouton de confirmation - désactivé si proposition avec prix inférieur au total */}
               <BlockersTooltip
                 blockers={isSubmitting ? [] : getSubmitBlockers()}

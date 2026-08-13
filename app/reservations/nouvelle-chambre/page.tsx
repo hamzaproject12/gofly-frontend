@@ -47,6 +47,7 @@ import {
   X,
   Download,
   ChevronUp,
+  AlertTriangle,
 } from "lucide-react";
 
 interface Hotel {
@@ -1055,6 +1056,17 @@ export default function NouvelleChambrePage() {
     if (!roomAutreIds[ph.hotel.id]) hotelsRequisManquants.push(`Sélectionnez une chambre pour l'hôtel « ${ph.hotel.name} »`);
   }
   const hotelsComplets = hotelsRequisManquants.length === 0;
+  // Le montant saisi dans un paiement est plafonné au prix COURANT du dossier.
+  // Une réduction appliquée APRÈS la saisie abaisse ce prix : le total des
+  // paiements peut alors le dépasser. L'enregistrement était refusé au clic
+  // (toast seul, souvent masqué par la barre fixe) alors que le bouton
+  // paraissait actif — on remonte donc la condition dans les bloqueurs.
+  const totalPaiementsSaisis = payments.reduce(
+    (total, p) => total + (Number(p.amount) || 0),
+    0
+  );
+  const prixDossier = normaliserPrix(formData.prix) ?? 0;
+  const paiementsDepassentPrix = prixGenere && totalPaiementsSaisis > prixDossier;
   const canSubmit =
     !!formData.programId &&
     !!formData.typeChambre &&
@@ -1062,6 +1074,7 @@ export default function NouvelleChambrePage() {
     hasAnyRoomSelected &&
     hotelsComplets &&
     prixGenere &&
+    !paiementsDepassentPrix &&
     identitiesMinimumOk;
   const propositionInvalid =
     prixMode === "proposition" &&
@@ -1079,6 +1092,11 @@ export default function NouvelleChambrePage() {
     // Chaque hôtel actif doit avoir une chambre choisie (désactivez-le dans « Éditer » sinon).
     reasons.push(...hotelsRequisManquants);
     if (!prixGenere) reasons.push("Le prix n'est pas généré");
+    if (paiementsDepassentPrix) {
+      reasons.push(
+        `Le total des paiements (${formatMontant(totalPaiementsSaisis)}) dépasse le prix du dossier (${formatMontant(prixDossier)}) : diminuez la réduction ou les paiements`
+      );
+    }
 
     // Identités des occupants
     if (capacity >= 2 && occupants.length !== capacity) {
@@ -1156,11 +1174,12 @@ export default function NouvelleChambrePage() {
         (sum, p) => sum + (Number(p.amount) || 0),
         0
       );
-    const suggestedPrice = Number(formData.prix) || 0;
-    if (suggestedPrice > 0 && totalPayments > suggestedPrice) {
+    // Prix 0 DH inclus : un dossier offert ne peut pas non plus encaisser un paiement.
+    const suggestedPrice = normaliserPrix(formData.prix) ?? 0;
+    if (totalPayments > suggestedPrice) {
       toast({
         title: "Montant de paiements invalide",
-        description: `Le total des paiements (${formatMontant(totalPayments)}) dépasse le prix suggéré (${formatMontant(suggestedPrice)}).`,
+        description: `Le total des paiements (${formatMontant(totalPayments)}) dépasse le prix du dossier (${formatMontant(suggestedPrice)}). Diminuez la réduction ou les paiements.`,
         variant: "destructive",
       });
       return;
@@ -2786,6 +2805,18 @@ export default function NouvelleChambrePage() {
                       placeholder={calculatePrice.toString()}
                     />
                     <span className="text-sm text-green-600 font-medium">DH</span>
+                  </div>
+                )}
+                {/* Le prix est passé sous le total déjà encaissé (réduction appliquée
+                    après la saisie des paiements) : l'enregistrement reste bloqué tant
+                    que l'écart n'est pas corrigé, autant le dire ici. */}
+                {paiementsDepassentPrix && (
+                  <div className="flex items-center gap-2 bg-red-100 px-3 py-2 rounded-lg border border-red-300 text-red-800">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span className="text-xs font-semibold">
+                      Paiements déjà saisis : {formatMontant(totalPaiementsSaisis)} &gt; prix{" "}
+                      {formatMontant(prixDossier)} — diminuez la réduction ou les paiements.
+                    </span>
                   </div>
                 )}
               </div>

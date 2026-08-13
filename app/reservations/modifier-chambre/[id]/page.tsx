@@ -1833,36 +1833,61 @@ export default function EditReservation() {
     accompagnants,
   ]);
 
-  const isFormValid = useMemo(() => {
-    // Le formulaire est valide si :
-    // 1. Les paiements sont valides (ou il n'y a pas de paiements)
-    // 2. ET (il y a des changements OU le formulaire de base est valide)
-    const baseFormValid = estPrixValide(formData.prix) && formData.programId && formData.typeChambre && formData.gender;
-    // Si le document passeport est joint (leader ou accompagnant), le n° devient obligatoire
+  // Raisons pour lesquelles la modification ne peut pas encore être enregistrée.
+  // Miroir exact des contrôles de handleSubmit, affiché au survol du bouton
+  // (même principe que « Nouvelle Chambre »).
+  const getSubmitBlockers = (): string[] => {
+    const reasons: string[] = [];
+
+    if (!hasChanges) reasons.push("Aucune modification à enregistrer");
+
+    const telephone = (formData.telephone || "").trim();
+    if (!telephone) reasons.push("Le téléphone n'est pas saisi");
+    else if (!PHONE_REGEX.test(telephone)) {
+      reasons.push("Le téléphone n'est pas valide (format +XXX XXXXXXXXX)");
+    }
+
+    const passportNumber = (formData.passportNumber || "").trim();
     const leaderHasPassportDoc =
       documents.passport !== null ||
       (getDocumentUrl("passport") !== null && passportToDelete === null);
-    const leaderPassportOk =
-      !leaderHasPassportDoc ||
-      PASSPORT_REGEX.test((formData.passportNumber || "").trim());
-    const accompagnantsPassportNumberOk = accompagnants.every((a) => {
+    if (leaderHasPassportDoc && !PASSPORT_REGEX.test(passportNumber)) {
+      reasons.push(
+        "Le passeport du chef de dossier est joint : son n° est obligatoire (2 lettres + 7 chiffres)"
+      );
+    } else if (passportNumber && !PASSPORT_REGEX.test(passportNumber)) {
+      reasons.push("Le n° de passeport est invalide (2 lettres + 7 chiffres)");
+    }
+
+    accompagnants.forEach((a, i) => {
       const existingPassDoc = (a.documents || []).find((d: any) =>
         ["passport", "passeport"].includes(d.fileType)
       );
       const del = memberPassportDelete[a.id];
       const newFile = memberPassportFiles[a.id];
       const hasDoc = (!!existingPassDoc && del == null) || !!newFile;
-      return !hasDoc || PASSPORT_REGEX.test((a.passportNumber || "").trim());
+      if (hasDoc && !PASSPORT_REGEX.test((a.passportNumber || "").trim())) {
+        reasons.push(
+          `Le passeport de l'accompagnant ${i + 1} est joint : son n° est obligatoire`
+        );
+      }
     });
-    if (!leaderPassportOk || !accompagnantsPassportNumberOk) return false;
-    // Si des changements sont détectés, activer le bouton même si certains champs ne sont pas remplis
-    // (car on peut modifier juste une partie)
-    if (hasChanges) {
-      return arePaymentsValid; // Juste vérifier que les paiements sont valides
+
+    if (!arePaymentsValid) {
+      reasons.push("Un paiement est incomplet (mode, montant et date requis)");
     }
-    // Sinon, vérifier que le formulaire de base est valide
-    return arePaymentsValid && baseFormValid;
-  }, [arePaymentsValid, hasChanges, formData, documents.passport, passportToDelete, previews, reservationData, accompagnants, memberPassportFiles, memberPassportDelete])
+
+    if (Number.isFinite(totalPrice) && totalPrice > 0 && totalPaid > totalPrice) {
+      reasons.push(
+        `Le total des paiements (${formatMontant(totalPaid)}) dépasse le prix (${formatMontant(totalPrice)})`
+      );
+    }
+
+    return reasons;
+  };
+
+  const submitBlockers = getSubmitBlockers();
+  const canSubmit = submitBlockers.length === 0;
 
   const totalProgress = [section1Complete, section2Complete, section3Complete, section4Complete]
     .filter(Boolean).length * 25
@@ -3783,15 +3808,21 @@ export default function EditReservation() {
                     Annuler
                   </Button>
                 </Link>
-                <Button
-                  type="submit"
-                  disabled={isSubmitting || (!isFormValid && !hasChanges)}
-                  size="lg"
-                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                <BlockersTooltip
+                  blockers={isSubmitting ? [] : submitBlockers}
+                  title="Modification indisponible :"
+                  enabledHint="Enregistrer les modifications"
                 >
-                  <Edit className="h-4 w-4 mr-2" />
-                      {isSubmitting ? "Modification..." : "Modifier la réservation"}
-                    </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting || !canSubmit}
+                    size="lg"
+                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    {isSubmitting ? "Modification..." : "Modifier la réservation"}
+                  </Button>
+                </BlockersTooltip>
                   </div>
             </form>
                 </CardContent>

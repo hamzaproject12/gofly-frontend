@@ -1660,25 +1660,45 @@ export default function EditReservation() {
     memberPassportDelete,
   ]);
 
-  const isFormValid = useMemo(() => {
-    // Le formulaire est valide si :
-    // 1. Les paiements sont valides (ou il n'y a pas de paiements)
-    // 2. ET (il y a des changements OU le formulaire de base est valide)
-    const baseFormValid = estPrixValide(formData.prix) && formData.programId && formData.typeChambre && formData.gender;
-    // Si le document passeport est joint (nouveau ou existant), le n° devient obligatoire
-    const hasPassportDoc = !!documents.passport || !!getDocumentUrl("passport");
-    const passportNumberOk =
-      !hasPassportDoc ||
-      PASSPORT_REGEX.test((formData.passportNumber || "").trim());
-    if (!passportNumberOk) return false;
-    // Si des changements sont détectés, activer le bouton même si certains champs ne sont pas remplis
-    // (car on peut modifier juste une partie)
-    if (hasChanges) {
-      return arePaymentsValid; // Juste vérifier que les paiements sont valides
+  // Raisons pour lesquelles la modification ne peut pas encore être enregistrée.
+  // Miroir exact des contrôles de handleSubmit, affiché au survol du bouton
+  // (même principe que « Nouvelle Réservation »).
+  const getSubmitBlockers = (): string[] => {
+    const reasons: string[] = [];
+
+    if (!hasChanges) reasons.push("Aucune modification à enregistrer");
+
+    const telephone = (formData.telephone || "").trim();
+    if (!telephone) reasons.push("Le téléphone n'est pas saisi");
+    else if (!PHONE_REGEX.test(telephone)) {
+      reasons.push("Le téléphone n'est pas valide (format +XXX XXXXXXXXX)");
     }
-    // Sinon, vérifier que le formulaire de base est valide
-    return arePaymentsValid && baseFormValid;
-  }, [arePaymentsValid, hasChanges, formData, documents.passport, passportToDelete, previews, reservationData])
+
+    const passportNumber = (formData.passportNumber || "").trim();
+    const hasPassportDoc = !!documents.passport || !!getDocumentUrl("passport");
+    if (hasPassportDoc && !PASSPORT_REGEX.test(passportNumber)) {
+      reasons.push(
+        "Le passeport est joint : son n° est obligatoire (2 lettres + 7 chiffres)"
+      );
+    } else if (passportNumber && !PASSPORT_REGEX.test(passportNumber)) {
+      reasons.push("Le n° de passeport est invalide (2 lettres + 7 chiffres)");
+    }
+
+    if (!arePaymentsValid) {
+      reasons.push("Un paiement est incomplet (mode, montant et date requis)");
+    }
+
+    if (Number.isFinite(totalPrice) && totalPrice > 0 && totalPaid > totalPrice) {
+      reasons.push(
+        `Le total des paiements (${formatMontant(totalPaid)}) dépasse le prix (${formatMontant(totalPrice)})`
+      );
+    }
+
+    return reasons;
+  };
+
+  const submitBlockers = getSubmitBlockers();
+  const canSubmit = submitBlockers.length === 0;
 
   const totalProgress = [section1Complete, section2Complete, section3Complete, section4Complete]
     .filter(Boolean).length * 25
@@ -3129,15 +3149,21 @@ export default function EditReservation() {
                     Annuler
                   </Button>
                 </Link>
-                <Button
-                  type="submit"
-                  disabled={isSubmitting || (!isFormValid && !hasChanges)}
-                  size="lg"
-                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                <BlockersTooltip
+                  blockers={isSubmitting ? [] : submitBlockers}
+                  title="Modification indisponible :"
+                  enabledHint="Enregistrer les modifications"
                 >
-                  <Edit className="h-4 w-4 mr-2" />
-                      {isSubmitting ? "Modification..." : "Modifier la réservation"}
-                    </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting || !canSubmit}
+                    size="lg"
+                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    {isSubmitting ? "Modification..." : "Modifier la réservation"}
+                  </Button>
+                </BlockersTooltip>
                   </div>
             </form>
                 </CardContent>

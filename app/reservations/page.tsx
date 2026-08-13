@@ -463,7 +463,8 @@ export default function ReservationsPage() {
                 : new Date(reservation.updated_at).toISOString(),
           };
         }
-        // Nouvelle logique d'urgence : on teste dans l'ordre Passeport, Visa, Hôtel, Vol
+        // Logique d'urgence : on teste dans l'ordre Passeport, Visa, Vol, Hôtel
+        // (même ordre que les pastilles d'étapes affichées sur la carte).
         const now = new Date();
         let isUrgent = false;
         let urgentReason = undefined;
@@ -490,16 +491,6 @@ export default function ReservationsPage() {
             urgentDate = date;
           }
         }
-        // Hôtel
-        if (programActif && !isUrgent && !hotelGroupOk && reservation.program?.hotelDeadline) {
-          const date = new Date(reservation.program.hotelDeadline);
-          const diff = (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
-          if (diff >= 0 && diff <= DAYS_URGENCY_WINDOW) {
-            isUrgent = true;
-            urgentReason = "Hôtel";
-            urgentDate = date;
-          }
-        }
         // Vol
         if (programActif && !isUrgent && !flightGroupOk && reservation.program?.flightDeadline) {
           const date = new Date(reservation.program.flightDeadline);
@@ -507,6 +498,16 @@ export default function ReservationsPage() {
           if (diff >= 0 && diff <= DAYS_URGENCY_WINDOW) {
             isUrgent = true;
             urgentReason = "Billet";
+            urgentDate = date;
+          }
+        }
+        // Hôtel
+        if (programActif && !isUrgent && !hotelGroupOk && reservation.program?.hotelDeadline) {
+          const date = new Date(reservation.program.hotelDeadline);
+          const diff = (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+          if (diff >= 0 && diff <= DAYS_URGENCY_WINDOW) {
+            isUrgent = true;
+            urgentReason = "Hôtel";
             urgentDate = date;
           }
         }

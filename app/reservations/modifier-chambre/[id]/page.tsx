@@ -1543,35 +1543,27 @@ export default function EditReservation() {
     return 'image/*';
   }
 
-  // Helper function pour obtenir le nom d'un hôtel par son ID
-  const getHotelName = (hotelId: string, city: 'madina' | 'makkah') => {
-    console.log('🔍 getHotelName called:', { hotelId, city, programId: formData.programId, programsCount: programs.length });
-    
-    if (!hotelId || hotelId === 'none') return 'Sans hôtel';
-    if (!formData.programId || programs.length === 0) {
-      console.log('⚠️ No program loaded yet');
-      return 'Chargement...';
-    }
-    
+  // Helper function pour obtenir le nom d'un hôtel
+  // La réservation peut stocker soit l'ID de l'hôtel, soit directement son nom
+  const getHotelName = (hotelRef: string, city: 'madina' | 'makkah') => {
+    if (!hotelRef || hotelRef === 'none') return 'Sans hôtel';
+    if (!formData.programId || programs.length === 0) return 'Chargement...';
+
     const program = programs.find(p => p.id === parseInt(formData.programId));
-    console.log('🔍 Program found:', program?.id, program?.name);
-    
-    if (!program) {
-      console.log('⚠️ Program not found in programs array');
-      return 'Chargement...';
-    }
-    
+    if (!program) return 'Chargement...';
+
     const hotelsList = city === 'madina' ? program.hotelsMadina : program.hotelsMakkah;
-    console.log('🔍 Hotels list:', { city, count: hotelsList?.length, hotelsList });
-    
-    const hotelRelation = hotelsList?.find((ph: { hotel: Hotel }) => ph.hotel.id.toString() === hotelId);
-    console.log('🔍 Hotel relation found:', hotelRelation);
-    
-    if (!hotelRelation) {
-      console.log('⚠️ Hotel not found with ID:', hotelId);
-      return `Hôtel ID ${hotelId}`;
-    }
-    
+    const ref = hotelRef.trim();
+
+    const hotelRelation = hotelsList?.find(
+      (ph: { hotel: Hotel }) =>
+        ph.hotel.id.toString() === ref ||
+        ph.hotel.name?.trim().toLowerCase() === ref.toLowerCase()
+    );
+
+    // Hôtel plus rattaché au programme : un nom reste lisible, un ID brut n'apporte rien
+    if (!hotelRelation) return /^\d+$/.test(ref) ? 'Hôtel inconnu' : ref;
+
     return hotelRelation.hotel.name;
   }
 
@@ -1600,7 +1592,10 @@ export default function EditReservation() {
       city === "madina"
         ? programDetail?.hotelsMadina
         : programDetail?.hotelsMakkah;
-    const found = list?.find((ph: { hotel: Hotel }) => ph.hotel?.name === raw);
+    const target = String(raw).trim().toLowerCase();
+    const found = list?.find(
+      (ph: { hotel: Hotel }) => ph.hotel?.name?.trim().toLowerCase() === target
+    );
     return found?.hotel?.id ?? null;
   };
 

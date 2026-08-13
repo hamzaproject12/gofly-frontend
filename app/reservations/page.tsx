@@ -58,7 +58,7 @@ import {
   DialogDescription,
   DialogClose,
 } from "@/components/ui/dialog"
-import { format } from "date-fns"
+import { differenceInCalendarDays } from "date-fns"
 
 // Types
 type Reservation = {
@@ -1023,8 +1023,19 @@ export default function ReservationsPage() {
                 const etapeUrgente = urgentInfo
                   ? (urgentInfo.label === "Billet" ? "Vol" : urgentInfo.label)
                   : null;
-                const echeanceCourte = urgentInfo ? format(urgentInfo.date, "dd/MM") : "";
-                const echeanceLongue = urgentInfo ? format(urgentInfo.date, "dd/MM/yyyy") : "";
+                // On affiche le temps restant avant l'échéance, jamais la date limite :
+                // « J-3 » se lit plus vite qu'une date qu'il faut comparer mentalement.
+                const joursRestants = urgentInfo
+                  ? Math.max(0, differenceInCalendarDays(urgentInfo.date, new Date()))
+                  : 0;
+                const echeanceCourte = urgentInfo
+                  ? (joursRestants === 0 ? "Auj." : `J-${joursRestants}`)
+                  : "";
+                const echeanceLongue = urgentInfo
+                  ? (joursRestants === 0
+                      ? "aujourd'hui"
+                      : `dans ${joursRestants} jour${joursRestants > 1 ? "s" : ""}`)
+                  : "";
                 // Détermine la classe de fond selon le statut
                 const urgentBg = reservation.statut === "Urgent" ? "bg-red-50" : "";
                 // Zone paiement : un dossier à 0 DH (accompagnateur non facturé)
@@ -1108,7 +1119,7 @@ export default function ReservationsPage() {
                           {reservation.statut === "Urgent" && (
                             <span
                               className="inline-flex items-center gap-1 whitespace-nowrap bg-red-100 text-red-800 border border-red-200 rounded px-2 py-0.5 text-sm font-bold"
-                              title={urgentInfo ? `Urgent — ${urgentInfo.label} : échéance le ${echeanceLongue}` : "Urgent"}
+                              title={urgentInfo ? `Urgent — ${urgentInfo.label} : échéance ${echeanceLongue}` : "Urgent"}
                             >
                               <AlertTriangle className="h-4 w-4 shrink-0 animate-bounce text-red-600" />
                               Urgent
@@ -1153,7 +1164,7 @@ export default function ReservationsPage() {
                                       {etape.label}
                                     </span>
                                     <span
-                                      title={declencheUrgence ? `${etape.label} — échéance le ${echeanceLongue}` : etape.label}
+                                      title={declencheUrgence ? `${etape.label} — échéance ${echeanceLongue}` : etape.label}
                                       className={`inline-flex rounded-full p-0.5 ${declencheUrgence ? "bg-red-100 ring-2 ring-red-500" : ""}`}
                                     >
                                       {etape.ok ? (

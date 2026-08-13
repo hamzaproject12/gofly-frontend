@@ -176,6 +176,34 @@ export default function NouvelleReservation() {
   })
   const [paiements, setPaiements] = useState<Paiement[]>([])
   const [previews, setPreviews] = useState<{ [key: string]: { url: string, type: string } }>({})
+  // --- Pré-remplissage depuis le tableau de bord ---
+  // L'URL ne transporte qu'un POINTEUR (programme, chambre, place). Le type de chambre,
+  // le genre et l'hôtel sont ensuite DÉRIVÉS des données rechargées depuis l'API : les
+  // paramètres d'URL ne sont jamais considérés comme fiables.
+  // Lecture via window.location (et non useSearchParams) pour ne pas imposer de frontière
+  // Suspense à cette page — même motif que app/depenses/page.tsx.
+  const [prefill] = useState<{ programId: string; roomId: number; place: number } | null>(() => {
+    if (typeof window === "undefined") return null;
+    const params = new URLSearchParams(window.location.search);
+    const programId = params.get("programId");
+    const roomId = Number(params.get("roomId"));
+    const place = Number(params.get("place"));
+    if (!programId) return null;
+    if (!Number.isInteger(roomId) || roomId <= 0) return null;
+    if (!Number.isInteger(place) || place < 0) return null;
+    return { programId, roomId, place };
+  });
+  // Bandeau d'origine : hôtel/ville résolus après chargement.
+  const [prefillInfo, setPrefillInfo] = useState<{ hotelName: string; city: string } | null>(null);
+  const [prefillPlaceIndisponible, setPrefillPlaceIndisponible] = useState(false);
+  const prefillAppliedRef = useRef(false);
+  // Signature du triplet (programme|type|genre) posé par le pré-remplissage : tant qu'elle
+  // correspond, l'effet de réinitialisation ne doit pas effacer la place présélectionnée.
+  const prefillSignatureRef = useRef<string | null>(null);
+  // Vrai quand la chambre est « Mixte » : son genre ne permet pas de déduire celui du
+  // pèlerin, l'agent doit le choisir — et ce choix ne doit pas coûter la place cliquée.
+  const prefillAwaitingGenderRef = useRef(false);
+
   const [formData, setFormData] = useState<{
     programme: string;
     typeChambre: string;
@@ -210,7 +238,7 @@ export default function NouvelleReservation() {
     hotelMadina: "",
     hotelMakkah: "",
     dateReservation: new Date().toISOString().split('T')[0],
-    programId: "",
+    programId: prefill?.programId ?? "",
     gender: "",
     statutVisa: false,
     statutVol: false,
@@ -735,6 +763,26 @@ export default function NouvelleReservation() {
 
   // Réinitialiser la sélection des places quand les critères de base changent
   useEffect(() => {
+    const signature = `${formData.programId}|${formData.typeChambre}|${formData.gender}`;
+
+    // Le pré-remplissage pose lui-même ces trois champs : sans ce garde-fou, il effacerait
+    // la place cliquée juste après l'avoir posée (l'auto-sélection en choisirait alors une
+    // autre, silencieusement). La comparaison par signature est idempotente : elle résiste
+    // au double appel des effets en mode strict, contrairement à un drapeau à usage unique.
+    if (prefillSignatureRef.current === signature) return;
+
+    // Chambre « Mixte » : le genre était inconnu au pré-remplissage. L'agent vient de le
+    // choisir — on adopte la nouvelle signature et on conserve la place présélectionnée.
+    // Toute autre modification (programme ou type) reprend la réinitialisation normale.
+    if (prefillAwaitingGenderRef.current && formData.gender) {
+      const [programIdPrefill, typePrefill] = (prefillSignatureRef.current || "").split("|");
+      if (programIdPrefill === formData.programId && typePrefill === formData.typeChambre) {
+        prefillSignatureRef.current = signature;
+        prefillAwaitingGenderRef.current = false;
+        return;
+      }
+    }
+
     setSelectedPlacesMadina({});
     setSelectedPlacesMakkah({});
   }, [formData.programId, formData.typeChambre, formData.gender]);
@@ -793,6 +841,97 @@ export default function NouvelleReservation() {
     setHotelsAutreSelection(selection);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.programId]);
+
+  // Pré-remplissage depuis le tableau de bord (clic sur une place libre).
+  // On attend que les programmes ET les détails du programme soient chargés, puis on REVALIDE
+  // la place auprès de ces données fraîches avant de la présélectionner : entre l'affichage du
+  // tableau de bord et l'ouverture du formulaire, elle a pu être prise par quelqu'un d'autre.
+  useEffect(() => {
+    if (!prefill || prefillAppliedRef.current) return;
+    if (!programInfo?.rooms || programs.length === 0) return;
+
+    const programme = programs.find(p => p.id.toString() === prefill.programId);
+    const room = programInfo.rooms.find(r => r.id === prefill.roomId);
+
+    // Résoudre la ville depuis l'hôtel de la chambre (et non depuis l'URL).
+    const hotelMadinaCible = programme?.hotelsMadina?.find(ph => ph.hotel.id === room?.hotelId)?.hotel;
+    const hotelMakkahCible = programme?.hotelsMakkah?.find(ph => ph.hotel.id === room?.hotelId)?.hotel;
+    const hotelAutreCible = programme?.hotelsAutre?.find(ph => ph.hotel.id === room?.hotelId)?.hotel;
+    const hotel = hotelMadinaCible || hotelMakkahCible || hotelAutreCible;
+
+    prefillAppliedRef.current = true;
+
+    // Chambre ou hôtel introuvables : le programme a changé depuis l'affichage du tableau
+    // de bord. On laisse le formulaire vierge plutôt que d'inventer un contexte.
+    if (!programme || !room || !hotel) {
+      setPrefillPlaceIndisponible(true);
+      toast({
+        title: 'Place indisponible',
+        description: "Cette place n'est plus disponible, merci d'en choisir une autre",
+      });
+      return;
+    }
+
+    // Revalidation : la place doit toujours être libre dans les données fraîches.
+    const placesOccupees = room.nbrPlaceTotal - room.nbrPlaceRestantes;
+    const placeLibre = room.nbrPlaceRestantes > 0 && prefill.place >= placesOccupees;
+
+    // Une chambre encore « Mixte » n'a jamais été réservée : son genre ne dit rien de celui
+    // du pèlerin, l'agent le choisira (cf. garde-fou de l'effet de réinitialisation).
+    const genreDeduit = room.gender === 'Homme' || room.gender === 'Femme' ? room.gender : "";
+    prefillAwaitingGenderRef.current = genreDeduit === "";
+
+    // Le triplet est posé en UN SEUL setFormData : deux appels = deux rendus = l'effet de
+    // réinitialisation se déclencherait deux fois et le garde-fou n'en couvrirait qu'un.
+    prefillSignatureRef.current = `${prefill.programId}|${room.roomType}|${genreDeduit}`;
+    setFormData(prev => ({
+      ...prev,
+      programme: programme.name,
+      programId: prefill.programId,
+      typeChambre: room.roomType,
+      gender: genreDeduit,
+      ...(hotelMadinaCible ? { hotelMadina: hotel.id.toString() } : {}),
+      ...(hotelMakkahCible ? { hotelMakkah: hotel.id.toString() } : {}),
+    }));
+
+    // L'effet d'initialisation des hôtels « Autre » ne dépend que de programId : au montage
+    // avec pré-remplissage, il tourne avant l'arrivée de `programs` et laisse les blocs sur
+    // « none ». On les réamorce ici, uniquement s'ils sont encore vides.
+    if (hotelsAutreProgramme.length > 0 && Object.keys(hotelsAutreSelection).length === 0) {
+      const active: { [hotelId: number]: boolean } = {};
+      const jours: { [hotelId: number]: number } = {};
+      const selection: { [hotelId: number]: string } = {};
+      for (const ph of hotelsAutreProgramme) {
+        active[ph.hotel.id] = true;
+        jours[ph.hotel.id] = ph.nbJours || 0;
+        selection[ph.hotel.id] = ph.hotel.id.toString();
+      }
+      setAutreActive(active);
+      setAutreJours(jours);
+      setHotelsAutreSelection(selection);
+    }
+
+    if (placeLibre) {
+      if (hotelMadinaCible) {
+        setSelectedPlacesMadina({ [room.id]: [prefill.place] });
+      } else if (hotelMakkahCible) {
+        setSelectedPlacesMakkah({ [room.id]: [prefill.place] });
+      } else {
+        setSelectedPlacesAutre(prev => ({ ...prev, [room.hotelId]: { [room.id]: [prefill.place] } }));
+      }
+    } else {
+      // Le contexte (programme, type, genre, hôtel) reste pré-rempli : il est toujours
+      // valable. Seule la place change — l'auto-sélection existante en prendra une libre.
+      setPrefillPlaceIndisponible(true);
+      toast({
+        title: 'Place indisponible',
+        description: "Cette place n'est plus disponible, merci d'en choisir une autre",
+      });
+    }
+
+    setPrefillInfo({ hotelName: hotel.name, city: hotel.city });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill, programInfo, programs, toast]);
 
   // --- Bascule d'activation par catégorie d'hôtel (panneau « Éditer ») ---
   // OFF → l'hôtel est exclu du prix et n'est plus obligatoire ; on nettoie sa sélection.
@@ -2025,6 +2164,46 @@ export default function NouvelleReservation() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-6">
+                {/* Bandeau d'origine : le formulaire a été ouvert depuis une place du tableau
+                    de bord. Les champs pré-remplis restent tous modifiables. */}
+                {prefill && (
+                  <div
+                    className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm ${
+                      prefillPlaceIndisponible
+                        ? "border-amber-200 bg-amber-50 text-amber-800"
+                        : "border-blue-200 bg-blue-50 text-blue-800"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {prefillPlaceIndisponible ? (
+                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                      ) : (
+                        <Info className="h-4 w-4 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="break-words">
+                          {prefillPlaceIndisponible
+                            ? "Cette place n'est plus disponible, merci d'en choisir une autre"
+                            : prefillInfo
+                              ? `Pré-rempli depuis le tableau de bord — ${prefillInfo.hotelName}, ${prefillInfo.city}`
+                              : "Pré-rempli depuis le tableau de bord"}
+                        </p>
+                        {prefillPlaceIndisponible && prefillInfo && (
+                          <p className="text-xs opacity-80 break-words">
+                            {`Pré-rempli depuis le tableau de bord — ${prefillInfo.hotelName}, ${prefillInfo.city}`}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => window.location.assign("/reservations/nouvelle")}
+                      className="underline font-medium hover:no-underline shrink-0"
+                    >
+                      {"Repartir d'un formulaire vierge"}
+                    </button>
+                  </div>
+                )}
                 <form onSubmit={handleSubmit}>
                 {/* Section 1: Champs pour calculer le prix */}
                   <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">

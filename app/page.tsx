@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -845,19 +846,34 @@ export default function HomePage() {
                                   </Badge>
                                 </div>
                                 
-                                {/* Affichage visuel des places */}
+                                {/* Affichage visuel des places.
+                                    Une place libre est cliquable : elle ouvre le formulaire de
+                                    réservation pré-rempli sur cette chambre et cette place.
+                                    Les places occupées (et donc les chambres complètes) restent inertes. */}
                                 <div className="flex flex-wrap items-center gap-1 mb-1.5">
-                                  {room.visualPlaces.map((place, index) => (
-                                    <div
-                                      key={index}
-                                  className={`w-4 h-4 rounded-full border-2 ${
-                                    place.isOccupied 
-                                      ? 'bg-red-500 border-red-600' 
-                                      : 'bg-green-500 border-green-600'
-                                  }`}
-                                  title={place.isOccupied ? 'Réservé' : 'Disponible'}
-                                    />
-                                  ))}
+                                  {room.visualPlaces.map((place, index) => {
+                                    const estLibre = !place.isOccupied && room.placesRestantes > 0;
+
+                                    if (!estLibre) {
+                                      return (
+                                        <div
+                                          key={index}
+                                          className="w-4 h-4 rounded-full border-2 bg-red-500 border-red-600"
+                                          title="Réservé"
+                                        />
+                                      );
+                                    }
+
+                                    return (
+                                      <Link
+                                        key={index}
+                                        href={`/reservations/nouvelle?programId=${program.id}&roomId=${room.id}&place=${index}`}
+                                        title="Réserver cette place"
+                                        aria-label={`Réserver la place ${index + 1} — ${getRoomTypeLabel(room.roomType)}`}
+                                        className="block w-4 h-4 rounded-full border-2 bg-green-500 border-green-600 cursor-pointer transition-all hover:scale-125 hover:ring-2 hover:ring-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
+                                      />
+                                    );
+                                  })}
                                 </div>
                                 
                                 <div className="flex items-center justify-between text-sm">

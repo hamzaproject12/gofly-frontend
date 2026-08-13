@@ -177,27 +177,27 @@ export default function DepensesPage() {
           "Hotel Madina": 0,
           "Hotel Makkah": 0,
           Visa: 0,
+          Autre: 0,
         }
 
-        const totalsAll = sorted.reduce((sum, d) => sum + d.montant, 0)
-        const totalsCore = sorted.reduce((sum, d) => {
-          if (d.type in sums) {
-            sums[d.type] += d.montant
-            return sum + d.montant
-          }
-          return sum
+        // Le total de la carte doit toujours refléter la somme réelle du
+        // groupe (types "Autre" inclus), sinon il diverge des stats en haut
+        // de page.
+        const total = sorted.reduce((sum, d) => {
+          sums[d.type] = (sums[d.type] || 0) + d.montant
+          return sum + d.montant
         }, 0)
 
         return {
           key,
           items: sorted,
+          isSingle: sorted.length === 1,
           reservationId: first.reservation?.id ?? null,
           reservationName: first.reservation?.nom ?? "Non attribué",
           programme: first.programme,
           date: first.date,
           sums,
-          totalsCore,
-          totalsAll,
+          total,
         }
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -527,17 +527,66 @@ export default function DepensesPage() {
               ) : (
                 groupedDepenses.map((group) => {
                   const isOpen = !!openDetailsByGroup[group.key]
-                  const displayTotal =
-                    group.totalsCore > 0 ? group.totalsCore : group.totalsAll
-                  const coreTypes = new Set([
-                    "Vol",
-                    "Hotel Madina",
-                    "Hotel Makkah",
-                    "Visa",
-                  ])
-                  const detailsItems = group.items.filter((d) =>
-                    coreTypes.has(d.type)
-                  )
+                  const displayTotal = group.total
+                  const detailsItems = group.items
+
+                  // Une dépense isolée n'a rien à replier : le panneau de
+                  // détails ne ferait que répéter l'en-tête. On l'affiche
+                  // donc en ligne simple, sans bouton ni totaux par type.
+                  if (group.isSingle) {
+                    const depense = group.items[0]
+                    return (
+                      <div key={group.key} className="mx-2 mb-2">
+                        <div className="relative transition-all duration-300 rounded-xl shadow border hover:scale-[1.01] hover:shadow-xl bg-white overflow-hidden">
+                          <div className="px-3 py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                            <div className="flex items-center gap-3 flex-wrap min-w-0">
+                              <div className="flex items-center gap-2 min-w-[140px]">
+                                <Calendar className="h-5 w-5 text-blue-400" />
+                                <span className="font-medium text-gray-700">
+                                  {formatDateFr(depense.date)}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <Users className="h-5 w-5 text-blue-400" />
+                                <span className="font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-1">
+                                  {group.reservationName}
+                                </span>
+                              </div>
+
+                              {group.programme && (
+                                <span className="text-xs font-semibold text-gray-600 bg-gray-50 border border-gray-200 rounded px-3 py-1">
+                                  {group.programme}
+                                </span>
+                              )}
+
+                              <span
+                                className={`flex items-center gap-1.5 font-semibold rounded px-3 py-1 ${getTypeColor(depense.type)}`}
+                              >
+                                {getTypeIcon(depense.type)}
+                                {depense.type}
+                              </span>
+
+                              {depense.description && (
+                                <span className="text-sm text-gray-600 break-words min-w-0">
+                                  {depense.description}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-col sm:items-end shrink-0">
+                              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                Total
+                              </span>
+                              <span className="font-bold text-xl text-blue-900">
+                                {formatMontant(depense.montant)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  }
 
                   return (
                     <div key={group.key} className="mx-2 mb-2">
@@ -607,46 +656,45 @@ export default function DepensesPage() {
                                 </Badge>
                               )
                             )}
+                            {group.sums.Autre > 0 && (
+                              <Badge className={getTypeColor("Autre")}>
+                                Autre: {formatMontant(group.sums.Autre)}
+                              </Badge>
+                            )}
                           </div>
                         </div>
 
                         {isOpen && (
                           <div className="border-t bg-gray-50 p-4">
                             <div className="space-y-2">
-                              {detailsItems.length === 0 ? (
-                                <p className="text-sm text-gray-600">
-                                  Aucun détail pour ce groupe.
-                                </p>
-                              ) : (
-                                detailsItems.map((depense) => (
-                                  <div
-                                    key={depense.id}
-                                    className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 bg-white border rounded-lg p-3"
-                                  >
-                                    <div className="min-w-0">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        {getTypeIcon(depense.type)}
-                                        <span
-                                          className={`font-semibold rounded px-3 py-1 ${getTypeColor(depense.type)} border border-current/10`}
-                                        >
-                                          {depense.type}
-                                        </span>
-                                        <span className="text-xs text-gray-500">
-                                          {formatDateFr(depense.date)}
-                                        </span>
-                                      </div>
-                                      <div className="mt-1 text-gray-900 font-medium text-sm break-words">
-                                        {depense.description}
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <span className="font-bold text-blue-900">
-                                        {formatMontant(depense.montant)}
+                              {detailsItems.map((depense) => (
+                                <div
+                                  key={depense.id}
+                                  className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 bg-white border rounded-lg p-3"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      {getTypeIcon(depense.type)}
+                                      <span
+                                        className={`font-semibold rounded px-3 py-1 ${getTypeColor(depense.type)} border border-current/10`}
+                                      >
+                                        {depense.type}
+                                      </span>
+                                      <span className="text-xs text-gray-500">
+                                        {formatDateFr(depense.date)}
                                       </span>
                                     </div>
+                                    <div className="mt-1 text-gray-900 font-medium text-sm break-words">
+                                      {depense.description}
+                                    </div>
                                   </div>
-                                ))
-                              )}
+                                  <div className="text-right">
+                                    <span className="font-bold text-blue-900">
+                                      {formatMontant(depense.montant)}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         )}

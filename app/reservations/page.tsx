@@ -190,7 +190,7 @@ export default function ReservationsPage() {
   const [totalReservations, setTotalReservations] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [hasPrevPage, setHasPrevPage] = useState(false);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(30);
   
   // Filtres avancés
   const [filters, setFilters] = useState({
@@ -704,7 +704,10 @@ export default function ReservationsPage() {
     }
   }
 
-  // Urgent en premier, puis par dernière modification (aligné sur l’API orderBy updated_at)
+  // Urgent en premier, puis par dernière modification. L'API applique déjà ce tri
+  // sur l'ensemble des dossiers avant de découper la page (sans quoi les urgents
+  // se retrouvaient dispersés page par page) ; ce tri local ne fait que le
+  // reproduire à l'identique sur les lignes reçues.
   const sortedReservations = [...filteredReservations].sort((a, b) => {
     if (a.statut === "Urgent" && b.statut !== "Urgent") return -1;
     if (a.statut !== "Urgent" && b.statut === "Urgent") return 1;
@@ -934,7 +937,7 @@ export default function ReservationsPage() {
                   }}
                 >
                   <SelectTrigger className="h-9 rounded-lg border border-slate-300 bg-white focus-visible:ring-2 focus-visible:ring-blue-500/40 min-w-[110px]">
-                    <SelectValue placeholder="10/page" />
+                    <SelectValue placeholder="30/page" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="10">10/page</SelectItem>

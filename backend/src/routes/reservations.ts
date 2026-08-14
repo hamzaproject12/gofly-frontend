@@ -39,6 +39,61 @@ const reservationJournalInclude = {
   agent: { select: { id: true, nom: true } },
 } as const;
 
+/** Fenêtre d'urgence en jours — doit rester alignée sur DAYS_URGENCY_WINDOW du front. */
+const DAYS_URGENCY_WINDOW = 7;
+
+/**
+ * Une réservation est urgente si une étape non terminée (passeport, visa, vol,
+ * hôtel) arrive à échéance dans les `windowDays` jours.
+ *
+ * Mêmes règles que la carte affichée dans la liste : un dossier « Complet » ou
+ * rattaché à un programme non ACTIF (voyage terminé) n'est jamais urgent, et les
+ * statuts se lisent sur tout le groupe — leader + accompagnants.
+ */
+function isReservationUrgent(reservation: any, now: Date, windowDays = DAYS_URGENCY_WINDOW): boolean {
+  if (reservation.status === 'Complet') return false;
+  const programStatus = reservation.program?.status;
+  if (programStatus && programStatus !== 'ACTIF') return false;
+
+  const members = [reservation, ...(reservation.accompagnants || [])];
+  const etapes = [
+    { ok: members.every((m: any) => Boolean(m.statutPasseport)), date: reservation.program?.passportDeadline },
+    { ok: members.every((m: any) => Boolean(m.statutVisa)), date: reservation.program?.visaDeadline },
+    { ok: members.every((m: any) => Boolean(m.statutVol)), date: reservation.program?.flightDeadline },
+    { ok: members.every((m: any) => Boolean(m.statutHotel)), date: reservation.program?.hotelDeadline },
+  ];
+
+  for (const etape of etapes) {
+    if (etape.ok || !etape.date) continue;
+    const diff = (new Date(etape.date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+    if (diff >= 0 && diff <= windowDays) return true;
+  }
+  return false;
+}
+
+/** Projection minimale nécessaire au calcul d'urgence et au tri de la liste. */
+const reservationUrgencySelect = {
+  id: true,
+  status: true,
+  updated_at: true,
+  statutPasseport: true,
+  statutVisa: true,
+  statutHotel: true,
+  statutVol: true,
+  accompagnants: {
+    select: { statutPasseport: true, statutVisa: true, statutHotel: true, statutVol: true },
+  },
+  program: {
+    select: {
+      status: true,
+      visaDeadline: true,
+      hotelDeadline: true,
+      flightDeadline: true,
+      passportDeadline: true,
+    },
+  },
+} as const;
+
 /** Filtre liste / stats : roomType Prisma ou "FAMILLE" = chambres privées (famille) */
 function applyRoomTypeQuery(where: Record<string, unknown>, roomType: unknown) {
   const rt = typeof roomType === 'string' ? roomType : '';
@@ -209,10 +264,11 @@ router.get('/', async (req, res) => {
       where.program = { status: 'ACTIF' };
     }
 
+    const wantsUrgentOnly = status === 'Urgent';
     if (status && status !== 'all') {
       // Le statut "Urgent" n'existe pas en base, il est calculé dynamiquement
       // Donc on ne filtre pas par status quand c'est "Urgent"
-      if (status !== 'Urgent') {
+      if (!wantsUrgentOnly) {
         where.status = status;
       } else {
         // Pour "Urgent", exclure les réservations "Complet" qui ne peuvent pas être urgentes
@@ -242,40 +298,64 @@ router.get('/', async (req, res) => {
       ];
     }
 
-    // Compter le total des réservations (pour la pagination)
-    const totalReservations = await prisma.reservation.count({ where });
-    
-    // Récupérer les réservations avec pagination
-    const reservations = await prisma.reservation.findMany({
+    // Tri « Urgent en premier », puis dernière modification. L'urgence dépend des
+    // échéances du programme et des statuts de tout le groupe : impossible à
+    // déléguer à un `orderBy` Prisma. On ordonne donc la totalité des dossiers
+    // filtrés sur une projection légère, PUIS on découpe la page — sinon les
+    // dossiers urgents restent éparpillés d'une page à l'autre, le tri du front ne
+    // portant que sur les lignes déjà reçues.
+    const candidates = await prisma.reservation.findMany({
       where,
-      include: {
-        agent: { select: { id: true, nom: true } },
-        program: {
-          select: {
-            id: true,
-            name: true,
-            status: true,
-            visaDeadline: true,
-            hotelDeadline: true,
-            flightDeadline: true,
-            passportDeadline: true
-          }
-        },
-        documents: true,
-        payments: {
-          include: {
-            fichier: true
-          }
-        },
-        accompagnants: true
-      } as any,
-      orderBy: {
-        updated_at: 'desc'
-      },
-      skip,
-      take: limitNumber
+      select: reservationUrgencySelect as any
     });
-    
+
+    const now = new Date();
+    const ordered = (candidates as any[])
+      .map((r) => ({ id: r.id, urgent: isReservationUrgent(r, now), updatedAt: r.updated_at }))
+      // "Urgent" n'existant pas en base, le filtre par statut se termine ici.
+      .filter((r) => (wantsUrgentOnly ? r.urgent : true))
+      .sort((a, b) => {
+        if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      });
+
+    const totalReservations = ordered.length;
+    const pageIds = ordered.slice(skip, skip + limitNumber).map((r) => r.id);
+
+    // Seule la page demandée porte la relation complète (documents, paiements…).
+    const pageRows = pageIds.length
+      ? await prisma.reservation.findMany({
+          where: { id: { in: pageIds } },
+          include: {
+            agent: { select: { id: true, nom: true } },
+            program: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+                visaDeadline: true,
+                hotelDeadline: true,
+                flightDeadline: true,
+                passportDeadline: true
+              }
+            },
+            documents: true,
+            payments: {
+              include: {
+                fichier: true
+              }
+            },
+            accompagnants: true
+          } as any
+        })
+      : [];
+
+    // `where: { id: { in: [...] } }` ne garantit aucun ordre : on réapplique celui du tri.
+    const rowsById = new Map((pageRows as any[]).map((r) => [r.id, r]));
+    const reservations = pageIds
+      .map((id) => rowsById.get(id))
+      .filter((r): r is any => Boolean(r));
+
     // Calculer les métadonnées de pagination
     const totalPages = Math.ceil(totalReservations / limitNumber);
     const hasNextPage = pageNumber < totalPages;
@@ -302,7 +382,6 @@ router.get('/', async (req, res) => {
 router.get('/stats', async (req, res) => {
   try {
     const { program, programId, roomType, dateFrom, dateTo, status } = req.query;
-    const DAYS_URGENCY_WINDOW = 7;
 
     // Construire les filtres pour les stats
     const where: any = {
@@ -342,6 +421,7 @@ router.get('/stats', async (req, res) => {
         },
         program: {
           select: {
+            status: true,
             visaDeadline: true,
             hotelDeadline: true,
             flightDeadline: true,
@@ -356,32 +436,12 @@ router.get('/stats', async (req, res) => {
       (acc, reservation: any) => {
         const members = [reservation, ...(reservation.accompagnants || [])];
         const groupSize = members.length;
-        const passportGroupOk = members.every((m: any) => Boolean(m.statutPasseport));
-        const visaGroupOk = members.every((m: any) => Boolean(m.statutVisa));
-        const hotelGroupOk = members.every((m: any) => Boolean(m.statutHotel));
-        const flightGroupOk = members.every((m: any) => Boolean(m.statutVol));
 
-        let finalStatus = reservation.status as string;
-        if (reservation.status !== 'Complet') {
-          let isUrgent = false;
-          const deadlines = [
-            { ok: passportGroupOk, date: reservation.program?.passportDeadline },
-            { ok: visaGroupOk, date: reservation.program?.visaDeadline },
-            { ok: hotelGroupOk, date: reservation.program?.hotelDeadline },
-            { ok: flightGroupOk, date: reservation.program?.flightDeadline }
-          ];
-          for (const deadline of deadlines) {
-            if (deadline.ok || !deadline.date) continue;
-            const diff = (new Date(deadline.date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
-            if (diff >= 0 && diff <= DAYS_URGENCY_WINDOW) {
-              isUrgent = true;
-              break;
-            }
-          }
-          if (isUrgent) {
-            finalStatus = 'Urgent';
-          }
-        }
+        // Même calcul que la liste (helper partagé) : les compteurs ne peuvent
+        // plus diverger des pastilles affichées sur les cartes.
+        const finalStatus = isReservationUrgent(reservation, now)
+          ? 'Urgent'
+          : (reservation.status as string);
 
         if (status && status !== 'all' && finalStatus !== status) {
           return acc;

@@ -21,6 +21,7 @@ import exportRoutes from './routes/export';
 import fixedChargesRoutes from './routes/fixed-charges';
 import journalSuppressionRoutes from './routes/journal-suppression';
 import creditsRoutes from './routes/credits';
+import filesRoutes from './routes/files';
 import cron from 'node-cron';
 import { generateFixedChargesForYearMonth, formatYearMonth } from './services/fixedChargeGenerator';
 import { ensureWallet } from './services/creditService';
@@ -114,6 +115,7 @@ app.use('/api/room-availability', roomAvailabilityRouter);
 app.use('/api/fixed-charges', fixedChargesRoutes);
 app.use('/api/journal-suppressions', journalSuppressionRoutes);
 app.use('/api/credits', creditsRoutes);
+app.use('/api/files', filesRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

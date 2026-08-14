@@ -9,6 +9,7 @@ import { estPrixValide, normaliserPrix, plafonnerReduction } from "@/lib/prix";
 import { notifyCreditsUpdated } from "@/app/components/CreditCounter";
 import { generatePaymentReceiptFile } from "@/lib/generateReceipt";
 import { BlockersTooltip } from "@/components/blockers-tooltip";
+import { SubmitOverlay, type SubmitStep } from "@/components/reservations/SubmitOverlay";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -142,6 +143,7 @@ export default function NouvelleChambrePage() {
 
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStep, setSubmitStep] = useState<SubmitStep>("reservation");
   const [programs, setPrograms] = useState<Program[]>([]);
 
   const [formData, setFormData] = useState({
@@ -1168,7 +1170,11 @@ export default function NouvelleChambrePage() {
       return;
     }
 
+    setSubmitStep("reservation");
     setIsSubmitting(true);
+    // Reste vrai uniquement si tout a abouti : l'overlay doit rester affiché
+    // pendant la navigation, mais disparaître sur toute sortie anticipée.
+    let submitSucceeded = false;
     try {
       const totalPayments = payments.reduce(
         (sum, p) => sum + (Number(p.amount) || 0),
@@ -1290,6 +1296,7 @@ export default function NouvelleChambrePage() {
       }
 
       // 1) Upload passeport pour chaque membre (lié à son ID de réservation)
+      setSubmitStep("documents");
       await Promise.all(
         createdReservations.map(async (reservation: { id: number }, index: number) => {
           const passportFile = occupantPassportFiles[index];
@@ -1352,6 +1359,7 @@ export default function NouvelleChambrePage() {
       );
 
       // 3) Expenses pour chaque membre (leader + accompagnants) — en parallèle
+      setSubmitStep("finalisation");
       if (programInfo) {
         const roomMadina = programInfo.rooms.find((r) => r.id === Number(roomMadinaId));
         const roomMakkah = programInfo.rooms.find((r) => r.id === Number(roomMakkahId));
@@ -1463,12 +1471,16 @@ export default function NouvelleChambrePage() {
         throw new Error(patchErr.error || "Erreur mise à jour statuts leader");
       }
 
+      setSubmitStep("done");
+
       toast({
         title: "Succès",
         description: allPassportFilesProvided
           ? "Dossier chambre privée créé (passeports joints)."
           : "Dossier chambre privée créé. Vous pourrez ajouter les passeports plus tard depuis la fiche.",
       });
+      // L'overlay reste affiché pendant la navigation pour éviter un double envoi.
+      submitSucceeded = true;
       router.push("/reservations");
     } catch (error) {
       toast({
@@ -1480,7 +1492,7 @@ export default function NouvelleChambrePage() {
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false);
+      if (!submitSucceeded) setIsSubmitting(false);
     }
   };
 
@@ -1497,6 +1509,7 @@ export default function NouvelleChambrePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      <SubmitOverlay open={isSubmitting} step={submitStep} mode="create" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
         <div className="grid grid-cols-1 gap-6">
           <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm h-full">

@@ -3,6 +3,7 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import ExcelJS from 'exceljs';
 import { authenticateToken } from '../middleware/auth';
 import { parseHotelsAutre } from '../services/hotelsAutreService';
+import { buildFileDownloadUrl, publicApiBaseUrl } from '../services/fileDownloadLink';
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -103,33 +104,31 @@ function roomLabel(roomType: string, typeReservation: string): string {
   return m[roomType] || roomType;
 }
 
-function findDocUrl(
-  docs: { fileType: string; cloudinaryUrl: string | null; filePath: string }[],
+type DocRef = { id: number; fileType: string };
+
+function findDocId(
+  docs: DocRef[],
   ...matchers: ((t: string) => boolean)[]
-): string {
+): number | null {
   for (const d of docs || []) {
     const t = (d.fileType || '').toLowerCase();
     if (matchers.some((fn) => fn(t))) {
-      return d.cloudinaryUrl || d.filePath || '';
+      return d.id;
     }
   }
-  return '';
+  return null;
 }
 
-function passportUrl(
-  docs: { fileType: string; cloudinaryUrl: string | null; filePath: string }[]
-): string {
-  return findDocUrl(
+function passportDocId(docs: DocRef[]): number | null {
+  return findDocId(
     docs,
     (t) => t.includes('pass') || t.includes('passeport'),
     (t) => t === 'passport'
   );
 }
 
-function cinUrl(
-  docs: { fileType: string; cloudinaryUrl: string | null; filePath: string }[]
-): string {
-  return findDocUrl(docs, (t) => t.includes('cin') || t.includes('carte identite'));
+function cinDocId(docs: DocRef[]): number | null {
+  return findDocId(docs, (t) => t.includes('cin') || t.includes('carte identite'));
 }
 
 type Pay = {
@@ -137,28 +136,41 @@ type Pay = {
   paymentMethod: string;
   paymentDate: Date;
   fichier: {
-    cloudinaryUrl: string | null;
-    filePath: string;
+    id: number;
   } | null;
 };
 
-function paymentImages(payments: Pay[]) {
+function paymentDocIds(payments: Pay[]) {
   const sorted = [...payments].sort(
     (a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
   );
-  let recu = '';
-  let virement = '';
+  let recu: number | null = null;
+  let virement: number | null = null;
   for (const p of sorted) {
-    const url = p.fichier?.cloudinaryUrl || p.fichier?.filePath || '';
-    if (!url) continue;
+    const id = p.fichier?.id;
+    if (!id) continue;
     const method = (p.paymentMethod || '').toLowerCase();
     if (method.includes('virement')) {
-      if (!virement) virement = url;
+      if (!virement) virement = id;
     } else {
-      if (!recu) recu = url;
+      if (!recu) recu = id;
     }
   }
   return { recu, virement };
+}
+
+/**
+ * Cellule Excel cliquable pointant vers /api/files/:id/download.
+ * On ne met plus l'URL Cloudinary brute : les PDF y sont stockés en `raw`
+ * sans extension, le fichier téléchargé arrivait donc sans extension et ne
+ * s'ouvrait pas. Le backend renvoie le bon Content-Type et un nom lisible.
+ */
+function docCell(baseUrl: string, id: number | null, label: string): string | ExcelJS.CellHyperlinkValue {
+  if (!id) return '';
+  return {
+    text: label,
+    hyperlink: buildFileDownloadUrl(baseUrl, id),
+  };
 }
 
 function avances(payments: Pay[]): [string, string, string] {
@@ -210,6 +222,14 @@ const HEADERS = [
   'image virement',
 ];
 
+/** Index (1-based) des colonnes contenant un lien de document. */
+const DOC_LINK_COLUMNS = [
+  HEADERS.indexOf('Image passport') + 1,
+  HEADERS.indexOf('Image CIN') + 1,
+  HEADERS.indexOf('image recu') + 1,
+  HEADERS.indexOf('image virement') + 1,
+];
+
 function buildExportWhere(
   query: Record<string, string | undefined>
 ): Prisma.ReservationWhereInput {
@@ -240,6 +260,7 @@ router.get(
     try {
       const query = req.query as Record<string, string | undefined>;
       const where = buildExportWhere(query);
+      const apiBaseUrl = publicApiBaseUrl(req);
 
       const leadersRaw = await prisma.reservation.findMany({
         where,
@@ -378,7 +399,7 @@ router.get(
             const docs = person.documents || [];
             const pays = (isLeader ? fin.payments : (person as any).payments || []) as Pay[];
             const [a1, a2, a3] = avances(pays);
-            const { recu, virement } = paymentImages(pays);
+            const { recu, virement } = paymentDocIds(pays);
             const remis = isLeader ? fin.paidAmount : (person as any).paidAmount ?? 0;
             const vente = isLeader ? fin.price : (person as any).price ?? 0;
             const reste = Math.max(0, Math.round((vente - remis) * 100) / 100);
@@ -388,7 +409,7 @@ router.get(
             const hm = resolveHotel(person.hotelMadina) || resolveHotel(leader.hotelMadina);
             const autres = autreHotelsLabel(person.hotelsAutre) || autreHotelsLabel(leader.hotelsAutre);
 
-            sheet.addRow([
+            const row = sheet.addRow([
               idx,
               groupe,
               nomComplet,
@@ -399,8 +420,8 @@ router.get(
               hm,
               autres,
               chambre,
-              passportUrl(docs as any),
-              cinUrl(docs as any),
+              docCell(apiBaseUrl, passportDocId(docs as any), 'Passeport'),
+              docCell(apiBaseUrl, cinDocId(docs as any), 'CIN'),
               person.phone || '',
               person.statutVisa ? 'Oui' : 'Non',
               person.statutVol ? 'Oui' : 'Non',
@@ -413,9 +434,17 @@ router.get(
               isLeader ? String(totalVentesGroupe) : '',
               transportLabel(person.transport),
               person.remarque || '',
-              isLeader ? recu : '',
-              isLeader ? virement : '',
+              isLeader ? docCell(apiBaseUrl, recu, 'Reçu') : '',
+              isLeader ? docCell(apiBaseUrl, virement, 'Virement') : '',
             ]);
+
+            // Colonnes documents : style lien pour qu'elles soient reconnaissables
+            for (const col of DOC_LINK_COLUMNS) {
+              const cell = row.getCell(col);
+              if (cell.value && typeof cell.value === 'object' && 'hyperlink' in cell.value) {
+                cell.font = { color: { argb: 'FF0563C1' }, underline: true };
+              }
+            }
           };
 
           emitRow(leader, true);

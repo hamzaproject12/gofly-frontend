@@ -7,6 +7,7 @@ import { formatMontant } from "@/lib/format"
 import { estPrixValide } from "@/lib/prix"
 import { generatePaymentReceiptFile } from "@/lib/generateReceipt"
 import { BlockersTooltip } from "@/components/blockers-tooltip"
+import { SubmitOverlay, type SubmitStep } from "@/components/reservations/SubmitOverlay"
 import ProgramStatusBanner from "@/components/ProgramStatusBanner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -364,6 +365,7 @@ export default function EditReservation() {
 
   const [loading, setLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitStep, setSubmitStep] = useState<SubmitStep>("reservation")
   const [programs, setPrograms] = useState<Program[]>([])
   // Statut du cycle de vie du programme lié (bandeau lecture seule)
   const [programStatus, setProgramStatus] = useState<"ACTIF" | "CLOTURE" | "ARCHIVE" | null>(null)
@@ -736,7 +738,12 @@ export default function EditReservation() {
       return;
     }
 
+    setSubmitStep("reservation")
     setIsSubmitting(true)
+
+    // Reste vrai uniquement si tout a abouti : l'overlay doit rester affiché
+    // pendant la navigation, mais disparaître sur toute sortie anticipée.
+    let submitSucceeded = false
 
     try {
       const fileUploadErrors: string[] = []
@@ -912,6 +919,7 @@ export default function EditReservation() {
       }
 
       // 3. Supprimer l'ancien passeport si on a un nouveau ou si on a marqué pour suppression
+      setSubmitStep("documents")
       const fileIdToDelete = passportToDelete || (documents.passport ? getPassportFileId() : null);
       if (fileIdToDelete !== null) {
         console.log('🗑️ Suppression de l\'ancien passeport...')
@@ -1048,6 +1056,7 @@ export default function EditReservation() {
         })
       }
 
+      setSubmitStep("finalisation")
       // Si c'est un dossier leader, gérer les fichiers passeport des accompagnants
       // et accumuler leurs champs pour un seul appel groupé (une entrée journal).
       const accompagnantsPayload: any[] = []
@@ -1123,6 +1132,10 @@ export default function EditReservation() {
         }
       }
 
+      setSubmitStep("done")
+
+      // L'overlay reste affiché pendant la navigation pour éviter un double envoi.
+      submitSucceeded = true
       router.push('/reservations')
     } catch (error) {
       console.error('Erreur modification:', error)
@@ -1132,7 +1145,7 @@ export default function EditReservation() {
         variant: "destructive"
       })
     } finally {
-      setIsSubmitting(false)
+      if (!submitSucceeded) setIsSubmitting(false)
     }
   }
 
@@ -1458,17 +1471,11 @@ export default function EditReservation() {
       return url;
     }
     
-    // Pour les URLs Cloudinary raw/upload, ajouter .pdf à la fin pour forcer le Content-Type
-    if (url.includes('/raw/upload/')) {
-      // Extraire la partie avant les paramètres de requête/ancre
-      const urlParts = url.split(/[?#]/);
-      const baseUrl = urlParts[0];
-      const queryAndHash = urlParts.slice(1).join('');
-      
-      // Ajouter .pdf avant les paramètres de requête/ancre
-      return baseUrl + '.pdf' + (queryAndHash ? (url.includes('?') ? '?' : '#') + queryAndHash : '');
-    }
-    
+    // NE PAS ajouter .pdf aux URLs Cloudinary raw/upload : en `raw`, l'extension
+    // fait partie du public_id, donc l'URL avec .pdf ajouté renvoie une 404
+    // ("Resource not found"). Les anciens PDF sont stockés sans extension, on
+    // sert donc l'URL telle quelle.
+
     // Pour les autres types d'URLs Cloudinary, retourner telle quelle
     return url;
   };
@@ -2140,6 +2147,7 @@ export default function EditReservation() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      <SubmitOverlay open={isSubmitting} step={submitStep} mode="edit" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="mb-8">

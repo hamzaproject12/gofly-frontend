@@ -103,11 +103,16 @@ class CloudinaryService {
     fileType: string = 'payment'
   ): Promise<UploadResult> {
     const folder = `omra-travel/${fileType}s`;
-    const public_id = `${fileType}_${reservationId}_${Date.now()}`;
 
     // Déterminer le resource_type selon le type de fichier
     // Pour les PDFs, utiliser 'raw' explicitement pour éviter qu'ils soient stockés comme images
-    const resourceType = file.mimetype === 'application/pdf' ? 'raw' : 'auto';
+    const isPdf = file.mimetype === 'application/pdf';
+    const resourceType = isPdf ? 'raw' : 'auto';
+
+    // En `raw`, Cloudinary n'ajoute aucune extension à l'URL : elle doit être
+    // dans le public_id, sinon le fichier téléchargé arrive sans extension
+    // (« passport_176_1786535713924 ») et ne s'ouvre pas.
+    const public_id = `${fileType}_${reservationId}_${Date.now()}${isPdf ? '.pdf' : ''}`;
 
     // Optimisations spécifiques pour les reçus de paiement
     const transformation = [];

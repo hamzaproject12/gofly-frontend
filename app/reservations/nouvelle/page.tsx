@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { HotelCategoryBlock } from "@/components/reservations/HotelCategoryBlock"
+import { SubmitOverlay, type SubmitStep } from "@/components/reservations/SubmitOverlay"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 
@@ -159,6 +160,7 @@ export default function NouvelleReservation() {
   const { toast } = useToast()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitStep, setSubmitStep] = useState<SubmitStep>("reservation")
   const [programs, setPrograms] = useState<Program[]>([])
   const [loading, setLoading] = useState(true)
   const [documents, setDocuments] = useState<{
@@ -1654,6 +1656,7 @@ export default function NouvelleReservation() {
       return;
     }
 
+    setSubmitStep("reservation");
     setIsSubmitting(true);
 
     // Calculer la somme des montants des paiements juste avant l'insertion
@@ -1702,6 +1705,10 @@ export default function NouvelleReservation() {
 
     // Déclare l'objet local fichierIds ici
     const fichierIds: { visa: number | null, flightBooked: number | null, hotelBooked: number | null } = { visa: null, flightBooked: null, hotelBooked: null };
+
+    // Reste vrai uniquement si tout a abouti : l'overlay doit rester affiché
+    // pendant la navigation, mais disparaître sur toute sortie anticipée.
+    let submitSucceeded = false;
 
     try {
       // Construire l'objet documents pour indiquer les statuts d'attachement
@@ -1785,6 +1792,7 @@ export default function NouvelleReservation() {
       notifyCreditsUpdated();
 
       // 2. Upload all files with the reservation ID
+      setSubmitStep("documents");
       const fileUploadPromises = [];
       const fileUploadErrors: string[] = [];
       const newUploadedStatus = { ...uploadedStatus };
@@ -1977,6 +1985,7 @@ export default function NouvelleReservation() {
       setUploadedStatus(newUploadedStatus);
 
       // Insertion des Expenses automatiques basées sur les services activés
+      setSubmitStep("finalisation");
       const expenseErrors: string[] = [];
       const expensesToCreate = [];
 
@@ -2140,12 +2149,16 @@ export default function NouvelleReservation() {
         }),
       });
 
+      setSubmitStep("done");
+
       toast({
         title: "Succès",
         description: "La réservation, les documents et les dépenses fournisseur ont été enregistrés avec succès",
       });
 
       // Rediriger uniquement après que tout a été enregistré avec succès
+      // L'overlay reste affiché pendant la navigation pour éviter un double envoi.
+      submitSucceeded = true;
       router.push("/reservations");
     } catch (error) {
       console.error("Erreur lors de la création de la réservation:", error);
@@ -2155,12 +2168,13 @@ export default function NouvelleReservation() {
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false);
+      if (!submitSucceeded) setIsSubmitting(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      <SubmitOverlay open={isSubmitting} step={submitStep} mode="create" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
         {/* Layout en 1 colonne : Formulaire prend toute la page */}
         <div className="grid grid-cols-1 gap-6">

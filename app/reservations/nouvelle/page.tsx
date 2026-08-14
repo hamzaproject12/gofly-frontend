@@ -1670,9 +1670,25 @@ export default function NouvelleReservation() {
       return;
     }
 
-    // Déterminer le statut de la réservation
-    const allDocsAttached = attachmentStatus.passport && attachmentStatus.visa && attachmentStatus.flightBooked && attachmentStatus.hotelBooked;
-    const isPaid = paidAmount === parseInt(formData.prix, 10);
+    // Déterminer le statut de la réservation à partir des statuts réellement
+    // enregistrés (ceux qui alimentent les pastilles de la liste). Cette page ne
+    // collecte qu'un fichier passeport : se baser sur attachmentStatus.visa /
+    // .flightBooked / .hotelBooked rendait tout dossier "Incomplet" à vie.
+    const statutVisaEnregistre = customization.includeVisa ? formData.statutVisa : false;
+    const statutHotelEnregistre =
+      formData.hotelMadina !== "none" ||
+      formData.hotelMakkah !== "none" ||
+      Object.keys(selectedPlacesAutre).length > 0
+        ? formData.statutHotel
+        : false;
+    const statutVolEnregistre = customization.includeAvion ? formData.statutVol : false;
+    const allDocsAttached =
+      attachmentStatus.passport &&
+      statutVisaEnregistre &&
+      statutHotelEnregistre &&
+      statutVolEnregistre;
+    // Un dossier à 0 DH est soldé d'emblée (même règle que la création par chambre).
+    const isPaid = paidAmount >= suggestedPrice;
     const reservationStatus = allDocsAttached && isPaid ? "Complet" : "Incomplet";
 
     // Réinitialiser les statuts d'upload
@@ -1720,9 +1736,9 @@ export default function NouvelleReservation() {
           reservationDate: formData.dateReservation,
           status: reservationStatus,
           statutPasseport: attachmentStatus.passport,
-          statutVisa: customization.includeVisa ? formData.statutVisa : false,
-          statutHotel: (formData.hotelMadina !== "none" || formData.hotelMakkah !== "none" || Object.keys(selectedPlacesAutre).length > 0) ? formData.statutHotel : false,
-          statutVol: customization.includeAvion ? formData.statutVol : false,
+          statutVisa: statutVisaEnregistre,
+          statutHotel: statutHotelEnregistre,
+          statutVol: statutVolEnregistre,
           paidAmount: paidAmount,
           plan: customization.plan,
           // Ajouter les IDs des chambres sélectionnées
@@ -2108,9 +2124,19 @@ export default function NouvelleReservation() {
         method: 'PATCH',
         body: JSON.stringify({
           statutPasseport: newUploadedStatus.passport,
-          statutVisa: customization.includeVisa ? formData.statutVisa : false,
-          statutHotel: (formData.hotelMadina !== "none" || formData.hotelMakkah !== "none" || Object.keys(selectedPlacesAutre).length > 0) ? formData.statutHotel : false,
-          statutVol: customization.includeAvion ? formData.statutVol : false
+          statutVisa: statutVisaEnregistre,
+          statutHotel: statutHotelEnregistre,
+          statutVol: statutVolEnregistre,
+          // Le passeport n'est confirmé qu'après l'upload : on rejoue le calcul du
+          // statut global pour qu'il reste cohérent avec les quatre pastilles.
+          status:
+            newUploadedStatus.passport &&
+            statutVisaEnregistre &&
+            statutHotelEnregistre &&
+            statutVolEnregistre &&
+            isPaid
+              ? "Complet"
+              : "Incomplet"
         }),
       });
 

@@ -21,7 +21,7 @@ import {
   DollarSign,
   Plane,
   PiggyBank,
-  Clock,
+  Info,
   Save,
   ArrowLeft,
   User,
@@ -44,6 +44,8 @@ interface ProgramApi {
   id: number
   name: string
   created_at: string
+  dateDepart: string | null
+  dateArrivee: string | null
   visaDeadline: string | null
   hotelDeadline: string | null
   flightDeadline: string | null
@@ -68,6 +70,33 @@ interface ProgramApi {
     nbrPlaceTotal: number
     nbrPlaceRestantes?: number
   }>
+}
+
+/** Convertit une date ISO renvoyée par l'API en `Date`, ou `null` si absente/invalide. */
+function toDate(value: string | null | undefined): Date | null {
+  if (!value) return null
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+/**
+ * Repli pour les programmes créés avant l'arrivée de `dateDepart` : leurs colonnes
+ * de voyage sont NULL (migration additive) mais les 4 dates limites étaient saisies.
+ * On propose la plus ancienne comme date de départ — l'admin peut la corriger avant
+ * d'enregistrer. Aucun repli pour `dateArrivee` : rien en base ne permet de la deviner.
+ */
+function ancienneDateDepart(program: ProgramApi): Date | null {
+  const deadlines = [
+    program.passportDeadline,
+    program.visaDeadline,
+    program.flightDeadline,
+    program.hotelDeadline,
+  ]
+    .map(toDate)
+    .filter((d): d is Date => d !== null)
+
+  if (deadlines.length === 0) return null
+  return deadlines.reduce((plusAncienne, d) => (d < plusAncienne ? d : plusAncienne))
 }
 
 function mapRoomTypeToIndex(roomType: RoomType): 1 | 2 | 3 | 4 | 5 {
@@ -123,12 +152,8 @@ export default function ModifierProgrammePage() {
       ordre: string
       chambres: { [key: number]: { nb: string; prix: string } }
     }>,
-    datesLimites: {
-      visa: null as Date | null,
-      hotels: null as Date | null,
-      billets: null as Date | null,
-      passport: null as Date | null,
-    },
+    dateDepart: null as Date | null,
+    dateArrivee: null as Date | null,
   })
 
   // Contraintes calculées à partir des rooms existantes: par hôtel et type → {occupied, total}
@@ -293,12 +318,8 @@ export default function ModifierProgrammePage() {
           hotelsMadina: selectedMadina,
           hotelsMakkah: selectedMakkah,
           hotelsAutre: selectedAutre,
-          datesLimites: {
-            visa: program.visaDeadline ? new Date(program.visaDeadline) : null,
-            hotels: program.hotelDeadline ? new Date(program.hotelDeadline) : null,
-            billets: program.flightDeadline ? new Date(program.flightDeadline) : null,
-            passport: program.passportDeadline ? new Date(program.passportDeadline) : null,
-          },
+          dateDepart: toDate(program.dateDepart) ?? ancienneDateDepart(program),
+          dateArrivee: toDate(program.dateArrivee),
         })
         setRoomConstraints({ Madina: constraintsMadina, Makkah: constraintsMakkah, Autre: constraintsAutre })
       } catch (error) {
@@ -313,13 +334,7 @@ export default function ModifierProgrammePage() {
   }, [id, toast])
 
   const isFormValid = useMemo(() => {
-    return (
-      formData.nom &&
-      formData.datesLimites.passport &&
-      formData.datesLimites.visa &&
-      formData.datesLimites.billets &&
-      formData.datesLimites.hotels
-    )
+    return Boolean(formData.nom && formData.dateDepart && formData.dateArrivee)
   }, [formData])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -401,10 +416,14 @@ export default function ModifierProgrammePage() {
         profitEconomique: formData.profitEconomique ? parseFloat(formData.profitEconomique) : undefined,
         profitNormal: formData.profitNormal ? parseFloat(formData.profitNormal) : undefined,
         profitVIP: formData.profitVIP ? parseFloat(formData.profitVIP) : undefined,
-        visaDeadline: formData.datesLimites.visa ?? undefined,
-        hotelDeadline: formData.datesLimites.hotels ?? undefined,
-        flightDeadline: formData.datesLimites.billets ?? undefined,
-        passportDeadline: formData.datesLimites.passport ?? undefined,
+        dateDepart: formData.dateDepart ?? undefined,
+        dateArrivee: formData.dateArrivee ?? undefined,
+        // Les 4 dates limites sont alignées sur la date de départ : plus de saisie
+        // manuelle, le bloc « Dates limites » a été retiré du formulaire.
+        visaDeadline: formData.dateDepart ?? undefined,
+        hotelDeadline: formData.dateDepart ?? undefined,
+        flightDeadline: formData.dateDepart ?? undefined,
+        passportDeadline: formData.dateDepart ?? undefined,
         hotelsMadina: normalizedMadina,
         hotelsMakkah: normalizedMakkah,
         hotelsAutre: normalizedAutre,
@@ -495,7 +514,55 @@ export default function ModifierProgrammePage() {
                             className="h-12 border-2 border-blue-200 bg-gray-50 rounded-lg cursor-not-allowed"
                           />
                         </div>
+                        {([
+                          { key: "dateDepart", label: "Date de départ", icon: Plane },
+                          { key: "dateArrivee", label: "Date d'arrivée", icon: MapPin },
+                        ] as const).map((item) => {
+                          const dateValue = formData[item.key]
+                          const Icon = item.icon
+                          return (
+                            <div key={item.key} className="space-y-2">
+                              <Label className="text-blue-700 font-medium flex items-center gap-2">
+                                <Icon className="h-4 w-4" />
+                                {item.label} *
+                              </Label>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    className="w-full justify-start text-left font-normal h-12 border-2 border-blue-200 hover:border-blue-300 rounded-lg bg-white/80"
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4 text-blue-500" />
+                                    {dateValue ? (
+                                      format(dateValue, "PPP", { locale: fr })
+                                    ) : (
+                                      <span>Sélectionner une date</span>
+                                    )}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0 shadow-xl border-0">
+                                  <CalendarComponent
+                                    mode="single"
+                                    selected={dateValue ?? undefined}
+                                    onSelect={(date) =>
+                                      setFormData((prev) => ({ ...prev, [item.key]: date ?? null }))
+                                    }
+                                    initialFocus
+                                    className="rounded-lg"
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                          )
+                        })}
                       </div>
+                      <p className="mt-4 text-sm text-blue-700 bg-white/70 border border-blue-200 rounded-lg px-3 py-2 flex items-start gap-2">
+                        <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
+                        <span>
+                          Les dates limites (passeport, visa, billets, hôtels) sont automatiquement
+                          alignées sur la date de départ.
+                        </span>
+                      </p>
                     </div>
 
                     <div className="bg-gradient-to-br from-green-50 to-emerald-100 p-6 rounded-xl border border-green-200 mb-6">
@@ -1009,48 +1076,8 @@ export default function ModifierProgrammePage() {
                       </TabsContent>
                     </Tabs>
 
-                    {/* Dates limites */}
-                    <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200">
-                      <h3 className="text-lg font-semibold text-orange-800 mb-4 flex items-center gap-2">
-                        <Clock className="h-5 w-5" />
-                        Dates limites
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {([
-                          { key: "passport", label: "Date limite passeport" },
-                          { key: "visa", label: "Date limite visa" },
-                          { key: "billets", label: "Date limite billets" },
-                          { key: "hotels", label: "Date limite hôtels" },
-                        ] as const).map((item) => {
-                          type Key = "visa" | "hotels" | "billets" | "passport"
-                          const key = item.key as Key
-                          const dateValue = formData.datesLimites[key]
-                          const selectedDate: Date | undefined = dateValue ?? undefined
-                          return (
-                            <div key={item.key} className="space-y-2">
-                              <Label className="text-orange-700 font-medium text-sm">{item.label}</Label>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button variant="outline" className="w-full justify-start text-left font-normal h-10 border-2 border-orange-200 hover:border-orange-300 rounded-lg text-sm">
-                                    <CalendarIcon className="mr-2 h-4 w-4 text-orange-500" />
-                                    {dateValue ? format(dateValue, "PPP", { locale: fr }) : <span>Sélectionner une date</span>}
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0 shadow-xl border-0">
-                                  <CalendarComponent
-                                    mode="single"
-                                    selected={selectedDate}
-                                    onSelect={(date) => setFormData({ ...formData, datesLimites: { ...formData.datesLimites, [key]: date || null } })}
-                                    initialFocus
-                                    className="rounded-lg"
-                                  />
-                                </PopoverContent>
-                              </Popover>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
+                    {/* Le bloc « Dates limites » a été retiré : les 4 deadlines sont
+                        désormais dérivées de la date de départ (voir Informations de base). */}
 
                     <div className="flex gap-4 mt-8">
                       <Button type="submit" disabled={!isFormValid || isSubmitting} className="flex-1 h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">

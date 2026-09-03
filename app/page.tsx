@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,7 +27,11 @@ import {
   Calendar as CalendarIcon,
   ChevronUp,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  PlaneTakeoff,
+  PlaneLanding,
+  AlertTriangle,
+  Siren
 } from 'lucide-react';
 
 interface Agent {
@@ -62,6 +66,10 @@ interface Program {
   id: number;
   name: string;
   created_at: string;
+  /** Date de départ du voyage (null tant qu'elle n'est pas saisie sur le programme). */
+  dateDepart?: string | null;
+  /** Date d'arrivée du voyage. */
+  dateArrivee?: string | null;
   dureeJours?: number;
   statistics: {
     totalRooms: number;
@@ -111,6 +119,75 @@ const PROGRAM_ACCENTS = [
   'border-l-rose-500',
   'border-l-teal-500',
 ];
+
+/**
+ * Fenêtre d'alerte avant une date de voyage, en jours calendaires.
+ * Une date qui tombe dans cette fenetre (aujourd'hui inclus) declenche une alerte.
+ */
+const JOURS_ALERTE_VOYAGE = 2;
+
+/**
+ * Nombre de jours calendaires entre aujourd'hui et `value` : 0 = aujourd'hui,
+ * 2 = dans deux jours, négatif = date déjà passée. `null` si la date est absente
+ * ou invalide. On compare des minuits locaux pour que l'heure de la journée
+ * n'influence jamais le décompte.
+ */
+function joursAvant(value: string | Date | null | undefined): number | null {
+  if (!value) return null;
+  const cible = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(cible.getTime())) return null;
+  const minuitCible = new Date(cible.getFullYear(), cible.getMonth(), cible.getDate());
+  const now = new Date();
+  const minuitAujourdhui = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((minuitCible.getTime() - minuitAujourdhui.getTime()) / 86400000);
+}
+
+/** Vrai si l'échéance tombe dans les `JOURS_ALERTE_VOYAGE` jours à venir. */
+function estImminente(jours: number | null): jours is number {
+  return jours !== null && jours >= 0 && jours <= JOURS_ALERTE_VOYAGE;
+}
+
+/** Libellé d'échéance lisible : « aujourd'hui », « demain », « dans 2 jours ». */
+function libelleEcheance(jours: number): string {
+  if (jours === 0) return "aujourd'hui";
+  if (jours === 1) return 'demain';
+  return `dans ${jours} jours`;
+}
+
+/**
+ * Pastille d'une date de voyage. Elle vire à l'ambre quand le départ approche et
+ * au rouge clignotant quand c'est l'arrivée — même code couleur que les bandeaux
+ * d'alerte en haut du dashboard.
+ */
+function DateVoyageChip({
+  type,
+  value,
+}: {
+  type: 'depart' | 'arrivee';
+  value?: string | null;
+}) {
+  const jours = joursAvant(value);
+  const imminente = estImminente(jours);
+  const Icon = type === 'depart' ? PlaneTakeoff : PlaneLanding;
+  const label = type === 'depart' ? 'Départ' : 'Arrivée';
+  const tone = !imminente
+    ? 'bg-slate-100 text-slate-700 ring-slate-200'
+    : type === 'arrivee'
+      ? 'bg-red-100 text-red-800 ring-red-300 animate-pulse'
+      : 'bg-amber-100 text-amber-900 ring-amber-300';
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${tone}`}
+    >
+      <Icon className="h-3 w-3 shrink-0" />
+      <span>
+        {label} : {value ? formatDateFr(value) : '—'}
+      </span>
+      {imminente && <span className="font-bold">· {libelleEcheance(jours)}</span>}
+    </span>
+  );
+}
 
 // En-tête coloré d'un bloc ville : icône, nom, nombre d'hôtels et places libres
 function CityHeader({
@@ -208,6 +285,41 @@ export default function HomePage() {
   const [viewMode, setViewMode] = useState<'dashboard' | 'hotel-detail'>('dashboard');
   const [collapsedPrograms, setCollapsedPrograms] = useState<Set<number>>(new Set());
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  // Les échéances sont calculées à partir de l'heure courante : ce compteur force un
+  // recalcul périodique pour qu'un dashboard laissé ouvert n'affiche pas un décompte périmé.
+  const [tickEcheances, setTickEcheances] = useState(0);
+
+  // Rafraîchissement horaire du décompte des alertes (pas de nouvel appel réseau).
+  useEffect(() => {
+    const timer = setInterval(() => setTickEcheances((t) => t + 1), 60 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  /**
+   * Programmes dont une date de voyage tombe dans les {@link JOURS_ALERTE_VOYAGE} jours.
+   * Les programmes supprimés sont exclus : ils n'ont plus de voyage à surveiller.
+   */
+  const alertesVoyage = useMemo(() => {
+    const departs: { program: Program; jours: number }[] = [];
+    const arrivees: { program: Program; jours: number }[] = [];
+
+    for (const program of roomData?.data ?? []) {
+      if (program.isDeleted) continue;
+
+      const joursDepart = joursAvant(program.dateDepart);
+      if (estImminente(joursDepart)) departs.push({ program, jours: joursDepart });
+
+      const joursArrivee = joursAvant(program.dateArrivee);
+      if (estImminente(joursArrivee)) arrivees.push({ program, jours: joursArrivee });
+    }
+
+    const plusUrgentDAbord = (a: { jours: number }, b: { jours: number }) => a.jours - b.jours;
+    return {
+      departs: departs.sort(plusUrgentDAbord),
+      arrivees: arrivees.sort(plusUrgentDAbord),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomData, tickEcheances]);
 
   const toggleProgram = (programId: number) => {
     setCollapsedPrograms((prev) => {
@@ -690,6 +802,82 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* SUPER ALERTE — arrivée imminente (≤ 2 jours) */}
+        {alertesVoyage.arrivees.length > 0 && (
+          <div
+            role="alert"
+            className="mb-4 overflow-hidden rounded-xl border-2 border-red-500 bg-red-50 shadow-lg ring-2 ring-red-300"
+          >
+            <div className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-rose-600 px-4 py-2">
+              <Siren className="h-5 w-5 shrink-0 animate-pulse text-white" />
+              <h2 className="text-sm font-bold uppercase tracking-wide text-white sm:text-base">
+                Super alerte — arrivée imminente
+              </h2>
+              <span className="ml-auto rounded-full bg-white/25 px-2 py-0.5 text-xs font-bold text-white">
+                {alertesVoyage.arrivees.length} programme
+                {alertesVoyage.arrivees.length > 1 ? 's' : ''}
+              </span>
+            </div>
+            <ul className="divide-y divide-red-200">
+              {alertesVoyage.arrivees.map(({ program, jours }) => (
+                <li key={program.id}>
+                  <Link
+                    href={`/reservations?programme=${program.id}`}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 transition-colors hover:bg-red-100"
+                  >
+                    <PlaneLanding className="h-4 w-4 shrink-0 text-red-600" />
+                    <span className="font-bold text-red-900">{program.name}</span>
+                    <span className="text-sm text-red-800">
+                      Arrivée le {formatDateFr(program.dateArrivee)}
+                    </span>
+                    <span className="ml-auto rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-bold uppercase text-white">
+                      {libelleEcheance(jours)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Alerte — départ imminent (≤ 2 jours) */}
+        {alertesVoyage.departs.length > 0 && (
+          <div
+            role="alert"
+            className="mb-4 overflow-hidden rounded-xl border-2 border-amber-400 bg-amber-50 shadow-md"
+          >
+            <div className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2">
+              <AlertTriangle className="h-5 w-5 shrink-0 text-white" />
+              <h2 className="text-sm font-bold uppercase tracking-wide text-white sm:text-base">
+                Alerte — départ imminent
+              </h2>
+              <span className="ml-auto rounded-full bg-white/25 px-2 py-0.5 text-xs font-bold text-white">
+                {alertesVoyage.departs.length} programme
+                {alertesVoyage.departs.length > 1 ? 's' : ''}
+              </span>
+            </div>
+            <ul className="divide-y divide-amber-200">
+              {alertesVoyage.departs.map(({ program, jours }) => (
+                <li key={program.id}>
+                  <Link
+                    href={`/reservations?programme=${program.id}`}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 transition-colors hover:bg-amber-100"
+                  >
+                    <PlaneTakeoff className="h-4 w-4 shrink-0 text-amber-700" />
+                    <span className="font-bold text-amber-900">{program.name}</span>
+                    <span className="text-sm text-amber-800">
+                      Départ le {formatDateFr(program.dateDepart)}
+                    </span>
+                    <span className="ml-auto rounded-full bg-amber-600 px-2.5 py-0.5 text-xs font-bold uppercase text-white">
+                      {libelleEcheance(jours)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Contenu conditionnel selon la vue */}
         {viewMode === 'dashboard' ? (
           /* Vue Dashboard - Liste des programmes */
@@ -719,6 +907,11 @@ export default function HomePage() {
                           <CalendarIcon className="h-3 w-3" />
                           {formatDateFr(program.created_at)}
                         </p>
+                        {/* Dates de voyage : passent en alerte quand l'échéance approche */}
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          <DateVoyageChip type="depart" value={program.dateDepart} />
+                          <DateVoyageChip type="arrivee" value={program.dateArrivee} />
+                        </div>
                       </div>
                     </div>
 
@@ -947,6 +1140,11 @@ export default function HomePage() {
                             <CalendarIcon className="h-3 w-3" />
                             {formatDateFr(program.created_at)}
                           </p>
+                          {/* Dates de voyage : passent en alerte quand l'échéance approche */}
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            <DateVoyageChip type="depart" value={program.dateDepart} />
+                            <DateVoyageChip type="arrivee" value={program.dateArrivee} />
+                          </div>
                         </div>
                       </div>
 

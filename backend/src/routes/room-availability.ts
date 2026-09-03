@@ -108,6 +108,9 @@ router.get('/', async (req, res) => {
         id: program.id,
         name: program.name,
         created_at: program.created_at,
+        // Dates de voyage : alimentent l'affichage et les alertes d'imminence du dashboard.
+        dateDepart: program.dateDepart,
+        dateArrivee: program.dateArrivee,
         dureeJours,
         isDeleted: (program as any).isDeleted || false,
         deletedAt: (program as any).deletedAt || null,

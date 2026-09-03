@@ -142,6 +142,8 @@ model Program {
   status           ProgramStatus        @default(ACTIF)
   dateCloture      DateTime?
   dateArchivage    DateTime?
+  dateDepart       DateTime?
+  dateArrivee      DateTime?
   visaDeadline     DateTime?
   hotelDeadline    DateTime?
   flightDeadline   DateTime?

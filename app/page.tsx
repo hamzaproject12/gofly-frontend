@@ -30,6 +30,7 @@ import {
   ChevronRight,
   PlaneTakeoff,
   PlaneLanding,
+  CalendarClock,
   AlertTriangle,
   Siren
 } from 'lucide-react';
@@ -155,8 +156,8 @@ function libelleEcheance(jours: number): string {
 }
 
 /**
- * Pastille d'une date de voyage. Elle vire à l'ambre quand le départ approche et
- * au rouge clignotant quand c'est l'arrivée — même code couleur que les bandeaux
+ * Pastille d'une date de voyage. Elle vire au rouge clignotant quand le départ
+ * approche et à l'ambre quand c'est l'arrivée — même code couleur que les bandeaux
  * d'alerte en haut du dashboard.
  */
 function DateVoyageChip({
@@ -172,7 +173,7 @@ function DateVoyageChip({
   const label = type === 'depart' ? 'Départ' : 'Arrivée';
   const tone = !imminente
     ? 'bg-slate-100 text-slate-700 ring-slate-200'
-    : type === 'arrivee'
+    : type === 'depart'
       ? 'bg-red-100 text-red-800 ring-red-300 animate-pulse'
       : 'bg-amber-100 text-amber-900 ring-amber-300';
 
@@ -186,6 +187,69 @@ function DateVoyageChip({
       </span>
       {imminente && <span className="font-bold">· {libelleEcheance(jours)}</span>}
     </span>
+  );
+}
+
+/**
+ * Jours restants avant le départ, en clair sur chaque programme : « 5j », « 7j »…
+ * La couleur suit l'urgence : rouge clignotant sous {@link JOURS_ALERTE_VOYAGE} jours
+ * (même seuil que la super alerte), ambre sous une semaine, indigo au-delà.
+ */
+function CompteARebours({ dateDepart }: { dateDepart?: string | null }) {
+  const jours = joursAvant(dateDepart);
+
+  // Date absente ou départ déjà passé : rien à décompter, on reste neutre.
+  const { valeur, tone, iconTone, labelTone } =
+    jours === null
+      ? {
+          valeur: 'Non définie',
+          tone: 'bg-slate-100 border-slate-300',
+          iconTone: 'text-slate-500',
+          labelTone: 'text-slate-600',
+        }
+      : jours < 0
+        ? {
+            valeur: 'Parti',
+            tone: 'bg-slate-100 border-slate-300',
+            iconTone: 'text-slate-500',
+            labelTone: 'text-slate-600',
+          }
+        : jours === 0
+          ? {
+              valeur: "Aujourd'hui",
+              tone: 'bg-red-100 border-red-400 ring-2 ring-red-300 animate-pulse',
+              iconTone: 'text-red-700',
+              labelTone: 'text-red-800',
+            }
+          : jours <= JOURS_ALERTE_VOYAGE
+            ? {
+                valeur: `${jours}j`,
+                tone: 'bg-red-100 border-red-400 ring-2 ring-red-300 animate-pulse',
+                iconTone: 'text-red-700',
+                labelTone: 'text-red-800',
+              }
+            : jours <= 7
+              ? {
+                  valeur: `${jours}j`,
+                  tone: 'bg-amber-100 border-amber-400',
+                  iconTone: 'text-amber-700',
+                  labelTone: 'text-amber-800',
+                }
+              : {
+                  valeur: `${jours}j`,
+                  tone: 'bg-indigo-100 border-indigo-300',
+                  iconTone: 'text-indigo-700',
+                  labelTone: 'text-indigo-800',
+                };
+
+  return (
+    <div className={`flex items-center gap-2 rounded-lg border px-2 py-1 ${tone}`}>
+      <CalendarClock className={`h-4 w-4 shrink-0 ${iconTone}`} />
+      <div>
+        <p className={`text-xs font-medium ${labelTone}`}>Avant départ</p>
+        <p className={`text-base font-bold leading-tight ${labelTone}`}>{valeur}</p>
+      </div>
+    </div>
   );
 }
 
@@ -802,8 +866,8 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* SUPER ALERTE — arrivée imminente (≤ 2 jours) */}
-        {alertesVoyage.arrivees.length > 0 && (
+        {/* SUPER ALERTE — départ imminent (≤ 2 jours) */}
+        {alertesVoyage.departs.length > 0 && (
           <div
             role="alert"
             className="mb-4 overflow-hidden rounded-xl border-2 border-red-500 bg-red-50 shadow-lg ring-2 ring-red-300"
@@ -811,24 +875,24 @@ export default function HomePage() {
             <div className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-rose-600 px-4 py-2">
               <Siren className="h-5 w-5 shrink-0 animate-pulse text-white" />
               <h2 className="text-sm font-bold uppercase tracking-wide text-white sm:text-base">
-                Super alerte — arrivée imminente
+                Super alerte — départ imminent
               </h2>
               <span className="ml-auto rounded-full bg-white/25 px-2 py-0.5 text-xs font-bold text-white">
-                {alertesVoyage.arrivees.length} programme
-                {alertesVoyage.arrivees.length > 1 ? 's' : ''}
+                {alertesVoyage.departs.length} programme
+                {alertesVoyage.departs.length > 1 ? 's' : ''}
               </span>
             </div>
             <ul className="divide-y divide-red-200">
-              {alertesVoyage.arrivees.map(({ program, jours }) => (
+              {alertesVoyage.departs.map(({ program, jours }) => (
                 <li key={program.id}>
                   <Link
                     href={`/reservations?programme=${program.id}`}
                     className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 transition-colors hover:bg-red-100"
                   >
-                    <PlaneLanding className="h-4 w-4 shrink-0 text-red-600" />
+                    <PlaneTakeoff className="h-4 w-4 shrink-0 text-red-600" />
                     <span className="font-bold text-red-900">{program.name}</span>
                     <span className="text-sm text-red-800">
-                      Arrivée le {formatDateFr(program.dateArrivee)}
+                      Départ le {formatDateFr(program.dateDepart)}
                     </span>
                     <span className="ml-auto rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-bold uppercase text-white">
                       {libelleEcheance(jours)}
@@ -840,8 +904,8 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Alerte — départ imminent (≤ 2 jours) */}
-        {alertesVoyage.departs.length > 0 && (
+        {/* Alerte — arrivée imminente (≤ 2 jours) */}
+        {alertesVoyage.arrivees.length > 0 && (
           <div
             role="alert"
             className="mb-4 overflow-hidden rounded-xl border-2 border-amber-400 bg-amber-50 shadow-md"
@@ -849,24 +913,24 @@ export default function HomePage() {
             <div className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2">
               <AlertTriangle className="h-5 w-5 shrink-0 text-white" />
               <h2 className="text-sm font-bold uppercase tracking-wide text-white sm:text-base">
-                Alerte — départ imminent
+                Alerte — arrivée imminente
               </h2>
               <span className="ml-auto rounded-full bg-white/25 px-2 py-0.5 text-xs font-bold text-white">
-                {alertesVoyage.departs.length} programme
-                {alertesVoyage.departs.length > 1 ? 's' : ''}
+                {alertesVoyage.arrivees.length} programme
+                {alertesVoyage.arrivees.length > 1 ? 's' : ''}
               </span>
             </div>
             <ul className="divide-y divide-amber-200">
-              {alertesVoyage.departs.map(({ program, jours }) => (
+              {alertesVoyage.arrivees.map(({ program, jours }) => (
                 <li key={program.id}>
                   <Link
                     href={`/reservations?programme=${program.id}`}
                     className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 transition-colors hover:bg-amber-100"
                   >
-                    <PlaneTakeoff className="h-4 w-4 shrink-0 text-amber-700" />
+                    <PlaneLanding className="h-4 w-4 shrink-0 text-amber-700" />
                     <span className="font-bold text-amber-900">{program.name}</span>
                     <span className="text-sm text-amber-800">
-                      Départ le {formatDateFr(program.dateDepart)}
+                      Arrivée le {formatDateFr(program.dateArrivee)}
                     </span>
                     <span className="ml-auto rounded-full bg-amber-600 px-2.5 py-0.5 text-xs font-bold uppercase text-white">
                       {libelleEcheance(jours)}
@@ -917,6 +981,9 @@ export default function HomePage() {
 
                     {/* Statistiques compactes en ligne */}
                     <div className="flex items-center gap-3 flex-wrap">
+                      {/* Jours restants avant le départ */}
+                      <CompteARebours dateDepart={program.dateDepart} />
+
                       {/* Montant restant à payer */}
                       {program.statistics.remainingAmount !== undefined && (
                         <div className="flex items-center gap-2 bg-yellow-100 border border-yellow-300 rounded-lg px-2 py-1">
@@ -1148,8 +1215,8 @@ export default function HomePage() {
                         </div>
                       </div>
 
-                      {/* Durée */}
-                      <div className="col-span-2 flex items-center gap-2 md:justify-center">
+                      {/* Durée + jours restants avant le départ */}
+                      <div className="col-span-2 flex flex-wrap items-center gap-2 md:flex-col md:justify-center md:gap-1.5">
                         <span className="text-xs text-gray-400 md:hidden">Durée :</span>
                         {program.dureeJours ? (
                           <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
@@ -1158,6 +1225,7 @@ export default function HomePage() {
                         ) : (
                           <span className="text-sm text-gray-400">—</span>
                         )}
+                        <CompteARebours dateDepart={program.dateDepart} />
                       </div>
 
                       {/* Occupation */}

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { api } from "@/lib/api"
 import { formatMontant, formatDateFr } from "@/lib/format"
+import { CompteARebours, DateVoyageChip } from "@/components/voyage-dates"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -56,6 +57,8 @@ interface ProgramOverview {
   id: number;
   name: string;
   created_at: string;
+  dateDepart: string | null;
+  dateArrivee: string | null;
   flightDeadline: string | null;
   hotelDeadline: string | null;
   visaDeadline: string | null;
@@ -879,9 +882,17 @@ export default function ProgrammesPage() {
                         <Calendar className="h-3.5 w-3.5" />
                         Créé le {formatDateFr(programme.created_at)}
                       </CardDescription>
+                      {/* Dates de voyage : passent en alerte quand l'échéance approche */}
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <DateVoyageChip type="depart" value={programme.dateDepart} />
+                        <DateVoyageChip type="arrivee" value={programme.dateArrivee} />
+                      </div>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {/* Jours restants avant le départ */}
+                    <CompteARebours dateDepart={programme.dateDepart} />
+
                     <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-100/70 px-2 py-1">
                       <Users className="h-4 w-4 text-blue-700" />
                       <div>

@@ -6,6 +6,9 @@ export interface ProgramOverview {
   id: number;
   name: string;
   created_at: string;
+  /** Dates de voyage du programme (null sur les programmes antérieurs à la migration). */
+  dateDepart: string | null;
+  dateArrivee: string | null;
   flightDeadline: string | null;
   hotelDeadline: string | null;
   visaDeadline: string | null;
@@ -195,6 +198,8 @@ export class ProgramOverviewService {
         id: program.id,
         name: program.name,
         created_at: program.created_at.toISOString(),
+        dateDepart: program.dateDepart?.toISOString() || null,
+        dateArrivee: program.dateArrivee?.toISOString() || null,
         flightDeadline: program.flightDeadline?.toISOString() || null,
         hotelDeadline: program.hotelDeadline?.toISOString() || null,
         visaDeadline: program.visaDeadline?.toISOString() || null,

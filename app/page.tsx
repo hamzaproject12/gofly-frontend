@@ -12,6 +12,7 @@ import { formatMontant, formatDateFr } from '@/lib/format';
 import { JOURS_ALERTE_VOYAGE, estImminente, joursAvant, libelleEcheance } from '@/lib/voyage';
 import { CompteARebours, DateVoyageChip } from '@/components/voyage-dates';
 import { auMoins, type AgentRole } from '@/lib/roles';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   Hotel, 
   Users, 
@@ -56,6 +57,8 @@ interface Room {
   visualPlaces: Array<{
     isOccupied: boolean;
     color: 'green' | 'red';
+    /** Pèlerin occupant la place (null si la réservation n'est pas retrouvable). */
+    occupant?: { id: number; nom: string; status: string } | null;
   }>;
 }
 
@@ -979,31 +982,57 @@ export default function HomePage() {
                                     Une place libre est cliquable : elle ouvre le formulaire de
                                     réservation pré-rempli sur cette chambre et cette place.
                                     Les places occupées (et donc les chambres complètes) restent inertes. */}
-                                <div className="flex flex-wrap items-center gap-1 mb-1.5">
-                                  {room.visualPlaces.map((place, index) => {
-                                    const estLibre = !place.isOccupied && room.placesRestantes > 0;
+                                <TooltipProvider delayDuration={100}>
+                                  <div className="flex flex-wrap items-center gap-1 mb-1.5">
+                                    {room.visualPlaces.map((place, index) => {
+                                      const estLibre = !place.isOccupied && room.placesRestantes > 0;
 
-                                    if (!estLibre) {
+                                      if (!estLibre) {
+                                        // Place occupée : le survol révèle le nom du pèlerin.
+                                        const nomOccupant = place.occupant?.nom?.trim();
+                                        return (
+                                          <Tooltip key={index}>
+                                            <TooltipTrigger asChild>
+                                              <div
+                                                aria-label={
+                                                  nomOccupant
+                                                    ? `Place ${index + 1} réservée par ${nomOccupant}`
+                                                    : `Place ${index + 1} réservée`
+                                                }
+                                                className="w-4 h-4 rounded-full border-2 bg-red-500 border-red-600 transition-all hover:scale-125 hover:ring-2 hover:ring-red-300"
+                                              />
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top">
+                                              {nomOccupant ? (
+                                                <div className="text-left">
+                                                  <p className="font-semibold">{nomOccupant}</p>
+                                                  {place.occupant?.status && (
+                                                    <p className="text-[11px] opacity-80">{place.occupant.status}</p>
+                                                  )}
+                                                </div>
+                                              ) : (
+                                                <span>Réservé</span>
+                                              )}
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        );
+                                      }
+
                                       return (
-                                        <div
-                                          key={index}
-                                          className="w-4 h-4 rounded-full border-2 bg-red-500 border-red-600"
-                                          title="Réservé"
-                                        />
+                                        <Tooltip key={index}>
+                                          <TooltipTrigger asChild>
+                                            <Link
+                                              href={`/reservations/nouvelle?programId=${program.id}&roomId=${room.id}&place=${index}`}
+                                              aria-label={`Réserver la place ${index + 1} — ${getRoomTypeLabel(room.roomType)}`}
+                                              className="block w-4 h-4 rounded-full border-2 bg-green-500 border-green-600 cursor-pointer transition-all hover:scale-125 hover:ring-2 hover:ring-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
+                                            />
+                                          </TooltipTrigger>
+                                          <TooltipContent side="top">Réserver cette place</TooltipContent>
+                                        </Tooltip>
                                       );
-                                    }
-
-                                    return (
-                                      <Link
-                                        key={index}
-                                        href={`/reservations/nouvelle?programId=${program.id}&roomId=${room.id}&place=${index}`}
-                                        title="Réserver cette place"
-                                        aria-label={`Réserver la place ${index + 1} — ${getRoomTypeLabel(room.roomType)}`}
-                                        className="block w-4 h-4 rounded-full border-2 bg-green-500 border-green-600 cursor-pointer transition-all hover:scale-125 hover:ring-2 hover:ring-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
-                                      />
-                                    );
-                                  })}
-                                </div>
+                                    })}
+                                  </div>
+                                </TooltipProvider>
                                 
                                 <div className="flex items-center justify-between text-sm">
                                   <span className={roomStyle.textColor}>

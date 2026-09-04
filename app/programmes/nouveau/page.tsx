@@ -37,11 +37,22 @@ import {
   Info,
   Download,
   Loader2,
+  AlertTriangle,
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import Link from "next/link"
@@ -327,6 +338,8 @@ export default function NouveauProgramme() {
   const [simAutresChargesDH, setSimAutresChargesDH] = useState("")
   const [showValidationReasons, setShowValidationReasons] = useState(false)
   const [showSimulationSection, setShowSimulationSection] = useState(false)
+  /** Confirmation demandée quand les catégories d'hôtels n'ont pas le même nombre de lits */
+  const [showBedsMismatchDialog, setShowBedsMismatchDialog] = useState(false)
 
   const hasUnsavedChanges = useMemo(() => {
     const hasDates = Boolean(formData.dateDepart || formData.dateArrivee)
@@ -480,6 +493,36 @@ export default function NouveauProgramme() {
   const madinaBedsCount = useMemo(() => totalBedsByCity(formData.hotelsMadina), [formData.hotelsMadina])
   const makkahBedsCount = useMemo(() => totalBedsByCity(formData.hotelsMakkah), [formData.hotelsMakkah])
   const autreBedsCount = useMemo(() => totalBedsByCity(formData.hotelsAutre), [formData.hotelsAutre])
+
+  /**
+   * Les catégories d'hôtels (Madina / Makkah / Autre) doivent offrir le même
+   * nombre total de lits : la capacité réelle du programme est le minimum des
+   * catégories présentes, tout lit en excès dans une catégorie est perdu.
+   * On compare uniquement les catégories qui contiennent au moins un hôtel.
+   */
+  const bedsMismatch = useMemo(() => {
+    const categories = [
+      { key: "madina", label: "Madina", beds: madinaBedsCount, present: formData.hotelsMadina.length > 0 },
+      { key: "makkah", label: "Makkah", beds: makkahBedsCount, present: formData.hotelsMakkah.length > 0 },
+      { key: "autre", label: "Autre", beds: autreBedsCount, present: formData.hotelsAutre.length > 0 },
+    ].filter((c) => c.present)
+
+    if (categories.length < 2) return null
+
+    const counts = categories.map((c) => c.beds)
+    const min = Math.min(...counts)
+    const max = Math.max(...counts)
+    if (min === max) return null
+
+    return { categories, min, max, ecart: max - min }
+  }, [
+    madinaBedsCount,
+    makkahBedsCount,
+    autreBedsCount,
+    formData.hotelsMadina.length,
+    formData.hotelsMakkah.length,
+    formData.hotelsAutre.length,
+  ])
 
   const simulationPreview = useMemo(() => {
     const exchange = parseNum(formData.exchange, 1) || 1
@@ -1241,6 +1284,19 @@ export default function NouveauProgramme() {
     e.preventDefault()
     if (!isFormValid || isSubmitting) return
 
+    // Nombre de lits différent entre catégories d'hôtels : on demande une
+    // confirmation explicite avant de créer le programme.
+    if (bedsMismatch) {
+      setShowBedsMismatchDialog(true)
+      return
+    }
+
+    await createProgram()
+  }
+
+  const createProgram = async () => {
+    if (!isFormValid || isSubmitting) return
+
     setIsSubmitting(true)
 
     try {
@@ -1542,6 +1598,27 @@ export default function NouveauProgramme() {
                         🏨 Autre <span className="ml-1 font-semibold">[{autreBedsCount}]</span>
                       </TabsTrigger>
                     </TabsList>
+
+                    {bedsMismatch && (
+                      <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
+                          <div>
+                            <p className="font-semibold">
+                              Nombre de places different entre les categories d'hotels.
+                            </p>
+                            <p className="mt-1">
+                              {bedsMismatch.categories.map((c) => `${c.label} : ${c.beds} lits`).join(" — ")}
+                              {" "}(ecart de {bedsMismatch.ecart} lit{bedsMismatch.ecart > 1 ? "s" : ""}).
+                            </p>
+                            <p className="mt-1 text-amber-800">
+                              La capacite reelle du programme sera limitee a {bedsMismatch.min} place
+                              {bedsMismatch.min > 1 ? "s" : ""} : les lits en trop ne seront pas reservables.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     <TabsContent value="madina">
                     {/* Hôtels à Madina */}
@@ -2677,6 +2754,65 @@ export default function NouveauProgramme() {
           */}
         </div>
       </div>
+
+      {/* Confirmation : nombre de lits different entre categories d'hotels */}
+      <AlertDialog open={showBedsMismatchDialog} onOpenChange={setShowBedsMismatchDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-900">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              Nombre de places different
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-left">
+                <p>
+                  Les categories d'hotels selectionnees n'offrent pas le meme nombre total de places.
+                </p>
+                {bedsMismatch && (
+                  <>
+                    <ul className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 space-y-1">
+                      {bedsMismatch.categories.map((c) => (
+                        <li key={c.key} className="flex items-center justify-between gap-4">
+                          <span className="font-medium text-amber-900">{c.label}</span>
+                          <span
+                            className={
+                              c.beds === bedsMismatch.min
+                                ? "font-semibold text-amber-900"
+                                : "font-semibold text-red-700"
+                            }
+                          >
+                            {c.beds} lit{c.beds > 1 ? "s" : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p>
+                      Ecart de {bedsMismatch.ecart} lit{bedsMismatch.ecart > 1 ? "s" : ""}. La capacite
+                      reelle du programme sera limitee a {bedsMismatch.min} place
+                      {bedsMismatch.min > 1 ? "s" : ""} : les lits en trop ne seront pas reservables.
+                    </p>
+                  </>
+                )}
+                <p className="font-medium">
+                  Voulez-vous confirmer et enregistrer le programme malgre cet ecart ?
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Corriger les hotels</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-600 hover:bg-amber-700"
+              onClick={() => {
+                setShowBedsMismatchDialog(false)
+                void createProgram()
+              }}
+            >
+              Confirmer quand meme
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

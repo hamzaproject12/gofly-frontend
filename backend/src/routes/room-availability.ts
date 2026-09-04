@@ -40,6 +40,28 @@ router.get('/', async (req, res) => {
       }
     })
 
+    // Occupants des chambres : `Room.listeIdsReservation` liste, dans l'ordre
+    // d'arrivée, les réservations rattachées à la chambre (1 réservation = 1 place,
+    // cf. getPlacesByRoomType). On résout ces IDs en une seule requête pour pouvoir
+    // afficher le nom du pèlerin sur chaque place occupée du dashboard.
+    const allReservationIds = Array.from(
+      new Set(programs.flatMap(p => p.rooms.flatMap(r => r.listeIdsReservation || [])))
+    )
+    const occupantsById = new Map<number, { id: number; nom: string; status: string }>()
+    if (allReservationIds.length > 0) {
+      const occupants = await prisma.reservation.findMany({
+        where: { id: { in: allReservationIds } },
+        select: { id: true, firstName: true, lastName: true, status: true }
+      })
+      for (const o of occupants) {
+        occupantsById.set(o.id, {
+          id: o.id,
+          nom: `${o.firstName} ${o.lastName}`.trim(),
+          status: o.status
+        })
+      }
+    }
+
     // Transformer les données pour l'affichage
     const programsWithAvailability = programs.map(program => {
       // Calculer les statistiques du programme
@@ -96,11 +118,21 @@ router.get('/', async (req, res) => {
           placesRestantes: room.nbrPlaceRestantes,
           placesOccupees: room.nbrPlaceTotal - room.nbrPlaceRestantes,
           prixRoom: room.prixRoom,
-          // Générer les couleurs pour l'affichage visuel
-          visualPlaces: Array.from({ length: room.nbrPlaceTotal }, (_, index) => ({
-            isOccupied: index < (room.nbrPlaceTotal - room.nbrPlaceRestantes),
-            color: index < (room.nbrPlaceTotal - room.nbrPlaceRestantes) ? 'red' : 'green'
-          }))
+          // Générer les couleurs pour l'affichage visuel. Chaque place occupée
+          // porte son occupant (nom du pèlerin) quand la réservation est
+          // retrouvable — `occupant` reste null si les données ont dérivé.
+          visualPlaces: Array.from({ length: room.nbrPlaceTotal }, (_, index) => {
+            const isOccupied = index < (room.nbrPlaceTotal - room.nbrPlaceRestantes)
+            const reservationId = (room.listeIdsReservation || [])[index]
+            const occupant = isOccupied && reservationId != null
+              ? occupantsById.get(reservationId) || null
+              : null
+            return {
+              isOccupied,
+              color: isOccupied ? 'red' : 'green',
+              occupant
+            }
+          })
         }))
       }))
 

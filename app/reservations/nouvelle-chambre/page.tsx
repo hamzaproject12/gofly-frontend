@@ -5,7 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api"
 import { formatMontant } from "@/lib/format";
-import { estPrixValide, normaliserPrix, plafonnerReduction } from "@/lib/prix";
+import {
+  ajustementDepuisPrixFinal,
+  estPrixValide,
+  normaliserPrix,
+  plafonnerReduction,
+  prixApresAjustement,
+} from "@/lib/prix";
 import { notifyCreditsUpdated } from "@/app/components/CreditCounter";
 import { generatePaymentReceiptFile } from "@/lib/generateReceipt";
 import { BlockersTooltip } from "@/components/blockers-tooltip";
@@ -49,6 +55,8 @@ import {
   Download,
   ChevronUp,
   AlertTriangle,
+  Pencil,
+  Check,
 } from "lucide-react";
 
 interface Hotel {
@@ -235,7 +243,13 @@ export default function NouvelleChambrePage() {
   const [prixMode, setPrixMode] = useState<"reduction" | "proposition" | null>(
     null
   );
+  // Supplément proposé (montant ajouté au prix calculé)
   const [prixPropose, setPrixPropose] = useState<number | null>(null);
+
+  // Édition directe du prix affiché dans l'en-tête : la saisie est retraduite en
+  // réduction (prix plus bas) ou en supplément (prix plus haut) — cf. lib/prix.ts.
+  const [editionPrix, setEditionPrix] = useState(false);
+  const [prixSaisi, setPrixSaisi] = useState("");
 
   const capacity = formData.typeChambre
     ? ROOM_CAPACITY[formData.typeChambre] || 0
@@ -544,21 +558,45 @@ export default function NouvelleChambrePage() {
 
   useEffect(() => {
     if (calculatePrice > 0) {
-      let prixFinal: number;
-      if (
-        prixMode === "proposition" &&
-        prixPropose !== null &&
-        prixPropose >= calculatePrice
-      ) {
-        prixFinal = Math.max(0, Math.round(prixPropose));
-      } else if (prixMode === "reduction") {
-        prixFinal = Math.max(0, Math.round(calculatePrice - reduction));
-      } else {
-        prixFinal = Math.max(0, Math.round(calculatePrice));
-      }
+      const prixFinal = prixApresAjustement(calculatePrice, prixMode, reduction, prixPropose);
       setFormData((prev) => ({ ...prev, prix: String(prixFinal) }));
     }
   }, [calculatePrice, reduction, prixPropose, prixMode]);
+
+  // Prix courant du dossier : celui déjà posé dans le formulaire, sinon le prix
+  // calculé (l'effet ci-dessus ne l'écrit qu'une fois le calcul disponible).
+  const prixAffiche = useMemo(() => {
+    const enregistre = normaliserPrix(formData.prix);
+    return enregistre !== null ? enregistre : Math.max(0, Math.round(calculatePrice));
+  }, [formData.prix, calculatePrice]);
+
+  /** Écart entre le prix affiché et le prix calculé : < 0 remise, > 0 supplément. */
+  const ecartPrix = prixAffiche - Math.round(calculatePrice);
+
+  const ouvrirEditionPrix = () => {
+    setPrixSaisi(String(prixAffiche));
+    setEditionPrix(true);
+  };
+
+  /**
+   * Applique le prix saisi : en dessous du prix calculé il devient une réduction,
+   * au-dessus un supplément (« Propos. »), les toggles se positionnant seuls.
+   */
+  const validerEditionPrix = () => {
+    const ajustement = ajustementDepuisPrixFinal(prixSaisi, calculatePrice);
+    if (!ajustement) {
+      toast({
+        title: "Prix invalide",
+        description: "Saisissez un montant en DH (0 ou plus).",
+        variant: "destructive",
+      });
+      return;
+    }
+    setPrixMode(ajustement.mode);
+    setReduction(ajustement.reduction);
+    setPrixPropose(ajustement.supplement);
+    setEditionPrix(false);
+  };
 
   const hotelNameMadina = useMemo(() => {
     if (!formData.hotelMadina || formData.hotelMadina === "none") {
@@ -1078,13 +1116,8 @@ export default function NouvelleChambrePage() {
     prixGenere &&
     !paiementsDepassentPrix &&
     identitiesMinimumOk;
-  const propositionInvalid =
-    prixMode === "proposition" &&
-    prixPropose !== null &&
-    prixPropose < calculatePrice;
-
   // Raisons pour lesquelles la chambre ne peut pas encore être enregistrée
-  // (miroir de canSubmit + contrainte du prix proposé).
+  // (miroir de canSubmit).
   const getSubmitBlockers = (): string[] => {
     const reasons: string[] = [];
     if (!formData.programId) reasons.push("Le programme n'est pas sélectionné");
@@ -1120,7 +1153,6 @@ export default function NouvelleChambrePage() {
       }
     });
 
-    if (propositionInvalid) reasons.push("Le prix proposé est inférieur au prix calculé");
     return reasons;
   };
 
@@ -1527,11 +1559,74 @@ export default function NouvelleChambrePage() {
                     <span className="text-sm font-medium text-emerald-800">
                       Prix suggéré:
                     </span>
-                    <span className="text-lg font-bold text-emerald-900">
-                      {formData.prix
-                        ? formatMontant(parseInt(formData.prix, 10))
-                        : formatMontant(calculatePrice)}
-                    </span>
+                    {editionPrix ? (
+                      <>
+                        <Input
+                          autoFocus
+                          type="text"
+                          inputMode="numeric"
+                          value={prixSaisi}
+                          onChange={(e) => setPrixSaisi(e.target.value.replace(/[^0-9]/g, ""))}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              validerEditionPrix();
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              setEditionPrix(false);
+                            }
+                          }}
+                          className="w-28 h-8 text-base font-bold text-center bg-white text-gray-900 border-2 border-emerald-300 focus-visible:ring-1"
+                          placeholder={String(Math.round(calculatePrice))}
+                          aria-label="Prix de la chambre en DH"
+                        />
+                        <span className="text-sm font-medium text-emerald-800">DH</span>
+                        <button
+                          type="button"
+                          onClick={validerEditionPrix}
+                          title="Appliquer ce prix"
+                          aria-label="Appliquer ce prix"
+                          className="p-1 rounded-md bg-white/80 hover:bg-white transition-colors"
+                        >
+                          <Check className="h-3.5 w-3.5 text-emerald-700" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditionPrix(false)}
+                          title="Annuler"
+                          aria-label="Annuler la modification du prix"
+                          className="p-1 rounded-md bg-white/80 hover:bg-white transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5 text-gray-600" />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-lg font-bold text-emerald-900">
+                          {formatMontant(prixAffiche)}
+                        </span>
+                        {ecartPrix !== 0 && (
+                          <span
+                            className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${
+                              ecartPrix < 0 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+                            }`}
+                          >
+                            {ecartPrix < 0
+                              ? `Réduc. ${formatMontant(-ecartPrix)}`
+                              : `Propos. +${formatMontant(ecartPrix)}`}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={ouvrirEditionPrix}
+                          title="Modifier le prix"
+                          aria-label="Modifier le prix"
+                          className="p-1 rounded-md bg-white/70 hover:bg-white transition-colors"
+                        >
+                          <Pencil className="h-3.5 w-3.5 text-emerald-800" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </CardTitle>
@@ -2718,7 +2813,7 @@ export default function NouvelleChambrePage() {
                   >
                     <Button
                       type="submit"
-                      disabled={!canSubmit || isSubmitting || propositionInvalid}
+                      disabled={!canSubmit || isSubmitting}
                       className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
                     >
                       {isSubmitting ? "Enregistrement..." : "Enregistrer"}
@@ -2740,7 +2835,7 @@ export default function NouvelleChambrePage() {
                   <Wallet className="h-4 w-4 text-emerald-800" />
                   <span className="text-sm font-medium text-emerald-700">Total:</span>
                   <span className="font-bold text-emerald-900 text-lg">
-                    {formatMontant(Number(formData.prix || 0) || 0)}
+                    {formatMontant(prixAffiche)}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-gray-300">
@@ -2802,20 +2897,22 @@ export default function NouvelleChambrePage() {
                     )}
                   </div>
                 )}
+                {/* Proposition = supplément ajouté au prix calculé (symétrique de la réduction) */}
                 {prixMode === "proposition" && (
                   <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-lg border border-green-200">
                     <ChevronUp className="h-4 w-4 text-green-600" />
                     <span className="text-sm font-medium text-green-700">Proposition:</span>
+                    <span className="text-sm font-semibold text-green-600">+</span>
                     <Input
                       type="text"
+                      inputMode="numeric"
                       value={prixPropose === null ? "" : prixPropose}
                       onChange={(e) => {
-                        const value =
-                          e.target.value === "" ? null : parseInt(e.target.value, 10) || null;
-                        setPrixPropose(value);
+                        const brut = e.target.value.replace(/[^0-9]/g, "");
+                        setPrixPropose(brut === "" ? null : parseInt(brut, 10));
                       }}
                       className="w-24 h-7 text-sm border border-green-300 focus:border-green-500 rounded text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      placeholder={calculatePrice.toString()}
+                      placeholder="0"
                     />
                     <span className="text-sm text-green-600 font-medium">DH</span>
                   </div>
@@ -2839,7 +2936,7 @@ export default function NouvelleChambrePage() {
               >
                 <Button
                   type="submit"
-                  disabled={!canSubmit || isSubmitting || propositionInvalid}
+                  disabled={!canSubmit || isSubmitting}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 text-lg disabled:opacity-50"
                   onClick={(e) => {
                     e.preventDefault();

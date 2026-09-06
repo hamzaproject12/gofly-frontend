@@ -34,7 +34,8 @@ import {
   PlaneTakeoff,
   PlaneLanding,
   AlertTriangle,
-  Siren
+  Siren,
+  BedDouble
 } from 'lucide-react';
 
 interface Agent {
@@ -891,6 +892,18 @@ export default function HomePage() {
                         </div>
                       </div>
 
+                      {/* Plan de chambres : qui dort dans quelle chambre (+ export PDF) */}
+                      <Button
+                        size="sm"
+                        asChild
+                        className="h-8 gap-1.5 bg-indigo-600 text-white hover:bg-indigo-700"
+                      >
+                        <Link href={`/programmes/plan-chambres/${program.id}`}>
+                          <BedDouble className="h-4 w-4" />
+                          <span className="font-medium">Voir détails</span>
+                        </Link>
+                      </Button>
+
                       {/* Bouton de réduction/développement */}
                       <Button
                         variant="ghost"
@@ -1067,12 +1080,16 @@ export default function HomePage() {
             </div>
 
             {/* En-tête de colonnes (desktop) */}
-            <div className="hidden border-b border-emerald-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500 md:grid md:grid-cols-12 md:gap-3">
-              <div className="col-span-4 pl-7">Programme</div>
-              <div className="col-span-2 text-center">Durée</div>
-              <div className="col-span-2 text-center">Occupation</div>
-              <div className="col-span-2 text-center">Progression</div>
-              <div className="col-span-2 text-right">Finances</div>
+            <div className="hidden border-b border-emerald-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-gray-500 md:flex">
+              <div className="grid flex-1 grid-cols-12 gap-3 px-4 py-2.5">
+                <div className="col-span-4 pl-7">Programme</div>
+                <div className="col-span-2 text-center">Durée</div>
+                <div className="col-span-2 text-center">Occupation</div>
+                <div className="col-span-2 text-center">Progression</div>
+                <div className="col-span-2 text-right">Finances</div>
+              </div>
+              {/* Miroir de la colonne d'action des lignes (largeur fixe) */}
+              <div className="w-[148px] shrink-0" />
             </div>
 
             {/* Lignes de programme */}
@@ -1083,80 +1100,94 @@ export default function HomePage() {
                 const { gradient } = getOccupancyGradient(rate);
                 return (
                   <div key={program.id} className={program.isDeleted ? 'bg-yellow-50/60' : ''}>
-                    {/* Ligne cliquable */}
-                    <button
-                      type="button"
-                      onClick={() => toggleRow(program.id)}
-                      className="flex w-full flex-col gap-2 px-4 py-2 text-left transition-colors hover:bg-emerald-50/50 md:grid md:grid-cols-12 md:items-center md:gap-3"
-                    >
-                      {/* Programme */}
-                      <div className="col-span-4 flex items-center gap-2">
-                        <ChevronRight
-                          className={`h-5 w-5 shrink-0 text-emerald-600 transition-transform ${isOpen ? 'rotate-90' : ''}`}
-                        />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            {program.isDeleted && (
-                              <Badge className="bg-yellow-500 text-[10px] text-white">Supprimé</Badge>
-                            )}
-                            <p className="truncate font-bold text-gray-900">{program.name}</p>
-                          </div>
-                          <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-500">
-                            <CalendarIcon className="h-3 w-3" />
-                            {formatDateFr(program.created_at)}
-                          </p>
-                          {/* Dates de voyage : passent en alerte quand l'échéance approche */}
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                            <DateVoyageChip type="depart" value={program.dateDepart} />
-                            <DateVoyageChip type="arrivee" value={program.dateArrivee} />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Durée + jours restants avant le départ */}
-                      <div className="col-span-2 flex flex-wrap items-center gap-2 md:flex-col md:justify-center md:gap-1.5">
-                        <span className="text-xs text-gray-400 md:hidden">Durée :</span>
-                        {program.dureeJours ? (
-                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                            {program.dureeJours} jours
-                          </span>
-                        ) : (
-                          <span className="text-sm text-gray-400">—</span>
-                        )}
-                        <CompteARebours dateDepart={program.dateDepart} />
-                      </div>
-
-                      {/* Occupation */}
-                      <div className="col-span-2 flex items-center gap-2 md:flex-col md:items-center md:gap-0">
-                        <span className="text-xs text-gray-400 md:hidden">Occupation :</span>
-                        <p className="font-bold text-gray-900">
-                          {program.statistics.placesOccupees}/{program.statistics.totalPlaces}
-                        </p>
-                        <p className="text-xs text-gray-500">{program.statistics.occupancyRate}% occupé</p>
-                      </div>
-
-                      {/* Progression */}
-                      <div className="col-span-2 flex items-center gap-2 md:block">
-                        <span className="text-xs text-gray-400 md:hidden">Progression :</span>
-                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
-                          <div
-                            className="h-full rounded-full transition-all duration-700 ease-out"
-                            style={{ width: `${rate}%`, backgroundImage: gradient }}
+                    {/* Ligne cliquable + action « Voir détails » (hors du <button>) */}
+                    <div className="flex items-stretch">
+                      <button
+                        type="button"
+                        onClick={() => toggleRow(program.id)}
+                        className="flex min-w-0 flex-1 flex-col gap-2 px-4 py-2 text-left transition-colors hover:bg-emerald-50/50 md:grid md:grid-cols-12 md:items-center md:gap-3"
+                      >
+                        {/* Programme */}
+                        <div className="col-span-4 flex items-center gap-2">
+                          <ChevronRight
+                            className={`h-5 w-5 shrink-0 text-emerald-600 transition-transform ${isOpen ? 'rotate-90' : ''}`}
                           />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              {program.isDeleted && (
+                                <Badge className="bg-yellow-500 text-[10px] text-white">Supprimé</Badge>
+                              )}
+                              <p className="truncate font-bold text-gray-900">{program.name}</p>
+                            </div>
+                            <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-500">
+                              <CalendarIcon className="h-3 w-3" />
+                              {formatDateFr(program.created_at)}
+                            </p>
+                            {/* Dates de voyage : passent en alerte quand l'échéance approche */}
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <DateVoyageChip type="depart" value={program.dateDepart} />
+                              <DateVoyageChip type="arrivee" value={program.dateArrivee} />
+                            </div>
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Finances */}
-                      <div className="col-span-2 flex items-center justify-between md:block md:text-right">
-                        <span className="text-xs text-gray-400 md:hidden">Solde restant :</span>
-                        <div>
-                          <p className="font-bold text-amber-600">
-                            {formatMontant(program.statistics.remainingAmount ?? 0)}
-                          </p>
-                          <p className="text-xs text-gray-500">solde restant</p>
+                        {/* Durée + jours restants avant le départ */}
+                        <div className="col-span-2 flex flex-wrap items-center gap-2 md:flex-col md:justify-center md:gap-1.5">
+                          <span className="text-xs text-gray-400 md:hidden">Durée :</span>
+                          {program.dureeJours ? (
+                            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                              {program.dureeJours} jours
+                            </span>
+                          ) : (
+                            <span className="text-sm text-gray-400">—</span>
+                          )}
+                          <CompteARebours dateDepart={program.dateDepart} />
                         </div>
+
+                        {/* Occupation */}
+                        <div className="col-span-2 flex items-center gap-2 md:flex-col md:items-center md:gap-0">
+                          <span className="text-xs text-gray-400 md:hidden">Occupation :</span>
+                          <p className="font-bold text-gray-900">
+                            {program.statistics.placesOccupees}/{program.statistics.totalPlaces}
+                          </p>
+                          <p className="text-xs text-gray-500">{program.statistics.occupancyRate}% occupé</p>
+                        </div>
+
+                        {/* Progression */}
+                        <div className="col-span-2 flex items-center gap-2 md:block">
+                          <span className="text-xs text-gray-400 md:hidden">Progression :</span>
+                          <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
+                            <div
+                              className="h-full rounded-full transition-all duration-700 ease-out"
+                              style={{ width: `${rate}%`, backgroundImage: gradient }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Finances */}
+                        <div className="col-span-2 flex items-center justify-between md:block md:text-right">
+                          <span className="text-xs text-gray-400 md:hidden">Solde restant :</span>
+                          <div>
+                            <p className="font-bold text-amber-600">
+                              {formatMontant(program.statistics.remainingAmount ?? 0)}
+                            </p>
+                            <p className="text-xs text-gray-500">solde restant</p>
+                          </div>
+                        </div>
+                      </button>
+                      <div className="flex shrink-0 items-center pr-3 md:w-[148px]">
+                        <Button
+                          size="sm"
+                          asChild
+                          className="h-8 gap-1.5 bg-indigo-600 text-white hover:bg-indigo-700"
+                        >
+                          <Link href={`/programmes/plan-chambres/${program.id}`}>
+                            <BedDouble className="h-4 w-4" />
+                            <span className="hidden font-medium sm:inline">Voir détails</span>
+                          </Link>
+                        </Button>
                       </div>
-                    </button>
+                    </div>
 
                     {/* Contenu déplié */}
                     {isOpen && (

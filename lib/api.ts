@@ -149,6 +149,8 @@ export const api = {
     balance: '/api/balance',
     analytics: '/api/analytics',
     roomAvailability: '/api/room-availability',
+    /** Plan de chambres d'un programme : qui dort dans quelle chambre */
+    roomingPlan: (programId: number | string) => `/api/room-availability/${programId}/rooming`,
     health: '/health',
     test: '/api/test',
     // Program overview endpoints

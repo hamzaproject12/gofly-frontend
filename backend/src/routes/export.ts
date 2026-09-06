@@ -230,6 +230,120 @@ const DOC_LINK_COLUMNS = [
   HEADERS.indexOf('image virement') + 1,
 ];
 
+/** Index (1-based) de la colonne « Chambre ». */
+const ROOM_COLUMN = HEADERS.indexOf('Chambre') + 1;
+
+/**
+ * Codes couleur de l'export.
+ * - Chambre privée : une couleur par chambre, pour voir d'un coup d'œil
+ *   quelles personnes occupent la même chambre.
+ * - Lit en chambre partagée (réservation normale) : alternance blanc / gris,
+ *   volontairement neutre pour rester distinguable des chambres privées.
+ */
+const PRIVATE_ROOM_FILLS = [
+  'FFFDE9D9',
+  'FFE2EFDA',
+  'FFFFF2CC',
+  'FFE4DFEC',
+  'FFFCE4EC',
+  'FFDAEEF3',
+  'FFEAF1DD',
+  'FFFFE0B2',
+  'FFD9E1F2',
+  'FFF8CBAD',
+];
+const SHARED_BED_FILLS = ['FFFFFFFF', 'FFF2F2F2'];
+const GROUP_BORDER_COLOR = { argb: 'FFA6A6A6' };
+
+function paintRow(row: ExcelJS.Row, argb: string, columns: number): void {
+  for (let c = 1; c <= columns; c += 1) {
+    row.getCell(c).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb },
+    };
+  }
+}
+
+/** Encadre les lignes d'une même réservation pour matérialiser le regroupement. */
+function outlineGroup(
+  sheet: ExcelJS.Worksheet,
+  firstRow: number,
+  lastRow: number,
+  columns: number
+): void {
+  for (let r = firstRow; r <= lastRow; r += 1) {
+    const row = sheet.getRow(r);
+    for (let c = 1; c <= columns; c += 1) {
+      const border: Partial<ExcelJS.Borders> = {};
+      if (r === firstRow) border.top = { style: 'thin', color: GROUP_BORDER_COLOR };
+      if (r === lastRow) border.bottom = { style: 'thin', color: GROUP_BORDER_COLOR };
+      if (c === 1) border.left = { style: 'thin', color: GROUP_BORDER_COLOR };
+      if (c === columns) border.right = { style: 'thin', color: GROUP_BORDER_COLOR };
+      row.getCell(c).border = border;
+    }
+  }
+}
+
+/** Feuille d'explication des couleurs, placée en tête du classeur. */
+function addLegendSheet(workbook: ExcelJS.Workbook): void {
+  const sheet = workbook.addWorksheet('Légende');
+  sheet.getColumn(1).width = 16;
+  sheet.getColumn(2).width = 90;
+
+  const title = sheet.addRow(['Légende des couleurs']);
+  title.font = { bold: true, size: 14 };
+  sheet.addRow([]);
+
+  const header = sheet.addRow(['Couleur', 'Signification']);
+  header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  paintRow(header, 'FF4472C4', 2);
+
+  const entries: { fill: string; text: string }[] = [
+    {
+      fill: PRIVATE_ROOM_FILLS[0],
+      text: 'Chambre privée : toutes les lignes de cette couleur occupent la MÊME chambre.',
+    },
+    {
+      fill: PRIVATE_ROOM_FILLS[1],
+      text: 'Chambre privée suivante : la couleur change à chaque chambre privée.',
+    },
+    {
+      fill: PRIVATE_ROOM_FILLS[2],
+      text: 'Chambre privée suivante (les couleurs tournent sur 10 teintes).',
+    },
+    {
+      fill: SHARED_BED_FILLS[0],
+      text: 'Réservation normale (lit en chambre partagée) : fond blanc, aucune chambre réservée en propre.',
+    },
+    {
+      fill: SHARED_BED_FILLS[1],
+      text: 'Réservation normale suivante : alternance blanc / gris pour séparer deux réservations.',
+    },
+  ];
+
+  for (const entry of entries) {
+    const row = sheet.addRow(['', entry.text]);
+    paintRow(row, entry.fill, 1);
+    row.getCell(1).border = {
+      top: { style: 'thin', color: GROUP_BORDER_COLOR },
+      bottom: { style: 'thin', color: GROUP_BORDER_COLOR },
+      left: { style: 'thin', color: GROUP_BORDER_COLOR },
+      right: { style: 'thin', color: GROUP_BORDER_COLOR },
+    };
+    row.getCell(2).alignment = { vertical: 'middle', wrapText: true };
+  }
+
+  sheet.addRow([]);
+  const note = sheet.addRow([
+    '',
+    'Un encadré fin regroupe les personnes d’une même réservation (titulaire + accompagnants). '
+      + 'La colonne « Chambre » indique le type : « Chambre privée » ou le nombre de lits de la chambre partagée.',
+  ]);
+  note.getCell(2).alignment = { vertical: 'middle', wrapText: true };
+  note.getCell(2).font = { italic: true };
+}
+
 function buildExportWhere(
   query: Record<string, string | undefined>
 ): Prisma.ReservationWhereInput {
@@ -356,6 +470,9 @@ router.get(
         return;
       }
 
+      // Feuille d'explication des couleurs, en tête du classeur.
+      addLegendSheet(workbook);
+
       const usedNames = new Set<string>();
 
       for (const [, rows] of byProgram) {
@@ -379,6 +496,10 @@ router.get(
         headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
 
         let idx = 0;
+        // Compteurs de rotation des couleurs : indépendants pour les chambres
+        // privées et pour les lits partagés.
+        let privateRoomColorIdx = 0;
+        let sharedBedColorIdx = 0;
         for (const leader of rows) {
           const groupe = leader.groupe || '';
           const chambre = roomLabel(leader.roomType, leader.typeReservation);
@@ -394,7 +515,7 @@ router.get(
           const emitRow = (
             person: (typeof leader) & { documents?: typeof leader.documents },
             isLeader: boolean
-          ) => {
+          ): ExcelJS.Row => {
             idx += 1;
             const docs = person.documents || [];
             const pays = (isLeader ? fin.payments : (person as any).payments || []) as Pay[];
@@ -445,12 +566,35 @@ router.get(
                 cell.font = { color: { argb: 'FF0563C1' }, underline: true };
               }
             }
+
+            return row;
           };
 
-          emitRow(leader, true);
+          const groupRows: ExcelJS.Row[] = [emitRow(leader, true)];
           for (const acc of leader.accompagnants || []) {
-            emitRow(acc as any, false);
+            groupRows.push(emitRow(acc as any, false));
           }
+
+          // Couleur du groupe : une teinte par chambre privée (toutes les
+          // personnes d'une même chambre partagent la couleur), alternance
+          // neutre blanc/gris pour les réservations normales (lit partagé).
+          const isPrivateRoom = leader.typeReservation === 'CHAMBRE_PRIVEE';
+          const fillColor = isPrivateRoom
+            ? PRIVATE_ROOM_FILLS[privateRoomColorIdx++ % PRIVATE_ROOM_FILLS.length]
+            : SHARED_BED_FILLS[sharedBedColorIdx++ % SHARED_BED_FILLS.length];
+
+          for (const groupRow of groupRows) {
+            paintRow(groupRow, fillColor, HEADERS.length);
+            if (isPrivateRoom) {
+              groupRow.getCell(ROOM_COLUMN).font = { bold: true };
+            }
+          }
+          outlineGroup(
+            sheet,
+            groupRows[0].number,
+            groupRows[groupRows.length - 1].number,
+            HEADERS.length
+          );
         }
 
         sheet.columns.forEach((col) => {

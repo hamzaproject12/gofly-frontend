@@ -93,6 +93,8 @@ NEXT_PUBLIC_APP_DESCRIPTION=
 NEXT_PUBLIC_APP_LOGO=
 NEXT_PUBLIC_CONTACT_EMAIL=
 NEXT_PUBLIC_DISABLE_AUTH_CHECK=  # Set "true" to bypass Next.js middleware auth
+PASSPORT_OCR_URL=                # OCR/MRZ service endpoint (POST .../extract-text/), proxied by /api/passport-ocr
+NEXT_PUBLIC_OCR_MAX_FILE_SIZE_MB=  # Max upload size for OCR (default 4, capped by the Vercel serverless body limit)
 ```
 
 ### Backend (`backend/.env`)

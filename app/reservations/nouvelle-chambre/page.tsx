@@ -14,6 +14,15 @@ import {
 } from "@/lib/prix";
 import { notifyCreditsUpdated } from "@/app/components/CreditCounter";
 import { generatePaymentReceiptFile } from "@/lib/generateReceipt";
+import {
+  documentPreviewType,
+  extractPassportData,
+  isPdfUpload,
+  isSupportedDocumentUpload,
+  ocrQualityWarning,
+  OCR_FAILURE_MESSAGE,
+  UNSUPPORTED_DOCUMENT_MESSAGE,
+} from "@/lib/passportOcr";
 import { BlockersTooltip } from "@/components/blockers-tooltip";
 import { SubmitOverlay, type SubmitStep } from "@/components/reservations/SubmitOverlay";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -96,14 +105,6 @@ type PaymentRow = {
   amount: string;
   type: string;
   receipt: File | null;
-};
-
-type OcrExtractData = {
-  first_name?: string;
-  last_name?: string;
-  passport?: string;
-  personal_id_number?: string;
-  sex?: string;
 };
 
 function mapOcrSexToGender(sex: string | undefined): "Homme" | "Femme" | null {
@@ -229,6 +230,7 @@ export default function NouvelleChambrePage() {
     lastName: string;
     passport: string;
     sex?: string;
+    warning?: string | null;
   } | null>(null);
   const [ocrProcessingIndex, setOcrProcessingIndex] = useState<number | null>(
     null
@@ -672,17 +674,41 @@ export default function NouvelleChambrePage() {
     });
   };
 
+  // Lecture automatique du passeport via le service OCR : accepte aussi bien
+  // une image qu'un PDF (texte natif ou scanné).
+  const runPassportOcr = async (file: File, index: number) => {
+    setOcrProcessingIndex(index);
+    try {
+      const result = await extractPassportData(file);
+      setOcrValidation({
+        occupantIndex: index,
+        firstName: result.firstName,
+        lastName: result.lastName,
+        passport: result.passport,
+        sex: result.sex,
+        warning: ocrQualityWarning(result),
+      });
+    } catch (err) {
+      toast({
+        title: "Lecture automatique du passeport",
+        description: err instanceof Error ? err.message : OCR_FAILURE_MESSAGE,
+        variant: "destructive",
+      });
+    } finally {
+      setOcrProcessingIndex(null);
+    }
+  };
+
   const handleOccupantPassportChange = (
     index: number,
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!(file.type === "application/pdf" || file.type.startsWith("image/"))) {
+    if (!isSupportedDocumentUpload(file)) {
       toast({
         title: "Erreur",
-        description:
-          "Format de fichier non supporté. Seuls les fichiers PDF et images sont acceptés.",
+        description: UNSUPPORTED_DOCUMENT_MESSAGE,
         variant: "destructive",
       });
       return;
@@ -698,65 +724,33 @@ export default function NouvelleChambrePage() {
       next[index] = null;
       return next;
     });
-    if (file.type.startsWith("image/")) {
+    if (isPdfUpload(file)) {
+      setOccupantPreviews((p) => {
+        const x = [...p];
+        x[index] = {
+          url: URL.createObjectURL(file),
+          type: documentPreviewType(file),
+        };
+        return x;
+      });
+    } else {
       const reader = new FileReader();
       reader.onloadend = () => {
         setOccupantPreviews((p) => {
           const x = [...p];
           revokePreviewEntry(x[index]);
-          x[index] = { url: reader.result as string, type: file.type };
+          x[index] = {
+            url: reader.result as string,
+            type: documentPreviewType(file),
+          };
           return x;
         });
       };
       reader.readAsDataURL(file);
-
-      void (async () => {
-        setOcrProcessingIndex(index);
-        try {
-          const fd = new FormData();
-          fd.append("file", file);
-          const res = await fetch("/api/passport-ocr", {
-            method: "POST",
-            body: fd,
-          });
-          const json = (await res.json()) as {
-            status?: string;
-            data?: OcrExtractData;
-            error?: string;
-          };
-          if (!res.ok) {
-            throw new Error(json.error || "Service OCR indisponible");
-          }
-          const raw = json.data || {};
-          setOcrValidation({
-            occupantIndex: index,
-            firstName: String(raw.first_name ?? "").trim(),
-            lastName: String(raw.last_name ?? "").trim(),
-            passport: String(
-              raw.passport ?? raw.personal_id_number ?? ""
-            ).trim(),
-            sex: typeof raw.sex === "string" ? raw.sex : undefined,
-          });
-        } catch (err) {
-          toast({
-            title: "Lecture automatique du passeport",
-            description:
-              err instanceof Error
-                ? err.message
-                : "Impossible d’analyser l’image. Vous pouvez saisir les champs manuellement.",
-            variant: "destructive",
-          });
-        } finally {
-          setOcrProcessingIndex(null);
-        }
-      })();
-    } else {
-      setOccupantPreviews((p) => {
-        const x = [...p];
-        x[index] = { url: URL.createObjectURL(file), type: file.type };
-        return x;
-      });
     }
+
+    // OCR sur image comme sur PDF
+    void runPassportOcr(file, index);
   };
 
   const applyOcrValidation = () => {
@@ -855,11 +849,10 @@ export default function NouvelleChambrePage() {
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!(file.type === "application/pdf" || file.type.startsWith("image/"))) {
+    if (!isSupportedDocumentUpload(file)) {
       toast({
         title: "Erreur",
-        description:
-          "Format de fichier non supporté. Seuls les fichiers PDF et images sont acceptés.",
+        description: UNSUPPORTED_DOCUMENT_MESSAGE,
         variant: "destructive",
       });
       return;
@@ -875,23 +868,29 @@ export default function NouvelleChambrePage() {
       next[index] = null;
       return next;
     });
-    if (file.type.startsWith("image/")) {
+    if (isPdfUpload(file)) {
+      setPaymentPreviews((p) => {
+        const x = [...p];
+        x[index] = {
+          url: URL.createObjectURL(file),
+          type: documentPreviewType(file),
+        };
+        return x;
+      });
+    } else {
       const reader = new FileReader();
       reader.onloadend = () => {
         setPaymentPreviews((p) => {
           const x = [...p];
           revokePreviewEntry(x[index]);
-          x[index] = { url: reader.result as string, type: file.type };
+          x[index] = {
+            url: reader.result as string,
+            type: documentPreviewType(file),
+          };
           return x;
         });
       };
       reader.readAsDataURL(file);
-    } else {
-      setPaymentPreviews((p) => {
-        const x = [...p];
-        x[index] = { url: URL.createObjectURL(file), type: file.type };
-        return x;
-      });
     }
   };
 
@@ -2969,6 +2968,11 @@ export default function NouvelleChambrePage() {
           </DialogHeader>
           {ocrValidation && (
             <div className="grid gap-3 py-2">
+              {ocrValidation.warning && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
+                  {ocrValidation.warning}
+                </p>
+              )}
               <div className="space-y-1">
                 <Label htmlFor="ocr-lastName">Nom</Label>
                 <Input

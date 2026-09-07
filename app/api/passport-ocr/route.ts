@@ -3,6 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 const DEFAULT_OCR_URL =
   "https://ocr-api-production-bdf8.up.railway.app/extract-text/";
 
+// L'OCR d'un PDF scanné (rendu de la page + tesseract) est plus lent que sur
+// une simple photo : on laisse au service le temps de répondre.
+export const maxDuration = 60;
+export const runtime = "nodejs";
+
+const MAX_FILE_SIZE =
+  (Number(process.env.NEXT_PUBLIC_OCR_MAX_FILE_SIZE_MB) || 4) * 1024 * 1024;
+
 function getOcrUrl(): string {
   return (
     process.env.PASSPORT_OCR_URL ||
@@ -22,8 +30,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        {
+          error: `Fichier trop volumineux (${Math.round(
+            MAX_FILE_SIZE / (1024 * 1024)
+          )} Mo maximum)`,
+        },
+        { status: 413 }
+      );
+    }
+
     const forward = new FormData();
-    forward.append("file", file);
+    // Le nom est conservé : le service accepte images et PDF, et se sert de
+    // l'extension en secours quand le Content-Type est générique.
+    forward.append("file", file, (file as File).name || "document");
 
     const ocrUrl = getOcrUrl();
     const res = await fetch(ocrUrl, {
@@ -31,13 +52,27 @@ export async function POST(req: NextRequest) {
       body: forward,
     });
 
-    const data = await res.json().catch(() => ({}));
+    // Le service peut répondre autre chose que du JSON (502/504 d'un proxy,
+    // page d'erreur HTML) : on ne laisse pas échouer le parsing.
+    const text = await res.text();
+    let data: unknown = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = {};
+    }
+
     if (!res.ok) {
+      const detail =
+        (data as { error?: string; detail?: string }).error ||
+        (data as { detail?: string }).detail;
       return NextResponse.json(
         {
           error:
-            (data as { error?: string }).error ||
-            `Service OCR indisponible (${res.status})`,
+            (typeof detail === "string" && detail) ||
+            (res.status === 413
+              ? "Fichier trop volumineux pour le service OCR"
+              : `Service OCR indisponible (${res.status})`),
         },
         { status: res.status }
       );

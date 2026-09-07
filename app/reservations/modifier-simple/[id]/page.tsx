@@ -6,6 +6,15 @@ import { api } from "@/lib/api"
 import { formatMontant } from "@/lib/format"
 import { estPrixValide } from "@/lib/prix"
 import { generatePaymentReceiptFile } from "@/lib/generateReceipt"
+import {
+  documentPreviewType,
+  extractPassportData,
+  isPdfUpload,
+  isSupportedDocumentUpload,
+  ocrQualityWarning,
+  OCR_FAILURE_MESSAGE,
+  UNSUPPORTED_DOCUMENT_MESSAGE,
+} from "@/lib/passportOcr"
 import { BlockersTooltip } from "@/components/blockers-tooltip"
 import { SubmitOverlay, type SubmitStep } from "@/components/reservations/SubmitOverlay"
 import ProgramStatusBanner from "@/components/ProgramStatusBanner"
@@ -56,13 +65,6 @@ import {
 
 // Types
 type DocumentType = 'passport' | 'visa' | 'flightBooked' | 'hotelBooked' | 'payment';
-type OcrExtractData = {
-  first_name?: string;
-  last_name?: string;
-  passport?: string;
-  personal_id_number?: string;
-  sex?: string;
-};
 type OcrTarget = "leader" | number;
 
 function formatPassportInput(value: string): string {
@@ -428,6 +430,7 @@ export default function EditReservation() {
     lastName: string;
     passport: string;
     sex?: string;
+    warning?: string | null;
   } | null>(null)
   const [documents, setDocuments] = useState<{
     passport: File | null;
@@ -1078,33 +1081,39 @@ export default function EditReservation() {
     if (!files || files.length === 0) return;
     const file = files[0];
     
-    if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
-      setDocuments(prev => ({
+    if (!isSupportedDocumentUpload(file)) {
+      toast({
+        title: "Erreur",
+        description: UNSUPPORTED_DOCUMENT_MESSAGE,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setDocuments(prev => ({
+      ...prev,
+      [type]: file
+    }));
+
+    if (isPdfUpload(file)) {
+      setPreviews(prev => ({
         ...prev,
-        [type]: file
+        [type]: { url: URL.createObjectURL(file), type: documentPreviewType(file) }
       }));
-      
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setPreviews(prev => ({
-            ...prev,
-            [type]: { url: reader.result as string, type: file.type }
-          }));
-        };
-        reader.readAsDataURL(file);
-        if (type === "passport") {
-          void runPassportOcr(file, "leader");
-        }
-      } else if (file.type === 'application/pdf') {
+    } else {
+      const reader = new FileReader();
+      reader.onloadend = () => {
         setPreviews(prev => ({
           ...prev,
-          [type]: { url: URL.createObjectURL(file), type: file.type }
+          [type]: { url: reader.result as string, type: documentPreviewType(file) }
         }));
-        if (type === "passport") {
-          void runPassportOcr(file, "leader");
-        }
-      }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // OCR sur image comme sur PDF
+    if (type === "passport") {
+      void runPassportOcr(file, "leader");
     }
   }
 
@@ -1157,37 +1166,19 @@ export default function EditReservation() {
   const runPassportOcr = async (file: File, target: OcrTarget) => {
     setOcrProcessingTarget(target);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/passport-ocr", {
-        method: "POST",
-        body: fd,
-      });
-      const json = (await res.json()) as {
-        status?: string;
-        data?: OcrExtractData;
-        error?: string;
-      };
-      if (!res.ok) {
-        throw new Error(json.error || "Service OCR indisponible");
-      }
-      const raw = json.data || {};
+      const result = await extractPassportData(file);
       setOcrValidation({
         target,
-        firstName: String(raw.first_name ?? "").trim(),
-        lastName: String(raw.last_name ?? "").trim(),
-        passport: formatPassportInput(
-          String(raw.passport ?? raw.personal_id_number ?? "").trim()
-        ),
-        sex: typeof raw.sex === "string" ? raw.sex : undefined,
+        firstName: result.firstName,
+        lastName: result.lastName,
+        passport: formatPassportInput(result.passport),
+        sex: result.sex,
+        warning: ocrQualityWarning(result),
       });
     } catch (err) {
       toast({
         title: "Lecture automatique du passeport",
-        description:
-          err instanceof Error
-            ? err.message
-            : "Impossible d’analyser l’image. Vous pouvez saisir les champs manuellement.",
+        description: err instanceof Error ? err.message : OCR_FAILURE_MESSAGE,
         variant: "destructive",
       });
     } finally {
@@ -1254,7 +1245,7 @@ export default function EditReservation() {
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!(file.type === "application/pdf" || file.type.startsWith("image/"))) {
+    if (!isSupportedDocumentUpload(file)) {
       toast({
         title: "Erreur",
         description: "PDF ou image uniquement.",
@@ -1264,29 +1255,29 @@ export default function EditReservation() {
     }
     setMemberPassportFiles((prev) => ({ ...prev, [memberId]: file }));
     setMemberPassportDelete((prev) => ({ ...prev, [memberId]: null }));
-    if (file.type.startsWith("image/")) {
+    if (isPdfUpload(file)) {
+      setPreviews((p) => ({
+        ...p,
+        [`member_passport_${memberId}`]: {
+          url: URL.createObjectURL(file),
+          type: documentPreviewType(file),
+        },
+      }));
+    } else {
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreviews((p) => ({
           ...p,
           [`member_passport_${memberId}`]: {
             url: reader.result as string,
-            type: file.type,
+            type: documentPreviewType(file),
           },
         }));
       };
       reader.readAsDataURL(file);
-      void runPassportOcr(file, memberId);
-    } else {
-      setPreviews((p) => ({
-        ...p,
-        [`member_passport_${memberId}`]: {
-          url: URL.createObjectURL(file),
-          type: file.type,
-        },
-      }));
-      void runPassportOcr(file, memberId);
     }
+    // OCR sur image comme sur PDF
+    void runPassportOcr(file, memberId);
   };
 
   const mettreAJourPaiement = <K extends keyof Paiement>(index: number, field: K, value: Paiement[K]) => {
@@ -3204,6 +3195,11 @@ export default function EditReservation() {
           </DialogHeader>
           {ocrValidation && (
             <div className="grid gap-3 py-2">
+              {ocrValidation.warning && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
+                  {ocrValidation.warning}
+                </p>
+              )}
               <div className="space-y-1">
                 <Label htmlFor="ocr-lastName">Nom</Label>
                 <Input

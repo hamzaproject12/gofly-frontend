@@ -12,6 +12,15 @@ import {
 } from "@/lib/prix"
 import { notifyCreditsUpdated } from "@/app/components/CreditCounter"
 import { generatePaymentReceiptFile, downloadReceipt } from "@/lib/generateReceipt"
+import {
+  documentPreviewType,
+  extractPassportData,
+  isPdfUpload,
+  isSupportedDocumentUpload,
+  ocrQualityWarning,
+  OCR_FAILURE_MESSAGE,
+  UNSUPPORTED_DOCUMENT_MESSAGE,
+} from "@/lib/passportOcr"
 import { BlockersTooltip } from "@/components/blockers-tooltip"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -128,14 +137,6 @@ type Documents = {
   billet: File | null;
   hotel: File | null;
   paiements: File[];
-};
-
-type OcrExtractData = {
-  first_name?: string;
-  last_name?: string;
-  passport?: string;
-  personal_id_number?: string;
-  sex?: string;
 };
 
 const PHONE_REGEX = /^\+\d{3}\s\d{9}$/;
@@ -262,6 +263,7 @@ export default function NouvelleReservation() {
     lastName: string;
     passport: string;
     sex?: string;
+    warning?: string | null;
   } | null>(null);
   const [showRoomGuide, setShowRoomGuide] = useState(false);
   const [selectedPlaces, setSelectedPlaces] = useState<{[roomId: number]: number[]}>({});
@@ -1339,94 +1341,83 @@ export default function NouvelleReservation() {
 
   // Fonction pour uploader vers Cloudinary
 
+  // Lecture automatique du passeport via le service OCR : accepte aussi bien
+  // une image qu'un PDF (texte natif ou scanné).
+  const runPassportOcr = async (file: File) => {
+    setOcrProcessingPassport(true);
+    try {
+      const result = await extractPassportData(file);
+      setOcrValidation({
+        firstName: result.firstName,
+        lastName: result.lastName,
+        passport: formatPassportInput(result.passport),
+        sex: result.sex,
+        warning: ocrQualityWarning(result),
+      });
+    } catch (err) {
+      toast({
+        title: "Lecture automatique du passeport",
+        description: err instanceof Error ? err.message : OCR_FAILURE_MESSAGE,
+        variant: "destructive",
+      });
+    } finally {
+      setOcrProcessingPassport(false);
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: DocumentType) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
-    
-    if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
-      // Stocker le fichier localement pour l'aperçu (pas d'upload vers Cloudinary maintenant)
-      setDocuments(prev => ({
-        ...prev,
-        [type]: file
-      }));
-      setAttachmentStatus(prev => ({
-        ...prev,
-        [type]: true
-      }));
-      
-      // Créer l'aperçu local
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setPreviews(prev => ({
-            ...prev,
-            [type]: { url: reader.result as string, type: file.type }
-          }));
-        };
-        reader.readAsDataURL(file);
 
-        if (type === "passport") {
-          void (async () => {
-            setOcrProcessingPassport(true);
-            try {
-              const fd = new FormData();
-              fd.append("file", file);
-              const res = await fetch("/api/passport-ocr", {
-                method: "POST",
-                body: fd,
-              });
-              const json = (await res.json()) as {
-                status?: string;
-                data?: OcrExtractData;
-                error?: string;
-              };
-              if (!res.ok) {
-                throw new Error(json.error || "Service OCR indisponible");
-              }
-              const raw = json.data || {};
-              setOcrValidation({
-                firstName: String(raw.first_name ?? "").trim(),
-                lastName: String(raw.last_name ?? "").trim(),
-                passport: formatPassportInput(
-                  String(raw.passport ?? raw.personal_id_number ?? "").trim()
-                ),
-                sex: typeof raw.sex === "string" ? raw.sex : undefined,
-              });
-            } catch (err) {
-              toast({
-                title: "Lecture automatique du passeport",
-                description:
-                  err instanceof Error
-                    ? err.message
-                    : "Impossible d’analyser l’image. Vous pouvez saisir les champs manuellement.",
-                variant: "destructive",
-              });
-            } finally {
-              setOcrProcessingPassport(false);
-            }
-          })();
-        }
-      } else if (file.type === 'application/pdf') {
-        setPreviews(prev => ({
-          ...prev,
-          [type]: { url: URL.createObjectURL(file), type: file.type }
-        }));
-      }
-      
-      console.log('🔍 Debug - File selected locally:', {
-        type,
-        fileName: file.name,
-        fileType: file.type,
-        localPreview: true
-      });
-    } else {
+    if (!isSupportedDocumentUpload(file)) {
       toast({
         title: "Erreur",
-        description: "Format de fichier non supporté. Seuls les fichiers PDF et images sont acceptés.",
+        description: UNSUPPORTED_DOCUMENT_MESSAGE,
         variant: "destructive",
       });
+      return;
     }
+
+    // Stocker le fichier localement pour l'aperçu (pas d'upload vers Cloudinary maintenant)
+    setDocuments(prev => ({
+      ...prev,
+      [type]: file
+    }));
+    setAttachmentStatus(prev => ({
+      ...prev,
+      [type]: true
+    }));
+
+    // Créer l'aperçu local
+    if (isPdfUpload(file)) {
+      setPreviews(prev => ({
+        ...prev,
+        [type]: { url: URL.createObjectURL(file), type: documentPreviewType(file) }
+      }));
+    } else {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviews(prev => ({
+          ...prev,
+          [type]: { url: reader.result as string, type: documentPreviewType(file) }
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // OCR sur image comme sur PDF
+    if (type === "passport") {
+      void runPassportOcr(file);
+    }
+
+    console.log('🔍 Debug - File selected locally:', {
+      type,
+      fileName: file.name,
+      fileType: file.type,
+      isPdf: isPdfUpload(file),
+      localPreview: true
+    });
   };
 
   const applyOcrValidation = () => {
@@ -3563,6 +3554,11 @@ export default function NouvelleReservation() {
           </DialogHeader>
           {ocrValidation && (
             <div className="grid gap-3 py-2">
+              {ocrValidation.warning && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
+                  {ocrValidation.warning}
+                </p>
+              )}
               <div className="space-y-1">
                 <Label htmlFor="ocr-lastName">Nom</Label>
                 <Input

@@ -16,6 +16,7 @@ import {
   UNSUPPORTED_DOCUMENT_MESSAGE,
   type OcrAlert,
 } from "@/lib/passportOcr"
+import { PassportOcrSummary } from "@/components/reservations/PassportOcrSummary"
 import { BlockersTooltip } from "@/components/blockers-tooltip"
 import { SubmitOverlay, type SubmitStep } from "@/components/reservations/SubmitOverlay"
 import ProgramStatusBanner from "@/components/ProgramStatusBanner"
@@ -431,6 +432,7 @@ export default function EditReservation() {
     lastName: string;
     passport: string;
     sex?: string;
+    expiryDate?: string;
     warning?: OcrAlert | null;
   } | null>(null)
   const [documents, setDocuments] = useState<{
@@ -1174,6 +1176,7 @@ export default function EditReservation() {
         lastName: result.lastName,
         passport: formatPassportInput(result.passport),
         sex: result.sex,
+        expiryDate: result.expiryDate,
         warning: ocrQualityWarning(result),
       });
     } catch (err) {
@@ -3196,17 +3199,10 @@ export default function EditReservation() {
           </DialogHeader>
           {ocrValidation && (
             <div className="grid gap-3 py-2">
-              {ocrValidation.warning && (
-                <p
-                  className={`text-xs border rounded-md p-2 ${
-                    ocrValidation.warning.level === "error"
-                      ? "text-red-700 bg-red-50 border-red-200 font-medium"
-                      : "text-amber-700 bg-amber-50 border-amber-200"
-                  }`}
-                >
-                  {ocrValidation.warning.message}
-                </p>
-              )}
+              <PassportOcrSummary
+                expiryDate={ocrValidation.expiryDate}
+                alert={ocrValidation.warning}
+              />
               <div className="space-y-1">
                 <Label htmlFor="ocr-lastName">Nom</Label>
                 <Input

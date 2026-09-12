@@ -8,8 +8,6 @@
 //
 // Endpoint : POST /api/passport-ocr (proxy Next.js vers POST /extract-text/).
 
-import { formatDateFr } from "@/lib/format";
-
 export type OcrExtractData = {
   // Les 8 clés historiques, format inchangé (date_of_birth reste en AAMMJJ brut)
   first_name?: string;
@@ -252,15 +250,13 @@ export function ocrQualityWarning(result: PassportOcrResult): OcrAlert | null {
   let level: OcrAlertLevel = "warning";
 
   const statutExpiration = passportExpiryStatus(result.expiryDate);
-  const dateFr = formatDateFr(result.expiryDate);
 
-  if (statutExpiration === "expired") {
-    level = "error";
-    messages.push(
-      `Passeport expiré depuis le ${dateFr} : il doit être renouvelé avant toute réservation.`
-    );
-  } else if (statutExpiration === "unknown" && result.expired === true) {
-    // Date illisible de notre côté, mais le service la juge dépassée.
+  // La date elle-même est affichée par le bloc de la modale : les messages
+  // ci-dessous portent la conséquence et l'action, pas la date.
+  if (
+    statutExpiration === "expired" ||
+    (statutExpiration === "unknown" && result.expired === true)
+  ) {
     level = "error";
     messages.push(
       "Passeport expiré : il doit être renouvelé avant toute réservation."
@@ -268,11 +264,11 @@ export function ocrQualityWarning(result: PassportOcrResult): OcrAlert | null {
   } else if (statutExpiration === "insufficient") {
     level = "error";
     messages.push(
-      `Validité insuffisante : ce passeport expire le ${dateFr}, soit dans moins de ${PASSPORT_MIN_VALIDITY_MONTHS} mois. Un passeport valide au moins ${PASSPORT_MIN_VALIDITY_MONTHS} mois est exigé pour le visa.`
+      `Validité insuffisante : un passeport valide au moins ${PASSPORT_MIN_VALIDITY_MONTHS} mois est exigé pour le visa. Demandez le renouvellement du document avant de confirmer le dossier.`
     );
   } else if (statutExpiration === "unknown") {
     messages.push(
-      `Date d'expiration illisible : vérifiez manuellement que le passeport reste valide au moins ${PASSPORT_MIN_VALIDITY_MONTHS} mois après le départ.`
+      `Date d'expiration non détectée : vérifiez sur le document qu'il reste valide au moins ${PASSPORT_MIN_VALIDITY_MONTHS} mois.`
     );
   }
 

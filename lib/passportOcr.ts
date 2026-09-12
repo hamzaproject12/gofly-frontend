@@ -8,6 +8,8 @@
 //
 // Endpoint : POST /api/passport-ocr (proxy Next.js vers POST /extract-text/).
 
+import { formatDateFr } from "@/lib/format";
+
 export type OcrExtractData = {
   // Les 8 clés historiques, format inchangé (date_of_birth reste en AAMMJJ brut)
   first_name?: string;
@@ -17,16 +19,36 @@ export type OcrExtractData = {
   sex?: string;
   date_of_birth?: string;
   expiration_date?: string;
+  date_of_expiry?: string; // nom actuel de `expiration_date` (AAMMJJ brut)
   nationality?: string;
   country?: string;
   // Clés ajoutées par la nouvelle version du service (toutes optionnelles)
   date_of_birth_iso?: string;
   expiration_date_iso?: string;
+  date_of_expiry_iso?: string; // nom actuel de `expiration_date_iso` (AAAA-MM-JJ)
   valid?: boolean;
   valid_format?: string; // TD1 (CNIE 3x30) | TD2 (2x36) | TD3 (passeport)
+  document_format?: string; // nom actuel de `valid_format`
   page?: number; // page du PDF où la MRZ a été trouvée
   expired?: boolean;
   checks?: Record<string, boolean>; // chiffres de contrôle ICAO par champ
+};
+
+/**
+ * Enveloppe renvoyée par le service : les champs MRZ sont regroupés dans
+ * `data`, le verdict de lecture est posé à la racine.
+ */
+type OcrResponse = {
+  status?: string;
+  error?: string;
+  data?: OcrExtractData;
+  valid?: boolean;
+  expired?: boolean;
+  page?: number;
+  document_format?: string;
+  valid_format?: string;
+  checks?: Record<string, boolean>;
+  mrz_found?: boolean;
 };
 
 export type PassportOcrResult = {
@@ -39,6 +61,8 @@ export type PassportOcrResult = {
   expired?: boolean;
   /** TD1 / TD2 / TD3 */
   format?: string;
+  /** Date d'expiration au format AAAA-MM-JJ, si le service l'a fournie */
+  expiryDate?: string;
   /** Page du PDF où la MRZ a été lue (1 pour une image) */
   page?: number;
   raw: OcrExtractData;
@@ -101,17 +125,23 @@ export async function extractPassportData(file: File): Promise<PassportOcrResult
   fd.append("file", file, file.name);
 
   const res = await fetch("/api/passport-ocr", { method: "POST", body: fd });
-  const json = (await res.json().catch(() => ({}))) as {
-    status?: string;
-    data?: OcrExtractData;
-    error?: string;
-  };
+  const json = (await res.json().catch(() => ({}))) as OcrResponse;
 
   if (!res.ok) {
     throw new Error(json.error || "Service OCR indisponible");
   }
 
-  const raw = json.data || {};
+  // Le service renvoie les champs MRZ dans `data`, mais le verdict de lecture
+  // (`valid`, `expired`, `page`, `document_format`) à côté, dans l'enveloppe.
+  const raw: OcrExtractData = {
+    valid: json.valid,
+    expired: json.expired,
+    page: json.page,
+    document_format: json.document_format,
+    valid_format: json.valid_format,
+    checks: json.checks,
+    ...(json.data || {}),
+  };
   return {
     firstName: String(raw.first_name ?? "").trim(),
     lastName: String(raw.last_name ?? "").trim(),
@@ -119,22 +149,139 @@ export async function extractPassportData(file: File): Promise<PassportOcrResult
     sex: typeof raw.sex === "string" ? raw.sex : undefined,
     valid: typeof raw.valid === "boolean" ? raw.valid : undefined,
     expired: typeof raw.expired === "boolean" ? raw.expired : undefined,
-    format: typeof raw.valid_format === "string" ? raw.valid_format : undefined,
+    format: firstString(raw.document_format, raw.valid_format),
     page: typeof raw.page === "number" ? raw.page : undefined,
+    expiryDate: readExpiryIso(raw),
     raw,
   };
 }
 
+function firstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
 /**
- * Message d'avertissement quand la lecture est douteuse (chiffres de contrôle
- * ICAO faux) ou le document expiré — à afficher dans la modale de validation.
+ * Date d'expiration normalisée en AAAA-MM-JJ. Le service la fournit déjà au
+ * format ISO (`date_of_expiry_iso`, anciennement `expiration_date_iso`) ; on
+ * retombe sinon sur la valeur brute AAMMJJ de la MRZ.
  */
-export function ocrQualityWarning(result: PassportOcrResult): string | null {
+function readExpiryIso(raw: OcrExtractData): string | undefined {
+  const iso = firstString(raw.date_of_expiry_iso, raw.expiration_date_iso);
+  if (iso && /^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+
+  const brut = firstString(raw.date_of_expiry, raw.expiration_date);
+  const mrz = brut && /^\d{6}$/.test(brut) ? brut : null;
+  if (!mrz) return undefined;
+  // AAMMJJ : une date d'expiration est toujours dans les années 2000.
+  return `20${mrz.slice(0, 2)}-${mrz.slice(2, 4)}-${mrz.slice(4, 6)}`;
+}
+
+/** Validité minimale exigée pour un passeport au départ (règle Omra / visa). */
+export const PASSPORT_MIN_VALIDITY_MONTHS = 6;
+
+export type OcrAlertLevel = "error" | "warning";
+
+export type OcrAlert = {
+  level: OcrAlertLevel;
+  message: string;
+};
+
+export type PassportExpiryStatus =
+  | "unknown" // pas de date d'expiration lisible
+  | "expired" // document déjà périmé
+  | "insufficient" // expire dans moins de 6 mois
+  | "ok";
+
+/** Date "AAAA-MM-JJ" lue à midi local, pour rester insensible au fuseau. */
+function parseIsoDate(value: string | undefined): Date | null {
+  if (!value) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Ajoute des mois en ramenant au dernier jour du mois si besoin (31/08 + 6 → 28/02). */
+function addMonths(date: Date, months: number): Date {
+  const jour = date.getDate();
+  const d = new Date(date.getTime());
+  d.setMonth(d.getMonth() + months);
+  if (d.getDate() < jour) d.setDate(0);
+  return d;
+}
+
+/**
+ * Le passeport doit rester valide au moins 6 mois : c'est la règle appliquée
+ * par les autorités saoudiennes pour la délivrance du visa Omra.
+ */
+export function passportExpiryStatus(
+  expiryDate: string | undefined,
+  aujourdHui: Date = new Date()
+): PassportExpiryStatus {
+  const expiration = parseIsoDate(expiryDate);
+  if (!expiration) return "unknown";
+
+  const reference = new Date(
+    aujourdHui.getFullYear(),
+    aujourdHui.getMonth(),
+    aujourdHui.getDate(),
+    12,
+    0,
+    0
+  );
+  if (expiration.getTime() < reference.getTime()) return "expired";
+  if (
+    expiration.getTime() <
+    addMonths(reference, PASSPORT_MIN_VALIDITY_MONTHS).getTime()
+  ) {
+    return "insufficient";
+  }
+  return "ok";
+}
+
+/**
+ * Alerte à afficher dans la modale de validation : validité restante du
+ * document (règle des 6 mois) puis qualité de la lecture MRZ. Le niveau
+ * `error` signale un document inutilisable en l'état pour un départ.
+ */
+export function ocrQualityWarning(result: PassportOcrResult): OcrAlert | null {
+  const messages: string[] = [];
+  let level: OcrAlertLevel = "warning";
+
+  const statutExpiration = passportExpiryStatus(result.expiryDate);
+  const dateFr = formatDateFr(result.expiryDate);
+
+  if (statutExpiration === "expired") {
+    level = "error";
+    messages.push(
+      `Passeport expiré depuis le ${dateFr} : il doit être renouvelé avant toute réservation.`
+    );
+  } else if (statutExpiration === "unknown" && result.expired === true) {
+    // Date illisible de notre côté, mais le service la juge dépassée.
+    level = "error";
+    messages.push(
+      "Passeport expiré : il doit être renouvelé avant toute réservation."
+    );
+  } else if (statutExpiration === "insufficient") {
+    level = "error";
+    messages.push(
+      `Validité insuffisante : ce passeport expire le ${dateFr}, soit dans moins de ${PASSPORT_MIN_VALIDITY_MONTHS} mois. Un passeport valide au moins ${PASSPORT_MIN_VALIDITY_MONTHS} mois est exigé pour le visa.`
+    );
+  } else if (statutExpiration === "unknown") {
+    messages.push(
+      `Date d'expiration illisible : vérifiez manuellement que le passeport reste valide au moins ${PASSPORT_MIN_VALIDITY_MONTHS} mois après le départ.`
+    );
+  }
+
   if (result.valid === false) {
-    return "Lecture incertaine : les chiffres de contrôle du document ne correspondent pas. Vérifiez chaque champ.";
+    messages.push(
+      "Lecture incertaine : les chiffres de contrôle du document ne correspondent pas. Vérifiez chaque champ."
+    );
   }
-  if (result.expired === true) {
-    return "Attention : ce document semble expiré.";
-  }
-  return null;
+
+  if (messages.length === 0) return null;
+  return { level, message: messages.join(" ") };
 }

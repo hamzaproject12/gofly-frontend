@@ -38,8 +38,8 @@ import {
   Loader2,
   AlertTriangle,
   Clock,
+  Table2,
 } from "lucide-react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -58,7 +58,6 @@ import { fr } from "date-fns/locale"
 import Link from "next/link"
 import { siteConfig } from "@/lib/config"
 import { GrilleTarifaire } from "@/components/grille-tarifaire"
-import { BasculePricingMode, PricingMode } from "@/components/bascule-pricing-mode"
 import {
   CAPACITE_TYPE,
   COLONNES_GRILLE,
@@ -68,7 +67,6 @@ import {
   VilleHotel,
   cleHotel,
   formulesVersApi,
-  grilleContientUnPrix,
   prixCase,
   validerGrille,
 } from "@/lib/grilleTarifaire"
@@ -185,75 +183,10 @@ function totalBedsByCity(hotels: { chambres: ChambresConfig }[]): number {
   return total
 }
 
-function profitForPlan(
-  plan: "Économique" | "Normal" | "VIP",
-  profit: number,
-  profitEconomique: number,
-  profitNormal: number,
-  profitVIP: number
-): number {
-  switch (plan) {
-    case "Économique":
-      return profitEconomique || profit
-    case "VIP":
-      return profitVIP || profit
-    case "Normal":
-    default:
-      return profitNormal || profit
-  }
-}
-
-/**
- * Même principe que `calculatePrice` dans `app/reservations/nouvelle/page.tsx` :
- * prixAvion + profit(plan) + (visa + hôtels Madina + Makkah en Riyal) × exchange
- * avec prix hôtel = (prix chambre / nb personnes du type) × jours ville.
- */
-function unitTicketPriceDh(params: {
-  exchange: number
-  prixAvionDH: number
-  prixVisaRiyal: number
-  profit: number
-  profitEconomique: number
-  profitNormal: number
-  profitVIP: number
-  plan: "Économique" | "Normal" | "VIP"
-  roomTypeKey: number
-  prixRoomMadinaRiyal: number
-  prixRoomMakkahRiyal: number
-  joursMadina: number
-  joursMakkah: number
-  includeAvion: boolean
-  includeVisa: boolean
-  /** Coût hôtels « Autre » déjà par voyageur (Σ prixRoom/nbPersonnes × nuits), en Riyal */
-  prixHotelAutreRiyalPerTraveler?: number
-}): number {
-  const nbPersonnes = params.roomTypeKey
-  const p = profitForPlan(
-    params.plan,
-    params.profit,
-    params.profitEconomique,
-    params.profitNormal,
-    params.profitVIP
-  )
-  const prixAvion = params.includeAvion ? params.prixAvionDH : 0
-  const prixVisa = params.includeVisa ? params.prixVisaRiyal : 0
-  const prixHotelMadina =
-    params.prixRoomMadinaRiyal > 0 && nbPersonnes > 0
-      ? (params.prixRoomMadinaRiyal / nbPersonnes) * params.joursMadina
-      : 0
-  const prixHotelMakkah =
-    params.prixRoomMakkahRiyal > 0 && nbPersonnes > 0
-      ? (params.prixRoomMakkahRiyal / nbPersonnes) * params.joursMakkah
-      : 0
-  const riyalTotal =
-    prixVisa + prixHotelMadina + prixHotelMakkah + (params.prixHotelAutreRiyalPerTraveler ?? 0)
-  const prixFinal = prixAvion + p + riyalTotal * params.exchange
-  return Math.round(prixFinal)
-}
-
 /**
  * Coût agence par voyageur (vol + hôtels + visa en DH), sans marge commerciale.
- * Même décomposition que le prix client (`unitTicketPriceDh`) mais sans le terme `profit`.
+ * C'est une ESTIMATION DE COÛT, affichée en regard du prix de la brochure pour
+ * juger la marge — jamais un prix de vente.
  */
 function unitAgencyCostTravelerDh(params: {
   exchange: number
@@ -349,7 +282,6 @@ export default function NouveauProgramme() {
   /** Hypothèses pour la simulation (même logique de prix que « Nouvelle réservation ») */
   const [simIncludeAvion, setSimIncludeAvion] = useState(true)
   const [simIncludeVisa, setSimIncludeVisa] = useState(true)
-  const [simPlan, setSimPlan] = useState<"Économique" | "Normal" | "VIP">("Normal")
   /** Places réservées pour agents / staff : pas de paiement client, comptées en charges */
   const [simAgentPlaces, setSimAgentPlaces] = useState("")
   const [simAgentCostPerPlaceDH, setSimAgentCostPerPlaceDH] = useState("")
@@ -357,12 +289,6 @@ export default function NouveauProgramme() {
   const [showValidationReasons, setShowValidationReasons] = useState(false)
   const [showSimulationSection, setShowSimulationSection] = useState(false)
 
-  /**
-   * Origine du prix de vente. Un programme NEUF est créé en GRILLE : le prix
-   * affiché au client est celui de la brochure. La grille peut rester vide et
-   * être complétée plus tard, le programme est créé quand même.
-   */
-  const [pricingMode, setPricingMode] = useState<PricingMode>("GRILLE")
   /** Lignes de la grille tarifaire en cours de saisie (formules de la brochure). */
   const [formules, setFormules] = useState<FormuleForm[]>([])
   /** Confirmation demandée quand les catégories d'hôtels n'ont pas le même nombre de lits */
@@ -721,29 +647,9 @@ export default function NouveauProgramme() {
       const paired = presentPlaces.length > 0 ? Math.min(...presentPlaces) : 0
       if (paired <= 0) continue
 
-      // En mode GRILLE, le chiffre d'affaires vient du prix de la BROCHURE, pas du
-      // calcul : le coût agence ci-dessous reste identique dans les deux modes.
-      const unitDh =
-        pricingMode === "GRILLE"
-          ? prixGrilleParCapacite[t] ?? 0
-          : unitTicketPriceDh({
-              exchange,
-              prixAvionDH,
-              prixVisaRiyal,
-              profit,
-              profitEconomique,
-              profitNormal,
-              profitVIP,
-              plan: simPlan,
-              roomTypeKey: t,
-              prixRoomMadinaRiyal: pm,
-              prixRoomMakkahRiyal: pk,
-              joursMadina: jM,
-              joursMakkah: jK,
-              includeAvion: simIncludeAvion,
-              includeVisa: simIncludeVisa,
-              prixHotelAutreRiyalPerTraveler: autreRiyalPerTraveler,
-            })
+      // Le chiffre d'affaires vient du prix de la BROCHURE : c'est le seul prix de
+      // vente. Le coût agence calculé plus bas reste, lui, une estimation de coût.
+      const unitDh = prixGrilleParCapacite[t] ?? 0
       const subtotalDh = paired * unitDh
       const nbPersonnes = t
       const unitCostVolDh = simIncludeAvion ? prixAvionDH : 0
@@ -794,18 +700,16 @@ export default function NouveauProgramme() {
       costVolHotelVisaAllTravelersDh + agentChargesTotalDh + autresChargesDh
     const resultatPrevDh = revenueAfterAgentsDh - totalChargesDh
 
-    // Places dont le prix de vente est inconnu en mode GRILLE (case « — ») : elles
+    // Places dont le prix de vente est inconnu (case « — » de la grille) : elles
     // coûtent à l'agence sans rien rapporter, autant le signaler.
-    const placesSansPrixGrille =
-      pricingMode === "GRILLE"
-        ? byType.filter((row) => row.unitDh <= 0).reduce((total, row) => total + row.places, 0)
-        : 0
+    const placesSansPrixGrille = byType
+      .filter((row) => row.unitDh <= 0)
+      .reduce((total, row) => total + row.places, 0)
 
     return {
       exchange,
       joursMadinaEff: jM,
       joursMakkahEff: jK,
-      pricingMode,
       placesSansPrixGrille,
       byType,
       totalTravelersMax,
@@ -839,11 +743,9 @@ export default function NouveauProgramme() {
     formData.hotelsAutre,
     simIncludeAvion,
     simIncludeVisa,
-    simPlan,
     simAgentPlaces,
     simAgentCostPerPlaceDH,
     simAutresChargesDH,
-    pricingMode,
     prixGrilleParCapacite,
   ])
 
@@ -1036,12 +938,7 @@ export default function NouveauProgramme() {
     kvTable([
       ["Inclure avion dans le coût", simIncludeAvion ? "Oui" : "Non"],
       ["Inclure visa dans le coût", simIncludeVisa ? "Oui" : "Non"],
-      [
-        "Origine du prix de vente",
-        pricingMode === "GRILLE" ? "Grille tarifaire (brochure)" : "Calcul automatique",
-      ],
-      // Le plan ne joue aucun rôle quand le prix vient de la brochure.
-      ["Plan tarifaire", pricingMode === "GRILLE" ? "—" : simPlan],
+      ["Origine du prix de vente", "Grille tarifaire (brochure)"],
       ...(formData.hotelsAutre.length > 0
         ? [["Hôtels Autre", `${formData.hotelsAutre.length} (nuits par hôtel)`] as [string, string]]
         : []),
@@ -1237,11 +1134,9 @@ export default function NouveauProgramme() {
     formData,
     simIncludeAvion,
     simIncludeVisa,
-    simPlan,
     simAgentPlaces,
     simAgentCostPerPlaceDH,
     simAutresChargesDH,
-    pricingMode,
     toast,
   ])
 
@@ -1493,10 +1388,10 @@ export default function NouveauProgramme() {
           ordre: h.ordre ? parseInt(h.ordre) : 0,
           chambres: h.chambres,
         })),
-        // Origine du prix de vente et grille de la brochure. Les hôtels des
-        // formules sont transmis par nom + ville : ils viennent d'être saisis et
-        // n'ont pas encore d'identifiant côté navigateur.
-        pricingMode,
+        // Grille de la brochure. Les hôtels des formules sont transmis par nom +
+        // ville : ils viennent d'être saisis et n'ont pas encore d'identifiant côté
+        // navigateur. L'origine du prix n'est plus transmise — le serveur impose la
+        // grille à tout nouveau programme.
         formules: formulesVersApi(formules, hotelsGrille),
       }
 
@@ -2386,13 +2281,17 @@ export default function NouveauProgramme() {
                     </TabsContent>
                   </Tabs>
 
-                  {/* Grille tarifaire : le prix de la brochure publiée, saisi formule par formule */}
+                  {/* Grille tarifaire : le prix de la brochure publiée, saisi formule par
+                      formule. C'est le SEUL prix de vente — plus aucun mode à choisir. */}
                   <div className="mb-6 rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/70 to-white p-4 ring-1 ring-violet-200/40">
-                    <BasculePricingMode
-                      mode={pricingMode}
-                      onChange={setPricingMode}
-                      grilleAUnPrix={grilleContientUnPrix(formules)}
-                    />
+                    <p className="flex items-center gap-2 text-sm font-medium text-violet-900">
+                      <Table2 className="h-4 w-4 shrink-0" />
+                      Prix de vente : grille tarifaire (brochure)
+                    </p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-violet-700/80">
+                      Les réservations de ce programme prendront le prix saisi ci-dessous. La
+                      grille peut rester vide et être complétée plus tard.
+                    </p>
                     <div className="mt-4">
                       <GrilleTarifaire
                         formules={formules}
@@ -2489,28 +2388,6 @@ export default function NouveauProgramme() {
                           </label>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {/* Le plan tarifaire ne pilote le chiffre d'affaires qu'en mode
-                              CALCUL. En GRILLE, le prix vient de la brochure : afficher un
-                              sélecteur sans effet induirait le gérant en erreur. */}
-                          {pricingMode === "CALCUL" && (
-                            <div className="space-y-2">
-                              <Label className="text-violet-800 text-sm">Plan tarifaire</Label>
-                              <Select
-                                value={simPlan}
-                                disabled={!canRunSimulation}
-                                onValueChange={(v) => setSimPlan(v as "Économique" | "Normal" | "VIP")}
-                              >
-                                <SelectTrigger className="border-violet-200 bg-white">
-                                  <SelectValue placeholder="Plan" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="Économique">Économique</SelectItem>
-                                  <SelectItem value="Normal">Normal</SelectItem>
-                                  <SelectItem value="VIP">VIP</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
                           <div className="space-y-2">
                             <Label className="text-violet-800 text-sm">Durées de séjour</Label>
                             <p className="text-xs text-violet-700/80 leading-relaxed">
@@ -2725,11 +2602,7 @@ export default function NouveauProgramme() {
                             <tr className="border-b border-violet-100 text-left text-violet-800">
                               <th className="p-2 font-medium">Type chambre</th>
                               <th className="p-2 font-medium">Places (capacité min.)</th>
-                              <th className="p-2 font-medium">
-                                {pricingMode === "GRILLE"
-                                  ? "Prix grille / pers. (DH)"
-                                  : "Prix / pers. (DH)"}
-                              </th>
+                              <th className="p-2 font-medium">Prix grille / pers. (DH)</th>
                               <th className="p-2 font-medium">Sous-total (DH)</th>
                             </tr>
                           </thead>
@@ -2744,22 +2617,20 @@ export default function NouveauProgramme() {
                             ))}
                           </tbody>
                         </table>
-                        {pricingMode === "GRILLE" && (
-                          <p className="border-t border-violet-100 bg-violet-50/60 px-3 py-2 text-xs text-violet-800">
-                            Chiffre d&apos;affaires calculé sur les prix de la grille tarifaire
-                            (moyenne des formules proposant chaque type de chambre). Le coût agence
-                            reste identique dans les deux modes.
-                            {simulationPreview.placesSansPrixGrille > 0 && (
-                              <>
-                                {" "}
-                                <span className="font-semibold text-amber-800">
-                                  {simulationPreview.placesSansPrixGrille} place(s) sans prix dans
-                                  la grille : elles sont comptées en charges, pas en recettes.
-                                </span>
-                              </>
-                            )}
-                          </p>
-                        )}
+                        <p className="border-t border-violet-100 bg-violet-50/60 px-3 py-2 text-xs text-violet-800">
+                          Chiffre d&apos;affaires calculé sur les prix de la grille tarifaire
+                          (moyenne des formules proposant chaque type de chambre). Le coût agence
+                          en regard est une estimation, pas un prix de vente.
+                          {simulationPreview.placesSansPrixGrille > 0 && (
+                            <>
+                              {" "}
+                              <span className="font-semibold text-amber-800">
+                                {simulationPreview.placesSansPrixGrille} place(s) sans prix dans
+                                la grille : elles sont comptées en charges, pas en recettes.
+                              </span>
+                            </>
+                          )}
+                        </p>
                       </div>
                     ) : (
                       <p className="mt-4 text-sm text-violet-700 bg-white/60 border border-violet-100 rounded-lg px-3 py-2">

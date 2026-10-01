@@ -136,8 +136,14 @@ enum ProgramStatus {
 }
 
 /// Origine du prix de vente d'un programme.
-/// CALCUL : prix dérivé du vol + visa + hôtels + profit (comportement historique).
-/// GRILLE : prix de la brochure publiée, saisi formule par formule (ProgramFormulePrix).
+/// GRILLE : prix de la brochure publiée, saisi formule par formule
+/// (ProgramFormulePrix). C'est le SEUL mode de vente : il n'est plus choisi dans
+/// l'interface, tout programme est vendu au prix de sa grille.
+/// CALCUL : ancien prix dérivé du vol + visa + hôtels + profit. Conservé pour les
+/// seuls programmes antérieurs à la grille qui n'en ont pas encore reçu une :
+/// enregistrer leur grille les bascule en GRILLE et ils n'en reviennent plus.
+/// Le calcul lui-même reste vivant comme ESTIMATION DU COÛT (aide à la décision),
+/// jamais comme prix de vente.
 enum PricingMode {
   CALCUL
   GRILLE
@@ -170,9 +176,11 @@ model Program {
   profitEconomique Float                @default(0)
   profitNormal     Float                @default(0)
   profitVIP        Float                @default(0)
-  /// Origine du prix de vente. Les programmes existants restent en CALCUL :
-  /// la migration est purement additive et ne change aucun prix déjà enregistré.
-  pricingMode      PricingMode          @default(CALCUL)
+  /// Origine du prix de vente : GRILLE pour tout nouveau programme. Le défaut a
+  /// changé (il valait CALCUL le temps de la mise en place de la grille) ; les
+  /// lignes déjà écrites ne bougent pas pour autant, d'où la bascule au démarrage
+  /// des programmes qui portent déjà une grille (cf. basculerProgrammesAvecGrille).
+  pricingMode      PricingMode          @default(GRILLE)
   isDeleted        Boolean              @default(false)
   deletedAt        DateTime?
   expenses         Expense[]

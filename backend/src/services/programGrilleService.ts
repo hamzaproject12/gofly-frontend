@@ -144,6 +144,37 @@ export function serializeProgrammeGrille<T extends { formules?: FormuleRow[] | n
   return { ...reste, formules: serializeFormules(formules ?? []) };
 }
 
+/**
+ * Bascule en GRILLE les programmes qui portent DÉJÀ une grille utilisable mais
+ * sont restés en CALCUL. L'origine du prix n'est plus un choix de l'utilisateur :
+ * la grille est le seul mode de vente.
+ *
+ * Idempotent — aucun programme concerné, aucune écriture ; l'appel peut donc être
+ * rejoué à chaque démarrage. Un programme SANS grille est délibérément laissé en
+ * CALCUL : le basculer bloquerait ses ventes en cours faute de prix de référence.
+ * Enregistrer sa grille le basculera (cf. `PUT /api/programs/:id/grille`).
+ */
+export async function basculerProgrammesAvecGrille(prisma: PrismaClient): Promise<number> {
+  // Sélection puis mise à jour par identifiants : un filtre de relation dans le
+  // `where` d'un `updateMany` n'est pas garanti par Prisma, alors qu'il l'est ici.
+  const candidats = await prisma.program.findMany({
+    where: {
+      isDeleted: false,
+      pricingMode: 'CALCUL',
+      // Au moins une formule portant au moins un prix : une grille vide ne suffit pas.
+      formules: { some: { prix: { some: {} } } },
+    },
+    select: { id: true },
+  });
+  if (candidats.length === 0) return 0;
+
+  const { count } = await prisma.program.updateMany({
+    where: { id: { in: candidats.map((programme) => programme.id) } },
+    data: { pricingMode: 'GRILLE' },
+  });
+  return count;
+}
+
 /** Vrai si au moins une formule porte au moins un prix — condition de la bascule en GRILLE. */
 export function grilleContientUnPrix(formules: Array<{ prix: unknown[] }>): boolean {
   return formules.some((f) => f.prix.length > 0);

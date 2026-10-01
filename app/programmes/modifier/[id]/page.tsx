@@ -38,12 +38,12 @@ import {
   BadgeCheck,
   AlertTriangle,
   Clock,
+  Table2,
 } from "lucide-react"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import { Checkbox } from "@/components/ui/checkbox"
 import { GrilleTarifaire } from "@/components/grille-tarifaire"
-import { BasculePricingMode, PricingMode } from "@/components/bascule-pricing-mode"
 import {
   CAPACITE_TYPE,
   COLONNES_GRILLE,
@@ -55,7 +55,6 @@ import {
   cleHotel,
   formulesDepuisApi,
   formulesVersApi,
-  grilleContientUnPrix,
   prixCase,
   validerGrille,
 } from "@/lib/grilleTarifaire"
@@ -170,14 +169,13 @@ export default function ModifierProgrammePage() {
   const [showBedsMismatchDialog, setShowBedsMismatchDialog] = useState(false)
 
   /**
-   * Origine du prix de vente du programme. Les programmes antérieurs à la grille
-   * arrivent en CALCUL et y restent tant que l'admin ne bascule pas lui-même.
+   * Vrai si le programme se vend encore au PRIX CALCULÉ : il est antérieur à la
+   * grille et n'en a pas reçu une. Enregistrer sa grille le bascule côté serveur,
+   * définitivement — l'origine du prix n'est plus un choix.
    */
-  const [pricingMode, setPricingMode] = useState<PricingMode>("CALCUL")
+  const [venteAuPrixCalcule, setVenteAuPrixCalcule] = useState(false)
   /** Grille tarifaire en cours d'édition (rechargée telle quelle depuis l'API). */
   const [formules, setFormules] = useState<FormuleForm[]>([])
-  /** Bascule de mode en cours côté serveur. */
-  const [basculeEnCours, setBasculeEnCours] = useState(false)
 
   const [formData, setFormData] = useState({
     nom: "",
@@ -495,7 +493,7 @@ export default function ModifierProgrammePage() {
         })
         setRoomConstraints({ Madina: constraintsMadina, Makkah: constraintsMakkah, Autre: constraintsAutre })
         // Grille tarifaire : rechargée à l'identique (formules, hôtels autorisés, cases).
-        setPricingMode(program.pricingMode === "GRILLE" ? "GRILLE" : "CALCUL")
+        setVenteAuPrixCalcule(program.pricingMode !== "GRILLE")
         const formulesChargees = formulesDepuisApi(program.formules)
         setFormules(formulesChargees)
         grilleInitialeRef.current = signatureGrille(formulesChargees)
@@ -561,46 +559,12 @@ export default function ModifierProgrammePage() {
       })
       return false
     }
+    // Enregistrer une grille utilisable fait basculer le programme sur ce prix
+    // côté serveur : la réponse porte l'origine du prix qui en résulte.
+    const data = await res.json().catch(() => ({} as { pricingMode?: string }))
+    if (data?.pricingMode) setVenteAuPrixCalcule(data.pricingMode !== "GRILLE")
     grilleInitialeRef.current = signature
     return true
-  }
-
-  /**
-   * Bascule CALCUL ↔ GRILLE. La grille est enregistrée d'abord : le serveur
-   * vérifie la grille EN BASE avant d'autoriser le passage en GRILLE.
-   */
-  const changerPricingMode = async (mode: PricingMode) => {
-    if (basculeEnCours) return
-    setBasculeEnCours(true)
-    try {
-      if (!(await enregistrerGrilleSiModifiee())) return
-
-      const res = await api.request(`/api/programs/${id}/pricing-mode`, {
-        method: "PUT",
-        body: JSON.stringify({ pricingMode: mode }),
-      })
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j.error || "Impossible de changer l'origine du prix")
-      }
-      const data = await res.json().catch(() => ({}))
-      setPricingMode(data.pricingMode === "GRILLE" ? "GRILLE" : "CALCUL")
-      toast({
-        title: "Origine du prix mise à jour",
-        description:
-          mode === "GRILLE"
-            ? "Les nouvelles réservations prendront le prix de la grille tarifaire."
-            : "Les nouvelles réservations repassent au prix calculé automatiquement.",
-      })
-    } catch (error) {
-      toast({
-        title: "Erreur",
-        description: error instanceof Error ? error.message : "Une erreur est survenue",
-        variant: "destructive",
-      })
-    } finally {
-      setBasculeEnCours(false)
-    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1382,13 +1346,25 @@ export default function ModifierProgrammePage() {
 
                     {/* Grille tarifaire : le prix de la brochure publiée, saisi formule par formule */}
                     <div className="mt-6 rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/70 to-white p-4 ring-1 ring-violet-200/40">
-                      <BasculePricingMode
-                        mode={pricingMode}
-                        onChange={changerPricingMode}
-                        grilleAUnPrix={grilleContientUnPrix(formules)}
-                        enCours={basculeEnCours}
-                        disabled={isSubmitting}
-                      />
+                      <p className="flex items-center gap-2 text-sm font-medium text-violet-900">
+                        <Table2 className="h-4 w-4 shrink-0" />
+                        Prix de vente : grille tarifaire (brochure)
+                      </p>
+                      <p className="mt-0.5 text-xs leading-relaxed text-violet-700/80">
+                        Les nouvelles réservations prennent le prix saisi dans la grille. Les
+                        réservations déjà enregistrées gardent leur prix et leur réduction.
+                      </p>
+                      {venteAuPrixCalcule && (
+                        <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                          <span>
+                            Ce programme est antérieur à la grille et se vend encore au{" "}
+                            <strong>prix calculé</strong> (vol + visa + hôtels + profit). Saisissez
+                            sa grille ci-dessous puis enregistrez : il passera au prix de la
+                            brochure. Les réservations déjà enregistrées gardent leur prix.
+                          </span>
+                        </div>
+                      )}
                       <div className="mt-4">
                         <GrilleTarifaire
                           formules={formules}

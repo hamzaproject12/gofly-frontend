@@ -154,17 +154,16 @@ router.post('/', async (req, res) => {
       passportDeadline,
       hotelsMadina,
       hotelsMakkah,
-      hotelsAutre,
-      pricingMode
+      hotelsAutre
     } = req.body;
 
     // Create the program with new financial/logistical fields
     const program = await prisma.program.create({
       data: {
         name,
-        // Origine du prix de vente. Un client qui n'envoie rien retombe sur le
-        // défaut du schéma (CALCUL) : aucun comportement existant ne change.
-        pricingMode: normalizePricingMode(pricingMode) ?? undefined,
+        // Tout nouveau programme se vend au prix de sa grille : l'origine du prix
+        // n'est plus un choix, la valeur envoyée par le client est donc ignorée.
+        pricingMode: 'GRILLE',
         nbJoursMadina: Number(nbJoursMadina) || 0,
         nbJoursMakkah: Number(nbJoursMakkah) || 0,
         exchange: exchange !== undefined ? parseFloat(exchange) : 1.0,
@@ -1388,7 +1387,32 @@ router.put('/:id/grille', authenticateToken, requireAdminOrSuperAdmin, async (re
       detailText: detail.detailText,
     });
 
-    res.json({ pricingMode: program.pricingMode, formules: grilleApres });
+    // Enregistrer une grille utilisable VAUT décision de vendre à ce prix : c'est
+    // le seul mode de vente. Un programme antérieur à la grille se convertit donc
+    // ici, sans action supplémentaire du gérant.
+    let pricingMode = program.pricingMode;
+    if (pricingMode !== 'GRILLE' && grilleContientUnPrix(grilleApres)) {
+      await prisma.program.update({
+        where: { id: programId },
+        data: { pricingMode: 'GRILLE' },
+      });
+      pricingMode = 'GRILLE';
+      const bascule = buildPricingModeChangeDetail(
+        program.name,
+        program.pricingMode,
+        'GRILLE',
+        grilleApres
+      );
+      await logJournalSuppression(prisma, req, {
+        action: JOURNAL_ACTION.PROGRAM_PRICING_MODE_CHANGED,
+        entityType: 'Program',
+        entityId: programId,
+        summary: bascule.summary,
+        detailText: bascule.detailText,
+      });
+    }
+
+    res.json({ pricingMode, formules: grilleApres });
   } catch (error) {
     if (error instanceof GrilleValidationError) {
       return res.status(400).json({ error: error.message });
@@ -1399,11 +1423,13 @@ router.put('/:id/grille', authenticateToken, requireAdminOrSuperAdmin, async (re
 });
 
 /**
- * Bascule l'origine du prix de vente d'un programme — ADMIN (rang ADMIN minimum).
+ * Passage d'un programme à la grille tarifaire — ADMIN (rang ADMIN minimum).
  *
- * CALCUL → GRILLE n'est accepté que si la grille porte au moins un prix : basculer
- * sur une grille vide laisserait les futures réservations sans prix de référence.
- * Les réservations déjà enregistrées gardent leur prix dans les deux sens.
+ * Seul GRILLE est accepté : le mode CALCUL a été retiré de l'interface et un
+ * programme vendu au prix de sa brochure n'y revient plus. La route subsiste pour
+ * convertir un programme antérieur à la grille, et refuse une grille vide — cela
+ * laisserait les futures réservations sans prix de référence.
+ * Les réservations déjà enregistrées gardent leur prix.
  */
 router.put('/:id/pricing-mode', authenticateToken, requireAdminOrSuperAdmin, async (req, res) => {
   try {
@@ -1415,7 +1441,13 @@ router.put('/:id/pricing-mode', authenticateToken, requireAdminOrSuperAdmin, asy
     const nextMode = normalizePricingMode(req.body?.pricingMode);
     if (nextMode === null) {
       return res.status(400).json({
-        error: "Origine du prix invalide. Valeurs autorisées : CALCUL, GRILLE.",
+        error: "Origine du prix invalide. Seule valeur autorisée : GRILLE.",
+      });
+    }
+    if (nextMode === 'CALCUL') {
+      return res.status(400).json({
+        error:
+          "Le prix calculé a été retiré : tous les programmes se vendent au prix de leur grille tarifaire.",
       });
     }
 

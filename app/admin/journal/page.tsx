@@ -117,6 +117,8 @@ const ACTION_LABELS: Record<string, string> = {
   PROGRAM_SOFT_DELETED: 'Programme masqué (soft)',
   PROGRAM_HARD_DELETED: 'Programme supprimé définitivement',
   PROGRAM_UPDATED: 'Programme / chambres modifiés',
+  PROGRAM_GRID_UPDATED: 'Grille tarifaire modifiée',
+  PROGRAM_PRICING_MODE_CHANGED: 'Origine du prix modifiée',
   FIXED_CHARGE_DELETED: 'Charge fixe supprimée',
   AGENT_DEACTIVATED: 'Agent désactivé',
   AGENT_DELETED: 'Utilisateur supprimé définitivement',

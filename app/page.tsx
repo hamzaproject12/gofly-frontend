@@ -9,7 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { api } from '@/lib/api';
 import { siteConfig } from '@/lib/config';
 import { formatMontant, formatDateFr } from '@/lib/format';
-import { JOURS_ALERTE_VOYAGE, estImminente, joursAvant, libelleEcheance } from '@/lib/voyage';
+import { JOURS_ALERTE_VOYAGE, estImminente, formatHeureVoyage, joursAvant, libelleEcheance } from '@/lib/voyage';
 import { CompteARebours, DateVoyageChip } from '@/components/voyage-dates';
 import { auMoins, type AgentRole } from '@/lib/roles';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -76,6 +76,9 @@ interface Program {
   dateDepart?: string | null;
   /** Date d'arrivée du voyage. */
   dateArrivee?: string | null;
+  /** Heures de vol au format "HH:mm" (null tant qu'elles ne sont pas saisies). */
+  heureDepart?: string | null;
+  heureArrivee?: string | null;
   dureeJours?: number;
   statistics: {
     totalRooms: number;
@@ -766,6 +769,8 @@ export default function HomePage() {
                     <span className="font-bold text-red-900">{program.name}</span>
                     <span className="text-sm text-red-800">
                       Départ le {formatDateFr(program.dateDepart)}
+                      {formatHeureVoyage(program.heureDepart) &&
+                        ` à ${formatHeureVoyage(program.heureDepart)}`}
                     </span>
                     <span className="ml-auto rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-bold uppercase text-white">
                       {libelleEcheance(jours)}
@@ -804,6 +809,8 @@ export default function HomePage() {
                     <span className="font-bold text-amber-900">{program.name}</span>
                     <span className="text-sm text-amber-800">
                       Arrivée le {formatDateFr(program.dateArrivee)}
+                      {formatHeureVoyage(program.heureArrivee) &&
+                        ` à ${formatHeureVoyage(program.heureArrivee)}`}
                     </span>
                     <span className="ml-auto rounded-full bg-amber-600 px-2.5 py-0.5 text-xs font-bold uppercase text-white">
                       {libelleEcheance(jours)}
@@ -846,8 +853,16 @@ export default function HomePage() {
                         </p>
                         {/* Dates de voyage : passent en alerte quand l'échéance approche */}
                         <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                          <DateVoyageChip type="depart" value={program.dateDepart} />
-                          <DateVoyageChip type="arrivee" value={program.dateArrivee} />
+                          <DateVoyageChip
+                            type="depart"
+                            value={program.dateDepart}
+                            heure={program.heureDepart}
+                          />
+                          <DateVoyageChip
+                            type="arrivee"
+                            value={program.dateArrivee}
+                            heure={program.heureArrivee}
+                          />
                         </div>
                       </div>
                     </div>
@@ -1125,8 +1140,16 @@ export default function HomePage() {
                             </p>
                             {/* Dates de voyage : passent en alerte quand l'échéance approche */}
                             <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                              <DateVoyageChip type="depart" value={program.dateDepart} />
-                              <DateVoyageChip type="arrivee" value={program.dateArrivee} />
+                              <DateVoyageChip
+                                type="depart"
+                                value={program.dateDepart}
+                                heure={program.heureDepart}
+                              />
+                              <DateVoyageChip
+                                type="arrivee"
+                                value={program.dateArrivee}
+                                heure={program.heureArrivee}
+                              />
                             </div>
                           </div>
                         </div>

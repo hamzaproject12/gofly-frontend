@@ -6,6 +6,7 @@ import {
   JOURS_ALERTE_VOYAGE,
   JOURS_VIGILANCE_VOYAGE,
   estImminente,
+  formatHeureVoyage,
   joursAvant,
   libelleEcheance,
 } from "@/lib/voyage"
@@ -18,11 +19,15 @@ import {
 export function DateVoyageChip({
   type,
   value,
+  heure,
 }: {
   type: "depart" | "arrivee"
   value?: string | null
+  /** Heure de vol "HH:mm" ; omise tant qu'elle n'est pas saisie sur le programme. */
+  heure?: string | null
 }) {
   const jours = joursAvant(value)
+  const heureLisible = formatHeureVoyage(heure)
   const imminente = estImminente(jours)
   const Icon = type === "depart" ? PlaneTakeoff : PlaneLanding
   const label = type === "depart" ? "Départ" : "Arrivée"
@@ -39,6 +44,7 @@ export function DateVoyageChip({
       <Icon className="h-3 w-3 shrink-0" />
       <span>
         {label} : {value ? formatDateFr(value) : "—"}
+        {heureLisible && <span className="font-bold"> à {heureLisible}</span>}
       </span>
       {imminente && <span className="font-bold">· {libelleEcheance(jours)}</span>}
     </span>

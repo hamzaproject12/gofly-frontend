@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { api } from "@/lib/api"
@@ -38,10 +38,28 @@ import {
   Bed,
   BadgeCheck,
   AlertTriangle,
+  Clock,
 } from "lucide-react"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import { Checkbox } from "@/components/ui/checkbox"
+import { GrilleTarifaire } from "@/components/grille-tarifaire"
+import { BasculePricingMode, PricingMode } from "@/components/bascule-pricing-mode"
+import {
+  CAPACITE_TYPE,
+  COLONNES_GRILLE,
+  FormuleApi,
+  FormuleForm,
+  HotelGrilleOption,
+  RoomTypeKey,
+  VilleHotel,
+  cleHotel,
+  formulesDepuisApi,
+  formulesVersApi,
+  grilleContientUnPrix,
+  prixCase,
+  validerGrille,
+} from "@/lib/grilleTarifaire"
 
 type RoomType = "SINGLE" | "DOUBLE" | "TRIPLE" | "QUAD" | "QUINT"
 
@@ -57,6 +75,9 @@ interface ProgramApi {
   created_at: string
   dateDepart: string | null
   dateArrivee: string | null
+  /** Heures de vol au format "HH:mm" (null sur les programmes anterieurs a la migration). */
+  heureDepart?: string | null
+  heureArrivee?: string | null
   visaDeadline: string | null
   hotelDeadline: string | null
   flightDeadline: string | null
@@ -70,6 +91,10 @@ interface ProgramApi {
   profitEconomique: number
   profitNormal: number
   profitVIP: number
+  /** Origine du prix de vente (CALCUL sur les programmes antérieurs à la grille). */
+  pricingMode?: "CALCUL" | "GRILLE"
+  /** Grille tarifaire du programme (vide en mode CALCUL). */
+  formules?: FormuleApi[]
   hotelsMadina: Array<{ hotel: { id: number; name: string; city: "Madina" } }>
   hotelsMakkah: Array<{ hotel: { id: number; name: string; city: "Makkah" } }>
   hotelsAutre?: Array<{ hotel: { id: number; name: string; city: "Autre" }; nbJours: number; ordre: number }>
@@ -110,6 +135,12 @@ function ancienneDateDepart(program: ProgramApi): Date | null {
   return deadlines.reduce((plusAncienne, d) => (d < plusAncienne ? d : plusAncienne))
 }
 
+/** Convertit une saisie en nombre fini, `fallback` sinon (virgule décimale acceptée). */
+function parseNum(s: string | undefined, fallback = 0): number {
+  const n = parseFloat(String(s ?? "").replace(",", "."))
+  return Number.isFinite(n) ? n : fallback
+}
+
 function mapRoomTypeToIndex(roomType: RoomType): 1 | 2 | 3 | 4 | 5 {
   switch (roomType) {
     case "SINGLE":
@@ -139,6 +170,16 @@ export default function ModifierProgrammePage() {
   /** Confirmation demandée quand les catégories d'hôtels n'ont pas le même nombre de lits */
   const [showBedsMismatchDialog, setShowBedsMismatchDialog] = useState(false)
 
+  /**
+   * Origine du prix de vente du programme. Les programmes antérieurs à la grille
+   * arrivent en CALCUL et y restent tant que l'admin ne bascule pas lui-même.
+   */
+  const [pricingMode, setPricingMode] = useState<PricingMode>("CALCUL")
+  /** Grille tarifaire en cours d'édition (rechargée telle quelle depuis l'API). */
+  const [formules, setFormules] = useState<FormuleForm[]>([])
+  /** Bascule de mode en cours côté serveur. */
+  const [basculeEnCours, setBasculeEnCours] = useState(false)
+
   const [formData, setFormData] = useState({
     nom: "",
     nbJoursMadina: "",
@@ -167,6 +208,9 @@ export default function ModifierProgrammePage() {
     }>,
     dateDepart: null as Date | null,
     dateArrivee: null as Date | null,
+    // Heures de vol au format "HH:mm" (chaine vide = non renseignee).
+    heureDepart: "",
+    heureArrivee: "",
   })
 
   // Contraintes calculées à partir des rooms existantes: par hôtel et type → {occupied, total}
@@ -212,6 +256,82 @@ export default function ModifierProgrammePage() {
     formData.hotelsMakkah.length,
     formData.hotelsAutre.length,
   ])
+
+  /**
+   * Hôtels du programme tels que la grille tarifaire les voit : nom + ville, prix
+   * de chambre en Riyal par type, et nombre de nuits — les trois ingrédients du
+   * coût estimé affiché sous chaque case.
+   */
+  const hotelsGrille = useMemo<HotelGrilleOption[]>(() => {
+    const joursMadina = parseNum(formData.nbJoursMadina, 0)
+    const joursMakkah = parseNum(formData.nbJoursMakkah, 0)
+
+    const prixChambreRiyal = (chambres: { [key: number]: { nb: string; prix: string } }) => {
+      const out: Partial<Record<RoomTypeKey, number>> = {}
+      for (const roomType of COLONNES_GRILLE) {
+        const prix = parseNum(chambres[CAPACITE_TYPE[roomType]]?.prix, 0)
+        if (prix > 0) out[roomType] = prix
+      }
+      return out
+    }
+
+    const construire = (
+      name: string,
+      city: VilleHotel,
+      chambres: { [key: number]: { nb: string; prix: string } },
+      nuits: number
+    ): HotelGrilleOption => ({
+      cle: cleHotel(city, name),
+      name,
+      city,
+      prixChambreRiyal: prixChambreRiyal(chambres),
+      nuits,
+    })
+
+    return [
+      ...formData.hotelsMadina.map((h) => construire(h.name, "Madina", h.chambres, joursMadina)),
+      ...formData.hotelsMakkah.map((h) => construire(h.name, "Makkah", h.chambres, joursMakkah)),
+      ...formData.hotelsAutre.map((h) =>
+        construire(h.name, "Autre", h.chambres, parseNum(h.nbJours, 0))
+      ),
+    ]
+  }, [
+    formData.hotelsMadina,
+    formData.hotelsMakkah,
+    formData.hotelsAutre,
+    formData.nbJoursMadina,
+    formData.nbJoursMakkah,
+  ])
+
+  const paramsCoutGrille = useMemo(
+    () => ({
+      exchange: parseNum(formData.exchange, 1) || 1,
+      prixAvionDH: parseNum(formData.prixAvion, 0),
+      prixVisaRiyal: parseNum(formData.prixVisaRiyal, 0),
+    }),
+    [formData.exchange, formData.prixAvion, formData.prixVisaRiyal]
+  )
+
+  // Un hôtel retiré (ou renommé) ne doit pas rester coché dans une formule.
+  // La référence est conservée telle quelle si rien ne change : pas de boucle de rendu.
+  useEffect(() => {
+    const disponibles = new Set(hotelsGrille.map((h) => h.cle))
+    setFormules((prev) => {
+      let modifie = false
+      const suivant = prev.map((formule) => {
+        const hotels = formule.hotels.filter((cle) => disponibles.has(cle))
+        if (hotels.length === formule.hotels.length) return formule
+        modifie = true
+        return { ...formule, hotels }
+      })
+      return modifie ? suivant : prev
+    })
+  }, [hotelsGrille])
+
+  const grilleRaisons = useMemo(
+    () => (formules.length === 0 ? [] : validerGrille(formules, hotelsGrille)),
+    [formules, hotelsGrille]
+  )
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -363,8 +483,15 @@ export default function ModifierProgrammePage() {
           hotelsAutre: selectedAutre,
           dateDepart: toDate(program.dateDepart) ?? ancienneDateDepart(program),
           dateArrivee: toDate(program.dateArrivee),
+          heureDepart: program.heureDepart ?? "",
+          heureArrivee: program.heureArrivee ?? "",
         })
         setRoomConstraints({ Madina: constraintsMadina, Makkah: constraintsMakkah, Autre: constraintsAutre })
+        // Grille tarifaire : rechargée à l'identique (formules, hôtels autorisés, cases).
+        setPricingMode(program.pricingMode === "GRILLE" ? "GRILLE" : "CALCUL")
+        const formulesChargees = formulesDepuisApi(program.formules)
+        setFormules(formulesChargees)
+        grilleInitialeRef.current = signatureGrille(formulesChargees)
       } catch (error) {
         console.error(error)
         toast({ title: "Erreur", description: error instanceof Error ? error.message : "Impossible de charger le programme", variant: "destructive" })
@@ -376,9 +503,99 @@ export default function ModifierProgrammePage() {
     if (id) fetchAll()
   }, [id, toast])
 
-  const isFormValid = useMemo(() => {
-    return Boolean(formData.nom && formData.dateDepart && formData.dateArrivee)
-  }, [formData])
+  /**
+   * Motifs de blocage de l'enregistrement : informations de base + cohérence de la
+   * grille tarifaire. La MARGE d'une case n'en fait jamais partie, même négative.
+   */
+  const raisonsBlocantes = useMemo(() => {
+    const raisons: string[] = []
+    if (!formData.nom) raisons.push("Le nom du programme est obligatoire.")
+    if (!formData.dateDepart) raisons.push("La date de départ est obligatoire.")
+    if (!formData.dateArrivee) raisons.push("La date d'arrivée est obligatoire.")
+    return [...raisons, ...grilleRaisons]
+  }, [formData.nom, formData.dateDepart, formData.dateArrivee, grilleRaisons])
+
+  const isFormValid = raisonsBlocantes.length === 0
+
+  /**
+   * Empreinte de la grille, pour n'appeler l'endpoint d'écriture (et donc ne
+   * journaliser une modification) que si la grille a réellement changé.
+   */
+  const signatureGrille = (liste: FormuleForm[]) =>
+    JSON.stringify(
+      liste.map((f) => ({
+        label: f.label.trim(),
+        note: f.note.trim(),
+        hotels: [...f.hotels].sort(),
+        prix: COLONNES_GRILLE.map((t) => prixCase(f, t)),
+      }))
+    )
+
+  /** Grille telle qu'elle a été chargée depuis l'API (référence de comparaison). */
+  const grilleInitialeRef = useRef<string>(signatureGrille([]))
+
+  /**
+   * Enregistre la grille si elle a changé. Renvoie `false` si le serveur l'a
+   * refusée — l'appelant arrête alors sa séquence plutôt que de continuer.
+   */
+  const enregistrerGrilleSiModifiee = async (): Promise<boolean> => {
+    const signature = signatureGrille(formules)
+    if (signature === grilleInitialeRef.current) return true
+
+    const res = await api.request(`/api/programs/${id}/grille`, {
+      method: "PUT",
+      body: JSON.stringify({ formules: formulesVersApi(formules, hotelsGrille) }),
+    })
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      toast({
+        title: "Grille tarifaire refusée",
+        description: j.error || "Impossible d'enregistrer la grille tarifaire",
+        variant: "destructive",
+      })
+      return false
+    }
+    grilleInitialeRef.current = signature
+    return true
+  }
+
+  /**
+   * Bascule CALCUL ↔ GRILLE. La grille est enregistrée d'abord : le serveur
+   * vérifie la grille EN BASE avant d'autoriser le passage en GRILLE.
+   */
+  const changerPricingMode = async (mode: PricingMode) => {
+    if (basculeEnCours) return
+    setBasculeEnCours(true)
+    try {
+      if (!(await enregistrerGrilleSiModifiee())) return
+
+      const res = await api.request(`/api/programs/${id}/pricing-mode`, {
+        method: "PUT",
+        body: JSON.stringify({ pricingMode: mode }),
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j.error || "Impossible de changer l'origine du prix")
+      }
+      const data = await res.json().catch(() => ({}))
+      setPricingMode(data.pricingMode === "GRILLE" ? "GRILLE" : "CALCUL")
+      toast({
+        title: "Origine du prix mise à jour",
+        description:
+          mode === "GRILLE"
+            ? "Les nouvelles réservations prendront le prix de la grille tarifaire."
+            : "Les nouvelles réservations repassent au prix calculé automatiquement.",
+      })
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Une erreur est survenue",
+        variant: "destructive",
+      })
+    } finally {
+      setBasculeEnCours(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -474,6 +691,10 @@ export default function ModifierProgrammePage() {
         profitVIP: formData.profitVIP ? parseFloat(formData.profitVIP) : undefined,
         dateDepart: formData.dateDepart ?? undefined,
         dateArrivee: formData.dateArrivee ?? undefined,
+        // Chaine vide transmise telle quelle : c'est ce qui permet d'effacer une
+        // heure deja enregistree (le backend la convertit en NULL).
+        heureDepart: formData.heureDepart,
+        heureArrivee: formData.heureArrivee,
         // Les 4 dates limites sont alignées sur la date de départ : plus de saisie
         // manuelle, le bloc « Dates limites » a été retiré du formulaire.
         visaDeadline: formData.dateDepart ?? undefined,
@@ -521,6 +742,10 @@ export default function ModifierProgrammePage() {
         })
       }
       
+      // La grille est enregistrée APRÈS le programme : une formule peut citer un
+      // hôtel tout juste ajouté, que seul le PUT précédent a rattaché au programme.
+      if (!(await enregistrerGrilleSiModifiee())) return
+
       toast({ title: "Succès", description: "Programme mis à jour" })
       router.push("/programmes")
     } catch (error) {
@@ -571,8 +796,20 @@ export default function ModifierProgrammePage() {
                           />
                         </div>
                         {([
-                          { key: "dateDepart", label: "Date de départ", icon: Plane },
-                          { key: "dateArrivee", label: "Date d'arrivée", icon: MapPin },
+                          {
+                            key: "dateDepart",
+                            heureKey: "heureDepart",
+                            label: "Date de départ",
+                            heureLabel: "Heure de départ",
+                            icon: Plane,
+                          },
+                          {
+                            key: "dateArrivee",
+                            heureKey: "heureArrivee",
+                            label: "Date d'arrivée",
+                            heureLabel: "Heure d'arrivée",
+                            icon: MapPin,
+                          },
                         ] as const).map((item) => {
                           const dateValue = formData[item.key]
                           const Icon = item.icon
@@ -581,33 +818,56 @@ export default function ModifierProgrammePage() {
                               <Label className="text-blue-700 font-medium flex items-center gap-2">
                                 <Icon className="h-4 w-4" />
                                 {item.label} *
+                                <span className="text-xs font-normal text-blue-500">
+                                  · heure facultative
+                                </span>
                               </Label>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    className="w-full justify-start text-left font-normal h-12 border-2 border-blue-200 hover:border-blue-300 rounded-lg bg-white/80"
-                                  >
-                                    <CalendarIcon className="mr-2 h-4 w-4 text-blue-500" />
-                                    {dateValue ? (
-                                      format(dateValue, "PPP", { locale: fr })
-                                    ) : (
-                                      <span>Sélectionner une date</span>
-                                    )}
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0 shadow-xl border-0">
-                                  <CalendarComponent
-                                    mode="single"
-                                    selected={dateValue ?? undefined}
-                                    onSelect={(date) =>
-                                      setFormData((prev) => ({ ...prev, [item.key]: date ?? null }))
+                              {/* Date et heure côte à côte : même disposition que la
+                                  création d'un programme. */}
+                              <div className="flex gap-2">
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      className="flex-1 justify-start text-left font-normal h-12 border-2 border-blue-200 hover:border-blue-300 rounded-lg bg-white/80"
+                                    >
+                                      <CalendarIcon className="mr-2 h-4 w-4 text-blue-500" />
+                                      {dateValue ? (
+                                        format(dateValue, "PPP", { locale: fr })
+                                      ) : (
+                                        <span>Sélectionner une date</span>
+                                      )}
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0 shadow-xl border-0">
+                                    <CalendarComponent
+                                      mode="single"
+                                      selected={dateValue ?? undefined}
+                                      onSelect={(date) =>
+                                        setFormData((prev) => ({ ...prev, [item.key]: date ?? null }))
+                                      }
+                                      initialFocus
+                                      className="rounded-lg"
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                                <div className="relative shrink-0">
+                                  <Clock className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-500" />
+                                  <Input
+                                    type="time"
+                                    aria-label={item.heureLabel}
+                                    title={item.heureLabel}
+                                    value={formData[item.heureKey]}
+                                    onChange={(e) =>
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        [item.heureKey]: e.target.value,
+                                      }))
                                     }
-                                    initialFocus
-                                    className="rounded-lg"
+                                    className="h-12 w-[7.5rem] pl-8 border-2 border-blue-200 focus:border-blue-500 rounded-lg bg-white/80 shadow-sm"
                                   />
-                                </PopoverContent>
-                              </Popover>
+                                </div>
+                              </div>
                             </div>
                           )
                         })}
@@ -1153,8 +1413,41 @@ export default function ModifierProgrammePage() {
                       </TabsContent>
                     </Tabs>
 
+                    {/* Grille tarifaire : le prix de la brochure publiée, saisi formule par formule */}
+                    <div className="mt-6 rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/70 to-white p-4 ring-1 ring-violet-200/40">
+                      <BasculePricingMode
+                        mode={pricingMode}
+                        onChange={changerPricingMode}
+                        grilleAUnPrix={grilleContientUnPrix(formules)}
+                        enCours={basculeEnCours}
+                        disabled={isSubmitting}
+                      />
+                      <div className="mt-4">
+                        <GrilleTarifaire
+                          formules={formules}
+                          onChange={setFormules}
+                          hotelsDuProgramme={hotelsGrille}
+                          params={paramsCoutGrille}
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                    </div>
+
                     {/* Le bloc « Dates limites » a été retiré : les 4 deadlines sont
                         désormais dérivées de la date de départ (voir Informations de base). */}
+
+                    {!isFormValid && (
+                      <div className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+                        <p className="font-semibold">
+                          Enregistrer est désactivé ({raisonsBlocantes.length} raison(s)) :
+                        </p>
+                        <ul className="mt-1.5 list-disc space-y-0.5 pl-5">
+                          {raisonsBlocantes.map((raison, idx) => (
+                            <li key={`${raison}-${idx}`}>{raison}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                     <div className="flex gap-4 mt-8">
                       <Button type="submit" disabled={!isFormValid || isSubmitting} className="flex-1 h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">

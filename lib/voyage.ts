@@ -42,3 +42,18 @@ export function libelleEcheance(jours: number): string {
   if (jours === 1) return "demain"
   return `dans ${jours} jours`
 }
+
+/**
+ * Heure de vol lisible : « 14h30 ». Les heures sont stockées en texte "HH:mm"
+ * (voir `Program.heureDepart` côté Prisma) : pas de conversion de fuseau, ce qui
+ * est saisi est ce qui s'affiche. Renvoie `null` si l'heure est absente ou illisible.
+ */
+export function formatHeureVoyage(value: string | null | undefined): string | null {
+  if (!value) return null
+  const m = String(value).trim().match(/^(\d{1,2}):(\d{2})/)
+  if (!m) return null
+  const heures = Number(m[1])
+  const minutes = Number(m[2])
+  if (heures > 23 || minutes > 59) return null
+  return `${String(heures).padStart(2, "0")}h${String(minutes).padStart(2, "0")}`
+}

@@ -1,5 +1,5 @@
 import express from 'express';
-import { PrismaClient, ProgramStatus } from '@prisma/client';
+import { PrismaClient, PricingMode, ProgramStatus } from '@prisma/client';
 import { ProgramOverviewController } from '../controllers/programOverviewController';
 import { authenticateToken } from '../middleware/auth';
 import { requireAdminOrSuperAdmin } from '../controllers/authController';
@@ -12,9 +12,49 @@ import {
   JOURNAL_ACTION,
   RoomJournalRow,
 } from '../services/journalSuppressionService';
+import {
+  GrilleValidationError,
+  PROGRAM_FORMULES_QUERY,
+  buildGrilleUpdateDetail,
+  buildPricingModeChangeDetail,
+  getProgrammeHotelsIndex,
+  grilleContientUnPrix,
+  parseGrilleInput,
+  readProgramFormules,
+  replaceProgramFormules,
+} from '../services/programGrilleService';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+/**
+ * Normalise une heure de vol reçue du client vers le format "HH:mm" stocké en base.
+ * Renvoie `null` pour une saisie vide (l'heure est facultative) et `undefined`
+ * pour un champ absent du payload, afin de ne pas écraser la valeur existante
+ * lors d'une mise à jour partielle.
+ */
+function normalizeHeure(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const texte = String(value).trim();
+  if (texte === '') return null;
+  const m = texte.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const heures = Number(m[1]);
+  const minutes = Number(m[2]);
+  if (heures > 23 || minutes > 59) return null;
+  return `${String(heures).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+/**
+ * Normalise l'origine du prix de vente reçue du client.
+ * Renvoie `null` pour une valeur absente ou inconnue : l'appelant retombe alors
+ * sur le défaut du schéma (CALCUL) sans jamais écrire une valeur douteuse.
+ */
+function normalizePricingMode(value: unknown): PricingMode | null {
+  if (value === 'CALCUL' || value === 'GRILLE') return value;
+  return null;
+}
 
 // Get all programs with their hotels (excluding soft deleted)
 // Filtre optionnel ?status : par défaut ACTIF seulement ; CLOTURE / ARCHIVE ciblés ;
@@ -42,7 +82,9 @@ router.get('/', async (req, res) => {
         hotelsMadina: { include: { hotel: true } },
         hotelsMakkah: { include: { hotel: true } },
         hotelsAutre: { include: { hotel: true } },
-        rooms: { include: { hotel: true } }
+        rooms: { include: { hotel: true } },
+        // Grille tarifaire (vide pour un programme en mode CALCUL)
+        formules: PROGRAM_FORMULES_QUERY
       }
     });
     res.json(programs);
@@ -65,7 +107,10 @@ router.get('/:id', async (req, res) => {
         hotelsMadina: { include: { hotel: true } },
         hotelsMakkah: { include: { hotel: true } },
         hotelsAutre: { include: { hotel: true } },
-        rooms: { include: { hotel: true } }
+        rooms: { include: { hotel: true } },
+        // La grille tarifaire est lue avec le programme : le formulaire d'édition
+        // la recharge telle quelle, sans second appel.
+        formules: PROGRAM_FORMULES_QUERY
       }
     });
 
@@ -96,19 +141,25 @@ router.post('/', async (req, res) => {
       profitVIP,
       dateDepart,
       dateArrivee,
+      heureDepart,
+      heureArrivee,
       visaDeadline,
       hotelDeadline,
       flightDeadline,
       passportDeadline,
       hotelsMadina,
       hotelsMakkah,
-      hotelsAutre
+      hotelsAutre,
+      pricingMode
     } = req.body;
 
     // Create the program with new financial/logistical fields
     const program = await prisma.program.create({
       data: {
         name,
+        // Origine du prix de vente. Un client qui n'envoie rien retombe sur le
+        // défaut du schéma (CALCUL) : aucun comportement existant ne change.
+        pricingMode: normalizePricingMode(pricingMode) ?? undefined,
         nbJoursMadina: Number(nbJoursMadina) || 0,
         nbJoursMakkah: Number(nbJoursMakkah) || 0,
         exchange: exchange !== undefined ? parseFloat(exchange) : 1.0,
@@ -120,6 +171,8 @@ router.post('/', async (req, res) => {
         profitVIP: profitVIP !== undefined ? parseFloat(profitVIP) : 0,
         dateDepart: dateDepart ? new Date(dateDepart) : null,
         dateArrivee: dateArrivee ? new Date(dateArrivee) : null,
+        heureDepart: normalizeHeure(heureDepart) ?? null,
+        heureArrivee: normalizeHeure(heureArrivee) ?? null,
         visaDeadline: visaDeadline ? new Date(visaDeadline) : null,
         hotelDeadline: hotelDeadline ? new Date(hotelDeadline) : null,
         flightDeadline: flightDeadline ? new Date(flightDeadline) : null,
@@ -370,6 +423,36 @@ router.post('/', async (req, res) => {
       }
     }
 
+    // Grille tarifaire saisie dès la création : les hôtels viennent d'être créés,
+    // les formules les désignent donc par nom + ville (cf. programGrilleService).
+    //
+    // Une grille refusée ne fait PAS échouer la requête : le programme est déjà
+    // créé, et répondre 400 inviterait à recliquer « Enregistrer » — donc à créer
+    // un doublon. On signale le motif, la grille se complète depuis l'écran de
+    // modification du programme.
+    let grilleWarning: string | null = null;
+    if (Array.isArray(req.body?.formules) && req.body.formules.length > 0) {
+      try {
+        const hotelsIndex = await getProgrammeHotelsIndex(prisma, program.id);
+        const formules = parseGrilleInput(req.body, hotelsIndex);
+        const grilleApres = await replaceProgramFormules(prisma, program.id, formules);
+        const detail = buildGrilleUpdateDetail(program.name, [], grilleApres);
+        await logJournalSuppression(prisma, req, {
+          action: JOURNAL_ACTION.PROGRAM_GRID_UPDATED,
+          entityType: 'Program',
+          entityId: program.id,
+          summary: detail.summary,
+          detailText: detail.detailText,
+        });
+      } catch (grilleError) {
+        grilleWarning =
+          grilleError instanceof GrilleValidationError
+            ? grilleError.message
+            : "La grille tarifaire n'a pas pu être enregistrée.";
+        console.error('Grille tarifaire non enregistrée à la création:', grilleError);
+      }
+    }
+
     // Return the created program with relations
     const createdProgram = await prisma.program.findUnique({
       where: { id: program.id },
@@ -378,10 +461,11 @@ router.post('/', async (req, res) => {
         hotelsMakkah: { include: { hotel: true } },
         hotelsAutre: { include: { hotel: true } },
         rooms: { include: { hotel: true } },
+        formules: PROGRAM_FORMULES_QUERY,
       }
     });
 
-    res.status(201).json(createdProgram);
+    res.status(201).json({ ...createdProgram, grilleWarning });
   } catch (error) {
     console.error('Error creating program:', error);
     res.status(500).json({ error: 'Error creating program' });
@@ -414,6 +498,8 @@ router.put('/:id', async (req, res) => {
       profitVIP,
       dateDepart,
       dateArrivee,
+      heureDepart,
+      heureArrivee,
       visaDeadline,
       hotelDeadline,
       flightDeadline,
@@ -443,6 +529,8 @@ router.put('/:id', async (req, res) => {
         profitVIP: profitVIP !== undefined ? parseFloat(profitVIP) : undefined,
         dateDepart: dateDepart ? new Date(dateDepart) : undefined,
         dateArrivee: dateArrivee ? new Date(dateArrivee) : undefined,
+        heureDepart: normalizeHeure(heureDepart),
+        heureArrivee: normalizeHeure(heureArrivee),
         visaDeadline: visaDeadline ? new Date(visaDeadline) : undefined,
         hotelDeadline: hotelDeadline ? new Date(hotelDeadline) : undefined,
         flightDeadline: flightDeadline ? new Date(flightDeadline) : undefined,
@@ -962,7 +1050,7 @@ router.put('/:id', async (req, res) => {
 
     const updated = await prisma.program.findUnique({
       where: { id: program.id },
-      include: { hotelsMadina: { include: { hotel: true } }, hotelsMakkah: { include: { hotel: true } }, hotelsAutre: { include: { hotel: true } }, rooms: { include: { hotel: true } } }
+      include: { hotelsMadina: { include: { hotel: true } }, hotelsMakkah: { include: { hotel: true } }, hotelsAutre: { include: { hotel: true } }, rooms: { include: { hotel: true } }, formules: PROGRAM_FORMULES_QUERY }
     });
 
     const roomsCountAfterPut = await prisma.room.count({ where: { programId: program.id } });
@@ -1251,6 +1339,123 @@ router.patch('/:id/status', authenticateToken, requireAdminOrSuperAdmin, async (
   } catch (error) {
     console.error('Erreur lors du changement de statut du programme:', error);
     res.status(500).json({ error: 'Erreur lors du changement de statut du programme' });
+  }
+});
+
+/**
+ * Remplace la GRILLE TARIFAIRE d'un programme — ADMIN (rang ADMIN minimum).
+ *
+ * La grille entière est remplacée dans UNE transaction : pas d'état intermédiaire
+ * où la moitié des formules aurait disparu. Les réservations existantes ne sont
+ * jamais touchées (ni prix, ni réduction, ni plan) et le mode de tarification
+ * n'est pas modifié ici — c'est l'objet de `PUT /:id/pricing-mode`.
+ */
+router.put('/:id/grille', authenticateToken, requireAdminOrSuperAdmin, async (req, res) => {
+  try {
+    const programId = parseInt(req.params.id);
+    if (Number.isNaN(programId)) {
+      return res.status(400).json({ error: 'Identifiant de programme invalide' });
+    }
+
+    const program = await prisma.program.findFirst({
+      where: { id: programId, isDeleted: false },
+      select: { id: true, name: true, pricingMode: true },
+    });
+    if (!program) {
+      return res.status(404).json({ error: 'Programme non trouvé' });
+    }
+
+    const hotelsIndex = await getProgrammeHotelsIndex(prisma, programId);
+    const formules = parseGrilleInput(req.body, hotelsIndex);
+
+    const grilleAvant = await readProgramFormules(prisma, programId);
+    const grilleApres = await replaceProgramFormules(prisma, programId, formules);
+
+    const detail = buildGrilleUpdateDetail(program.name, grilleAvant, grilleApres);
+    await logJournalSuppression(prisma, req, {
+      action: JOURNAL_ACTION.PROGRAM_GRID_UPDATED,
+      entityType: 'Program',
+      entityId: programId,
+      summary: detail.summary,
+      detailText: detail.detailText,
+    });
+
+    res.json({ pricingMode: program.pricingMode, formules: grilleApres });
+  } catch (error) {
+    if (error instanceof GrilleValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Erreur lors de la mise à jour de la grille tarifaire:', error);
+    res.status(500).json({ error: 'Erreur lors de la mise à jour de la grille tarifaire' });
+  }
+});
+
+/**
+ * Bascule l'origine du prix de vente d'un programme — ADMIN (rang ADMIN minimum).
+ *
+ * CALCUL → GRILLE n'est accepté que si la grille porte au moins un prix : basculer
+ * sur une grille vide laisserait les futures réservations sans prix de référence.
+ * Les réservations déjà enregistrées gardent leur prix dans les deux sens.
+ */
+router.put('/:id/pricing-mode', authenticateToken, requireAdminOrSuperAdmin, async (req, res) => {
+  try {
+    const programId = parseInt(req.params.id);
+    if (Number.isNaN(programId)) {
+      return res.status(400).json({ error: 'Identifiant de programme invalide' });
+    }
+
+    const nextMode = normalizePricingMode(req.body?.pricingMode);
+    if (nextMode === null) {
+      return res.status(400).json({
+        error: "Origine du prix invalide. Valeurs autorisées : CALCUL, GRILLE.",
+      });
+    }
+
+    const program = await prisma.program.findFirst({
+      where: { id: programId, isDeleted: false },
+      select: { id: true, name: true, pricingMode: true },
+    });
+    if (!program) {
+      return res.status(404).json({ error: 'Programme non trouvé' });
+    }
+
+    const formules = await readProgramFormules(prisma, programId);
+
+    if (program.pricingMode === nextMode) {
+      return res.json({ pricingMode: program.pricingMode, formules });
+    }
+
+    if (nextMode === 'GRILLE' && !grilleContientUnPrix(formules)) {
+      return res.status(400).json({
+        error:
+          "La grille tarifaire est vide : saisissez au moins un prix avant de l'utiliser comme prix de vente.",
+      });
+    }
+
+    const updated = await prisma.program.update({
+      where: { id: programId },
+      data: { pricingMode: nextMode },
+      select: { id: true, name: true, pricingMode: true },
+    });
+
+    const detail = buildPricingModeChangeDetail(
+      program.name,
+      program.pricingMode,
+      nextMode,
+      formules
+    );
+    await logJournalSuppression(prisma, req, {
+      action: JOURNAL_ACTION.PROGRAM_PRICING_MODE_CHANGED,
+      entityType: 'Program',
+      entityId: programId,
+      summary: detail.summary,
+      detailText: detail.detailText,
+    });
+
+    res.json({ pricingMode: updated.pricingMode, formules });
+  } catch (error) {
+    console.error("Erreur lors du changement de l'origine du prix:", error);
+    res.status(500).json({ error: "Erreur lors du changement de l'origine du prix" });
   }
 });
 

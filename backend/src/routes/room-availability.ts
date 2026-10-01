@@ -144,6 +144,9 @@ router.get('/', async (req, res) => {
         // Dates de voyage : alimentent l'affichage et les alertes d'imminence du dashboard.
         dateDepart: program.dateDepart,
         dateArrivee: program.dateArrivee,
+        // Heures de vol ("HH:mm"), affichées à côté des dates sur le dashboard.
+        heureDepart: program.heureDepart,
+        heureArrivee: program.heureArrivee,
         dureeJours,
         isDeleted: (program as any).isDeleted || false,
         deletedAt: (program as any).deletedAt || null,
@@ -393,6 +396,8 @@ router.get('/:programId/rooming', authenticateToken, async (req, res) => {
         status: program.status,
         dateDepart: program.dateDepart,
         dateArrivee: program.dateArrivee,
+        heureDepart: program.heureDepart,
+        heureArrivee: program.heureArrivee,
         dureeJours: program.nbJoursMadina + program.nbJoursMakkah + dureeAutre,
         isDeleted: program.isDeleted,
       },

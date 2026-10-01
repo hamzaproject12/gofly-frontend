@@ -35,6 +35,7 @@ import {
   Archive,
   RotateCcw,
   Percent,
+  Tag,
 } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/hooks/useAuth"
@@ -59,6 +60,9 @@ interface ProgramOverview {
   created_at: string;
   dateDepart: string | null;
   dateArrivee: string | null;
+  /** Heures de vol au format "HH:mm" (null tant qu'elles ne sont pas saisies). */
+  heureDepart?: string | null;
+  heureArrivee?: string | null;
   flightDeadline: string | null;
   hotelDeadline: string | null;
   visaDeadline: string | null;
@@ -133,6 +137,10 @@ interface ProgramOverview {
   status?: 'ACTIF' | 'CLOTURE' | 'ARCHIVE';
   dateCloture?: string | null;
   dateArchivage?: string | null;
+  /** Origine du prix de vente (absent sur une réponse antérieure à la grille). */
+  pricingMode?: 'CALCUL' | 'GRILLE';
+  /** Case la moins chère de la grille tarifaire, pour l'affichage « À partir de X DH ». */
+  prixGrilleMin?: number | null;
 }
 
 type ProgramStatusValue = 'ACTIF' | 'CLOTURE' | 'ARCHIVE';
@@ -884,8 +892,16 @@ export default function ProgrammesPage() {
                       </CardDescription>
                       {/* Dates de voyage : passent en alerte quand l'échéance approche */}
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                        <DateVoyageChip type="depart" value={programme.dateDepart} />
-                        <DateVoyageChip type="arrivee" value={programme.dateArrivee} />
+                        <DateVoyageChip
+                          type="depart"
+                          value={programme.dateDepart}
+                          heure={programme.heureDepart}
+                        />
+                        <DateVoyageChip
+                          type="arrivee"
+                          value={programme.dateArrivee}
+                          heure={programme.heureArrivee}
+                        />
                       </div>
                     </div>
                   </div>
@@ -912,6 +928,19 @@ export default function ProgrammesPage() {
                         </p>
                       </div>
                     </div>
+                    {/* Prix d'appel de la brochure : la case la moins chère de la grille */}
+                    {programme.pricingMode === 'GRILLE' &&
+                      typeof programme.prixGrilleMin === 'number' && (
+                        <div className="flex items-center gap-2 rounded-lg border border-violet-300 bg-violet-100/70 px-2 py-1">
+                          <Tag className="h-4 w-4 text-violet-700" />
+                          <div>
+                            <p className="text-xs font-medium text-violet-800">À partir de</p>
+                            <p className="text-sm font-bold tabular-nums text-violet-900">
+                              {formatMontant(programme.prixGrilleMin)}
+                            </p>
+                          </div>
+                        </div>
+                      )}
                   </div>
                 </div>
 

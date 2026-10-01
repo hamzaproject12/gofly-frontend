@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { grillePrixMin } from './programGrilleService';
 
 const prisma = new PrismaClient();
 
@@ -9,6 +10,9 @@ export interface ProgramOverview {
   /** Dates de voyage du programme (null sur les programmes antérieurs à la migration). */
   dateDepart: string | null;
   dateArrivee: string | null;
+  /** Heures de vol au format "HH:mm" (null si non renseignées). */
+  heureDepart: string | null;
+  heureArrivee: string | null;
   flightDeadline: string | null;
   hotelDeadline: string | null;
   visaDeadline: string | null;
@@ -19,7 +23,17 @@ export interface ProgramOverview {
   prixAvionDH: number;
   prixVisaRiyal: number;
   profit: number;
-  
+
+  /** Origine du prix de vente : CALCUL (vol + visa + hôtels + profit) ou GRILLE (brochure). */
+  pricingMode: 'CALCUL' | 'GRILLE';
+  /** Nombre de formules de la grille tarifaire (0 si aucune n'est saisie). */
+  nbFormules: number;
+  /**
+   * Prix d'appel de la grille — la case la moins chère, pour l'affichage
+   * « À partir de X DH ». `null` si aucune case n'est renseignée.
+   */
+  prixGrilleMin: number | null;
+
   // Hôtels
   hotelsMadina: Array<{
     id: number;
@@ -124,7 +138,9 @@ export class ProgramOverviewService {
             include: {
               hotel: true
             }
-          }
+          },
+          // Grille tarifaire : seuls les prix sont nécessaires ici (prix d'appel).
+          formules: { select: { prix: { select: { prixVente: true } } } }
         }
       });
 
@@ -200,6 +216,8 @@ export class ProgramOverviewService {
         created_at: program.created_at.toISOString(),
         dateDepart: program.dateDepart?.toISOString() || null,
         dateArrivee: program.dateArrivee?.toISOString() || null,
+        heureDepart: program.heureDepart || null,
+        heureArrivee: program.heureArrivee || null,
         flightDeadline: program.flightDeadline?.toISOString() || null,
         hotelDeadline: program.hotelDeadline?.toISOString() || null,
         visaDeadline: program.visaDeadline?.toISOString() || null,
@@ -210,7 +228,11 @@ export class ProgramOverviewService {
         prixAvionDH: program.prixAvionDH,
         prixVisaRiyal: program.prixVisaRiyal,
         profit: program.profit,
-        
+
+        pricingMode: program.pricingMode,
+        nbFormules: program.formules.length,
+        prixGrilleMin: grillePrixMin(program.formules),
+
         hotelsMadina: program.hotelsMadina.map(ph => ({
           id: ph.hotel.id,
           name: ph.hotel.name,

@@ -477,11 +477,29 @@ export default function NouvelleChambrePage() {
     familyMixed,
   ]);
 
-  const calculatePrice = useMemo(() => {
+  /**
+   * Résultat du calcul de prix de la chambre.
+   *
+   * `prix` vaut `null` quand le prix est **impossible à calculer** (programme pas
+   * encore chargé, type de chambre absent) et `raison` porte alors le motif réel,
+   * affiché à l'agent. Un prix **réellement nul** vaut `0` avec `raison: null` —
+   * confondre les deux bloquait l'enregistrement derrière un message
+   * « Le prix n'est pas généré » sans issue.
+   */
+  const calculPrix = useMemo<{ prix: number | null; raison: string | null }>(() => {
+    // Les deux seuls empêchements ici sont transitoires (programme en cours de
+    // chargement, type de chambre pas encore choisi) : le prix déjà posé n'a pas
+    // à être effacé, contrairement au formulaire « Nouvelle réservation » où une
+    // chambre peut devenir complète.
+    const impossible = (raison: string) => ({ prix: null, raison });
+
     // Garde-fou assoupli : seuls programme + type sont requis. Chaque catégorie
     // d'hôtel (Madina / Makkah / Autre) est optionnelle.
-    if (!programInfo || !formData.typeChambre) {
-      return 0;
+    if (!programInfo) {
+      return impossible("Les détails du programme ne sont pas encore chargés");
+    }
+    if (!formData.typeChambre) {
+      return impossible("Le type de chambre n'est pas sélectionné");
     }
 
     const roomType = formData.typeChambre;
@@ -546,7 +564,7 @@ export default function NouvelleChambrePage() {
         programInfo.exchange;
     const prixFinal = prixUnitaire * nbPersonnes;
 
-    return Math.round(prixFinal);
+    return { prix: Math.max(0, Math.round(prixFinal)), raison: null };
   }, [
     programInfo,
     formData.typeChambre,
@@ -561,8 +579,19 @@ export default function NouvelleChambrePage() {
     autreJours,
   ]);
 
+  /** Prix calculé, `null` si indéterminable (cf. `calculPrix`). */
+  const calculatePrice = calculPrix.prix;
+  /** Vrai dès que le prix est calculable — y compris s'il vaut 0. */
+  const prixCalculDisponible = calculatePrice !== null;
+  /** Base de calcul pour l'affichage et les bornes : 0 quand le prix est indéterminable. */
+  const prixBase = calculatePrice ?? 0;
+  /** Motif réel d'un prix indéterminable, à afficher plutôt que « Le prix n'est pas généré ». */
+  const raisonPrixIndisponible = calculPrix.raison;
+
+  // Toute valeur calculable est écrite, **0 compris** (réduction totale, chambre
+  // non facturée) : seul un calcul impossible laisse le champ intact.
   useEffect(() => {
-    if (calculatePrice > 0) {
+    if (calculatePrice !== null) {
       const prixFinal = prixApresAjustement(calculatePrice, prixMode, reduction, prixPropose);
       setFormData((prev) => ({ ...prev, prix: String(prixFinal) }));
     }
@@ -572,11 +601,11 @@ export default function NouvelleChambrePage() {
   // calculé (l'effet ci-dessus ne l'écrit qu'une fois le calcul disponible).
   const prixAffiche = useMemo(() => {
     const enregistre = normaliserPrix(formData.prix);
-    return enregistre !== null ? enregistre : Math.max(0, Math.round(calculatePrice));
-  }, [formData.prix, calculatePrice]);
+    return enregistre !== null ? enregistre : prixBase;
+  }, [formData.prix, prixBase]);
 
   /** Écart entre le prix affiché et le prix calculé : < 0 remise, > 0 supplément. */
-  const ecartPrix = prixAffiche - Math.round(calculatePrice);
+  const ecartPrix = prixAffiche - prixBase;
 
   const ouvrirEditionPrix = () => {
     setPrixSaisi(String(prixAffiche));
@@ -588,7 +617,7 @@ export default function NouvelleChambrePage() {
    * au-dessus un supplément (« Propos. »), les toggles se positionnant seuls.
    */
   const validerEditionPrix = () => {
-    const ajustement = ajustementDepuisPrixFinal(prixSaisi, calculatePrice);
+    const ajustement = ajustementDepuisPrixFinal(prixSaisi, prixBase);
     if (!ajustement) {
       toast({
         title: "Prix invalide",
@@ -903,13 +932,18 @@ export default function NouvelleChambrePage() {
   const getReservationBlockers = (): string[] => {
     const leader = occupants[0];
     const reasons: string[] = [];
-    if (!estPrixValide(formData.prix)) reasons.push("Le prix n'est pas généré");
+    // Prix absent : donner le motif réel du calcul impossible plutôt qu'un
+    // « Le prix n'est pas généré » sans issue.
+    if (!estPrixValide(formData.prix)) {
+      reasons.push(raisonPrixIndisponible ?? "Le prix n'est pas généré");
+    }
     if (!formData.programme?.trim()) reasons.push("Le programme n'est pas sélectionné");
     if (!formData.typeChambre) reasons.push("Le type de chambre n'est pas sélectionné");
     if (!leader?.lastName?.trim()) reasons.push("Le nom du chef de dossier n'est pas saisi");
     if (!leader?.firstName?.trim()) reasons.push("Le prénom du chef de dossier n'est pas saisi");
     if (!leader?.phone?.trim()) reasons.push("Le téléphone du chef de dossier n'est pas saisi");
-    return reasons;
+    // Le motif du prix indéterminable peut recouper un champ manquant listé ici.
+    return Array.from(new Set(reasons));
   };
 
   // Raisons pour lesquelles le reçu d'un paiement précis ne peut pas être généré.
@@ -1129,7 +1163,9 @@ export default function NouvelleChambrePage() {
     if (!hasAnyRoomSelected) reasons.push("Sélectionnez au moins une chambre (Madina, Makkah ou Autre)");
     // Chaque hôtel actif doit avoir une chambre choisie (désactivez-le dans « Éditer » sinon).
     reasons.push(...hotelsRequisManquants);
-    if (!prixGenere) reasons.push("Le prix n'est pas généré");
+    // Prix absent : motif réel du calcul impossible (le type de chambre manquant
+    // est déjà listé ci-dessus, d'où le dédoublonnage au retour).
+    if (!prixGenere) reasons.push(raisonPrixIndisponible ?? "Le prix n'est pas généré");
     if (paiementsDepassentPrix) {
       reasons.push(
         `Le total des paiements (${formatMontant(totalPaiementsSaisis)}) dépasse le prix du dossier (${formatMontant(prixDossier)}) : diminuez la réduction ou les paiements`
@@ -1156,7 +1192,7 @@ export default function NouvelleChambrePage() {
       }
     });
 
-    return reasons;
+    return Array.from(new Set(reasons));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1554,7 +1590,7 @@ export default function NouvelleChambrePage() {
                   <Sparkles className="h-6 w-6" />
                   Nouvelle Chambre Privée / Familiale
                 </div>
-                {calculatePrice > 0 && (
+                {prixCalculDisponible && (
                   <div
                     className={`flex items-center gap-2 backdrop-blur-sm px-3 py-1.5 rounded-lg border-2 border-emerald-300 bg-emerald-50 shadow-lg`}
                   >
@@ -1580,7 +1616,7 @@ export default function NouvelleChambrePage() {
                             }
                           }}
                           className="w-28 h-8 text-base font-bold text-center bg-white text-gray-900 border-2 border-emerald-300 focus-visible:ring-1"
-                          placeholder={String(Math.round(calculatePrice))}
+                          placeholder={String(prixBase)}
                           aria-label="Prix de la chambre en DH"
                         />
                         <span className="text-sm font-medium text-emerald-800">DH</span>
@@ -2829,7 +2865,7 @@ export default function NouvelleChambrePage() {
         </div>
       </div>
 
-      {calculatePrice > 0 && (
+      {prixCalculDisponible && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-emerald-200 shadow-2xl z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
@@ -2887,13 +2923,13 @@ export default function NouvelleChambrePage() {
                           e.target.value === "" ? 0 : parseInt(e.target.value, 10) || 0;
                         // Bornée à [0, prix calculé] : au maximum le prix
                         // devient 0 DH, jamais un prix négatif.
-                        setReduction(plafonnerReduction(value, calculatePrice));
+                        setReduction(plafonnerReduction(value, prixBase));
                       }}
                       className="w-24 h-7 text-sm border border-red-300 focus:border-red-500 rounded text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       placeholder="0"
                     />
                     <span className="text-sm text-red-600 font-medium">DH</span>
-                    {calculatePrice > 0 && reduction >= calculatePrice && (
+                    {prixBase > 0 && reduction >= prixBase && (
                       <span className="text-xs font-semibold text-red-700">
                         Réduction maximale atteinte — prix final 0 DH
                       </span>

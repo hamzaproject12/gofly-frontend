@@ -38,6 +38,7 @@ import {
   Download,
   Loader2,
   AlertTriangle,
+  Clock,
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -57,6 +58,21 @@ import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import Link from "next/link"
 import { siteConfig } from "@/lib/config"
+import { GrilleTarifaire } from "@/components/grille-tarifaire"
+import { BasculePricingMode, PricingMode } from "@/components/bascule-pricing-mode"
+import {
+  CAPACITE_TYPE,
+  COLONNES_GRILLE,
+  FormuleForm,
+  HotelGrilleOption,
+  RoomTypeKey,
+  VilleHotel,
+  cleHotel,
+  formulesVersApi,
+  grilleContientUnPrix,
+  prixCase,
+  validerGrille,
+} from "@/lib/grilleTarifaire"
 
 interface Hotel {
   id: number;
@@ -296,6 +312,9 @@ export default function NouveauProgramme() {
     dateCreation: new Date(),
     dateDepart: null as Date | null,
     dateArrivee: null as Date | null,
+    // Heures de vol au format "HH:mm" (chaine vide = non renseignee).
+    heureDepart: "",
+    heureArrivee: "",
     hotelsMadina: [] as Array<{
       name: string,
       chambres: {
@@ -338,11 +357,25 @@ export default function NouveauProgramme() {
   const [simAutresChargesDH, setSimAutresChargesDH] = useState("")
   const [showValidationReasons, setShowValidationReasons] = useState(false)
   const [showSimulationSection, setShowSimulationSection] = useState(false)
+
+  /**
+   * Origine du prix de vente. Un programme NEUF est créé en GRILLE : le prix
+   * affiché au client est celui de la brochure. La grille peut rester vide et
+   * être complétée plus tard, le programme est créé quand même.
+   */
+  const [pricingMode, setPricingMode] = useState<PricingMode>("GRILLE")
+  /** Lignes de la grille tarifaire en cours de saisie (formules de la brochure). */
+  const [formules, setFormules] = useState<FormuleForm[]>([])
   /** Confirmation demandée quand les catégories d'hôtels n'ont pas le même nombre de lits */
   const [showBedsMismatchDialog, setShowBedsMismatchDialog] = useState(false)
 
   const hasUnsavedChanges = useMemo(() => {
-    const hasDates = Boolean(formData.dateDepart || formData.dateArrivee)
+    const hasDates = Boolean(
+      formData.dateDepart ||
+      formData.dateArrivee ||
+      formData.heureDepart ||
+      formData.heureArrivee
+    )
     const hasMadinaRooms = formData.hotelsMadina.some((h) =>
       Array.from({ length: 5 }, (_, i) => i + 1).some((t) => {
         const nb = parseInt(h.chambres[t]?.nb || "0", 10) || 0
@@ -372,9 +405,12 @@ export default function NouveauProgramme() {
       formData.hotelsMakkah.length > 0 ||
       hasDates ||
       hasMadinaRooms ||
-      hasMakkahRooms
+      hasMakkahRooms ||
+      // La grille tarifaire fait partie du programme : une formule commencée
+      // compte comme une modification non enregistrée.
+      formules.length > 0
     )
-  }, [formData])
+  }, [formData, formules])
 
   useEffect(() => {
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -524,6 +560,100 @@ export default function NouveauProgramme() {
     formData.hotelsAutre.length,
   ])
 
+  /**
+   * Hôtels du programme tels que la grille tarifaire les voit : nom + ville (les
+   * hôtels saisis ici n'ont pas encore d'identifiant en base), prix de chambre en
+   * Riyal par type, et nombre de nuits — les trois ingrédients du coût estimé.
+   */
+  const hotelsGrille = useMemo<HotelGrilleOption[]>(() => {
+    const joursMadina = parseNum(formData.nbJoursMadina, 0)
+    const joursMakkah = parseNum(formData.nbJoursMakkah, 0)
+
+    const prixChambreRiyal = (chambres: ChambresConfig) => {
+      const out: Partial<Record<RoomTypeKey, number>> = {}
+      for (const roomType of COLONNES_GRILLE) {
+        const prix = parseNum(chambres[CAPACITE_TYPE[roomType]]?.prix, 0)
+        if (prix > 0) out[roomType] = prix
+      }
+      return out
+    }
+
+    const construire = (
+      name: string,
+      city: VilleHotel,
+      chambres: ChambresConfig,
+      nuits: number
+    ): HotelGrilleOption => ({
+      cle: cleHotel(city, name),
+      name,
+      city,
+      prixChambreRiyal: prixChambreRiyal(chambres),
+      nuits,
+    })
+
+    return [
+      ...formData.hotelsMadina.map((h) => construire(h.name, "Madina", h.chambres, joursMadina)),
+      ...formData.hotelsMakkah.map((h) => construire(h.name, "Makkah", h.chambres, joursMakkah)),
+      ...formData.hotelsAutre.map((h) =>
+        construire(h.name, "Autre", h.chambres, parseNum(h.nbJours, 0))
+      ),
+    ]
+  }, [
+    formData.hotelsMadina,
+    formData.hotelsMakkah,
+    formData.hotelsAutre,
+    formData.nbJoursMadina,
+    formData.nbJoursMakkah,
+  ])
+
+  const paramsCoutGrille = useMemo(
+    () => ({
+      exchange: parseNum(formData.exchange, 1) || 1,
+      prixAvionDH: parseNum(formData.prixAvion, 0),
+      prixVisaRiyal: parseNum(formData.prixVisaRiyal, 0),
+    }),
+    [formData.exchange, formData.prixAvion, formData.prixVisaRiyal]
+  )
+
+  // Un hôtel retiré (ou renommé) ne doit pas rester coché dans une formule.
+  // La référence est conservée telle quelle si rien ne change : pas de boucle de rendu.
+  useEffect(() => {
+    const disponibles = new Set(hotelsGrille.map((h) => h.cle))
+    setFormules((prev) => {
+      let modifie = false
+      const suivant = prev.map((formule) => {
+        const hotels = formule.hotels.filter((cle) => disponibles.has(cle))
+        if (hotels.length === formule.hotels.length) return formule
+        modifie = true
+        return { ...formule, hotels }
+      })
+      return modifie ? suivant : prev
+    })
+  }, [hotelsGrille])
+
+  const grilleRaisons = useMemo(
+    () => (formules.length === 0 ? [] : validerGrille(formules, hotelsGrille)),
+    [formules, hotelsGrille]
+  )
+
+  /**
+   * Prix de vente issu de la grille, par capacité de chambre (1..5), pour la
+   * simulation de rentabilité. Plusieurs formules peuvent proposer le même type
+   * de chambre à des prix différents : on retient la MOYENNE des prix proposés,
+   * faute de savoir comment les voyageurs se répartiront entre les formules.
+   */
+  const prixGrilleParCapacite = useMemo(() => {
+    const out: Record<number, number | null> = {}
+    for (const roomType of COLONNES_GRILLE) {
+      const prix = formules
+        .map((formule) => prixCase(formule, roomType))
+        .filter((p): p is number => p !== null)
+      out[CAPACITE_TYPE[roomType]] =
+        prix.length > 0 ? Math.round(prix.reduce((a, b) => a + b, 0) / prix.length) : null
+    }
+    return out
+  }, [formules])
+
   const simulationPreview = useMemo(() => {
     const exchange = parseNum(formData.exchange, 1) || 1
     const prixAvionDH = parseNum(formData.prixAvion, 0)
@@ -585,24 +715,29 @@ export default function NouveauProgramme() {
       const paired = presentPlaces.length > 0 ? Math.min(...presentPlaces) : 0
       if (paired <= 0) continue
 
-      const unitDh = unitTicketPriceDh({
-        exchange,
-        prixAvionDH,
-        prixVisaRiyal,
-        profit,
-        profitEconomique,
-        profitNormal,
-        profitVIP,
-        plan: simPlan,
-        roomTypeKey: t,
-        prixRoomMadinaRiyal: pm,
-        prixRoomMakkahRiyal: pk,
-        joursMadina: jM,
-        joursMakkah: jK,
-        includeAvion: simIncludeAvion,
-        includeVisa: simIncludeVisa,
-        prixHotelAutreRiyalPerTraveler: autreRiyalPerTraveler,
-      })
+      // En mode GRILLE, le chiffre d'affaires vient du prix de la BROCHURE, pas du
+      // calcul : le coût agence ci-dessous reste identique dans les deux modes.
+      const unitDh =
+        pricingMode === "GRILLE"
+          ? prixGrilleParCapacite[t] ?? 0
+          : unitTicketPriceDh({
+              exchange,
+              prixAvionDH,
+              prixVisaRiyal,
+              profit,
+              profitEconomique,
+              profitNormal,
+              profitVIP,
+              plan: simPlan,
+              roomTypeKey: t,
+              prixRoomMadinaRiyal: pm,
+              prixRoomMakkahRiyal: pk,
+              joursMadina: jM,
+              joursMakkah: jK,
+              includeAvion: simIncludeAvion,
+              includeVisa: simIncludeVisa,
+              prixHotelAutreRiyalPerTraveler: autreRiyalPerTraveler,
+            })
       const subtotalDh = paired * unitDh
       const nbPersonnes = t
       const unitCostVolDh = simIncludeAvion ? prixAvionDH : 0
@@ -653,10 +788,19 @@ export default function NouveauProgramme() {
       costVolHotelVisaAllTravelersDh + agentChargesTotalDh + autresChargesDh
     const resultatPrevDh = revenueAfterAgentsDh - totalChargesDh
 
+    // Places dont le prix de vente est inconnu en mode GRILLE (case « — ») : elles
+    // coûtent à l'agence sans rien rapporter, autant le signaler.
+    const placesSansPrixGrille =
+      pricingMode === "GRILLE"
+        ? byType.filter((row) => row.unitDh <= 0).reduce((total, row) => total + row.places, 0)
+        : 0
+
     return {
       exchange,
       joursMadinaEff: jM,
       joursMakkahEff: jK,
+      pricingMode,
+      placesSansPrixGrille,
       byType,
       totalTravelersMax,
       revenueIfAllPayDh,
@@ -693,6 +837,8 @@ export default function NouveauProgramme() {
     simAgentPlaces,
     simAgentCostPerPlaceDH,
     simAutresChargesDH,
+    pricingMode,
+    prixGrilleParCapacite,
   ])
 
   const canRunSimulation = useMemo(() => {
@@ -867,9 +1013,16 @@ export default function NouveauProgramme() {
     sectionTitle("Dates du voyage")
     const fmtDate = (d: Date | null | undefined) =>
       d ? format(d, "dd/MM/yyyy", { locale: fr }) : "—"
+    // Heure accolée à sa date : « 15/03/2026 a 14h30 ». Variante ASCII (« a » sans
+    // accent) imposée par la fonte Helvetica de jsPDF.
+    const fmtDateHeure = (d: Date | null | undefined, heure: string) => {
+      const date = fmtDate(d)
+      const h = heure ? heure.replace(":", "h") : ""
+      return h ? `${date} a ${h}` : date
+    }
     kvTable([
-      ["Date de départ", fmtDate(formData.dateDepart)],
-      ["Date d'arrivée", fmtDate(formData.dateArrivee)],
+      ["Date de départ", fmtDateHeure(formData.dateDepart, formData.heureDepart)],
+      ["Date d'arrivée", fmtDateHeure(formData.dateArrivee, formData.heureArrivee)],
       ["Dates limites (passeport, visa, billets, hôtels)", fmtDate(formData.dateDepart)],
     ])
 
@@ -878,7 +1031,12 @@ export default function NouveauProgramme() {
     kvTable([
       ["Inclure avion dans le coût", simIncludeAvion ? "Oui" : "Non"],
       ["Inclure visa dans le coût", simIncludeVisa ? "Oui" : "Non"],
-      ["Plan tarifaire", simPlan],
+      [
+        "Origine du prix de vente",
+        pricingMode === "GRILLE" ? "Grille tarifaire (brochure)" : "Calcul automatique",
+      ],
+      // Le plan ne joue aucun rôle quand le prix vient de la brochure.
+      ["Plan tarifaire", pricingMode === "GRILLE" ? "—" : simPlan],
       ...(formData.hotelsAutre.length > 0
         ? [["Hôtels Autre", `${formData.hotelsAutre.length} (nuits par hôtel)`] as [string, string]]
         : []),
@@ -1078,6 +1236,7 @@ export default function NouveauProgramme() {
     simAgentPlaces,
     simAgentCostPerPlaceDH,
     simAutresChargesDH,
+    pricingMode,
     toast,
   ])
 
@@ -1313,6 +1472,8 @@ export default function NouveauProgramme() {
         profitVIP: formData.profitVIP ? parseFloat(formData.profitVIP) : 0,
         dateDepart: formData.dateDepart,
         dateArrivee: formData.dateArrivee,
+        heureDepart: formData.heureDepart || null,
+        heureArrivee: formData.heureArrivee || null,
         // Les 4 dates limites sont alignées sur la date de départ : plus de saisie
         // manuelle, le bloc « Dates limites » a été retiré du formulaire.
         visaDeadline: formData.dateDepart,
@@ -1326,7 +1487,12 @@ export default function NouveauProgramme() {
           nbJours: h.nbJours ? parseInt(h.nbJours) : 0,
           ordre: h.ordre ? parseInt(h.ordre) : 0,
           chambres: h.chambres,
-        }))
+        })),
+        // Origine du prix de vente et grille de la brochure. Les hôtels des
+        // formules sont transmis par nom + ville : ils viennent d'être saisis et
+        // n'ont pas encore d'identifiant côté navigateur.
+        pricingMode,
+        formules: formulesVersApi(formules, hotelsGrille),
       }
 
       const response = await api.request(api.endpoints.programs, {
@@ -1339,15 +1505,30 @@ export default function NouveauProgramme() {
         throw new Error(errorData.error || 'Erreur lors de la création du programme')
       }
 
-      toast({
-        title: 'Succès',
-        description: 'Le programme a été créé avec succès',
-      })
+      const created = await response.json().catch(() => ({} as { id?: number; grilleWarning?: string | null }))
 
       // Enregistrement réussi : on neutralise le garde-fou « modifications non
       // enregistrées » (local + provider global) pour que la redirection ne
       // déclenche pas l'alerte navigateur « Changes you made may not be saved ».
       unsavedChanges?.clearDirty()
+
+      // Le programme est créé même si sa grille a été refusée : on emmène alors
+      // le gérant sur l'écran de modification pour qu'il la termine, au lieu de
+      // le laisser recliquer « Enregistrer » et créer un doublon.
+      if (created?.grilleWarning && created?.id) {
+        toast({
+          title: 'Programme créé, grille à compléter',
+          description: `${created.grilleWarning} Terminez la grille depuis cet écran.`,
+          variant: 'destructive',
+        })
+        router.push(`/programmes/modifier/${created.id}`)
+        return
+      }
+
+      toast({
+        title: 'Succès',
+        description: 'Le programme a été créé avec succès',
+      })
 
       // Redirection fiable vers le dashboard. On garde `isSubmitting` à true
       // (bouton désactivé) pendant la navigation pour éviter qu'un second clic
@@ -1367,7 +1548,16 @@ export default function NouveauProgramme() {
     }
   }
 
-  const isFormValid = validateRequiredFields.length === 0
+  /**
+   * Motifs de blocage de l'enregistrement : champs obligatoires du programme +
+   * cohérence de la grille tarifaire (libellés, hôtels par ville). La MARGE d'une
+   * case n'en fait jamais partie, même négative.
+   */
+  const raisonsBlocantes = useMemo(
+    () => [...validateRequiredFields, ...grilleRaisons],
+    [validateRequiredFields, grilleRaisons]
+  )
+  const isFormValid = raisonsBlocantes.length === 0
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
@@ -1430,8 +1620,20 @@ export default function NouveauProgramme() {
                         </div>
                       </div>
                       {([
-                        { key: "dateDepart", label: "Date de départ", icon: Plane },
-                        { key: "dateArrivee", label: "Date d'arrivée", icon: MapPin },
+                        {
+                          key: "dateDepart",
+                          heureKey: "heureDepart",
+                          label: "Date de départ",
+                          heureLabel: "Heure de départ",
+                          icon: Plane,
+                        },
+                        {
+                          key: "dateArrivee",
+                          heureKey: "heureArrivee",
+                          label: "Date d'arrivée",
+                          heureLabel: "Heure d'arrivée",
+                          icon: MapPin,
+                        },
                       ] as const).map((item) => {
                         const dateValue = formData[item.key]
                         const Icon = item.icon
@@ -1440,33 +1642,56 @@ export default function NouveauProgramme() {
                             <Label className="text-blue-700 font-medium flex items-center gap-2">
                               <Icon className="h-4 w-4" />
                               {item.label} *
+                              <span className="text-xs font-normal text-blue-500">
+                                · heure facultative
+                              </span>
                             </Label>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  className="w-full justify-start text-left font-normal h-12 border-2 border-blue-200 hover:border-blue-300 rounded-lg bg-white/80"
-                                >
-                                  <CalendarIcon className="mr-2 h-4 w-4 text-blue-500" />
-                                  {dateValue ? (
-                                    format(dateValue, "PPP", { locale: fr })
-                                  ) : (
-                                    <span>Sélectionner une date</span>
-                                  )}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0 shadow-xl border-0">
-                                <CalendarComponent
-                                  mode="single"
-                                  selected={dateValue ?? undefined}
-                                  onSelect={(date) =>
-                                    setFormData((prev) => ({ ...prev, [item.key]: date ?? null }))
+                            {/* Date et heure côte à côte : l'heure de vol appartient à la même
+                                information que la date, la séparer les désynchroniserait. */}
+                            <div className="flex gap-2">
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    className="flex-1 justify-start text-left font-normal h-12 border-2 border-blue-200 hover:border-blue-300 rounded-lg bg-white/80"
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4 text-blue-500" />
+                                    {dateValue ? (
+                                      format(dateValue, "PPP", { locale: fr })
+                                    ) : (
+                                      <span>Sélectionner une date</span>
+                                    )}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0 shadow-xl border-0">
+                                  <CalendarComponent
+                                    mode="single"
+                                    selected={dateValue ?? undefined}
+                                    onSelect={(date) =>
+                                      setFormData((prev) => ({ ...prev, [item.key]: date ?? null }))
+                                    }
+                                    initialFocus
+                                    className="rounded-lg"
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                              <div className="relative shrink-0">
+                                <Clock className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-500" />
+                                <Input
+                                  type="time"
+                                  aria-label={item.heureLabel}
+                                  title={item.heureLabel}
+                                  value={formData[item.heureKey]}
+                                  onChange={(e) =>
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      [item.heureKey]: e.target.value,
+                                    }))
                                   }
-                                  initialFocus
-                                  className="rounded-lg"
+                                  className="h-12 w-[7.5rem] pl-8 border-2 border-blue-200 focus:border-blue-500 rounded-lg bg-white/80 shadow-sm"
                                 />
-                              </PopoverContent>
-                            </Popover>
+                              </div>
+                            </div>
                           </div>
                         )
                       })}
@@ -2199,6 +2424,23 @@ export default function NouveauProgramme() {
                     </TabsContent>
                   </Tabs>
 
+                  {/* Grille tarifaire : le prix de la brochure publiée, saisi formule par formule */}
+                  <div className="mb-6 rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/70 to-white p-4 ring-1 ring-violet-200/40">
+                    <BasculePricingMode
+                      mode={pricingMode}
+                      onChange={setPricingMode}
+                      grilleAUnPrix={grilleContientUnPrix(formules)}
+                    />
+                    <div className="mt-4">
+                      <GrilleTarifaire
+                        formules={formules}
+                        onChange={setFormules}
+                        hotelsDuProgramme={hotelsGrille}
+                        params={paramsCoutGrille}
+                      />
+                    </div>
+                  </div>
+
                   {/* Simulation : après infos de base, financier et hôtels — champs désactivés tant que les prérequis ne sont pas remplis */}
                   <div
                     id="simulation-rentabilite"
@@ -2516,7 +2758,11 @@ export default function NouveauProgramme() {
                             <tr className="border-b border-violet-100 text-left text-violet-800">
                               <th className="p-2 font-medium">Type chambre</th>
                               <th className="p-2 font-medium">Places (capacité min.)</th>
-                              <th className="p-2 font-medium">Prix / pers. (DH)</th>
+                              <th className="p-2 font-medium">
+                                {pricingMode === "GRILLE"
+                                  ? "Prix grille / pers. (DH)"
+                                  : "Prix / pers. (DH)"}
+                              </th>
                               <th className="p-2 font-medium">Sous-total (DH)</th>
                             </tr>
                           </thead>
@@ -2531,6 +2777,22 @@ export default function NouveauProgramme() {
                             ))}
                           </tbody>
                         </table>
+                        {pricingMode === "GRILLE" && (
+                          <p className="border-t border-violet-100 bg-violet-50/60 px-3 py-2 text-xs text-violet-800">
+                            Chiffre d&apos;affaires calculé sur les prix de la grille tarifaire
+                            (moyenne des formules proposant chaque type de chambre). Le coût agence
+                            reste identique dans les deux modes.
+                            {simulationPreview.placesSansPrixGrille > 0 && (
+                              <>
+                                {" "}
+                                <span className="font-semibold text-amber-800">
+                                  {simulationPreview.placesSansPrixGrille} place(s) sans prix dans
+                                  la grille : elles sont comptées en charges, pas en recettes.
+                                </span>
+                              </>
+                            )}
+                          </p>
+                        )}
                       </div>
                     ) : (
                       <p className="mt-4 text-sm text-violet-700 bg-white/60 border border-violet-100 rounded-lg px-3 py-2">
@@ -2588,7 +2850,7 @@ export default function NouveauProgramme() {
                       <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <p className="font-semibold">
-                            Enregistrer le programme est desactive ({validateRequiredFields.length} raison(s)).
+                            Enregistrer le programme est desactive ({raisonsBlocantes.length} raison(s)).
                           </p>
                           <Button
                             type="button"
@@ -2602,7 +2864,7 @@ export default function NouveauProgramme() {
                         </div>
                         {showValidationReasons && (
                           <ul className="list-disc pl-5 space-y-1 mt-2">
-                            {validateRequiredFields.map((reason, idx) => (
+                            {raisonsBlocantes.map((reason, idx) => (
                               <li key={`${reason}-${idx}`}>{reason}</li>
                             ))}
                           </ul>
@@ -2679,7 +2941,19 @@ export default function NouveauProgramme() {
                     <span className="text-xs text-gray-600">Date de départ:</span>
                     <span className="font-medium text-xs">
                       {formData.dateDepart
-                        ? format(formData.dateDepart, "dd/MM/yyyy", { locale: fr })
+                        ? `${format(formData.dateDepart, "dd/MM/yyyy", { locale: fr })}${
+                            formData.heureDepart ? ` à ${formData.heureDepart.replace(":", "h")}` : ""
+                          }`
+                        : "Non définie"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-600">Date d'arrivée:</span>
+                    <span className="font-medium text-xs">
+                      {formData.dateArrivee
+                        ? `${format(formData.dateArrivee, "dd/MM/yyyy", { locale: fr })}${
+                            formData.heureArrivee ? ` à ${formData.heureArrivee.replace(":", "h")}` : ""
+                          }`
                         : "Non définie"}
                     </span>
                   </div>

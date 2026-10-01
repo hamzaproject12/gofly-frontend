@@ -135,6 +135,14 @@ enum ProgramStatus {
   ARCHIVE
 }
 
+/// Origine du prix de vente d'un programme.
+/// CALCUL : prix dérivé du vol + visa + hôtels + profit (comportement historique).
+/// GRILLE : prix de la brochure publiée, saisi formule par formule (ProgramFormulePrix).
+enum PricingMode {
+  CALCUL
+  GRILLE
+}
+
 model Program {
   id               Int                  @id @default(autoincrement())
   name             String               @db.VarChar(150)
@@ -144,6 +152,11 @@ model Program {
   dateArchivage    DateTime?
   dateDepart       DateTime?
   dateArrivee      DateTime?
+  /// Heures de vol au format "HH:mm". Stockees en texte et non dans dateDepart /
+  /// dateArrivee : une heure locale d'aeroport n'a pas de fuseau, la ranger dans un
+  /// TIMESTAMP la ferait glisser d'une heure a chaque conversion UTC.
+  heureDepart      String?              @db.VarChar(5)
+  heureArrivee     String?              @db.VarChar(5)
   visaDeadline     DateTime?
   hotelDeadline    DateTime?
   flightDeadline   DateTime?
@@ -157,24 +170,76 @@ model Program {
   profitEconomique Float                @default(0)
   profitNormal     Float                @default(0)
   profitVIP        Float                @default(0)
+  /// Origine du prix de vente. Les programmes existants restent en CALCUL :
+  /// la migration est purement additive et ne change aucun prix déjà enregistré.
+  pricingMode      PricingMode          @default(CALCUL)
   isDeleted        Boolean              @default(false)
   deletedAt        DateTime?
   expenses         Expense[]
   hotelsMadina     ProgramHotelMadina[]
   hotelsMakkah     ProgramHotelMakkah[]
   hotelsAutre      ProgramHotelAutre[]
+  formules         ProgramFormule[]
   reservations     Reservation[]
   rooms            Room[]
   payments         Payment[]
 }
 
+/// Une LIGNE de la grille tarifaire (brochure) : une combinaison d'hôtels vendue
+/// sous un libellé, ex. « Al Markaziya + Abraj Al Kiswah ». Le nombre de formules
+/// varie d'un programme à l'autre.
+model ProgramFormule {
+  id        Int                    @id @default(autoincrement())
+  programId Int
+  label     String                 @db.VarChar(200)
+  /// Mention libre affichée sous le libellé (« + petit-déjeuner », « 400 m du Haram »).
+  note      String?                @db.VarChar(300)
+  ordre     Int                    @default(0)
+  createdAt DateTime               @default(now()) @map("created_at")
+  updatedAt DateTime               @updatedAt @map("updated_at")
+  program   Program                @relation(fields: [programId], references: [id], onDelete: Cascade)
+  hotels    ProgramFormuleHotel[]
+  prix      ProgramFormulePrix[]
+
+  @@index([programId, ordre])
+}
+
+/// Hôtels AUTORISÉS par une formule. Plusieurs lignes pour une même ville
+/// expriment un choix (« Emaar Grand OU Diyafat Al Rajaa ») ; la ville est portée
+/// par l'hôtel lui-même (Hotel.city), comme partout ailleurs dans le schéma.
+model ProgramFormuleHotel {
+  id        Int            @id @default(autoincrement())
+  formuleId Int
+  hotelId   Int
+  formule   ProgramFormule @relation(fields: [formuleId], references: [id], onDelete: Cascade)
+  hotel     Hotel          @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@unique([formuleId, hotelId])
+  @@index([hotelId])
+}
+
+/// Une CASE de la brochure : prix de vente par personne, en dirhams entiers.
+/// Une case « — » (non proposée) est l'ABSENCE de ligne, jamais un prix à 0 :
+/// 0 DH resterait un prix valide (place offerte), il ne peut pas signifier « pas
+/// de prix ». Entier obligatoire — un prix de brochure n'a pas de centimes.
+model ProgramFormulePrix {
+  id        Int            @id @default(autoincrement())
+  formuleId Int
+  roomType  RoomType
+  prixVente Int
+  formule   ProgramFormule @relation(fields: [formuleId], references: [id], onDelete: Cascade)
+
+  @@unique([formuleId, roomType])
+}
+
 model Hotel {
-  id             Int                  @id @default(autoincrement())
-  name           String               @db.VarChar(150)
+  id             Int                   @id @default(autoincrement())
+  name           String                @db.VarChar(150)
   city           City
   programsMadina ProgramHotelMadina[]
   programsMakkah ProgramHotelMakkah[]
   programsAutre  ProgramHotelAutre[]
+  formules       ProgramFormuleHotel[]
   rooms          Room[]
 
   @@unique([name, city])

@@ -176,11 +176,18 @@ model Program {
   profitEconomique Float                @default(0)
   profitNormal     Float                @default(0)
   profitVIP        Float                @default(0)
-  /// Origine du prix de vente : GRILLE pour tout nouveau programme. Le défaut a
-  /// changé (il valait CALCUL le temps de la mise en place de la grille) ; les
-  /// lignes déjà écrites ne bougent pas pour autant, d'où la bascule au démarrage
-  /// des programmes qui portent déjà une grille (cf. basculerProgrammesAvecGrille).
-  pricingMode      PricingMode          @default(GRILLE)
+  /// Origine du prix de vente. Tout nouveau programme est créé en GRILLE : la
+  /// seule écriture de ce champ (POST /api/programs) l'impose, le défaut n'est
+  /// donc jamais utilisé à la création.
+  ///
+  /// Il reste à CALCUL pour une raison de MIGRATION : sur une base où la colonne
+  /// n'existe pas encore, `prisma db push` la crée avec son défaut et PostgreSQL
+  /// en remplit toutes les lignes existantes. Un défaut GRILLE ferait donc passer
+  /// d'un coup les programmes historiques — sans grille — sur un prix de vente
+  /// qu'ils n'ont pas, bloquant leurs réservations. Avec CALCUL ils gardent leur
+  /// prix, puis rejoignent la grille dès qu'elle est saisie (PUT /:id/grille) ou
+  /// au démarrage si elle l'est déjà (cf. basculerProgrammesAvecGrille).
+  pricingMode      PricingMode          @default(CALCUL)
   isDeleted        Boolean              @default(false)
   deletedAt        DateTime?
   expenses         Expense[]

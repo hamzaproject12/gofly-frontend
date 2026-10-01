@@ -16,6 +16,14 @@ import {
   type ReservationJournalRow,
 } from '../services/journalSuppressionService';
 import { parseHotelsAutre, type HotelAutreEntry } from '../services/hotelsAutreService';
+import { authenticateToken } from '../middleware/auth';
+import { auMoins } from '../services/roleService';
+import {
+  ReservationGrilleError,
+  buildEcartGrilleDetail,
+  validerReservationGrille,
+  type TraceGrille,
+} from '../services/reservationGrilleService';
 import {
   debitCreditsInTx,
   logConsumptionInTx,
@@ -197,6 +205,23 @@ function extractAgentIdFromToken(req: express.Request): number | null {
     console.log('⚠️ Error extracting agentId from token:', error);
     return null;
   }
+}
+
+/**
+ * Vrai si l'appelant est au moins ADMIN, **rôle relu en base**.
+ *
+ * Le rôle porté par le jeton peut être périmé : rétrograder un agent ne révoque
+ * pas les jetons déjà émis. Même doctrine que `requireRang` (authController) —
+ * on compare des rangs via `auMoins`, on n'énumère jamais les rôles.
+ */
+async function appelantEstAdminOuPlus(req: express.Request): Promise<boolean> {
+  const agentId = (req as { user?: { agentId?: number } }).user?.agentId ?? null;
+  if (!agentId) return false;
+  const agent = await prisma.agent.findUnique({
+    where: { id: agentId },
+    select: { role: true, isActive: true },
+  });
+  return Boolean(agent?.isActive && auMoins(agent.role, 'ADMIN'));
 }
 
 /** Libellé de l'auteur pour le ledger de crédits (email > nom > id > inconnu). */
@@ -486,7 +511,7 @@ router.get('/rooms/:id', async (req, res) => {
 });
 
 // Create reservation group (leader + accompagnants) in one transaction
-router.post('/group', async (req, res) => {
+router.post('/group', authenticateToken, async (req, res) => {
   try {
     const {
       groupId,
@@ -539,6 +564,34 @@ router.post('/group', async (req, res) => {
     }
     if (!isBookable(lifecycle.status)) {
       return res.status(409).json(PROGRAMME_NON_ACTIF_BODY);
+    }
+
+    // Grille tarifaire : le prix du client n'est pas cru, il est recalculé depuis la
+    // grille lue en base. La grille donne un prix PAR PERSONNE, et le prix d'une
+    // chambre privée est concentré sur le chef de dossier : le total attendu est
+    // donc `prixGrille × nombre d'occupants`. AVANT le débit de crédit.
+    let traceGrille: TraceGrille;
+    try {
+      traceGrille = await validerReservationGrille(prisma, {
+        programId: Number(common.programId),
+        roomType,
+        occupants: groupSize,
+        prixDemande: normalizedLeaderPrice,
+        reductionDemandee: common?.reduction,
+        formuleId: common?.formuleId,
+        horsGrilleDemande: common?.horsGrille,
+        hotels: {
+          hotelMadina: common?.hotelMadina,
+          hotelMakkah: common?.hotelMakkah,
+          hotelsAutre: autreEntries,
+        },
+        appelantEstAdmin: await appelantEstAdminOuPlus(req),
+      });
+    } catch (grilleError) {
+      if (grilleError instanceof ReservationGrilleError) {
+        return res.status(grilleError.statusCode).json({ error: grilleError.message });
+      }
+      throw grilleError;
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -604,10 +657,18 @@ router.post('/group', async (req, res) => {
             statutVisa: Boolean(common.statutVisa),
             statutHotel: Boolean(common.statutHotel),
             statutVol: Boolean(common.statutVol),
-            price: i === 0 ? normalizedLeaderPrice : 0,
+            // Prix et réduction retenus par le SERVEUR, concentrés sur le chef de
+            // dossier (les accompagnants restent à 0 — répartition inchangée).
+            price: i === 0 ? traceGrille.price : 0,
             paidAmount: i === 0 ? Number(leaderPaidAmount) : 0,
-            reduction: i === 0 ? Number(common.reduction || 0) : 0,
+            reduction: i === 0 ? traceGrille.reduction : 0,
             plan: common.plan || 'Normal',
+            // Trace de la grille : portée par TOUS les membres, pour qu'un accompagnant
+            // sache aussi dans quelle formule il voyage. Seul le prix reste concentré.
+            formuleId: traceGrille.formuleId,
+            formuleLabel: traceGrille.formuleLabel,
+            prixGrille: traceGrille.prixGrille,
+            horsGrille: traceGrille.horsGrille,
             groupe: common.groupe || null,
             remarque: common.remarque || null,
             transport: common.transport || null,
@@ -669,6 +730,26 @@ router.post('/group', async (req, res) => {
             detailText,
             actorIdFallback: leader?.agentId ?? null,
           });
+
+          // Vente qui s'écarte de la grille : entrée dédiée, rattachée au dossier leader.
+          const ecart = buildEcartGrilleDetail({
+            programName: leader?.program?.name ?? String(common.programId),
+            trace: traceGrille,
+            occupants: groupSize,
+            nomDossier: leader ? `${leader.lastName} ${leader.firstName}`.trim() : 'chambre privée',
+          });
+          if (ecart) {
+            await logJournalSuppression(prisma, req, {
+              action: traceGrille.horsGrille
+                ? JOURNAL_ACTION.RESERVATION_HORS_GRILLE
+                : JOURNAL_ACTION.RESERVATION_PRIX_AJUSTE,
+              entityType: 'Reservation',
+              entityId: result.leaderId,
+              summary: ecart.summary,
+              detailText: ecart.detailText,
+              actorIdFallback: leader?.agentId ?? null,
+            });
+          }
         }
       } catch (journalErr) {
         console.error('[Journal] Échec log création groupe réservation:', journalErr);
@@ -722,7 +803,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create new reservation
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   try {
     const { firstName, lastName, phone, passportNumber, groupe, remarque, transport, programId, roomType, gender, hotelMadina, hotelMakkah, hotelsAutre, price, reservationDate, status, statutPasseport, statutVisa, statutHotel, statutVol, paidAmount, reduction, roomMadinaId, roomMakkahId, plan, typeReservation, isLeader, parentId, groupId, familyMixed, roomSlot } = req.body;
 
@@ -790,6 +871,37 @@ router.post('/', async (req, res) => {
     if (!isBookable(lifecycle.status)) {
       return res.status(409).json(PROGRAMME_NON_ACTIF_BODY);
     }
+
+    // Grille tarifaire : le prix du client n'est pas cru, il est recalculé depuis la
+    // grille lue en base. AVANT le débit de crédit, pour qu'un refus ne consomme rien.
+    // Un programme en mode CALCUL traverse ce contrôle sans rien changer.
+    let traceGrille: TraceGrille;
+    try {
+      traceGrille = await validerReservationGrille(prisma, {
+        programId: Number(programId),
+        roomType,
+        occupants: 1,
+        prixDemande: normalizedPrice,
+        reductionDemandee: reduction,
+        formuleId: req.body?.formuleId,
+        horsGrilleDemande: req.body?.horsGrille,
+        hotels: { hotelMadina, hotelMakkah, hotelsAutre: hotelsAutreEntries },
+        appelantEstAdmin: await appelantEstAdminOuPlus(req),
+      });
+    } catch (grilleError) {
+      if (grilleError instanceof ReservationGrilleError) {
+        return res.status(grilleError.statusCode).json({ error: grilleError.message });
+      }
+      throw grilleError;
+    }
+
+    // Le prix, la réduction et la trace de la formule retenus sont ceux du SERVEUR.
+    reservationCreateData.price = traceGrille.price;
+    reservationCreateData.reduction = traceGrille.reduction;
+    reservationCreateData.formuleId = traceGrille.formuleId;
+    reservationCreateData.formuleLabel = traceGrille.formuleLabel;
+    reservationCreateData.prixGrille = traceGrille.prixGrille;
+    reservationCreateData.horsGrille = traceGrille.horsGrille;
 
     // Réservation LIT = 1 pèlerin = 1 crédit : débit conditionnel + création + ligne
     // CONSOMMATION dans la MÊME transaction (solde insuffisant → aucun dossier créé).
@@ -868,6 +980,27 @@ router.post('/', async (req, res) => {
           detailText,
           actorIdFallback: reservation.agentId ?? null,
         });
+
+        // Vente qui s'écarte de la grille (réduction, proposition, hors grille) :
+        // entrée dédiée, pour qu'un écart de prix se retrouve sans relire tous les dossiers.
+        const ecart = buildEcartGrilleDetail({
+          programName: snap.program?.name ?? String(programId),
+          trace: traceGrille,
+          occupants: 1,
+          nomDossier: `${lastName} ${firstName}`.trim(),
+        });
+        if (ecart) {
+          await logJournalSuppression(prisma, req, {
+            action: traceGrille.horsGrille
+              ? JOURNAL_ACTION.RESERVATION_HORS_GRILLE
+              : JOURNAL_ACTION.RESERVATION_PRIX_AJUSTE,
+            entityType: 'Reservation',
+            entityId: reservation.id,
+            summary: ecart.summary,
+            detailText: ecart.detailText,
+            actorIdFallback: reservation.agentId ?? null,
+          });
+        }
       }
     } catch (journalErr) {
       console.error('[Journal] Échec log création réservation:', journalErr);

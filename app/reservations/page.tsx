@@ -82,6 +82,10 @@ type Reservation = {
   statutVisa: boolean
   statutHotel: boolean
   statutVol: boolean
+  /** Dossier sorti de la grille tarifaire par un administrateur. */
+  horsGrille?: boolean
+  /** Libellé de la formule vendue, figé à la vente. */
+  formuleLabel?: string | null
   program: {
     id: number
     name: string
@@ -124,6 +128,10 @@ type TransformedReservation = {
   urgentDate?: Date
   groupSize: number
   typeReservation?: "LIT" | "CHAMBRE_PRIVEE"
+  /** Dossier vendu hors grille tarifaire (dérogation ADMIN). */
+  horsGrille?: boolean
+  /** Formule de la grille vendue, telle qu'elle était au moment de la vente. */
+  formuleLabel?: string | null
   /** Agent assigné au dossier (affiché sous Hôtel Makkah) */
   agentNom: string | null
   /** Pour tri par dernière modification */
@@ -455,6 +463,8 @@ export default function ReservationsPage() {
             urgentDate: undefined,
             groupSize,
             typeReservation: reservation.typeReservation,
+          horsGrille: Boolean((reservation as { horsGrille?: boolean }).horsGrille),
+          formuleLabel: (reservation as { formuleLabel?: string | null }).formuleLabel ?? null,
             programStatus: reservation.program?.status,
             agentNom: reservation.agent?.nom ?? null,
             updatedAt:
@@ -537,6 +547,8 @@ export default function ReservationsPage() {
           urgentDate,
           groupSize,
           typeReservation: reservation.typeReservation,
+          horsGrille: Boolean((reservation as { horsGrille?: boolean }).horsGrille),
+          formuleLabel: (reservation as { formuleLabel?: string | null }).formuleLabel ?? null,
           programStatus: reservation.program?.status,
           agentNom: reservation.agent?.nom ?? null,
           updatedAt:
@@ -1094,6 +1106,21 @@ export default function ReservationsPage() {
                               Groupe: {reservation.groupSize} pers.
                             </span>
                           ) : null}
+                          {/* Dossier vendu hors grille tarifaire : prix et hôtels
+                              choisis librement par un administrateur. */}
+                          {reservation.horsGrille && (
+                            <span className="inline-flex items-center gap-1 shrink-0 whitespace-nowrap text-xs font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded px-2 py-1">
+                              Hors grille
+                            </span>
+                          )}
+                          {!reservation.horsGrille && reservation.formuleLabel && (
+                            <span
+                              className="inline-flex items-center gap-1 min-w-0 max-w-[12rem] shrink-0 text-xs font-semibold text-violet-800 bg-violet-50 border border-violet-200 rounded px-2 py-1"
+                              title={`Formule vendue : ${reservation.formuleLabel}`}
+                            >
+                              <span className="truncate">{reservation.formuleLabel}</span>
+                            </span>
+                          )}
                           <span
                             className="inline-flex items-center gap-1 min-w-0 max-w-[14rem] text-base font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5"
                             title={reservation.programme}

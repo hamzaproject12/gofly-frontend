@@ -63,6 +63,8 @@ export interface HotelGrilleOption {
   city: VilleHotel
   /** Prix de la chambre en Riyal, par type de chambre. Absent = non renseigné. */
   prixChambreRiyal: Partial<Record<RoomTypeKey, number>>
+  /** Types de chambre réellement configurés dans cet hôtel (nombre de chambres > 0). */
+  typesChambre: RoomTypeKey[]
   /** Nuits passées dans cet hôtel (jours de la ville, ou nbJours de l'hôtel « Autre »). */
   nuits: number
 }
@@ -72,11 +74,15 @@ export interface FormuleForm {
   /** Clé React stable, indépendante de la base (une formule non enregistrée n'a pas d'id). */
   cle: string
   label: string
-  note: string
   /** Clés des hôtels autorisés (cf. `cleHotel`). */
   hotels: string[]
   /** Prix saisi par type de chambre. Chaîne vide = case « — » (non proposé). */
   prix: Partial<Record<RoomTypeKey, string>>
+  /**
+   * Le libellé a été saisi à la main : il n'est plus dérivé des hôtels cochés.
+   * Tant que ce drapeau est faux, cocher un hôtel met le libellé à jour tout seul.
+   */
+  labelManuel?: boolean
 }
 
 /** Paramètres financiers du programme utilisés par l'estimation du coût. */
@@ -182,6 +188,50 @@ export function estimerCoutCase(
   }
 }
 
+/**
+ * Colonnes à afficher dans la grille : uniquement les types de chambre que le
+ * programme propose RÉELLEMENT. Sans chambre double configurée, la colonne
+ * « Double » n'a pas lieu d'être — elle inviterait à vendre un hébergement
+ * inexistant.
+ *
+ * Un type déjà tarifé dans la grille reste affiché même s'il n'a plus de chambre :
+ * masquer la colonne ferait disparaître un prix saisi sans que personne ne le voie.
+ */
+export function colonnesGrille(
+  hotelsDuProgramme: HotelGrilleOption[],
+  formules: FormuleForm[]
+): RoomTypeKey[] {
+  const disponibles = new Set<RoomTypeKey>()
+  for (const hotel of hotelsDuProgramme) {
+    for (const roomType of hotel.typesChambre) disponibles.add(roomType)
+  }
+  for (const formule of formules) {
+    for (const roomType of COLONNES_GRILLE) {
+      if (prixCase(formule, roomType) !== null) disponibles.add(roomType)
+    }
+  }
+  return COLONNES_GRILLE.filter((roomType) => disponibles.has(roomType))
+}
+
+/**
+ * Libellé dérivé des hôtels cochés, dans l'ordre des villes d'un séjour :
+ * « Al Markaziya + Emaar Grand ou Diyafat Al Rajaa ». Les hôtels d'une même ville
+ * sont une alternative, d'où le « ou » ; les villes se cumulent, d'où le « + ».
+ */
+export function labelDepuisHotels(
+  clesHotels: string[],
+  hotelsDuProgramme: HotelGrilleOption[]
+): string {
+  const retenus = hotelsDuProgramme.filter((h) => clesHotels.includes(h.cle))
+  const parVille = ["Madina", "Makkah", "Autre"] as VilleHotel[]
+  const morceaux: string[] = []
+  for (const ville of parVille) {
+    const noms = retenus.filter((h) => h.city === ville).map((h) => h.name)
+    if (noms.length > 0) morceaux.push(noms.join(" ou "))
+  }
+  return morceaux.join(" + ")
+}
+
 /** Prix saisi dans une case, ou `null` si la case est vide (« non proposé »). */
 export function prixCase(formule: FormuleForm, roomType: RoomTypeKey): number | null {
   const brut = String(formule.prix[roomType] ?? "").trim()
@@ -267,7 +317,12 @@ export function validerGrille(
   return Array.from(new Set(raisons))
 }
 
-/** Formule reçue de l'API (GET /api/programs/:id). */
+/**
+ * Formule reçue de l'API (GET /api/programs/:id).
+ *
+ * `note` n'est plus saisissable — le champ a été retiré de l'interface — mais la
+ * colonne reste en base pour ne perdre aucune mention déjà enregistrée.
+ */
 export interface FormuleApi {
   id: number
   label: string
@@ -290,9 +345,11 @@ export function formulesDepuisApi(formules: FormuleApi[] | undefined | null): Fo
       return {
         cle: `api-${f.id}`,
         label: f.label,
-        note: f.note ?? "",
         hotels: f.hotels.map((h) => cleHotel(h.city, h.name)),
         prix,
+        // Un libellé déjà enregistré ne doit pas être réécrit par la génération
+        // automatique au premier clic sur un hôtel.
+        labelManuel: true,
       }
     })
 }
@@ -310,7 +367,6 @@ export function formulesVersApi(
   hotelsDuProgramme: HotelGrilleOption[]
 ): Array<{
   label: string
-  note: string | null
   ordre: number
   hotels: Array<{ name: string; city: VilleHotel }>
   prix: Array<{ roomType: RoomTypeKey; prixVente: number }>
@@ -318,7 +374,6 @@ export function formulesVersApi(
   const parCle = new Map(hotelsDuProgramme.map((h) => [h.cle, h]))
   return formules.map((formule, index) => ({
     label: formule.label.trim(),
-    note: formule.note.trim() === "" ? null : formule.note.trim(),
     ordre: index,
     hotels: formule.hotels
       .map((cle) => parCle.get(cle))
@@ -336,7 +391,6 @@ export function formuleVide(): FormuleForm {
   return {
     cle: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     label: "",
-    note: "",
     hotels: [],
     prix: {},
   }

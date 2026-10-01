@@ -200,6 +200,7 @@ model ProgramFormule {
   program   Program                @relation(fields: [programId], references: [id], onDelete: Cascade)
   hotels    ProgramFormuleHotel[]
   prix      ProgramFormulePrix[]
+  reservations Reservation[]
 
   @@index([programId, ordre])
 }
@@ -327,16 +328,30 @@ model Reservation {
   groupId         String?         @db.VarChar(64)
   familyMixed     Boolean         @default(false)
   roomSlot        Int?
+  /// Formule de la grille tarifaire vendue. Null pour un programme en mode CALCUL
+  /// ou pour un dossier hors grille.
+  formuleId       Int?
+  /// Libellé de la formule FIGÉ à la vente. Indispensable : remplacer la grille
+  /// d'un programme supprime ses formules, ce qui remet `formuleId` à NULL —
+  /// sans ce libellé, on ne saurait plus ce qui a été vendu.
+  formuleLabel    String?         @db.VarChar(200)
+  /// Prix de la grille PAR PERSONNE au moment de la vente, en dirhams entiers.
+  /// Instantané figé : modifier la grille ensuite ne touche aucun dossier existant.
+  prixGrille      Int?
+  /// Dossier volontairement sorti de la grille par un ADMIN : hôtels et prix libres.
+  horsGrille      Boolean         @default(false)
   expenses        Expense[]
   documents       Fichier[]
   payments        Payment[]
   agent           Agent?    @relation(fields: [agentId], references: [id])
   program         Program   @relation(fields: [programId], references: [id])
+  formule         ProgramFormule? @relation(fields: [formuleId], references: [id], onDelete: SetNull)
   parent          Reservation?  @relation("ReservationHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
   accompagnants   Reservation[] @relation("ReservationHierarchy")
 
   @@index([parentId])
   @@index([groupId])
+  @@index([formuleId])
 }
 
 model Fichier {

@@ -113,6 +113,8 @@ const ACTION_LABELS: Record<string, string> = {
   RESERVATION_CREATED: 'Réservation créée',
   RESERVATION_DELETED: 'Réservation supprimée',
   RESERVATION_UPDATED: 'Réservation modifiée',
+  RESERVATION_PRIX_AJUSTE: 'Prix ajusté (réduction / proposition)',
+  RESERVATION_HORS_GRILLE: 'Réservation hors grille',
   ROOM_DELETED: 'Chambre(s) supprimée(s)',
   PROGRAM_SOFT_DELETED: 'Programme masqué (soft)',
   PROGRAM_HARD_DELETED: 'Programme supprimé définitivement',

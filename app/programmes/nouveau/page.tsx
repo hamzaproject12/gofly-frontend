@@ -30,7 +30,6 @@ import {
   Plane,
   DollarSign,
   BadgeCheck,
-  PiggyBank,
   User,
   Bed,
   Calculator,
@@ -476,9 +475,8 @@ export default function NouveauProgramme() {
     if (!formData.exchange.trim()) reasons.push("Exchange est obligatoire.")
     if (!formData.prixAvion.trim()) reasons.push("Prix avion est obligatoire.")
     if (!formData.prixVisaRiyal.trim()) reasons.push("Prix visa est obligatoire.")
-    if (!formData.profitEconomique.trim()) reasons.push("Profit Economique est obligatoire.")
-    if (!formData.profitNormal.trim()) reasons.push("Profit Normal est obligatoire.")
-    if (!formData.profitVIP.trim()) reasons.push("Profit VIP est obligatoire.")
+    // Les profits par plan ne sont plus saisis : la marge est portée par le prix
+    // de la grille tarifaire. Plus rien à exiger ici.
 
     if (!formData.dateDepart) reasons.push("Date de depart est obligatoire.")
     if (!formData.dateArrivee) reasons.push("Date d'arrivee est obligatoire.")
@@ -578,6 +576,13 @@ export default function NouveauProgramme() {
       return out
     }
 
+    // Types de chambre réellement configurés (nombre de chambres > 0) : ils
+    // déterminent les colonnes affichées dans la grille tarifaire.
+    const typesChambre = (chambres: ChambresConfig) =>
+      COLONNES_GRILLE.filter(
+        (roomType) => (parseInt(chambres[CAPACITE_TYPE[roomType]]?.nb || "0", 10) || 0) > 0
+      )
+
     const construire = (
       name: string,
       city: VilleHotel,
@@ -588,6 +593,7 @@ export default function NouveauProgramme() {
       name,
       city,
       prixChambreRiyal: prixChambreRiyal(chambres),
+      typesChambre: typesChambre(chambres),
       nuits,
     })
 
@@ -1001,10 +1007,9 @@ export default function NouveauProgramme() {
       ["Nombre de jours Makkah", fmtNumFr(parseNum(formData.nbJoursMakkah, 0))],
       ["Prix avion (DH)", fmtDhFr(parseNum(formData.prixAvion, 0))],
       ["Prix visa (Riyal)", fmtNumFr(parseNum(formData.prixVisaRiyal, 0))],
-      ["Profit générique (DH)", fmtDhFr(parseNum(formData.profit, 0))],
-      ["Profit Économique (DH)", fmtDhFr(parseNum(formData.profitEconomique, 0))],
-      ["Profit Normal (DH)", fmtDhFr(parseNum(formData.profitNormal, 0))],
-      ["Profit VIP (DH)", fmtDhFr(parseNum(formData.profitVIP, 0))],
+      // Plus de lignes de profit : la marge n'est plus saisie sur le programme,
+      // elle est contenue dans le prix de la grille tarifaire (cf. le prix
+      // unitaire du tableau « Détail par type de chambre »).
     ])
 
     // === DATES DU VOYAGE ===
@@ -1760,54 +1765,11 @@ export default function NouveauProgramme() {
                       </div>
                     </div>
 
-                    {/* Section séparée pour les profits */}
-                    <div className="border-t border-green-200 pt-6">
-                      <h4 className="text-md font-semibold text-green-700 mb-4 flex items-center gap-2">
-                        <PiggyBank className="h-5 w-5" />
-                        Profits par plan
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="profitEconomique" className="text-green-700 font-medium flex items-center gap-2">
-                            Profit Économique (DH) *
-                          </Label>
-                          <Input
-                            id="profitEconomique"
-                            type="number"
-                            value={formData.profitEconomique}
-                            onChange={(e) => setFormData({ ...formData, profitEconomique: e.target.value })}
-                            placeholder="Ex: 1000"
-                            className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="profitNormal" className="text-green-700 font-medium flex items-center gap-2">
-                            Profit Normal (DH) *
-                          </Label>
-                          <Input
-                            id="profitNormal"
-                            type="number"
-                            value={formData.profitNormal}
-                            onChange={(e) => setFormData({ ...formData, profitNormal: e.target.value })}
-                            placeholder="Ex: 1500"
-                            className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="profitVIP" className="text-green-700 font-medium flex items-center gap-2">
-                            Profit VIP (DH) *
-                          </Label>
-                          <Input
-                            id="profitVIP"
-                            type="number"
-                            value={formData.profitVIP}
-                            onChange={(e) => setFormData({ ...formData, profitVIP: e.target.value })}
-                            placeholder="Ex: 2000"
-                            className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                    {/* Les profits par plan (Économique / Normal / VIP) ont été retirés de
+                        l'interface : la marge est désormais CONTENUE dans le prix de la grille
+                        tarifaire, que le gérant fixe en regard du coût estimé affiché sous
+                        chaque case. Un nouveau programme part donc avec des profits à 0 — ce
+                        qui est sans effet puisqu'il est créé en mode GRILLE. */}
                   </div>
 
                   {/* Hôtels — sélection par catégorie via onglets (Madina / Makkah / Autre) */}
@@ -2527,23 +2489,28 @@ export default function NouveauProgramme() {
                           </label>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label className="text-violet-800 text-sm">Plan tarifaire</Label>
-                            <Select
-                              value={simPlan}
-                              disabled={!canRunSimulation}
-                              onValueChange={(v) => setSimPlan(v as "Économique" | "Normal" | "VIP")}
-                            >
-                              <SelectTrigger className="border-violet-200 bg-white">
-                                <SelectValue placeholder="Plan" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Économique">Économique</SelectItem>
-                                <SelectItem value="Normal">Normal</SelectItem>
-                                <SelectItem value="VIP">VIP</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          {/* Le plan tarifaire ne pilote le chiffre d'affaires qu'en mode
+                              CALCUL. En GRILLE, le prix vient de la brochure : afficher un
+                              sélecteur sans effet induirait le gérant en erreur. */}
+                          {pricingMode === "CALCUL" && (
+                            <div className="space-y-2">
+                              <Label className="text-violet-800 text-sm">Plan tarifaire</Label>
+                              <Select
+                                value={simPlan}
+                                disabled={!canRunSimulation}
+                                onValueChange={(v) => setSimPlan(v as "Économique" | "Normal" | "VIP")}
+                              >
+                                <SelectTrigger className="border-violet-200 bg-white">
+                                  <SelectValue placeholder="Plan" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Économique">Économique</SelectItem>
+                                  <SelectItem value="Normal">Normal</SelectItem>
+                                  <SelectItem value="VIP">VIP</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
                           <div className="space-y-2">
                             <Label className="text-violet-800 text-sm">Durées de séjour</Label>
                             <p className="text-xs text-violet-700/80 leading-relaxed">
@@ -2926,8 +2893,12 @@ export default function NouveauProgramme() {
                     <span className="font-medium text-xs">{formData.prixVisaRiyal ? `${formData.prixVisaRiyal} Riyal` : "Non défini"}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-gray-600">Profit:</span>
-                    <span className="font-medium text-xs">{formData.profit ? `${formData.profit} DH` : "Non défini"}</span>
+                    <span className="text-xs text-gray-600">Formules grille:</span>
+                    <span className="font-medium text-xs">
+                      {formules.length > 0
+                        ? `${formules.length} formule(s)`
+                        : "Aucune"}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-gray-600">Hôtels Madina:</span>

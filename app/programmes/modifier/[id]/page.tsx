@@ -30,7 +30,6 @@ import {
   Wallet,
   DollarSign,
   Plane,
-  PiggyBank,
   Info,
   Save,
   ArrowLeft,
@@ -275,6 +274,13 @@ export default function ModifierProgrammePage() {
       return out
     }
 
+    // Types de chambre réellement configurés (nombre de chambres > 0) : ils
+    // déterminent les colonnes affichées dans la grille tarifaire.
+    const typesChambre = (chambres: { [key: number]: { nb: string; prix: string } }) =>
+      COLONNES_GRILLE.filter(
+        (roomType) => (parseInt(chambres[CAPACITE_TYPE[roomType]]?.nb || "0", 10) || 0) > 0
+      )
+
     const construire = (
       name: string,
       city: VilleHotel,
@@ -285,6 +291,7 @@ export default function ModifierProgrammePage() {
       name,
       city,
       prixChambreRiyal: prixChambreRiyal(chambres),
+      typesChambre: typesChambre(chambres),
       nuits,
     })
 
@@ -525,7 +532,6 @@ export default function ModifierProgrammePage() {
     JSON.stringify(
       liste.map((f) => ({
         label: f.label.trim(),
-        note: f.note.trim(),
         hotels: [...f.hotels].sort(),
         prix: COLONNES_GRILLE.map((t) => prixCase(f, t)),
       }))
@@ -932,51 +938,12 @@ export default function ModifierProgrammePage() {
                         </div>
                       </div>
 
-                      {/* Section séparée pour les profits */}
-                      <div className="border-t border-green-200 pt-6">
-                        <h4 className="text-md font-semibold text-green-700 mb-4 flex items-center gap-2">
-                          <PiggyBank className="h-5 w-5" />
-                          Profits par plan
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <Label className="text-green-700 font-medium flex items-center gap-2">
-                              Profit Économique (DH)
-                            </Label>
-                            <Input 
-                              type="number" 
-                              value={formData.profitEconomique} 
-                              onChange={(e) => setFormData({ ...formData, profitEconomique: e.target.value })} 
-                              placeholder="Ex: 1000" 
-                              className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" 
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-green-700 font-medium flex items-center gap-2">
-                              Profit Normal (DH)
-                            </Label>
-                            <Input 
-                              type="number" 
-                              value={formData.profitNormal} 
-                              onChange={(e) => setFormData({ ...formData, profitNormal: e.target.value })} 
-                              placeholder="Ex: 1500" 
-                              className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" 
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-green-700 font-medium flex items-center gap-2">
-                              Profit VIP (DH)
-                            </Label>
-                            <Input 
-                              type="number" 
-                              value={formData.profitVIP} 
-                              onChange={(e) => setFormData({ ...formData, profitVIP: e.target.value })} 
-                              placeholder="Ex: 2000" 
-                              className="h-12 border-2 border-green-200 focus:border-green-500 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all" 
-                            />
-                          </div>
-                        </div>
-                      </div>
+                      {/* Les profits par plan (Économique / Normal / VIP) ont été retirés de
+                          l'interface : la marge est désormais CONTENUE dans le prix de la
+                          grille tarifaire, que le gérant fixe en regard du coût estimé.
+                          Les valeurs déjà en base sont conservées et renvoyées telles quelles
+                          par l'enregistrement, pour ne rien changer aux programmes restés en
+                          mode CALCUL. */}
                     </div>
 
                     {/* Hôtels — sélection par catégorie via onglets (Madina / Makkah / Autre) */}

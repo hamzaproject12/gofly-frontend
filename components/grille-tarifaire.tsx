@@ -23,8 +23,10 @@ import {
   ParamsCoutProgramme,
   RoomTypeKey,
   VilleHotel,
+  colonnesGrille,
   estimerCoutCase,
   formuleVide,
+  labelDepuisHotels,
   prixCase,
   validerGrille,
 } from "@/lib/grilleTarifaire"
@@ -86,6 +88,15 @@ export function GrilleTarifaire({
     [hotelsParVille]
   )
 
+  /**
+   * Colonnes réellement affichées : seuls les types de chambre que le programme
+   * propose. Sans chambre double configurée, pas de colonne « Double ».
+   */
+  const colonnes = useMemo(
+    () => colonnesGrille(hotelsDuProgramme, formules),
+    [hotelsDuProgramme, formules]
+  )
+
   const raisons = useMemo(
     () => validerGrille(formules, hotelsDuProgramme),
     [formules, hotelsDuProgramme]
@@ -106,6 +117,11 @@ export function GrilleTarifaire({
     )
   }
 
+  /**
+   * Coche / décoche un hôtel et, tant que le libellé n'a pas été écrit à la main,
+   * le régénère depuis les hôtels retenus — c'est ainsi que les brochures nomment
+   * leurs formules, autant l'écrire tout seul.
+   */
   const basculerHotel = (cle: string, cleHotelOption: string) => {
     onChange(
       formules.map((f) => {
@@ -113,9 +129,21 @@ export function GrilleTarifaire({
         const hotels = f.hotels.includes(cleHotelOption)
           ? f.hotels.filter((h) => h !== cleHotelOption)
           : [...f.hotels, cleHotelOption]
-        return { ...f, hotels }
+        const suivant = { ...f, hotels }
+        if (!f.labelManuel) {
+          suivant.label = labelDepuisHotels(hotels, hotelsDuProgramme)
+        }
+        return suivant
       })
     )
+  }
+
+  /**
+   * Saisie manuelle du libellé : on cesse de le régénérer. Vider complètement le
+   * champ rend la main à la génération automatique.
+   */
+  const majLabel = (cle: string, valeur: string) => {
+    majFormule(cle, { label: valeur, labelManuel: valeur.trim() !== "" })
   }
 
   const deplacer = (index: number, sens: -1 | 1) => {
@@ -180,19 +208,29 @@ export function GrilleTarifaire({
         </div>
       )}
 
+      {formules.length > 0 && colonnes.length === 0 && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            Aucun type de chambre n&apos;est configuré dans les hôtels du programme : renseignez
+            le nombre de chambres par type ci-dessus pour que les colonnes apparaissent.
+          </span>
+        </div>
+      )}
+
       {formules.length === 0 ? (
         <div className="rounded-lg border border-dashed border-violet-300 bg-violet-50/40 p-3 text-center text-sm text-violet-700">
           Aucune formule. Ajoutez la première ligne de votre brochure.
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-violet-200 bg-white">
-          <table className="w-full min-w-[900px] border-collapse text-sm">
+          <table className="w-full min-w-[640px] border-collapse text-sm">
             <thead>
               <tr className="bg-violet-50/80 text-violet-900">
                 <th className="w-[320px] border-b border-violet-200 p-3 text-left font-medium">
                   Formule (hôtels)
                 </th>
-                {COLONNES_GRILLE.map((roomType) => (
+                {colonnes.map((roomType) => (
                   <th
                     key={roomType}
                     className="border-b border-l border-violet-200 p-3 text-center font-medium"
@@ -209,20 +247,17 @@ export function GrilleTarifaire({
                   <td className="border-b border-violet-100 p-3">
                     <Input
                       value={formule.label}
-                      onChange={(e) => majFormule(formule.cle, { label: e.target.value })}
-                      placeholder="Ex. Al Markaziya + Abraj Al Kiswah"
+                      onChange={(e) => majLabel(formule.cle, e.target.value)}
+                      placeholder="Cochez les hôtels — le libellé s'écrit tout seul"
                       disabled={disabled}
                       className="h-9"
                       aria-label={`Libellé de la formule ${index + 1}`}
                     />
-                    <Input
-                      value={formule.note}
-                      onChange={(e) => majFormule(formule.cle, { note: e.target.value })}
-                      placeholder="Mention (facultatif) : + petit-déjeuner, 400 m du Haram…"
-                      disabled={disabled}
-                      className="mt-2 h-8 text-xs"
-                      aria-label={`Mention de la formule ${index + 1}`}
-                    />
+                    {!formule.labelManuel && formule.hotels.length > 0 && (
+                      <p className="mt-1 text-[10px] leading-tight text-gray-500">
+                        Libellé repris des hôtels cochés — écrivez par-dessus pour le fixer.
+                      </p>
+                    )}
                     <div className="mt-3 space-y-2">
                       {Array.from(hotelsParVille.entries()).map(([ville, hotels]) => (
                         <div key={ville}>
@@ -266,7 +301,7 @@ export function GrilleTarifaire({
                     </div>
                   </td>
 
-                  {COLONNES_GRILLE.map((roomType) => {
+                  {colonnes.map((roomType) => {
                     const prix = prixCase(formule, roomType)
                     const cout = estimerCoutCase(formule, roomType, hotelsDuProgramme, params)
                     const margeBasse = prix !== null && cout ? prix - cout.max : null

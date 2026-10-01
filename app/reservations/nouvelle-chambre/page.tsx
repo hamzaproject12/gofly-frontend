@@ -40,6 +40,17 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
+import { GrilleSelection } from "@/components/reservations/GrilleSelection";
+import { useAuth } from "@/hooks/useAuth";
+import { LIBELLE_TYPE, type RoomTypeKey } from "@/lib/grilleTarifaire";
+import {
+  type FormuleApi,
+  type PricingMode,
+  formulesTriees,
+  grilleExploitable,
+  hotelsImposes,
+  prixGrilleDe,
+} from "@/lib/grilleReservation";
 import {
   Dialog,
   DialogContent,
@@ -66,6 +77,7 @@ import {
   Download,
   ChevronUp,
   AlertTriangle,
+  Table2,
   Pencil,
   Check,
 } from "lucide-react";
@@ -181,6 +193,10 @@ export default function NouvelleChambrePage() {
     profitEconomique: number;
     profitNormal: number;
     profitVIP: number;
+    /** Origine du prix de vente du programme (CALCUL sur les programmes anciens). */
+    pricingMode: PricingMode;
+    /** Grille tarifaire du programme, vide en mode CALCUL. */
+    formules: FormuleApi[];
     rooms: RoomRow[];
   } | null>(null);
 
@@ -256,6 +272,16 @@ export default function NouvelleChambrePage() {
   const [editionPrix, setEditionPrix] = useState(false);
   const [prixSaisi, setPrixSaisi] = useState("");
 
+  /** Formule de la grille vendue (mode GRILLE uniquement). */
+  const [formuleId, setFormuleId] = useState<number | null>(null);
+  /**
+   * Dossier volontairement sorti de la grille : hôtels et prix libres.
+   * Réservé aux ADMIN — la case n'est pas affichée aux agents, et le backend
+   * refuse la requête (403) si elle est forgée.
+   */
+  const [horsGrille, setHorsGrille] = useState(false);
+  const { isAdmin } = useAuth();
+
   const capacity = formData.typeChambre
     ? ROOM_CAPACITY[formData.typeChambre] || 0
     : 0;
@@ -263,13 +289,42 @@ export default function NouvelleChambrePage() {
   const programmeSelectionne = programs.find(
     (p) => p.id.toString() === formData.programId
   );
-  const hotelsMadina =
+
+  /** Le prix de ce dossier vient-il de la grille tarifaire ? */
+  const modeGrille = programInfo?.pricingMode === "GRILLE" && !horsGrille;
+  const formulesProgramme = programInfo?.formules ?? [];
+  const formuleVendue = formulesProgramme.find((f) => f.id === formuleId) ?? null;
+
+  const hotelsMadinaProgramme =
     programmeSelectionne?.hotelsMadina?.map((ph) => ph.hotel) || [];
-  const hotelsMakkah =
+  const hotelsMakkahProgramme =
     programmeSelectionne?.hotelsMakkah?.map((ph) => ph.hotel) || [];
-  const hotelsAutreProgramme = [...(programmeSelectionne?.hotelsAutre || [])].sort(
+
+  /**
+   * En mode GRILLE les hôtels sont IMPOSÉS par la formule : on ne propose que les
+   * siens. Une ville à un seul hôtel autorisé est sélectionnée d'office, une ville
+   * à plusieurs laisse le choix entre ceux-là uniquement. Hors grille (ou en mode
+   * CALCUL), tous les hôtels du programme restent proposés.
+   */
+  const hotelsMadina = modeGrille
+    ? hotelsMadinaProgramme.filter((h) =>
+        hotelsImposes(formuleVendue, "Madina").some((imp) => imp.id === h.id)
+      )
+    : hotelsMadinaProgramme;
+  const hotelsMakkah = modeGrille
+    ? hotelsMakkahProgramme.filter((h) =>
+        hotelsImposes(formuleVendue, "Makkah").some((imp) => imp.id === h.id)
+      )
+    : hotelsMakkahProgramme;
+
+  const hotelsAutreTous = [...(programmeSelectionne?.hotelsAutre || [])].sort(
     (a, b) => a.ordre - b.ordre
   );
+  const hotelsAutreProgramme = modeGrille
+    ? hotelsAutreTous.filter((ph) =>
+        hotelsImposes(formuleVendue, "Autre").some((imp) => imp.id === ph.hotel.id)
+      )
+    : hotelsAutreTous;
 
   // Blocs hôtels réellement affichés (catégorie présente ET activée via le panneau « Éditer »).
   const showMadinaBlock = hotelsMadina.length > 0 && customization.includeMadina;
@@ -369,6 +424,10 @@ export default function NouvelleChambrePage() {
           profitEconomique: data.profitEconomique || 0,
           profitNormal: data.profitNormal || 0,
           profitVIP: data.profitVIP || 0,
+          // Grille tarifaire : un programme sans `pricingMode` (antérieur à la
+          // grille) reste en CALCUL, donc au comportement historique.
+          pricingMode: (data.pricingMode === "GRILLE" ? "GRILLE" : "CALCUL") as PricingMode,
+          formules: formulesTriees(data.formules),
           rooms: data.rooms || [],
         });
         setCustomization((prev) => ({
@@ -502,6 +561,27 @@ export default function NouvelleChambrePage() {
       return impossible("Le type de chambre n'est pas sélectionné");
     }
 
+    // ---- Mode GRILLE : le prix est celui de la BROCHURE, pas du calcul ----
+    // La grille donne un prix PAR PERSONNE ; le prix d'une chambre privée est
+    // concentré sur le chef de dossier, donc total = prix × nombre d'occupants.
+    if (modeGrille) {
+      if (!grilleExploitable(formulesProgramme)) {
+        return impossible("La grille tarifaire de ce programme est incomplète");
+      }
+      const prixDeLaGrille = prixGrilleDe(
+        formulesProgramme,
+        formuleId,
+        formData.typeChambre
+      );
+      if (prixDeLaGrille === null) {
+        return impossible(
+          "Choisissez une case de la grille tarifaire (formule et type de chambre)"
+        );
+      }
+      const occupantsCouverts = capacity > 0 ? capacity : 1;
+      return { prix: prixDeLaGrille * occupantsCouverts, raison: null };
+    }
+
     const roomType = formData.typeChambre;
     const nbPersonnes =
       {
@@ -566,6 +646,10 @@ export default function NouvelleChambrePage() {
 
     return { prix: Math.max(0, Math.round(prixFinal)), raison: null };
   }, [
+    modeGrille,
+    formulesProgramme,
+    formuleId,
+    capacity,
     programInfo,
     formData.typeChambre,
     formData.hotelMadina,
@@ -578,6 +662,11 @@ export default function NouvelleChambrePage() {
     autreActive,
     autreJours,
   ]);
+
+  /** Prix de la grille PAR PERSONNE pour la case choisie (mode GRILLE). */
+  const prixGrilleParPersonne = modeGrille
+    ? prixGrilleDe(formulesProgramme, formuleId, formData.typeChambre)
+    : null;
 
   /** Prix calculé, `null` si indéterminable (cf. `calculPrix`). */
   const calculatePrice = calculPrix.prix;
@@ -1322,6 +1411,10 @@ export default function NouvelleChambrePage() {
               statutVol: supplierStatus.statutVol,
               reduction: prixMode === "reduction" ? reduction || 0 : 0,
               plan: customization.plan,
+              // Grille tarifaire : la formule vendue et la dérogation éventuelle.
+              // Le backend relit le prix de la case en base — il ne croit pas celui-ci.
+              formuleId: modeGrille ? formuleId : null,
+              horsGrille,
               groupe: leaderMeta.groupe || null,
               remarque: leaderMeta.remarque || null,
               transport: leaderMeta.transport ? "Oui" : null,
@@ -1711,6 +1804,10 @@ export default function NouvelleChambrePage() {
                           setRoomMadinaId("");
                           setRoomMakkahId("");
                           setRoomAutreIds({});
+                          // La grille appartient au programme : une formule d'un
+                          // autre programme n'a plus aucun sens ici.
+                          setFormuleId(null);
+                          setHorsGrille(false);
                         }}
                       >
                         <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
@@ -1751,7 +1848,10 @@ export default function NouvelleChambrePage() {
                       </Select>
                     </div>
 
-                    <div className="space-y-2">
+                    {/* Le plan (Économique / Normal / VIP) ne sert qu'au calcul
+                        automatique. En mode GRILLE le prix vient de la brochure :
+                        le sélecteur n'aurait aucun effet, il disparaît. */}
+                    <div className={`space-y-2 ${modeGrille ? "hidden" : ""}`}>
                       <Label className="text-blue-700 font-medium text-sm">
                         Plan *
                       </Label>
@@ -1790,6 +1890,50 @@ export default function NouvelleChambrePage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Grille tarifaire : sélection de la case vendue + dérogation ADMIN */}
+                  {programInfo?.pricingMode === "GRILLE" && (
+                    <div className="mb-4 space-y-3 rounded-xl border border-violet-200 bg-violet-50/40 p-3">
+                      {modeGrille && (
+                        <GrilleSelection
+                          formules={formulesProgramme}
+                          programId={formData.programId}
+                          formuleId={formuleId}
+                          roomType={formData.typeChambre}
+                          onSelect={(idFormule, roomType) => {
+                            setFormuleId(idFormule);
+                            setFormData((prev) => ({ ...prev, typeChambre: roomType }));
+                            setRoomMadinaId("");
+                            setRoomMakkahId("");
+                            setRoomAutreIds({});
+                          }}
+                        />
+                      )}
+
+                      {/* Dérogation : hôtels et prix libres. Invisible pour un agent — et
+                          refusée par le backend (403) si la requête est forgée. */}
+                      {isAdmin && (
+                        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-violet-200 bg-white px-3 py-2">
+                          <Switch
+                            checked={horsGrille}
+                            onCheckedChange={(checked) => {
+                              setHorsGrille(checked);
+                              if (checked) setFormuleId(null);
+                            }}
+                            className="mt-0.5 data-[state=checked]:bg-amber-500"
+                          />
+                          <span className="text-xs leading-relaxed text-gray-700">
+                            <span className="font-semibold text-amber-800">
+                              Réservation hors grille
+                            </span>
+                            <br />
+                            Libère le choix des hôtels parmi ceux du programme et la saisie du
+                            prix. Le dossier portera la mention « Hors grille ».
+                          </span>
+                        </label>
+                      )}
+                    </div>
+                  )}
 
                   {/* Les Selects Madina/Makkah sont désormais réunis avec leurs chambres
                       dans la grille adaptative ci-dessous (alignée sur Nouvelle Réservation). */}
@@ -1920,7 +2064,7 @@ export default function NouvelleChambrePage() {
                       <Select
                         value={formData.hotelMadina}
                         onValueChange={(v) => { setFormData((p) => ({ ...p, hotelMadina: v })); setRoomMadinaId(""); }}
-                        disabled={!formData.programId}
+                        disabled={!formData.programId || (modeGrille && hotelsMadina.length <= 1)}
                       >
                         <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
                           <SelectValue placeholder={formData.programId ? "Sélectionner un hôtel à Madina" : "Sélectionnez d'abord un programme"} />
@@ -1996,7 +2140,7 @@ export default function NouvelleChambrePage() {
                       <Select
                         value={formData.hotelMakkah}
                         onValueChange={(v) => { setFormData((p) => ({ ...p, hotelMakkah: v })); setRoomMakkahId(""); }}
-                        disabled={!formData.programId}
+                        disabled={!formData.programId || (modeGrille && hotelsMakkah.length <= 1)}
                       >
                         <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
                           <SelectValue placeholder={formData.programId ? "Sélectionner un hôtel à Makkah" : "Sélectionnez d'abord un programme"} />
@@ -2870,9 +3014,38 @@ export default function NouvelleChambrePage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
+                {/* Origine du prix en mode GRILLE : le prix de brochure PAR PERSONNE,
+                    le nombre d'occupants, et le total obtenu. */}
+                {modeGrille && prixCalculDisponible && (
+                  <div className="flex items-center gap-2 rounded-lg border-2 border-violet-300 bg-violet-50 px-3 py-2 shadow">
+                    <Table2 className="h-4 w-4 shrink-0 text-violet-700" />
+                    <div className="leading-tight">
+                      <p className="text-[11px] font-medium text-violet-700">
+                        Prix grille : {formatMontant(prixGrilleParPersonne ?? 0)} / personne
+                        {capacity > 0
+                          ? ` × ${capacity} = ${formatMontant(prixBase)}`
+                          : ""}
+                      </p>
+                      <p className="text-[11px] text-violet-600">
+                        {formuleVendue?.label ?? "—"}
+                        {formData.typeChambre
+                          ? ` · ${LIBELLE_TYPE[formData.typeChambre as RoomTypeKey] ?? formData.typeChambre}`
+                          : ""}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {horsGrille && (
+                  <div className="flex items-center gap-2 rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-2 shadow">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" />
+                    <span className="text-xs font-semibold text-amber-800">Hors grille</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg border-2 bg-emerald-50 border-emerald-300 shadow-lg">
                   <Wallet className="h-4 w-4 text-emerald-800" />
-                  <span className="text-sm font-medium text-emerald-700">Total:</span>
+                  <span className="text-sm font-medium text-emerald-700">
+                    {modeGrille ? "Montant enregistré:" : "Total:"}
+                  </span>
                   <span className="font-bold text-emerald-900 text-lg">
                     {formatMontant(prixAffiche)}
                   </span>

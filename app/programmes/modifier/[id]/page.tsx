@@ -37,7 +37,6 @@ import {
   Bed,
   BadgeCheck,
   AlertTriangle,
-  Clock,
   Table2,
 } from "lucide-react"
 import { format } from "date-fns"
@@ -794,7 +793,7 @@ export default function ModifierProgrammePage() {
                               </Label>
                               {/* Date et heure côte à côte : même disposition que la
                                   création d'un programme. */}
-                              <div className="flex gap-2">
+                              <div className="flex flex-col gap-2 sm:flex-row">
                                 <Popover>
                                   <PopoverTrigger asChild>
                                     <Button
@@ -821,22 +820,23 @@ export default function ModifierProgrammePage() {
                                     />
                                   </PopoverContent>
                                 </Popover>
-                                <div className="relative shrink-0">
-                                  <Clock className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-500" />
-                                  <Input
-                                    type="time"
-                                    aria-label={item.heureLabel}
-                                    title={item.heureLabel}
-                                    value={formData[item.heureKey]}
-                                    onChange={(e) =>
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        [item.heureKey]: e.target.value,
-                                      }))
-                                    }
-                                    className="h-12 w-[7.5rem] pl-8 border-2 border-blue-200 focus:border-blue-500 rounded-lg bg-white/80 shadow-sm"
-                                  />
-                                </div>
+                                {/* Pas d'icône décorative ici : le champ natif affiche déjà son propre
+                                    sélecteur, en forme d'horloge, à sa droite. En ajouter une à gauche
+                                    doublait le symbole et coûtait 32 px de padding : le contenu débordait
+                                    du champ, d'autant qu'une locale en 12 h y ajoute un segment AM/PM. */}
+                                <Input
+                                  type="time"
+                                  aria-label={item.heureLabel}
+                                  title={item.heureLabel}
+                                  value={formData[item.heureKey]}
+                                  onChange={(e) =>
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      [item.heureKey]: e.target.value,
+                                    }))
+                                  }
+                                  className="h-12 w-full rounded-lg border-2 border-blue-200 bg-white/80 px-3 shadow-sm focus:border-blue-500 sm:w-[8.5rem]"
+                                />
                               </div>
                             </div>
                           )

@@ -9,17 +9,37 @@
  * de la brochure.
  */
 
-import { COLONNES_GRILLE, FormuleApi, RoomTypeKey, VilleHotel } from "@/lib/grilleTarifaire"
+import {
+  COLONNES_GRILLE,
+  FormuleApi,
+  RoomTypeKey,
+  VilleHotel,
+  hotelsFormuleDepuisApi,
+} from "@/lib/grilleTarifaire"
 
 export type { FormuleApi }
 
 /** Mode de tarification d'un programme. */
 export type PricingMode = "CALCUL" | "GRILLE"
 
-/** Formules triées dans l'ordre de la brochure. */
+/**
+ * Formules triées dans l'ordre de la brochure.
+ *
+ * Point d'entrée unique de la grille dans les formulaires de réservation : les
+ * hôtels y sont ramenés à la forme plate `{ id, name, city }` (cf.
+ * `hotelsFormuleDepuisApi`), dont dépendent `hotelsImposes` et
+ * `formulesContenantHotel`. L'opération est idempotente — une grille déjà plate
+ * traverse sans changement.
+ */
 export function formulesTriees(formules: FormuleApi[] | undefined | null): FormuleApi[] {
   if (!Array.isArray(formules)) return []
-  return [...formules].sort((a, b) => a.ordre - b.ordre || a.id - b.id)
+  return [...formules]
+    .map((f) => ({
+      ...f,
+      hotels: hotelsFormuleDepuisApi(f.hotels),
+      prix: Array.isArray(f.prix) ? f.prix : [],
+    }))
+    .sort((a, b) => a.ordre - b.ordre || a.id - b.id)
 }
 
 /** Prix de vente par personne d'une case, ou `null` si la case n'est pas proposée. */

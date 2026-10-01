@@ -86,7 +86,7 @@ function cleHotel(city: string, name: string): string {
 }
 
 /** Ligne de formule lue en base (avec ses hôtels et ses prix). */
-type FormuleRow = {
+export type FormuleRow = {
   id: number;
   label: string;
   note: string | null;
@@ -122,6 +122,26 @@ export function serializeFormules(rows: FormuleRow[]): GrilleFormuleDTO[] {
       .sort((a, b) => a.name.localeCompare(b.name, 'fr')),
     prix: sortPrix(row.prix.map((p) => ({ roomType: p.roomType, prixVente: p.prixVente }))),
   }));
+}
+
+/**
+ * Programme lu avec `PROGRAM_FORMULES_QUERY` → programme dont la grille est à la
+ * forme EXPOSÉE par l'API.
+ *
+ * Prisma imbrique l'hôtel d'une formule dans sa table de jointure
+ * (`hotels: [{ hotelId, hotel: { id, name, city } }]`), alors que les clients
+ * attendent la forme PLATE (`hotels: [{ id, name, city }]`) — celle que
+ * renvoient déjà `PUT /:id/grille` et `PUT /:id/pricing-mode`. Toute route qui
+ * expose un programme avec sa grille passe donc par ici : sans cela
+ * `formule.hotels[].city` et `.name` valent `undefined` côté navigateur, le
+ * formulaire d'édition échoue à recharger la grille et les hôtels imposés d'une
+ * formule sont introuvables dans les formulaires de réservation.
+ */
+export function serializeProgrammeGrille<T extends { formules?: FormuleRow[] | null }>(
+  programme: T
+) {
+  const { formules, ...reste } = programme;
+  return { ...reste, formules: serializeFormules(formules ?? []) };
 }
 
 /** Vrai si au moins une formule porte au moins un prix — condition de la bascule en GRILLE. */

@@ -22,6 +22,7 @@ import {
   parseGrilleInput,
   readProgramFormules,
   replaceProgramFormules,
+  serializeProgrammeGrille,
 } from '../services/programGrilleService';
 
 const router = express.Router();
@@ -87,7 +88,8 @@ router.get('/', async (req, res) => {
         formules: PROGRAM_FORMULES_QUERY
       }
     });
-    res.json(programs);
+    // La grille est aplatie avant d'être exposée (cf. serializeProgrammeGrille).
+    res.json(programs.map((program) => serializeProgrammeGrille(program)));
   } catch (error) {
     console.error('Error fetching programs:', error);
     res.status(500).json({ error: 'Error fetching programs' });
@@ -118,7 +120,10 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Program not found' });
     }
 
-    res.json(program);
+    // La grille est aplatie avant d'être exposée (cf. serializeProgrammeGrille) :
+    // c'est cette réponse que le formulaire d'édition et les formulaires de
+    // réservation rechargent.
+    res.json(serializeProgrammeGrille(program));
   } catch (error) {
     console.error('Error fetching program:', error);
     res.status(500).json({ error: 'Error fetching program' });
@@ -465,7 +470,10 @@ router.post('/', async (req, res) => {
       }
     });
 
-    res.status(201).json({ ...createdProgram, grilleWarning });
+    res.status(201).json({
+      ...(createdProgram ? serializeProgrammeGrille(createdProgram) : createdProgram),
+      grilleWarning,
+    });
   } catch (error) {
     console.error('Error creating program:', error);
     res.status(500).json({ error: 'Error creating program' });
@@ -1071,7 +1079,7 @@ router.put('/:id', async (req, res) => {
       });
     }
 
-    res.json(updated);
+    res.json(updated ? serializeProgrammeGrille(updated) : updated);
   } catch (error) {
     console.error('❌ Error updating program:', error);
     console.error('Error details:', error instanceof Error ? error.message : String(error));

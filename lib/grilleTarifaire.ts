@@ -332,6 +332,36 @@ export interface FormuleApi {
   prix: Array<{ roomType: RoomTypeKey; prixVente: number }>
 }
 
+/**
+ * Hôtels d'une formule reçus de l'API, ramenés à la forme plate `{ id, name, city }`.
+ *
+ * La forme plate est le contrat du backend. Une route qui renverrait les lignes
+ * Prisma brutes imbriquerait l'hôtel dans sa table de jointure
+ * (`{ hotelId, hotel: { … } }`) : les deux formes sont donc acceptées, sans quoi
+ * `cleHotel` lèverait sur un `name` absent et ferait échouer TOUT le chargement
+ * du formulaire. Une entrée illisible est ignorée plutôt que de tout faire tomber.
+ */
+export function hotelsFormuleDepuisApi(
+  hotels: unknown
+): Array<{ id: number; name: string; city: VilleHotel }> {
+  if (!Array.isArray(hotels)) return []
+  const sortie: Array<{ id: number; name: string; city: VilleHotel }> = []
+  for (const entree of hotels) {
+    if (!entree || typeof entree !== "object") continue
+    const brut = entree as Record<string, unknown>
+    // Forme imbriquée (ligne de jointure) ou forme plate (contrat de l'API).
+    const source = (brut.hotel && typeof brut.hotel === "object" ? brut.hotel : brut) as Record<
+      string,
+      unknown
+    >
+    const name = typeof source.name === "string" ? source.name : null
+    const city = source.city
+    if (!name || (city !== "Madina" && city !== "Makkah" && city !== "Autre")) continue
+    sortie.push({ id: Number(source.id), name, city })
+  }
+  return sortie
+}
+
 /** Grille de l'API → état du formulaire. */
 export function formulesDepuisApi(formules: FormuleApi[] | undefined | null): FormuleForm[] {
   if (!Array.isArray(formules)) return []
@@ -339,13 +369,13 @@ export function formulesDepuisApi(formules: FormuleApi[] | undefined | null): Fo
     .sort((a, b) => a.ordre - b.ordre || a.id - b.id)
     .map((f) => {
       const prix: Partial<Record<RoomTypeKey, string>> = {}
-      for (const cellule of f.prix) {
+      for (const cellule of Array.isArray(f.prix) ? f.prix : []) {
         prix[cellule.roomType] = String(cellule.prixVente)
       }
       return {
         cle: `api-${f.id}`,
         label: f.label,
-        hotels: f.hotels.map((h) => cleHotel(h.city, h.name)),
+        hotels: hotelsFormuleDepuisApi(f.hotels).map((h) => cleHotel(h.city, h.name)),
         prix,
         // Un libellé déjà enregistré ne doit pas être réécrit par la génération
         // automatique au premier clic sur un hôtel.

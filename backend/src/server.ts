@@ -25,7 +25,7 @@ import filesRoutes from './routes/files';
 import cron from 'node-cron';
 import { generateFixedChargesForYearMonth, formatYearMonth } from './services/fixedChargeGenerator';
 import { ensureWallet } from './services/creditService';
-import { basculerProgrammesAvecGrille } from './services/programGrilleService';
+import { basculerProgrammesEnGrille } from './services/programGrilleService';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -225,13 +225,14 @@ app.listen(PORT, async () => {
     console.error('[startup] Génération charges fixes:', err);
   }
 
-  // La grille tarifaire est le seul mode de vente : les programmes qui en portent
-  // déjà une rejoignent GRILLE. Sans effet dès qu'ils y sont tous (cf.
-  // basculerProgrammesAvecGrille), donc rejouable à chaque démarrage.
+  // La grille tarifaire est le seul mode de vente : aucun programme ne reste au
+  // prix calculé. Un programme sans grille est basculé aussi — ses ventes sont
+  // alors refusées jusqu'à sa saisie, plutôt que conclues hors brochure. Sans
+  // effet dès qu'ils y sont tous, donc rejouable à chaque démarrage.
   try {
-    const bascules = await basculerProgrammesAvecGrille(prisma);
+    const bascules = await basculerProgrammesEnGrille(prisma);
     if (bascules > 0) {
-      console.log(`[startup] ${bascules} programme(s) basculé(s) sur leur grille tarifaire`);
+      console.log(`[startup] ${bascules} programme(s) basculé(s) sur la grille tarifaire`);
     }
   } catch (err) {
     console.error('[startup] Bascule des programmes sur la grille tarifaire:', err);

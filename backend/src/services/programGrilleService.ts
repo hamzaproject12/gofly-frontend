@@ -145,31 +145,21 @@ export function serializeProgrammeGrille<T extends { formules?: FormuleRow[] | n
 }
 
 /**
- * Bascule en GRILLE les programmes qui portent DÉJÀ une grille utilisable mais
- * sont restés en CALCUL. L'origine du prix n'est plus un choix de l'utilisateur :
- * la grille est le seul mode de vente.
+ * Bascule en GRILLE TOUT programme resté en CALCUL. La grille est le seul mode de
+ * vente : plus aucun programme ne doit se vendre à un prix calculé.
  *
- * Idempotent — aucun programme concerné, aucune écriture ; l'appel peut donc être
- * rejoué à chaque démarrage. Un programme SANS grille est délibérément laissé en
- * CALCUL : le basculer bloquerait ses ventes en cours faute de prix de référence.
- * Enregistrer sa grille le basculera (cf. `PUT /api/programs/:id/grille`).
+ * Un programme SANS grille est basculé lui aussi, et c'est voulu : ses nouvelles
+ * réservations seront refusées — « La grille tarifaire de ce programme est
+ * incomplète », avec un lien vers l'édition — jusqu'à ce que sa grille soit saisie.
+ * Mieux vaut refuser une vente que la conclure à un prix qui n'est pas celui de la
+ * brochure.
+ *
+ * Idempotent : sans programme concerné, aucune écriture. L'appel est donc rejoué
+ * sans effet à chaque démarrage.
  */
-export async function basculerProgrammesAvecGrille(prisma: PrismaClient): Promise<number> {
-  // Sélection puis mise à jour par identifiants : un filtre de relation dans le
-  // `where` d'un `updateMany` n'est pas garanti par Prisma, alors qu'il l'est ici.
-  const candidats = await prisma.program.findMany({
-    where: {
-      isDeleted: false,
-      pricingMode: 'CALCUL',
-      // Au moins une formule portant au moins un prix : une grille vide ne suffit pas.
-      formules: { some: { prix: { some: {} } } },
-    },
-    select: { id: true },
-  });
-  if (candidats.length === 0) return 0;
-
+export async function basculerProgrammesEnGrille(prisma: PrismaClient): Promise<number> {
   const { count } = await prisma.program.updateMany({
-    where: { id: { in: candidats.map((programme) => programme.id) } },
+    where: { isDeleted: false, pricingMode: 'CALCUL' },
     data: { pricingMode: 'GRILLE' },
   });
   return count;

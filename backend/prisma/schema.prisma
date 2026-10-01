@@ -137,11 +137,13 @@ enum ProgramStatus {
 
 /// Origine du prix de vente d'un programme.
 /// GRILLE : prix de la brochure publiée, saisi formule par formule
-/// (ProgramFormulePrix). C'est le SEUL mode de vente : il n'est plus choisi dans
-/// l'interface, tout programme est vendu au prix de sa grille.
-/// CALCUL : ancien prix dérivé du vol + visa + hôtels + profit. Conservé pour les
-/// seuls programmes antérieurs à la grille qui n'en ont pas encore reçu une :
-/// enregistrer leur grille les bascule en GRILLE et ils n'en reviennent plus.
+/// (ProgramFormulePrix). C'est désormais le SEUL mode de vente — il n'est plus
+/// choisi dans l'interface et aucun programme n'y échappe.
+/// CALCUL : ancien prix dérivé du vol + visa + hôtels + profit. La valeur n'est
+/// plus écrite par personne : le démarrage bascule en GRILLE tout programme qui
+/// y serait resté (cf. basculerProgrammesEnGrille). Elle n'est gardée dans l'enum
+/// que pour ne pas casser une base dont des lignes la portent encore le temps d'un
+/// déploiement.
 /// Le calcul lui-même reste vivant comme ESTIMATION DU COÛT (aide à la décision),
 /// jamais comme prix de vente.
 enum PricingMode {
@@ -176,18 +178,17 @@ model Program {
   profitEconomique Float                @default(0)
   profitNormal     Float                @default(0)
   profitVIP        Float                @default(0)
-  /// Origine du prix de vente. Tout nouveau programme est créé en GRILLE : la
-  /// seule écriture de ce champ (POST /api/programs) l'impose, le défaut n'est
-  /// donc jamais utilisé à la création.
+  /// Origine du prix de vente : GRILLE, toujours. Tout programme se vend au prix
+  /// de sa brochure, il n'y a plus de mode à choisir.
   ///
-  /// Il reste à CALCUL pour une raison de MIGRATION : sur une base où la colonne
-  /// n'existe pas encore, `prisma db push` la crée avec son défaut et PostgreSQL
-  /// en remplit toutes les lignes existantes. Un défaut GRILLE ferait donc passer
-  /// d'un coup les programmes historiques — sans grille — sur un prix de vente
-  /// qu'ils n'ont pas, bloquant leurs réservations. Avec CALCUL ils gardent leur
-  /// prix, puis rejoignent la grille dès qu'elle est saisie (PUT /:id/grille) ou
-  /// au démarrage si elle l'est déjà (cf. basculerProgrammesAvecGrille).
-  pricingMode      PricingMode          @default(CALCUL)
+  /// CONSÉQUENCE ASSUMÉE sur une base où la colonne n'existe pas encore : le
+  /// `prisma db push` du démarrage la crée avec ce défaut et PostgreSQL en remplit
+  /// toutes les lignes existantes. Les programmes historiques passent donc en
+  /// GRILLE sans en avoir une, et leurs nouvelles réservations sont refusées — avec
+  /// le message « La grille tarifaire de ce programme est incomplète » et un lien
+  /// vers l'édition — jusqu'à ce que leur grille soit saisie. C'est le comportement
+  /// voulu : aucun programme ne doit se vendre à un prix calculé.
+  pricingMode      PricingMode          @default(GRILLE)
   isDeleted        Boolean              @default(false)
   deletedAt        DateTime?
   expenses         Expense[]

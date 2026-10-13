@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import Link from "next/link"
 import { AlertTriangle, Table2 } from "lucide-react"
 import { formatMontant } from "@/lib/format"
@@ -42,6 +43,7 @@ export function GrilleSelection({
   chambres,
   gender,
   chambreEntiere = false,
+  action,
 }: {
   formules: FormuleApi[]
   programId: string | number
@@ -56,6 +58,8 @@ export function GrilleSelection({
   gender?: string | null
   /** Chambre privée : il faut une chambre entièrement libre, pas un lit. */
   chambreEntiere?: boolean
+  /** Contenu aligné à droite du titre (la dérogation ADMIN y tient en une ligne). */
+  action?: ReactNode
 }) {
   const liste = formulesTriees(formules)
 
@@ -85,10 +89,13 @@ export function GrilleSelection({
 
   return (
     <div className="space-y-2">
-      <p className="flex items-center gap-2 text-sm font-medium text-violet-900">
-        <Table2 className="h-4 w-4 shrink-0" />
-        Grille tarifaire — cliquez la case vendue
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-sm font-medium text-violet-900">
+          <Table2 className="h-4 w-4 shrink-0" />
+          Grille tarifaire — cliquez la case vendue
+        </p>
+        {action}
+      </div>
       {miseEnAvant.size > 0 && (
         <p className="rounded border border-violet-200 bg-violet-50 px-2 py-1 text-xs text-violet-800">
           L&apos;hôtel d&apos;origine appartient à plusieurs formules : choisissez celle qui a été

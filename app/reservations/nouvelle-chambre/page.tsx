@@ -48,7 +48,9 @@ import {
   type PricingMode,
   formulesTriees,
   grilleExploitable,
+  hotelADesPlaces,
   hotelsImposes,
+  premierHotelAvecPlace,
   prixGrilleDe,
 } from "@/lib/grilleReservation";
 import {
@@ -325,6 +327,28 @@ export default function NouvelleChambrePage() {
         hotelsImposes(formuleVendue, "Autre").some((imp) => imp.id === ph.hotel.id)
       )
     : hotelsAutreTous;
+
+  /**
+   * Dérogation ADMIN, tenue en UNE ligne dans l'en-tête de la grille : le pavé
+   * explicatif mangeait la moitié du cadre pour une bascule utilisée rarement.
+   * Invisible pour un agent — et refusée par le backend (403) si forgée.
+   */
+  const horsGrilleToggle = isAdmin ? (
+    <label
+      className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-violet-200 bg-white px-2 py-1"
+      title="Libère le choix des hôtels parmi ceux du programme et la saisie du prix. Le dossier portera la mention « Hors grille »."
+    >
+      <Switch
+        checked={horsGrille}
+        onCheckedChange={(checked) => {
+          setHorsGrille(checked);
+          if (checked) setFormuleId(null);
+        }}
+        className="scale-90 data-[state=checked]:bg-amber-500"
+      />
+      <span className="text-xs font-medium text-amber-800">Hors grille</span>
+    </label>
+  ) : null;
 
   // Blocs hôtels réellement affichés (catégorie présente ET activée via le panneau « Éditer »).
   const showMadinaBlock = hotelsMadina.length > 0 && customization.includeMadina;
@@ -1147,10 +1171,73 @@ export default function NouvelleChambrePage() {
     }
   }, [sortedRoomCandidatesMakkah]);
 
+  /**
+   * L'hôtel retenu doit rester cohérent avec la case vendue.
+   *
+   * Deux situations laissaient le formulaire sur un hôtel inexploitable, et le
+   * bloc affichait « Aucune chambre libre » alors que la brochure annonçait bien
+   * un prix : changer de formule laissait en place un hôtel que la nouvelle
+   * formule n'autorise plus, et une formule offrant le CHOIX entre plusieurs
+   * hôtels d'une ville retenait le premier, même sans chambre entièrement libre
+   * du type vendu. On ne déplace l'hôtel que s'il est inexploitable — un choix
+   * manuel qui fonctionne n'est jamais écrasé.
+   */
+  useEffect(() => {
+    if (!modeGrille || !programInfo || !formData.typeChambre) return;
+    const options = {
+      gender: familyMixed ? null : formData.gender,
+      chambreEntiere: true,
+    };
+    const recaler = (
+      hotelsVille: Hotel[],
+      courant: string,
+      appliquer: (id: string) => void
+    ) => {
+      if (hotelsVille.length === 0) return;
+      const autorise = hotelsVille.some((h) => h.id.toString() === courant);
+      if (
+        autorise &&
+        hotelADesPlaces(parseInt(courant, 10), formData.typeChambre, programInfo.rooms, options)
+      ) {
+        return;
+      }
+      const cible =
+        premierHotelAvecPlace(hotelsVille, formData.typeChambre, programInfo.rooms, options) ??
+        (autorise ? null : hotelsVille[0].id);
+      if (cible !== null && cible.toString() !== courant) appliquer(cible.toString());
+    };
+
+    if (customization.includeMadina) {
+      recaler(hotelsMadina, formData.hotelMadina, (id) =>
+        setFormData((prev) => ({ ...prev, hotelMadina: id }))
+      );
+    }
+    if (customization.includeMakkah) {
+      recaler(hotelsMakkah, formData.hotelMakkah, (id) =>
+        setFormData((prev) => ({ ...prev, hotelMakkah: id }))
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    modeGrille,
+    programInfo,
+    formuleId,
+    formData.typeChambre,
+    formData.gender,
+    familyMixed,
+    formData.hotelMadina,
+    formData.hotelMakkah,
+    customization.includeMadina,
+    customization.includeMakkah,
+  ]);
+
   // Auto-sélection du premier hôtel Madina/Makkah quand la catégorie est active (modifiable ensuite).
   // La chambre correspondante est ensuite auto-sélectionnée par les effets ci-dessus.
+  // En mode GRILLE, c'est le recalage ci-dessus qui désigne l'hôtel : deux effets
+  // qui écrivent le même champ se contrediraient (celui-ci prend le premier de la
+  // liste, l'autre le premier qui a une place).
   useEffect(() => {
-    if (!formData.programId) return;
+    if (!formData.programId || modeGrille) return;
     if (customization.includeMadina && hotelsMadina.length > 0 && !formData.hotelMadina) {
       setFormData((p) => ({ ...p, hotelMadina: hotelsMadina[0].id.toString() }));
     }
@@ -1158,7 +1245,7 @@ export default function NouvelleChambrePage() {
       setFormData((p) => ({ ...p, hotelMakkah: hotelsMakkah[0].id.toString() }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.programId, programInfo, customization.includeMadina, customization.includeMakkah, formData.hotelMadina, formData.hotelMakkah]);
+  }, [modeGrille, formData.programId, programInfo, customization.includeMadina, customization.includeMakkah, formData.hotelMadina, formData.hotelMakkah]);
 
   // Auto-sélection de la première chambre disponible pour chaque hôtel Autre actif.
   useEffect(() => {
@@ -1785,7 +1872,11 @@ export default function NouvelleChambrePage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                  <div
+                    className={`grid grid-cols-1 gap-4 mb-4 ${
+                      modeGrille ? "md:grid-cols-2" : "md:grid-cols-2 lg:grid-cols-3"
+                    }`}
+                  >
                     <div className="space-y-2">
                       <Label className="text-blue-700 font-medium text-sm">
                         Programme *
@@ -1823,7 +1914,10 @@ export default function NouvelleChambrePage() {
                       </Select>
                     </div>
 
-                    <div className="space-y-2">
+                    {/* Type de chambre : en mode GRILLE, c'est la case cliquée dans la
+                        brochure qui le fixe — un second sélecteur ne ferait que le
+                        contredire. Il reste là pour le calcul automatique et le hors grille. */}
+                    <div className={`space-y-2 ${modeGrille ? "hidden" : ""}`}>
                       <Label className="text-blue-700 font-medium text-sm">
                         Type de chambre *
                       </Label>
@@ -1893,8 +1987,8 @@ export default function NouvelleChambrePage() {
 
                   {/* Grille tarifaire : sélection de la case vendue + dérogation ADMIN */}
                   {programInfo?.pricingMode === "GRILLE" && (
-                    <div className="mb-4 space-y-3 rounded-xl border border-violet-200 bg-violet-50/40 p-3">
-                      {modeGrille && (
+                    <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50/40 p-3">
+                      {modeGrille ? (
                         <GrilleSelection
                           formules={formulesProgramme}
                           programId={formData.programId}
@@ -1903,6 +1997,7 @@ export default function NouvelleChambrePage() {
                           chambres={programInfo?.rooms ?? []}
                           gender={familyMixed ? null : formData.gender}
                           chambreEntiere
+                          action={horsGrilleToggle}
                           onSelect={(idFormule, roomType) => {
                             setFormuleId(idFormule);
                             setFormData((prev) => ({ ...prev, typeChambre: roomType }));
@@ -1911,29 +2006,15 @@ export default function NouvelleChambrePage() {
                             setRoomAutreIds({});
                           }}
                         />
-                      )}
-
-                      {/* Dérogation : hôtels et prix libres. Invisible pour un agent — et
-                          refusée par le backend (403) si la requête est forgée. */}
-                      {isAdmin && (
-                        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-violet-200 bg-white px-3 py-2">
-                          <Switch
-                            checked={horsGrille}
-                            onCheckedChange={(checked) => {
-                              setHorsGrille(checked);
-                              if (checked) setFormuleId(null);
-                            }}
-                            className="mt-0.5 data-[state=checked]:bg-amber-500"
-                          />
-                          <span className="text-xs leading-relaxed text-gray-700">
-                            <span className="font-semibold text-amber-800">
-                              Réservation hors grille
-                            </span>
-                            <br />
-                            Libère le choix des hôtels parmi ceux du programme et la saisie du
-                            prix. Le dossier portera la mention « Hors grille ».
-                          </span>
-                        </label>
+                      ) : (
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-xs leading-relaxed text-amber-900">
+                            <span className="font-semibold">Dossier hors grille</span> — hôtels du
+                            programme et prix libres. Le dossier portera la mention
+                            «&nbsp;Hors grille&nbsp;».
+                          </p>
+                          {horsGrilleToggle}
+                        </div>
                       )}
                     </div>
                   )}

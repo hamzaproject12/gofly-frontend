@@ -161,36 +161,88 @@ function genreCompatible(genreChambre: string | null | undefined, genreVendu: st
  * prétend pas savoir, la case reste vendable. Mieux vaut laisser vendre que
  * barrer toute une brochure sur une information absente.
  */
+export interface OptionsDispo {
+  /** Genre vendu ; `null` quand le dossier accepte une chambre mixte (famille). */
+  gender?: string | null
+  /** Chambre privée : il faut une chambre ENTIÈREMENT libre, pas un lit. */
+  chambreEntiere?: boolean
+}
+
+/** Reste-t-il quelque chose à occuper dans cette chambre ? */
+function estLibre(chambre: ChambreInventaire, options: OptionsDispo): boolean {
+  return options.chambreEntiere
+    ? chambre.nbrPlaceTotal > 0 && chambre.nbrPlaceRestantes >= chambre.nbrPlaceTotal
+    : chambre.nbrPlaceRestantes > 0
+}
+
+/** Chambres d'un hôtel qui correspondent au type et au genre vendus. */
+function chambresDeLHotel(
+  hotelId: number,
+  roomType: string,
+  chambres: ChambreInventaire[],
+  options: OptionsDispo
+): ChambreInventaire[] {
+  return chambres.filter(
+    (c) =>
+      c.hotelId === hotelId &&
+      c.roomType === roomType &&
+      genreCompatible(c.gender, options.gender)
+  )
+}
+
+/**
+ * Cet hôtel a-t-il encore une chambre du type et du genre vendus à occuper ?
+ *
+ * C'est la question que posent les blocs « Chambres disponibles à … » : sans
+ * réponse, ils affichent « Aucune chambre trouvée ».
+ */
+export function hotelADesPlaces(
+  hotelId: number,
+  roomType: string,
+  chambres: ChambreInventaire[] | undefined | null,
+  options: OptionsDispo = {}
+): boolean {
+  if (!Array.isArray(chambres) || !roomType) return false
+  return chambresDeLHotel(hotelId, roomType, chambres, options).some((c) => estLibre(c, options))
+}
+
+/**
+ * Premier hôtel de la liste qui a encore une place à occuper, ou `null`.
+ *
+ * Une formule peut offrir le CHOIX entre plusieurs hôtels d'une même ville
+ * (« Emaar Grand OU Diyafat Al Rajaa ») et tous n'ont pas les mêmes chambres :
+ * retenir aveuglément le premier de la liste conduisait à un bloc « Aucune
+ * chambre trouvée » alors qu'un autre hôtel de la formule avait la place.
+ */
+export function premierHotelAvecPlace(
+  hotels: Array<{ id: number }>,
+  roomType: string,
+  chambres: ChambreInventaire[] | undefined | null,
+  options: OptionsDispo = {}
+): number | null {
+  for (const hotel of hotels) {
+    if (hotelADesPlaces(hotel.id, roomType, chambres, options)) return hotel.id
+  }
+  return null
+}
+
 export function dispoCase(
   formule: FormuleApi,
   roomType: RoomTypeKey,
   chambres: ChambreInventaire[] | undefined | null,
-  options: {
-    /** Genre vendu ; `null` quand le dossier accepte une chambre mixte (famille). */
-    gender?: string | null
-    /** Chambre privée : il faut une chambre ENTIÈREMENT libre, pas un lit. */
-    chambreEntiere?: boolean
-  } = {}
+  options: OptionsDispo = {}
 ): DispoCase {
   if (!Array.isArray(chambres) || chambres.length === 0) return VENDABLE
 
-  const estLibre = (chambre: ChambreInventaire): boolean =>
-    options.chambreEntiere
-      ? chambre.nbrPlaceTotal > 0 && chambre.nbrPlaceRestantes >= chambre.nbrPlaceTotal
-      : chambre.nbrPlaceRestantes > 0
-
   for (const ville of VILLES_VENTE) {
-    const hotelsVille = formule.hotels.filter((h) => h.city === ville).map((h) => h.id)
+    const hotelsVille = formule.hotels.filter((h) => h.city === ville)
     // Formule sans étape dans cette ville : rien à vérifier.
     if (hotelsVille.length === 0) continue
-    const candidates = chambres.filter(
-      (c) =>
-        hotelsVille.includes(c.hotelId) &&
-        c.roomType === roomType &&
-        genreCompatible(c.gender, options.gender)
+    const candidates = hotelsVille.flatMap((h) =>
+      chambresDeLHotel(h.id, roomType, chambres, options)
     )
     if (candidates.length === 0) return { vendable: false, motif: "AUCUNE_CHAMBRE" }
-    if (!candidates.some(estLibre)) return { vendable: false, motif: "COMPLET" }
+    if (!candidates.some((c) => estLibre(c, options))) return { vendable: false, motif: "COMPLET" }
   }
 
   return VENDABLE

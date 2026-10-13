@@ -4,7 +4,6 @@ import { useState, useRef, useMemo, useEffect } from "react"
 import { api } from "@/lib/api"
 import { formatMontant } from "@/lib/format"
 import {
-  ajustementDepuisPrixFinal,
   estPrixValide,
   normaliserPrix,
   plafonnerReduction,
@@ -32,7 +31,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { HotelCategoryBlock } from "@/components/reservations/HotelCategoryBlock"
 import { GrilleSelection } from "@/components/reservations/GrilleSelection"
 import { useAuth } from "@/hooks/useAuth"
-import { LIBELLE_TYPE, type RoomTypeKey } from "@/lib/grilleTarifaire"
 import {
   type FormuleApi,
   type PricingMode,
@@ -74,9 +72,6 @@ import {
   Crown,
   Download,
   AlertTriangle,
-  Table2,
-  Pencil,
-  Check,
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/components/ui/use-toast"
@@ -416,11 +411,6 @@ export default function NouvelleReservation() {
   
   // État pour le supplément proposé (montant ajouté au prix calculé)
   const [prixPropose, setPrixPropose] = useState<number | null>(null);
-
-  // Édition directe du prix affiché dans l'en-tête : la saisie est retraduite en
-  // réduction (prix plus bas) ou en supplément (prix plus haut) — cf. lib/prix.ts.
-  const [editionPrix, setEditionPrix] = useState(false);
-  const [prixSaisi, setPrixSaisi] = useState("");
 
   const paymentDocuments = documents.payment;
 
@@ -946,33 +936,6 @@ export default function NouvelleReservation() {
     return enregistre !== null ? enregistre : prixBase;
   }, [formData.prix, prixBase]);
 
-  /** Écart entre le prix affiché et le prix calculé : < 0 remise, > 0 supplément. */
-  const ecartPrix = prixAffiche - prixBase;
-
-  const ouvrirEditionPrix = () => {
-    setPrixSaisi(String(prixAffiche));
-    setEditionPrix(true);
-  };
-
-  /**
-   * Applique le prix saisi : en dessous du prix calculé il devient une réduction,
-   * au-dessus un supplément (« Propos. »), les toggles se positionnant seuls.
-   */
-  const validerEditionPrix = () => {
-    const ajustement = ajustementDepuisPrixFinal(prixSaisi, prixBase);
-    if (!ajustement) {
-      toast({
-        title: "Prix invalide",
-        description: "Saisissez un montant en DH (0 ou plus).",
-        variant: "destructive",
-      });
-      return;
-    }
-    setPrixMode(ajustement.mode);
-    setReduction(ajustement.reduction);
-    setPrixPropose(ajustement.supplement);
-    setEditionPrix(false);
-  };
 
   // Réinitialiser la sélection des places quand les critères de base changent
   useEffect(() => {
@@ -2473,83 +2436,6 @@ export default function NouvelleReservation() {
                   <Sparkles className="h-6 w-6" />
                   Nouvelle Réservation
                   </div>
-                  {prixCalculDisponible && (
-                    <div className={`
-                      flex items-center gap-2 backdrop-blur-sm px-3 py-1.5 rounded-lg border-2 transition-all duration-300
-                      ${activeTheme.colors.bg} ${activeTheme.colors.border} ${activeTheme.colors.glow} shadow-lg
-                    `}>
-                      <Wallet className={`h-4 w-4 ${activeTheme.colors.textActive}`} />
-                      <span className={`text-sm font-medium ${activeTheme.colors.text}`}>Prix:</span>
-                      {editionPrix ? (
-                        <>
-                          <Input
-                            autoFocus
-                            type="text"
-                            inputMode="numeric"
-                            value={prixSaisi}
-                            onChange={(e) => setPrixSaisi(e.target.value.replace(/[^0-9]/g, ""))}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                validerEditionPrix();
-                              } else if (e.key === "Escape") {
-                                e.preventDefault();
-                                setEditionPrix(false);
-                              }
-                            }}
-                            className="w-28 h-8 text-base font-bold text-center bg-white text-gray-900 border-2 border-white/70 focus-visible:ring-1"
-                            placeholder={String(prixBase)}
-                            aria-label="Prix du dossier en DH"
-                          />
-                          <span className={`text-sm font-medium ${activeTheme.colors.text}`}>DH</span>
-                          <button
-                            type="button"
-                            onClick={validerEditionPrix}
-                            title="Appliquer ce prix"
-                            aria-label="Appliquer ce prix"
-                            className="p-1 rounded-md bg-white/70 hover:bg-white transition-colors"
-                          >
-                            <Check className="h-3.5 w-3.5 text-emerald-700" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditionPrix(false)}
-                            title="Annuler"
-                            aria-label="Annuler la modification du prix"
-                            className="p-1 rounded-md bg-white/70 hover:bg-white transition-colors"
-                          >
-                            <X className="h-3.5 w-3.5 text-gray-600" />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <span className={`text-lg font-bold ${activeTheme.colors.textActive}`}>
-                            {formatMontant(prixAffiche)}
-                          </span>
-                          {ecartPrix !== 0 && (
-                            <span
-                              className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${
-                                ecartPrix < 0 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
-                              }`}
-                            >
-                              {ecartPrix < 0
-                                ? `Réduc. ${formatMontant(-ecartPrix)}`
-                                : `Propos. +${formatMontant(ecartPrix)}`}
-                            </span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={ouvrirEditionPrix}
-                            title="Modifier le prix"
-                            aria-label="Modifier le prix"
-                            className="p-1 rounded-md bg-white/60 hover:bg-white transition-colors"
-                          >
-                            <Pencil className={`h-3.5 w-3.5 ${activeTheme.colors.textActive}`} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-6">
@@ -3701,24 +3587,6 @@ export default function NouvelleReservation() {
             <div className="flex items-center justify-between">
               {/* Section calcul du prix - Toggle entre Réduction et Proposition */}
               <div className="flex items-center gap-4">
-                {/* Origine du prix en mode GRILLE : le prix de brochure, puis le
-                    montant réellement enregistré après ajustement. */}
-                {modeGrille && prixCalculDisponible && (
-                  <div className="flex items-center gap-2 rounded-lg border-2 border-violet-300 bg-violet-50 px-3 py-2 shadow">
-                    <Table2 className="h-4 w-4 shrink-0 text-violet-700" />
-                    <div className="leading-tight">
-                      <p className="text-[11px] font-medium text-violet-700">
-                        Prix grille : {formatMontant(prixBase)} / personne
-                      </p>
-                      <p className="text-[11px] text-violet-600">
-                        {formuleVendue?.label ?? "—"}
-                        {formData.typeChambre
-                          ? ` · ${LIBELLE_TYPE[formData.typeChambre as RoomTypeKey] ?? formData.typeChambre}`
-                          : ""}
-                      </p>
-                    </div>
-                  </div>
-                )}
                 {horsGrille && (
                   <div className="flex items-center gap-2 rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-2 shadow">
                     <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" />

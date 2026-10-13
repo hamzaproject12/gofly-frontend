@@ -2691,6 +2691,8 @@ export default function NouvelleReservation() {
                           formuleId={formuleId}
                           roomType={formData.typeChambre}
                           formulesEnAvant={formulesEnAvantPrefill}
+                          chambres={programInfo?.rooms ?? []}
+                          gender={formData.gender || null}
                           onSelect={(idFormule, roomType) => {
                             setFormuleId(idFormule);
                             setFormData((prev) => ({ ...prev, typeChambre: roomType }));

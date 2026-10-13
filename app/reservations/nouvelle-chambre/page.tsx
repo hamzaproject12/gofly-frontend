@@ -1900,6 +1900,9 @@ export default function NouvelleChambrePage() {
                           programId={formData.programId}
                           formuleId={formuleId}
                           roomType={formData.typeChambre}
+                          chambres={programInfo?.rooms ?? []}
+                          gender={familyMixed ? null : formData.gender}
+                          chambreEntiere
                           onSelect={(idFormule, roomType) => {
                             setFormuleId(idFormule);
                             setFormData((prev) => ({ ...prev, typeChambre: roomType }));

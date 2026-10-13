@@ -104,3 +104,94 @@ export function totalGrille(prixParPersonne: number | null, occupants: number): 
   const n = Number.isInteger(occupants) && occupants > 0 ? occupants : 1
   return prixParPersonne * n
 }
+
+/**
+ * Une chambre du programme, réduite à ce qui décide de la disponibilité d'une
+ * case de la brochure. Forme volontairement minimale : les deux formulaires de
+ * réservation la servent depuis `programInfo.rooms` sans conversion.
+ */
+export interface ChambreInventaire {
+  hotelId: number
+  roomType: string
+  gender?: string | null
+  nbrPlaceTotal: number
+  nbrPlaceRestantes: number
+}
+
+/**
+ * Pourquoi une case de la brochure n'est plus vendable.
+ * - `COMPLET` : des chambres existent, elles sont toutes pleines.
+ * - `AUCUNE_CHAMBRE` : aucune chambre de ce type (et de ce genre) dans les
+ *   hôtels de la formule — rien à occuper, donc rien à vendre.
+ */
+export type MotifIndispo = "COMPLET" | "AUCUNE_CHAMBRE"
+
+export interface DispoCase {
+  vendable: boolean
+  motif: MotifIndispo | null
+}
+
+const VENDABLE: DispoCase = { vendable: true, motif: null }
+
+/**
+ * Villes dont l'hébergement conditionne la vente. Les hôtels « Autre » sont une
+ * étape optionnelle (l'agent peut la désactiver) : leur inventaire ne doit donc
+ * jamais faire passer une case de la brochure pour complète.
+ */
+const VILLES_VENTE: VilleHotel[] = ["Madina", "Makkah"]
+
+/** Une chambre réservée aux hommes n'accueille pas une pèlerine — et inversement. */
+function genreCompatible(genreChambre: string | null | undefined, genreVendu: string | null | undefined): boolean {
+  if (!genreVendu) return true
+  if (!genreChambre || genreChambre === "Mixte") return true
+  return genreChambre === genreVendu
+}
+
+/**
+ * Disponibilité d'une case de la grille (une formule × un type de chambre).
+ *
+ * Une case dont il ne reste rien à occuper n'a pas de prix à afficher : la
+ * brochure annoncerait un tarif que personne ne peut acheter. La règle est
+ * calquée sur les garde-fous du prix (« Aucune place disponible… », « Aucune
+ * chambre de ce type et de ce genre… ») : pour CHAQUE ville de séjour que la
+ * formule couvre, il faut au moins une chambre du bon type, du bon genre, et
+ * encore libre.
+ *
+ * Inventaire vide (programme pas encore chargé, chambres jamais créées) : on ne
+ * prétend pas savoir, la case reste vendable. Mieux vaut laisser vendre que
+ * barrer toute une brochure sur une information absente.
+ */
+export function dispoCase(
+  formule: FormuleApi,
+  roomType: RoomTypeKey,
+  chambres: ChambreInventaire[] | undefined | null,
+  options: {
+    /** Genre vendu ; `null` quand le dossier accepte une chambre mixte (famille). */
+    gender?: string | null
+    /** Chambre privée : il faut une chambre ENTIÈREMENT libre, pas un lit. */
+    chambreEntiere?: boolean
+  } = {}
+): DispoCase {
+  if (!Array.isArray(chambres) || chambres.length === 0) return VENDABLE
+
+  const estLibre = (chambre: ChambreInventaire): boolean =>
+    options.chambreEntiere
+      ? chambre.nbrPlaceTotal > 0 && chambre.nbrPlaceRestantes >= chambre.nbrPlaceTotal
+      : chambre.nbrPlaceRestantes > 0
+
+  for (const ville of VILLES_VENTE) {
+    const hotelsVille = formule.hotels.filter((h) => h.city === ville).map((h) => h.id)
+    // Formule sans étape dans cette ville : rien à vérifier.
+    if (hotelsVille.length === 0) continue
+    const candidates = chambres.filter(
+      (c) =>
+        hotelsVille.includes(c.hotelId) &&
+        c.roomType === roomType &&
+        genreCompatible(c.gender, options.gender)
+    )
+    if (candidates.length === 0) return { vendable: false, motif: "AUCUNE_CHAMBRE" }
+    if (!candidates.some(estLibre)) return { vendable: false, motif: "COMPLET" }
+  }
+
+  return VENDABLE
+}

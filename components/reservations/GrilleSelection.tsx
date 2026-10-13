@@ -5,8 +5,10 @@ import { AlertTriangle, Table2 } from "lucide-react"
 import { formatMontant } from "@/lib/format"
 import { LIBELLE_TYPE, RoomTypeKey } from "@/lib/grilleTarifaire"
 import {
+  ChambreInventaire,
   FormuleApi,
   colonnesVente,
+  dispoCase,
   formulesTriees,
   grilleExploitable,
   typesProposes,
@@ -23,6 +25,10 @@ import {
  * Quand la grille est vide, ce composant le DIT et renvoie vers l'édition du
  * programme. Jamais de repli silencieux sur le calcul automatique : vendre au
  * prix calculé un programme censé suivre la brochure, c'est vendre au mauvais prix.
+ *
+ * Une case sans plus aucune place à occuper n'affiche PAS son prix : elle
+ * annoncerait un tarif que personne ne peut acheter : elle affiche « Complet »
+ * et n'est pas cliquable.
  */
 export function GrilleSelection({
   formules,
@@ -33,6 +39,9 @@ export function GrilleSelection({
   /** Formules à mettre en avant (pré-remplissage : l'hôtel cliqué n'est que dans celles-là). */
   formulesEnAvant,
   disabled = false,
+  chambres,
+  gender,
+  chambreEntiere = false,
 }: {
   formules: FormuleApi[]
   programId: string | number
@@ -41,6 +50,12 @@ export function GrilleSelection({
   onSelect: (formuleId: number, roomType: RoomTypeKey, prixVente: number) => void
   formulesEnAvant?: number[]
   disabled?: boolean
+  /** Chambres du programme : décident des cases encore vendables. */
+  chambres?: ChambreInventaire[]
+  /** Genre vendu ; `null` quand le dossier accepte une chambre mixte (famille). */
+  gender?: string | null
+  /** Chambre privée : il faut une chambre entièrement libre, pas un lit. */
+  chambreEntiere?: boolean
 }) {
   const liste = formulesTriees(formules)
 
@@ -129,6 +144,21 @@ export function GrilleSelection({
                         </td>
                       )
                     }
+                    // Plus rien à occuper : le prix disparaît plutôt que d'annoncer
+                    // un tarif que personne ne peut acheter.
+                    const dispo = dispoCase(formule, type, chambres, { gender, chambreEntiere })
+                    if (!dispo.vendable) {
+                      const libelle = dispo.motif === "COMPLET" ? "Complet" : "Indisponible"
+                      return (
+                        <td
+                          key={type}
+                          className="border-b border-l border-violet-100 bg-gray-50 p-2.5 text-center text-[11px] font-medium text-gray-400"
+                          aria-label={`${LIBELLE_TYPE[type]} — ${libelle} pour ${formule.label}`}
+                        >
+                          {libelle}
+                        </td>
+                      )
+                    }
                     return (
                       <td
                         key={type}
@@ -157,7 +187,8 @@ export function GrilleSelection({
         </table>
       </div>
       <p className="text-[11px] text-gray-500">
-        Prix par personne. Une case «&nbsp;—&nbsp;» n&apos;est pas proposée par la formule.
+        Prix par personne. Une case «&nbsp;—&nbsp;» n&apos;est pas proposée par la formule ;
+        «&nbsp;Complet&nbsp;» signifie qu&apos;il n&apos;y reste aucune place à vendre.
       </p>
     </div>
   )

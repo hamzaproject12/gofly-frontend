@@ -313,6 +313,19 @@ export default function NouvelleReservation() {
     }>;
   } | null>(null);
 
+  /**
+   * Occupants des chambres du programme : `roomId → place (index 0) → nom`.
+   *
+   * Les places occupées sont de simples points rouges ; savoir QUI les occupe
+   * évite à l'agent d'ouvrir le plan de chambres dans un autre onglet pour
+   * placer une famille ou vérifier un voisinage. Les noms viennent du plan de
+   * chambres (`/api/room-availability/:id/rooming`), seule source qui associe
+   * une place à un pèlerin.
+   */
+  const [occupantsParChambre, setOccupantsParChambre] = useState<
+    Record<number, Record<number, string>>
+  >({});
+
   /** Formule de la grille vendue (mode GRILLE uniquement). */
   const [formuleId, setFormuleId] = useState<number | null>(null);
   /**
@@ -911,6 +924,20 @@ export default function NouvelleReservation() {
   /** Motif réel d'un prix indéterminable, à afficher plutôt que « Le prix n'est pas généré ». */
   const raisonPrixIndisponible = calculPrix.raison;
 
+  /**
+   * Le formulaire se déplie-t-il ?
+   *
+   * En mode GRILLE la vente se fait en trois gestes : le programme, le genre,
+   * puis la case de la brochure. Tant que le prix n'est pas fixé, hôtels,
+   * informations client, paiements et documents n'ont rien à recevoir — les
+   * afficher d'emblée noyait l'agent sous un formulaire de trois écrans.
+   *
+   * En mode CALCUL (programmes anciens) et hors grille, le prix DÉPEND au
+   * contraire des hôtels choisis : tout reste affiché, sans quoi le formulaire
+   * ne pourrait jamais s'ouvrir.
+   */
+  const formulaireDeploye = !modeGrille || prixCalculDisponible;
+
   /** Vrai quand un prix déjà posé est devenu caduc (chambre complète, par exemple). */
   const effacerPrixCaduc = calculPrix.effacerPrix;
 
@@ -1039,6 +1066,48 @@ export default function NouvelleReservation() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modeGrille, formData.programId, customization.includeMadina, customization.includeMakkah, formData.hotelMadina, formData.hotelMakkah]);
+
+  // Noms des occupants des chambres du programme (infobulle des places rouges).
+  // Un échec est silencieux : l'absence de nom n'empêche pas de réserver.
+  useEffect(() => {
+    const programId = formData.programId;
+    if (!programId) {
+      setOccupantsParChambre({});
+      return;
+    }
+    let annule = false;
+    (async () => {
+      try {
+        const res = await api.request(api.endpoints.roomingPlan(programId));
+        const data = await res.json().catch(() => null);
+        if (annule || !res.ok || !data?.success) return;
+        const parChambre: Record<number, Record<number, string>> = {};
+        for (const ville of data.villes ?? []) {
+          for (const hotel of ville.hotels ?? []) {
+            for (const room of hotel.rooms ?? []) {
+              const places: Record<number, string> = {};
+              for (const occupant of room.occupants ?? []) {
+                // `place` est 1-based dans le plan de chambres, les points rouges
+                // sont indexés à partir de 0.
+                if (occupant?.nom) places[Number(occupant.place) - 1] = occupant.nom;
+              }
+              if (Object.keys(places).length > 0) parChambre[Number(room.id)] = places;
+            }
+          }
+        }
+        setOccupantsParChambre(parChambre);
+      } catch {
+        if (!annule) setOccupantsParChambre({});
+      }
+    })();
+    return () => {
+      annule = true;
+    };
+  }, [formData.programId]);
+
+  /** Nom du pèlerin installé sur une place, pour l'infobulle du point rouge. */
+  const nomOccupant = (roomId: number, placeIndex: number): string | null =>
+    occupantsParChambre[roomId]?.[placeIndex] ?? null;
 
   // Charger les détails du programme quand il est sélectionné
   useEffect(() => {
@@ -2487,7 +2556,7 @@ export default function NouvelleReservation() {
                         <Sparkles className="h-5 w-5" />
                         Configuration du Voyage
                       </h3>
-                      {formData.programId && programInfo && (
+                      {formData.programId && programInfo && formulaireDeploye && (
                         <Button
                           type="button"
                           onClick={() => setIsCustomizationOpen(!isCustomizationOpen)}
@@ -2507,7 +2576,12 @@ export default function NouvelleReservation() {
                       }`}
                     >
                       <div className="space-y-2">
-                        <Label className="text-blue-700 font-medium text-sm">Programme *</Label>
+                        <Label className="flex items-center gap-2 text-sm font-medium text-blue-700">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[11px] font-bold text-white">
+                            1
+                          </span>
+                          Programme *
+                        </Label>
                         <Select
                           value={formData.programme}
                           onValueChange={(value) => {
@@ -2571,11 +2645,29 @@ export default function NouvelleReservation() {
                         </Select>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label className="text-blue-700 font-medium text-sm">Genre *</Label>
+                      {/* Étape 2 : le genre décide des chambres éligibles — il ne s'ouvre
+                          qu'une fois le programme choisi, pour que l'ordre saute aux yeux. */}
+                      <div
+                        className={`space-y-2 transition-opacity ${
+                          formData.programId ? "" : "opacity-60"
+                        }`}
+                      >
+                        <Label className="flex items-center gap-2 text-sm font-medium text-blue-700">
+                          <span
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                              formData.programId
+                                ? "bg-blue-600 text-white"
+                                : "bg-blue-200 text-blue-700"
+                            }`}
+                          >
+                            2
+                          </span>
+                          Genre *
+                        </Label>
                         <Select
                           value={formData.gender}
                           onValueChange={(value) => setFormData({ ...formData, gender: value })}
+                          disabled={!formData.programId}
                         >
                           <SelectTrigger className="h-10 border-2 border-blue-200 focus:border-blue-500 rounded-lg">
                             <SelectValue placeholder="Sélectionner le genre" />
@@ -2662,6 +2754,17 @@ export default function NouvelleReservation() {
                       </div>
                     </div>
 
+                  {/* Fil conducteur : l'agent voit où il en est des trois gestes de la vente. */}
+                  {!formulaireDeploye && (
+                    <p className="mb-3 rounded-lg bg-white/70 px-3 py-2 text-xs font-medium text-blue-800">
+                      {!formData.programId
+                        ? "Étape 1 — choisissez le programme."
+                        : !formData.gender
+                          ? "Étape 2 — choisissez le genre du pèlerin."
+                          : "Étape 3 — cliquez le prix vendu dans la grille tarifaire ci-dessous."}
+                    </p>
+                  )}
+
                   {/* Grille tarifaire : sélection de la case vendue + dérogation ADMIN */}
                   {programInfo?.pricingMode === "GRILLE" && (
                     <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50/40 p-3">
@@ -2675,6 +2778,9 @@ export default function NouvelleReservation() {
                           chambres={programInfo?.rooms ?? []}
                           gender={formData.gender || null}
                           action={horsGrilleToggle}
+                          // Les chambres sont genrées : sans genre, les places encore
+                          // libres ne sont pas connues et le prix ne sortira pas.
+                          disabled={!formData.gender}
                           onSelect={(idFormule, roomType) => {
                             setFormuleId(idFormule);
                             setFormData((prev) => ({ ...prev, typeChambre: roomType }));
@@ -2693,6 +2799,9 @@ export default function NouvelleReservation() {
                     </div>
                   )}
 
+                  {/* Hôtels et personnalisation : rien à remplir avant que le prix soit fixé. */}
+                  {formulaireDeploye && (
+                  <>
                   {/* Section de personnalisation compacte */}
                   {isCustomizationOpen && formData.programId && programInfo && (() => {
                     // Descripteurs des hôtels du programme : Madina / Makkah (si présents) + chaque Autre.
@@ -2859,6 +2968,7 @@ export default function NouvelleReservation() {
                           hoverBorderClass="hover:border-blue-300"
                           placeholderText="Sélectionner un hôtel à Madina"
                           allowNone={false}
+                          nomOccupant={nomOccupant}
                         />
                       )}
 
@@ -2883,6 +2993,7 @@ export default function NouvelleReservation() {
                           hoverBorderClass="hover:border-green-300"
                           placeholderText="Sélectionner un hôtel à Makkah"
                           allowNone={false}
+                          nomOccupant={nomOccupant}
                         />
                       )}
 
@@ -2921,10 +3032,13 @@ export default function NouvelleReservation() {
                               hoverBorderClass="hover:border-green-300"
                               placeholderText={`Sélectionner ${ph.hotel.name}`}
                               allowNone={false}
+                              nomOccupant={nomOccupant}
                             />
                           );
                         })}
                     </div>
+                  </>
+                  )}
                   </div>
 
 
@@ -3018,6 +3132,21 @@ export default function NouvelleReservation() {
                 </div>
                 */}
 
+                {!formulaireDeploye && (
+                  <div className="mb-6 rounded-xl border border-dashed border-blue-300 bg-blue-50/60 p-4">
+                    <p className="text-sm font-semibold text-blue-800">
+                      La suite du formulaire s&apos;affiche dès que le prix est fixé.
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-blue-700">
+                      Cliquez la case vendue dans la grille tarifaire : les hôtels, les
+                      informations du client, les paiements et les documents apparaîtront
+                      ensuite, et le prix s&apos;affichera en bas de l&apos;écran.
+                    </p>
+                  </div>
+                )}
+
+                {formulaireDeploye && (
+                <>
                 {/* Section 2: Informations Client */}
                 <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-6">
                   <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
@@ -3549,6 +3678,9 @@ export default function NouvelleReservation() {
 
                     </div>
                   </div>
+
+                </>
+                )}
 
                   {/* Bouton de soumission */}
                   <div className="flex justify-end gap-4 mt-8">

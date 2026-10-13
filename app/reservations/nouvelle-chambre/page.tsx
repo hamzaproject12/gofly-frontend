@@ -1231,6 +1231,19 @@ export default function NouvelleChambrePage() {
   // prix calculé) : seul un prix absent, illisible ou négatif bloque.
   const prixGenere = estPrixValide(formData.prix);
 
+  /**
+   * Le formulaire se déplie-t-il ?
+   *
+   * En mode GRILLE, la vente part du programme puis de la case de la brochure.
+   * Tant que le prix n'est pas fixé, hôtels, occupants, paiements et documents
+   * n'ont rien à recevoir — les afficher d'emblée noyait l'agent.
+   *
+   * En mode CALCUL (programmes anciens) et hors grille, le prix DÉPEND des
+   * hôtels choisis : tout reste affiché, sans quoi le formulaire ne pourrait
+   * jamais s'ouvrir.
+   */
+  const formulaireDeploye = !modeGrille || prixCalculDisponible;
+
   /** Obligatoire pour enregistrer : chef Nom/Prénom/téléphone + chaque accompagnant Nom/Prénom (passeports / fichiers optionnels) */
   const identitiesMinimumOk =
     occupants.length === capacity &&
@@ -1738,7 +1751,7 @@ export default function NouvelleChambrePage() {
                       <Sparkles className="h-5 w-5" />
                       Configuration du Voyage
                     </h3>
-                    {formData.programId && programInfo && (
+                    {formData.programId && programInfo && formulaireDeploye && (
                       <Button
                         type="button"
                         onClick={() => setIsCustomizationOpen(!isCustomizationOpen)}
@@ -1758,7 +1771,10 @@ export default function NouvelleChambrePage() {
                     }`}
                   >
                     <div className="space-y-2">
-                      <Label className="text-blue-700 font-medium text-sm">
+                      <Label className="flex items-center gap-2 text-sm font-medium text-blue-700">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[11px] font-bold text-white">
+                          1
+                        </span>
                         Programme *
                       </Label>
                       <Select
@@ -1865,6 +1881,15 @@ export default function NouvelleChambrePage() {
                     </div>
                   </div>
 
+                  {/* Fil conducteur : l'agent voit où il en est des deux gestes de la vente. */}
+                  {!formulaireDeploye && (
+                    <p className="mb-3 rounded-lg bg-white/70 px-3 py-2 text-xs font-medium text-blue-800">
+                      {!formData.programId
+                        ? "Étape 1 — choisissez le programme."
+                        : "Étape 2 — cliquez le prix vendu dans la grille tarifaire ci-dessous."}
+                    </p>
+                  )}
+
                   {/* Grille tarifaire : sélection de la case vendue + dérogation ADMIN */}
                   {programInfo?.pricingMode === "GRILLE" && (
                     <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50/40 p-3">
@@ -1902,6 +1927,9 @@ export default function NouvelleChambrePage() {
                   {/* Les Selects Madina/Makkah sont désormais réunis avec leurs chambres
                       dans la grille adaptative ci-dessous (alignée sur Nouvelle Réservation). */}
 
+                  {/* Hôtels et personnalisation : rien à remplir avant que le prix soit fixé. */}
+                  {formulaireDeploye && (
+                  <>
                   {isCustomizationOpen && (() => {
                     // Descripteurs des hôtels du programme : Madina / Makkah (si présents) + chaque Autre.
                     // active = ON (obligatoire) ; OFF = exclu du prix + non requis. jours = nuits éditables.
@@ -2249,8 +2277,25 @@ export default function NouvelleChambrePage() {
                     })}
                     </div>
                   )}
+                  </>
+                  )}
                 </div>
 
+                {!formulaireDeploye && (
+                  <div className="mb-6 rounded-xl border border-dashed border-blue-300 bg-blue-50/60 p-4">
+                    <p className="text-sm font-semibold text-blue-800">
+                      La suite du formulaire s&apos;affiche dès que le prix est fixé.
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-blue-700">
+                      Cliquez la case vendue dans la grille tarifaire : les hôtels, les
+                      occupants, les paiements et les documents apparaîtront ensuite, et le
+                      prix s&apos;affichera en bas de l&apos;écran.
+                    </p>
+                  </div>
+                )}
+
+                {formulaireDeploye && (
+                <>
                 <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 mb-2">
                   <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
                     <User className="h-5 w-5" />
@@ -2947,6 +2992,9 @@ export default function NouvelleChambrePage() {
                     Les statuts s'affichent uniquement pour les services activés.
                   </p>
                 </div>
+
+                </>
+                )}
 
                 <div className="flex justify-end gap-3 pt-2">
                   <Link href="/reservations">

@@ -64,6 +64,11 @@ interface HotelCategoryBlockProps {
   /** Placeholder du Select quand un programme est sélectionné */
   placeholderText?: string;
   /**
+   * Nom du pèlerin qui occupe une place, pour l'infobulle des points rouges.
+   * `null` quand la place est libre ou que l'occupant n'est pas (encore) connu.
+   */
+  nomOccupant?: (roomId: number, placeIndex: number) => string | null
+  /**
    * Autorise l'option « Sans hôtel » (valeur "none") dans le Select.
    * Mettre `false` quand la désactivation de l'hôtel se fait ailleurs
    * (ex. interrupteur du panneau « Éditer »), pour rendre le choix obligatoire.
@@ -105,6 +110,7 @@ export function HotelCategoryBlock({
   hoverBorderClass = "hover:border-blue-300",
   placeholderText,
   allowNone = true,
+  nomOccupant,
 }: HotelCategoryBlockProps) {
   const showRooms =
     rooms && value && value !== "none" && roomType && gender;
@@ -218,10 +224,17 @@ export function HotelCategoryBlock({
                             (_, placeIndex) => {
                               let placeColor = "bg-gray-300";
                               let placeTitle = `Place ${placeIndex + 1}`;
+                              // Qui occupe cette place : affiché au survol du point rouge.
+                              const occupant =
+                                placeIndex < placesOccupees
+                                  ? nomOccupant?.(room.id, placeIndex) ?? null
+                                  : null;
 
                               if (placeIndex < placesOccupees) {
                                 placeColor = "bg-red-500";
-                                placeTitle = `Place ${placeIndex + 1} occupée`;
+                                placeTitle = occupant
+                                  ? `Place ${placeIndex + 1} — ${occupant}`
+                                  : `Place ${placeIndex + 1} occupée`;
                               } else if (
                                 isSelected &&
                                 selectedPlaces[room.id]?.includes(placeIndex)
@@ -238,9 +251,18 @@ export function HotelCategoryBlock({
                               return (
                                 <div
                                   key={placeIndex}
-                                  className={`w-4 h-4 rounded-full ${placeColor} transition-all`}
-                                  title={placeTitle}
-                                />
+                                  className="group relative flex items-center"
+                                >
+                                  <div
+                                    className={`w-4 h-4 rounded-full ${placeColor} transition-all`}
+                                    title={placeTitle}
+                                  />
+                                  {occupant && (
+                                    <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 hidden -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[10px] font-medium text-white shadow-lg group-hover:block">
+                                      {occupant}
+                                    </span>
+                                  )}
+                                </div>
                               );
                             }
                           )}

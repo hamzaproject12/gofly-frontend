@@ -173,15 +173,20 @@ function docCell(baseUrl: string, id: number | null, label: string): string | Ex
   };
 }
 
-function avances(payments: Pay[]): [string, string, string] {
+/**
+ * Les trois premières avances, en NOMBRES (jamais en texte) : une colonne de
+ * montants doit s'additionner dans Excel et s'aligner sous son en-tete.
+ */
+function avances(payments: Pay[]): [number | '', number | '', number | ''] {
   const sorted = [...payments].sort(
     (a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
   );
-  const fmt = (n: number) => (Number.isFinite(n) ? String(Math.round(n * 100) / 100) : '');
+  const montant = (n: number): number | '' =>
+    Number.isFinite(n) ? Math.round(n * 100) / 100 : '';
   return [
-    sorted[0] ? fmt(sorted[0].amount) : '',
-    sorted[1] ? fmt(sorted[1].amount) : '',
-    sorted[2] ? fmt(sorted[2].amount) : '',
+    sorted[0] ? montant(sorted[0].amount) : '',
+    sorted[1] ? montant(sorted[1].amount) : '',
+    sorted[2] ? montant(sorted[2].amount) : '',
   ];
 }
 
@@ -210,6 +215,7 @@ const HEADERS = [
   'visa',
   'BILLET',
   'Vente',
+  'Prix grille',
   'Avance 1',
   'Avance 2',
   'Avance 3',
@@ -232,6 +238,93 @@ const DOC_LINK_COLUMNS = [
 
 /** Index (1-based) de la colonne « Chambre ». */
 const ROOM_COLUMN = HEADERS.indexOf('Chambre') + 1;
+
+/**
+ * Colonnes de montants : écrites en nombre, format monétaire, alignées à droite.
+ * En texte, Excel les collait à gauche (avec l'avertissement « nombre stocké sous
+ * forme de texte ») et aucune somme n'était possible.
+ */
+const MONEY_COLUMNS = [
+  'Vente',
+  'Prix grille',
+  'Avance 1',
+  'Avance 2',
+  'Avance 3',
+  'Remis',
+  'Reste',
+  'Total des ventes',
+].map((h) => HEADERS.indexOf(h) + 1);
+
+const MONEY_FORMAT = '#,##0.##';
+
+/**
+ * Largeur de chaque colonne, en caractères.
+ *
+ * Indispensable : à largeur uniforme, un nom, un hôtel ou une remarque plus long
+ * que sa colonne DÉBORDE sur les colonnes voisines vides — la valeur s'affiche
+ * alors sous un autre en-tête. Les cellules sont en plus passées en retour à la
+ * ligne (`wrapText`), ce qui interdit tout débordement.
+ */
+const COLUMN_WIDTHS: Record<string, number> = {
+  'Nbr': 6,
+  'Groupe': 16,
+  'Nom et Prenom': 26,
+  'الاسم الكامل': 22,
+  'H/F': 8,
+  'N° passport': 15,
+  'Hotel Makkah': 22,
+  'Hotel medina': 22,
+  'Autres hôtels': 22,
+  'Chambre': 16,
+  'Image passport': 14,
+  'Image CIN': 11,
+  'Téléphone': 16,
+  'visa': 7,
+  'BILLET': 9,
+  'Vente': 13,
+  'Prix grille': 13,
+  'Avance 1': 12,
+  'Avance 2': 12,
+  'Avance 3': 12,
+  'Remis': 13,
+  'Reste': 13,
+  'Total des ventes': 16,
+  'Transport': 14,
+  'Remarque': 32,
+  'image recu': 12,
+  'image virement': 14,
+};
+
+/** En-tête figé + filtre + largeurs : les colonnes restent lisibles jusqu'en bas. */
+function setupSheetLayout(sheet: ExcelJS.Worksheet): void {
+  HEADERS.forEach((header, index) => {
+    sheet.getColumn(index + 1).width = COLUMN_WIDTHS[header] ?? 18;
+  });
+  const headerRow = sheet.getRow(1);
+  headerRow.height = 30;
+  headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  sheet.views = [{ state: 'frozen', ySplit: 1 }];
+  sheet.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: 1, column: HEADERS.length },
+  };
+}
+
+/**
+ * Met chaque cellule dans sa colonne : retour à la ligne pour le texte (aucun
+ * débordement sur la colonne voisine) et format monétaire pour les montants.
+ */
+function styleDataRow(row: ExcelJS.Row): void {
+  for (let c = 1; c <= HEADERS.length; c += 1) {
+    row.getCell(c).alignment = { vertical: 'middle', wrapText: true };
+  }
+  row.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+  for (const col of MONEY_COLUMNS) {
+    const cell = row.getCell(col);
+    cell.numFmt = MONEY_FORMAT;
+    cell.alignment = { vertical: 'middle', horizontal: 'right' };
+  }
+}
 
 /**
  * Codes couleur de l'export.
@@ -458,6 +551,7 @@ router.get(
         const sheet = workbook.addWorksheet('Vide');
         sheet.addRow(HEADERS);
         sheet.addRow(['Aucune réservation pour ces filtres']);
+        setupSheetLayout(sheet);
         res.setHeader(
           'Content-Type',
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -511,6 +605,13 @@ router.get(
           const totalVentesGroupe =
             leader.price +
             (leader.accompagnants || []).reduce((sum, acc: any) => sum + (acc.price ?? 0), 0);
+          // Prix de la BROCHURE pour le dossier entier : `prixGrille` est figé PAR
+          // PERSONNE à la vente, et le prix d'un dossier est concentré sur le chef
+          // de dossier (cf. POST /api/reservations/group) — le comparable de la
+          // colonne « Vente » est donc prixGrille × nombre de personnes.
+          const tailleGroupe = 1 + (leader.accompagnants || []).length;
+          const prixGrilleDossier: number | '' =
+            typeof leader.prixGrille === 'number' ? leader.prixGrille * tailleGroupe : '';
 
           const emitRow = (
             person: (typeof leader) & { documents?: typeof leader.documents },
@@ -546,18 +647,21 @@ router.get(
               person.phone || '',
               person.statutVisa ? 'Oui' : 'Non',
               person.statutVol ? 'Oui' : 'Non',
-              isLeader ? String(vente) : '',
+              isLeader ? vente : '',
+              isLeader ? prixGrilleDossier : '',
               isLeader ? a1 : '',
               isLeader ? a2 : '',
               isLeader ? a3 : '',
-              isLeader ? String(remis) : '',
-              isLeader ? String(reste) : '',
-              isLeader ? String(totalVentesGroupe) : '',
+              isLeader ? remis : '',
+              isLeader ? reste : '',
+              isLeader ? totalVentesGroupe : '',
               transportLabel(person.transport),
               person.remarque || '',
               isLeader ? docCell(apiBaseUrl, recu, 'Reçu') : '',
               isLeader ? docCell(apiBaseUrl, virement, 'Virement') : '',
             ]);
+
+            styleDataRow(row);
 
             // Colonnes documents : style lien pour qu'elles soient reconnaissables
             for (const col of DOC_LINK_COLUMNS) {
@@ -597,9 +701,7 @@ router.get(
           );
         }
 
-        sheet.columns.forEach((col) => {
-          col.width = 18;
-        });
+        setupSheetLayout(sheet);
       }
 
       const stamp = new Date().toISOString().slice(0, 10);

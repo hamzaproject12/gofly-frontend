@@ -216,6 +216,7 @@ const HEADERS = [
   'BILLET',
   'Prix final (négocié)',
   'Prix grille (brochure)',
+  'Réduction',
   'Avance 1',
   'Avance 2',
   'Avance 3',
@@ -263,6 +264,7 @@ const ROOM_COLUMN = colonne('Chambre');
 const MONEY_COLUMNS = [
   'Prix final (négocié)',
   'Prix grille (brochure)',
+  'Réduction',
   'Avance 1',
   'Avance 2',
   'Avance 3',
@@ -299,6 +301,7 @@ const COLUMN_WIDTHS: Record<string, number> = {
   'BILLET': 9,
   'Prix final (négocié)': 15,
   'Prix grille (brochure)': 15,
+  'Réduction': 12,
   'Avance 1': 12,
   'Avance 2': 12,
   'Avance 3': 12,
@@ -629,6 +632,16 @@ router.get(
           const prixGrilleDossier: number | '' =
             typeof leader.prixGrille === 'number' ? leader.prixGrille * tailleGroupe : '';
 
+          // Réduction négociée, pour le dossier entier : elle est accordée sur le
+          // TOTAL de la grille (pas par personne) et enregistrée sur le chef de
+          // dossier. Colonne laissee vide a 0 : rien n'a ete negocie. Un dossier
+          // vendu AU-DESSUS de la grille (supplement accepte) a lui aussi 0 ici,
+          // l'ecart se lit alors entre les deux colonnes de prix.
+          const reductionDossier: number | '' =
+            typeof leader.reduction === 'number' && leader.reduction > 0
+              ? Math.round(leader.reduction * 100) / 100
+              : '';
+
           const emitRow = (
             person: (typeof leader) & { documents?: typeof leader.documents },
             isLeader: boolean
@@ -669,6 +682,7 @@ router.get(
               person.statutVol ? 'Oui' : 'Non',
               isLeader ? vente : '',
               isLeader ? prixGrilleDossier : '',
+              isLeader ? reductionDossier : '',
               isLeader ? a1 : '',
               isLeader ? a2 : '',
               isLeader ? a3 : '',

@@ -49,6 +49,7 @@ import {
   FormuleApi,
   FormuleForm,
   HotelGrilleOption,
+  LIBELLE_TYPE,
   RoomTypeKey,
   VilleHotel,
   cleHotel,
@@ -102,7 +103,24 @@ interface ProgramApi {
     prixRoom: number
     nbrPlaceTotal: number
     nbrPlaceRestantes?: number
+    /** Reservations rattachees a la chambre : une chambre qui en porte n'est pas vide. */
+    listeIdsReservation?: number[]
   }>
+}
+
+/**
+ * Une chambre n'est supprimable que si elle est reellement vide : toutes ses
+ * places libres ET aucune reservation rattachee. Meme regle que le backend
+ * (`isRoomVide` dans routes/programs.ts) : le bouton « - » ne doit jamais
+ * proposer une suppression que le serveur refusera.
+ */
+function chambreEstVide(room: {
+  nbrPlaceTotal: number
+  nbrPlaceRestantes?: number
+  listeIdsReservation?: number[]
+}): boolean {
+  if ((room.nbrPlaceRestantes ?? 0) !== (room.nbrPlaceTotal ?? 0)) return false
+  return !room.listeIdsReservation || room.listeIdsReservation.length === 0
 }
 
 /** Convertit une date ISO renvoyée par l'API en `Date`, ou `null` si absente/invalide. */
@@ -138,6 +156,12 @@ function parseNum(s: string | undefined, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback
 }
 
+/** Libellé d'un type de chambre à partir de sa capacité (1 à 5 places). */
+function libelleCapacite(type: number): string {
+  const roomType = (Object.keys(CAPACITE_TYPE) as RoomTypeKey[]).find((rt) => CAPACITE_TYPE[rt] === type)
+  return roomType ? LIBELLE_TYPE[roomType] : `${type} place${type > 1 ? "s" : ""}`
+}
+
 function mapRoomTypeToIndex(roomType: RoomType): 1 | 2 | 3 | 4 | 5 {
   switch (roomType) {
     case "SINGLE":
@@ -166,6 +190,7 @@ export default function ModifierProgrammePage() {
   const [activeHotelTab, setActiveHotelTab] = useState<"madina" | "makkah" | "autre">("madina")
   /** Confirmation demandée quand les catégories d'hôtels n'ont pas le même nombre de lits */
   const [showBedsMismatchDialog, setShowBedsMismatchDialog] = useState(false)
+  const [showSuppressionDialog, setShowSuppressionDialog] = useState(false)
 
   /**
    * Vrai si le programme se vend encore au PRIX CALCULÉ : il est antérieur à la
@@ -252,6 +277,40 @@ export default function ModifierProgrammePage() {
     formData.hotelsMakkah.length,
     formData.hotelsAutre.length,
   ])
+
+  /**
+   * Chambres vides que l'enregistrement va supprimer : chaque fois que le
+   * compteur « - » descend sous le nombre de chambres existantes, l'écart porte
+   * sur des chambres vides (le bouton ne descend jamais sous les occupées).
+   * On le récapitule avant d'enregistrer : la suppression est définitive et la
+   * chambre disparaît du tableau de bord.
+   */
+  const suppressionsPrevues = useMemo(() => {
+    const lignes: { ville: string; hotel: string; type: number; nb: number }[] = []
+    const parcourir = (
+      ville: "Madina" | "Makkah" | "Autre",
+      hotels: Array<{ name: string; chambres: { [key: number]: { nb: string; prix: string } } }>
+    ) => {
+      for (const hotel of hotels) {
+        for (let type = 1; type <= 5; type++) {
+          const total = roomConstraints[ville][hotel.name]?.[type]?.total || 0
+          const demande = parseInt(hotel.chambres[type]?.nb || "0", 10) || 0
+          if (total > demande) {
+            lignes.push({ ville, hotel: hotel.name, type, nb: total - demande })
+          }
+        }
+      }
+    }
+    parcourir("Madina", formData.hotelsMadina)
+    parcourir("Makkah", formData.hotelsMakkah)
+    parcourir("Autre", formData.hotelsAutre)
+    return lignes
+  }, [formData.hotelsMadina, formData.hotelsMakkah, formData.hotelsAutre, roomConstraints])
+
+  const totalChambresSupprimees = useMemo(
+    () => suppressionsPrevues.reduce((somme, l) => somme + l.nb, 0),
+    [suppressionsPrevues]
+  )
 
   /**
    * Hôtels du programme tels que la grille tarifaire les voit : nom + ville, prix
@@ -429,7 +488,7 @@ export default function ModifierProgrammePage() {
           mapRef[hotelName] = mapRef[hotelName] || {}
           const entry = mapRef[hotelName][typeIndex] || { occupied: 0, total: 0 }
           entry.total += 1
-          if ((room.nbrPlaceRestantes ?? 0) < (room.nbrPlaceTotal ?? 0)) {
+          if (!chambreEstVide(room)) {
             entry.occupied += 1
           }
           mapRef[hotelName][typeIndex] = entry
@@ -566,18 +625,32 @@ export default function ModifierProgrammePage() {
     return true
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!isFormValid || isSubmitting) return
-
-    // Nombre de lits différent entre catégories d'hôtels : on demande une
-    // confirmation explicite avant d'enregistrer les modifications.
+  /**
+   * Suite de l'enregistrement une fois la suppression des chambres acceptée :
+   * nombre de lits différent entre catégories d'hôtels, on demande une
+   * confirmation explicite avant d'enregistrer les modifications.
+   */
+  const poursuivreEnregistrement = async () => {
     if (bedsMismatch) {
       setShowBedsMismatchDialog(true)
       return
     }
 
     await saveProgram()
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!isFormValid || isSubmitting) return
+
+    // Supprimer une chambre est définitif : on récapitule d'abord lesquelles
+    // partent, puis seulement on enchaîne sur le reste des contrôles.
+    if (totalChambresSupprimees > 0) {
+      setShowSuppressionDialog(true)
+      return
+    }
+
+    await poursuivreEnregistrement()
   }
 
   const saveProgram = async () => {
@@ -715,7 +788,33 @@ export default function ModifierProgrammePage() {
       // hôtel tout juste ajouté, que seul le PUT précédent a rattaché au programme.
       if (!(await enregistrerGrilleSiModifiee())) return
 
-      toast({ title: "Succès", description: "Programme mis à jour" })
+      // Compte rendu réel : on compare, hôtel par hôtel et type par type, le
+      // nombre de chambres renvoyé par le serveur à celui chargé au début. Si
+      // le serveur a refusé une suppression, le message le reflète.
+      let chambresSupprimees = 0
+      if (Array.isArray(responseData.rooms)) {
+        const apres: Record<string, number> = {}
+        for (const room of responseData.rooms as ProgramApi["rooms"]) {
+          const cle = `${room.hotel.city}:${room.hotel.name}:${mapRoomTypeToIndex(room.roomType)}`
+          apres[cle] = (apres[cle] || 0) + 1
+        }
+        for (const [ville, parHotel] of Object.entries(roomConstraints)) {
+          for (const [nomHotel, parType] of Object.entries(parHotel)) {
+            for (const [type, compteur] of Object.entries(parType)) {
+              const reste = apres[`${ville}:${nomHotel}:${type}`] || 0
+              if (compteur.total > reste) chambresSupprimees += compteur.total - reste
+            }
+          }
+        }
+      }
+
+      toast({
+        title: "Succès",
+        description:
+          chambresSupprimees > 0
+            ? `Programme mis à jour — ${chambresSupprimees} chambre${chambresSupprimees > 1 ? "s" : ""} vide${chambresSupprimees > 1 ? "s" : ""} supprimée${chambresSupprimees > 1 ? "s" : ""}`
+            : "Programme mis à jour",
+      })
       router.push("/programmes")
     } catch (error) {
       console.error(error)
@@ -1011,6 +1110,11 @@ export default function ModifierProgrammePage() {
                                                 size="sm"
                                                 className="h-8 w-8 p-0 hover:bg-yellow-100 text-yellow-600 border-r border-yellow-200 rounded-l-lg"
                                                 disabled={!canDecrement}
+                                                title={canDecrement
+                                                  ? "Retirer une chambre vide (supprimée définitivement à l'enregistrement)"
+                                                  : occupied > 0
+                                                    ? `Impossible : les ${occupied} chambre(s) restantes de ce type sont occupées`
+                                                    : "Aucune chambre à retirer"}
                                                 onClick={() => {
                                                   if (!canDecrement) return;
                                                   const newValue = Math.max(occupied, currentValue - 1);
@@ -1048,7 +1152,12 @@ export default function ModifierProgrammePage() {
                                               </Button>
                                             </div>
                                           </div>
-                                          <div className="mt-1 text-center text-[11px] text-gray-500">Occupées: {occupied} • Total actuel: {total}</div>
+                                          <div className="mt-1 text-center text-[11px] text-gray-500">Occupées: {occupied} • Vides: {Math.max(0, total - occupied)} • Total actuel: {total}</div>
+                                          {total > currentValue && (
+                                            <div className="mt-1 text-center text-[11px] font-medium text-red-600">
+                                              {total - currentValue} chambre{total - currentValue > 1 ? "s" : ""} vide{total - currentValue > 1 ? "s" : ""} supprimée{total - currentValue > 1 ? "s" : ""} à l'enregistrement
+                                            </div>
+                                          )}
                                         </div>
                                         <div>
                                           <div className="text-sm text-yellow-700 mb-2 text-center font-semibold">Prix (Riyal)</div>
@@ -1141,6 +1250,11 @@ export default function ModifierProgrammePage() {
                                                   size="sm"
                                                   className="h-8 w-8 p-0 hover:bg-blue-100 text-blue-600 border-r border-blue-200 rounded-l-lg"
                                                   disabled={!canDecrement}
+                                                  title={canDecrement
+                                                    ? "Retirer une chambre vide (supprimée définitivement à l'enregistrement)"
+                                                    : occupied > 0
+                                                      ? `Impossible : les ${occupied} chambre(s) restantes de ce type sont occupées`
+                                                      : "Aucune chambre à retirer"}
                                                   onClick={() => {
                                                     if (!canDecrement) return;
                                                     const newValue = Math.max(occupied, currentValue - 1);
@@ -1178,7 +1292,12 @@ export default function ModifierProgrammePage() {
                                                 </Button>
                                               </div>
                                             </div>
-                                            <div className="mt-1 text-center text-[11px] text-gray-500">Occupées: {occupied} • Total actuel: {total}</div>
+                                            <div className="mt-1 text-center text-[11px] text-gray-500">Occupées: {occupied} • Vides: {Math.max(0, total - occupied)} • Total actuel: {total}</div>
+                                            {total > currentValue && (
+                                              <div className="mt-1 text-center text-[11px] font-medium text-red-600">
+                                                {total - currentValue} chambre{total - currentValue > 1 ? "s" : ""} vide{total - currentValue > 1 ? "s" : ""} supprimée{total - currentValue > 1 ? "s" : ""} à l'enregistrement
+                                              </div>
+                                            )}
                                           </div>
                                           <div>
                                             <div className="text-sm text-blue-700 mb-2 text-center font-semibold">Prix (Riyal)</div>
@@ -1279,6 +1398,11 @@ export default function ModifierProgrammePage() {
                                                 size="sm"
                                                 className="h-8 w-8 p-0 hover:bg-emerald-100 text-emerald-600 border-r border-emerald-200 rounded-l-lg"
                                                 disabled={!canDecrement}
+                                                title={canDecrement
+                                                  ? "Retirer une chambre vide (supprimée définitivement à l'enregistrement)"
+                                                  : occupied > 0
+                                                    ? `Impossible : les ${occupied} chambre(s) restantes de ce type sont occupées`
+                                                    : "Aucune chambre à retirer"}
                                                 onClick={() => {
                                                   if (!canDecrement) return;
                                                   const newValue = Math.max(occupied, currentValue - 1);
@@ -1316,7 +1440,12 @@ export default function ModifierProgrammePage() {
                                               </Button>
                                             </div>
                                           </div>
-                                          <div className="mt-1 text-center text-[11px] text-gray-500">Occupées: {occupied} • Total actuel: {total}</div>
+                                          <div className="mt-1 text-center text-[11px] text-gray-500">Occupées: {occupied} • Vides: {Math.max(0, total - occupied)} • Total actuel: {total}</div>
+                                          {total > currentValue && (
+                                            <div className="mt-1 text-center text-[11px] font-medium text-red-600">
+                                              {total - currentValue} chambre{total - currentValue > 1 ? "s" : ""} vide{total - currentValue > 1 ? "s" : ""} supprimée{total - currentValue > 1 ? "s" : ""} à l'enregistrement
+                                            </div>
+                                          )}
                                         </div>
                                         <div>
                                           <div className="text-sm text-emerald-700 mb-2 text-center font-semibold">Prix (Riyal)</div>
@@ -1411,6 +1540,56 @@ export default function ModifierProgrammePage() {
           </div>
         </div>
       </div>
+
+      {/* Suppression de chambres vides : definitive, donc recapitulee avant d'enregistrer. */}
+      <AlertDialog open={showSuppressionDialog} onOpenChange={setShowSuppressionDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              Supprimer {totalChambresSupprimees} chambre{totalChambresSupprimees > 1 ? "s" : ""} vide
+              {totalChambresSupprimees > 1 ? "s" : ""} ?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-gray-600">
+                <p>
+                  Ces chambres ne contiennent aucun pèlerin. Elles seront supprimées
+                  définitivement et ne compteront plus dans la disponibilité du tableau de bord.
+                </p>
+                <ul className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 space-y-1">
+                  {suppressionsPrevues.map((ligne) => (
+                    <li
+                      key={`${ligne.ville}-${ligne.hotel}-${ligne.type}`}
+                      className="flex items-center justify-between gap-4"
+                    >
+                      <span className="font-medium text-red-900">
+                        {ligne.hotel} <span className="font-normal text-red-700">({ligne.ville})</span> ·{" "}
+                        {libelleCapacite(ligne.type)}
+                      </span>
+                      <span className="font-semibold text-red-700">
+                        −{ligne.nb} chambre{ligne.nb > 1 ? "s" : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p>Les chambres occupées ne sont jamais supprimées.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => {
+                setShowSuppressionDialog(false)
+                void poursuivreEnregistrement()
+              }}
+            >
+              Supprimer et enregistrer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Confirmation : nombre de lits different entre categories d'hotels */}
       <AlertDialog open={showBedsMismatchDialog} onOpenChange={setShowBedsMismatchDialog}>

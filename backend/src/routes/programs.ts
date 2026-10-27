@@ -29,6 +29,18 @@ const router = express.Router();
 const prisma = new PrismaClient();
 
 /**
+ * Une chambre n'est supprimable que si elle est reellement vide : aucune place
+ * prise ET aucune reservation rattachee. Les deux conditions comptent, car
+ * `listeIdsReservation` peut porter une reservation alors que le compteur de
+ * places a derive (import, annulation partielle) : on refuse alors de la
+ * supprimer plutot que de perdre le lien avec le pelerin.
+ */
+function isRoomVide(room: { nbrPlaceTotal: number; nbrPlaceRestantes: number; listeIdsReservation?: number[] | null }): boolean {
+  if (room.nbrPlaceRestantes !== room.nbrPlaceTotal) return false;
+  return !room.listeIdsReservation || room.listeIdsReservation.length === 0;
+}
+
+/**
  * Normalise une heure de vol reçue du client vers le format "HH:mm" stocké en base.
  * Renvoie `null` pour une saisie vide (l'heure est facultative) et `undefined`
  * pour un champ absent du payload, afin de ne pas écraser la valeur existante
@@ -630,8 +642,8 @@ router.put('/:id', async (req, res) => {
             })));
           }
 
-          const freeRooms = existingRooms.filter(r => r.nbrPlaceRestantes === r.nbrPlaceTotal);
-          const occupiedRooms = existingRooms.filter(r => r.nbrPlaceRestantes < r.nbrPlaceTotal || (r.listeIdsReservation && r.listeIdsReservation.length > 0));
+          const freeRooms = existingRooms.filter(isRoomVide);
+          const occupiedRooms = existingRooms.filter(r => !isRoomVide(r));
           let currentTotal = existingRooms.length;
           
           console.log(`[Room Update] Breakdown - Free: ${freeRooms.length}, Occupied: ${occupiedRooms.length}, Total: ${currentTotal}`);
@@ -884,8 +896,8 @@ router.put('/:id', async (req, res) => {
                 // Détecter les rooms occupées de manière plus robuste :
                 // 1. Par listeIdsReservation (plus fiable car mis à jour lors de la réservation)
                 // 2. Par nbrPlaceRestantes < nbrPlaceTotal (fallback)
-                const freeRooms = existingRooms.filter(r => r.nbrPlaceRestantes === r.nbrPlaceTotal);
-                const occupiedRooms = existingRooms.filter(r => r.nbrPlaceRestantes < r.nbrPlaceTotal || (r.listeIdsReservation && r.listeIdsReservation.length > 0));
+                const freeRooms = existingRooms.filter(isRoomVide);
+                const occupiedRooms = existingRooms.filter(r => !isRoomVide(r));
                 
                 let currentTotal = existingRooms.length;
                 

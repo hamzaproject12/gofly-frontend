@@ -214,8 +214,8 @@ const HEADERS = [
   'Téléphone',
   'visa',
   'BILLET',
-  'Vente',
-  'Prix grille',
+  'Prix final (négocié)',
+  'Prix grille (brochure)',
   'Avance 1',
   'Avance 2',
   'Avance 3',
@@ -228,16 +228,32 @@ const HEADERS = [
   'image virement',
 ];
 
+/**
+ * Index (1-based) d'une colonne, par son en-tête.
+ *
+ * Lève à l'import si l'en-tête n'existe pas : `indexOf` renverrait -1, donc la
+ * colonne 0 — un index que `getCell` n'accepte pas et qui, au mieux, applique
+ * un format à la mauvaise colonne. Renommer un en-tête sans reporter le
+ * nouveau nom ici doit casser bruyamment, pas décaler l'export en silence.
+ */
+function colonne(header: string): number {
+  const index = HEADERS.indexOf(header);
+  if (index === -1) {
+    throw new Error(`Export : colonne « ${header} » absente de HEADERS.`);
+  }
+  return index + 1;
+}
+
 /** Index (1-based) des colonnes contenant un lien de document. */
 const DOC_LINK_COLUMNS = [
-  HEADERS.indexOf('Image passport') + 1,
-  HEADERS.indexOf('Image CIN') + 1,
-  HEADERS.indexOf('image recu') + 1,
-  HEADERS.indexOf('image virement') + 1,
+  colonne('Image passport'),
+  colonne('Image CIN'),
+  colonne('image recu'),
+  colonne('image virement'),
 ];
 
 /** Index (1-based) de la colonne « Chambre ». */
-const ROOM_COLUMN = HEADERS.indexOf('Chambre') + 1;
+const ROOM_COLUMN = colonne('Chambre');
 
 /**
  * Colonnes de montants : écrites en nombre, format monétaire, alignées à droite.
@@ -245,15 +261,15 @@ const ROOM_COLUMN = HEADERS.indexOf('Chambre') + 1;
  * forme de texte ») et aucune somme n'était possible.
  */
 const MONEY_COLUMNS = [
-  'Vente',
-  'Prix grille',
+  'Prix final (négocié)',
+  'Prix grille (brochure)',
   'Avance 1',
   'Avance 2',
   'Avance 3',
   'Remis',
   'Reste',
   'Total des ventes',
-].map((h) => HEADERS.indexOf(h) + 1);
+].map(colonne);
 
 const MONEY_FORMAT = '#,##0.##';
 
@@ -281,8 +297,8 @@ const COLUMN_WIDTHS: Record<string, number> = {
   'Téléphone': 16,
   'visa': 7,
   'BILLET': 9,
-  'Vente': 13,
-  'Prix grille': 13,
+  'Prix final (négocié)': 15,
+  'Prix grille (brochure)': 15,
   'Avance 1': 12,
   'Avance 2': 12,
   'Avance 3': 12,
@@ -631,7 +647,11 @@ router.get(
             const hm = resolveHotel(person.hotelMadina) || resolveHotel(leader.hotelMadina);
             const autres = autreHotelsLabel(person.hotelsAutre) || autreHotelsLabel(leader.hotelsAutre);
 
-            const row = sheet.addRow([
+            // Une ligne de données vaut exactement une valeur par en-tête, dans
+            // l'ordre de HEADERS. Ajouter ou retirer une valeur sans toucher
+            // HEADERS décalerait toute la fin de la ligne sous les mauvais
+            // titres : on refuse d'écrire plutôt que de livrer un fichier faux.
+            const valeurs = [
               idx,
               groupe,
               nomComplet,
@@ -659,7 +679,14 @@ router.get(
               person.remarque || '',
               isLeader ? docCell(apiBaseUrl, recu, 'Reçu') : '',
               isLeader ? docCell(apiBaseUrl, virement, 'Virement') : '',
-            ]);
+            ];
+            if (valeurs.length !== HEADERS.length) {
+              throw new Error(
+                `Export : ${valeurs.length} valeurs pour ${HEADERS.length} colonnes — ` +
+                  'les données seraient décalées sous les mauvais en-têtes.'
+              );
+            }
+            const row = sheet.addRow(valeurs);
 
             styleDataRow(row);
 

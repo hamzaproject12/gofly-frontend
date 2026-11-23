@@ -62,13 +62,31 @@ import {
   COLONNES_GRILLE,
   FormuleForm,
   HotelGrilleOption,
+  LIBELLE_TYPE,
   RoomTypeKey,
   VilleHotel,
   cleHotel,
+  estimerCoutCase,
   formulesVersApi,
+  grilleContientUnPrix,
   prixCase,
   validerGrille,
 } from "@/lib/grilleTarifaire"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+/**
+ * Places agents de la simulation : chaque ligne dit DANS QUELLE CASE de la grille
+ * (une formule × un type de chambre) les agents sont logés. C'est cette case qui
+ * fixe le manque à gagner (son prix de brochure) et le coût réel de la place.
+ */
+interface LignePlacesAgents {
+  id: string
+  /** `${formule.cle}::${roomType}` — vide tant qu'aucune case n'est choisie. */
+  caseCle: string
+  places: string
+}
+
+const cleCaseGrille = (formuleCle: string, roomType: RoomTypeKey) => `${formuleCle}::${roomType}`
 
 interface Hotel {
   id: number;
@@ -281,8 +299,9 @@ export default function NouveauProgramme() {
   /** Hypothèses pour la simulation (même logique de prix que « Nouvelle réservation ») */
   const [simIncludeAvion, setSimIncludeAvion] = useState(true)
   const [simIncludeVisa, setSimIncludeVisa] = useState(true)
-  /** Places réservées pour agents / staff : pas de paiement client, comptées en charges */
-  const [simAgentPlaces, setSimAgentPlaces] = useState("")
+  /** Places réservées pour agents / staff : pas de paiement client, logées dans une case de la grille */
+  const [simAgentLignes, setSimAgentLignes] = useState<LignePlacesAgents[]>([])
+  /** Frais propres aux agents EN PLUS du coût de leur place (indemnités…) */
   const [simAgentCostPerPlaceDH, setSimAgentCostPerPlaceDH] = useState("")
   const [simAutresChargesDH, setSimAutresChargesDH] = useState("")
   const [showValidationReasons, setShowValidationReasons] = useState(false)
@@ -585,6 +604,40 @@ export default function NouveauProgramme() {
     return out
   }, [formules])
 
+  /**
+   * Cases de la grille où loger des agents : toute case tarifée, plus les cases
+   * « non proposées » dont le coût est estimable (un agent peut occuper une
+   * chambre qu'on ne vend pas — il ne fait alors perdre aucune recette).
+   */
+  const casesGrilleAgents = useMemo(() => {
+    const params = { ...paramsCoutGrille, includeAvion: simIncludeAvion, includeVisa: simIncludeVisa }
+    const out: Array<{
+      cle: string
+      roomType: RoomTypeKey
+      capacite: number
+      libelle: string
+      prix: number | null
+      coutDh: number | null
+    }> = []
+    formules.forEach((formule, index) => {
+      const nom = formule.label.trim() || `Formule ${index + 1}`
+      for (const roomType of COLONNES_GRILLE) {
+        const prix = prixCase(formule, roomType)
+        const cout = estimerCoutCase(formule, roomType, hotelsGrille, params)
+        if (prix === null && cout === null) continue
+        out.push({
+          cle: cleCaseGrille(formule.cle, roomType),
+          roomType,
+          capacite: CAPACITE_TYPE[roomType],
+          libelle: `${nom} — ${LIBELLE_TYPE[roomType]}`,
+          prix,
+          coutDh: cout ? Math.round((cout.min + cout.max) / 2) : null,
+        })
+      }
+    })
+    return out
+  }, [formules, hotelsGrille, paramsCoutGrille, simIncludeAvion, simIncludeVisa])
+
   const simulationPreview = useMemo(() => {
     const exchange = parseNum(formData.exchange, 1) || 1
     const prixAvionDH = parseNum(formData.prixAvion, 0)
@@ -600,7 +653,11 @@ export default function NouveauProgramme() {
       typeKey: number
       label: string
       places: number
+      /** Places de ce type occupées par des agents (non payantes). */
+      agentPlaces: number
       unitDh: number
+      /** Coût agence moyen par voyageur pour ce type (tous hôtels confondus). */
+      unitCostDh: number
       subtotalDh: number
     }[] = []
 
@@ -681,17 +738,56 @@ export default function NouveauProgramme() {
         typeKey: t,
         label: labels[t] ?? `Type ${t}`,
         places: paired,
+        agentPlaces: 0,
         unitDh,
+        unitCostDh,
         subtotalDh,
       })
     }
 
-    const avgTicketDh = totalTravelersMax > 0 ? revenueIfAllPayDh / totalTravelersMax : 0
-    let agentPlaces = Math.max(0, parseInt(simAgentPlaces, 10) || 0)
-    const agentOver = agentPlaces > totalTravelersMax
-    if (agentPlaces > totalTravelersMax) agentPlaces = totalTravelersMax
+    // Places agents, case par case de la grille. Chaque place :
+    //  - fait perdre le prix de SA case (pas un ticket moyen) ;
+    //  - coûte le coût estimé de SA case : on remplace, dans le coût hôtel, le
+    //    coût moyen du type de chambre par celui des hôtels de la formule choisie.
+    // Les agents ne peuvent pas dépasser la capacité de leur type de chambre.
+    let agentPlaces = 0
+    let agentOver = false
+    let agentManqueAGagnerDh = 0
+    const agentLignes: Array<{
+      id: string
+      libelle: string
+      places: number
+      prix: number | null
+      coutDh: number
+    }> = []
+    for (const ligne of simAgentLignes) {
+      const demandees = Math.max(0, parseInt(ligne.places, 10) || 0)
+      if (demandees === 0) continue
+      const caseGrille = casesGrilleAgents.find((c) => c.cle === ligne.caseCle)
+      if (!caseGrille) continue
+      const row = byType.find((r) => r.typeKey === caseGrille.capacite)
+      const disponibles = row ? row.places - row.agentPlaces : 0
+      const places = Math.min(demandees, Math.max(0, disponibles))
+      if (places < demandees) agentOver = true
+      if (!row || places === 0) continue
+      row.agentPlaces += places
+      agentPlaces += places
+      const coutPlace = caseGrille.coutDh ?? row.unitCostDh
+      agentManqueAGagnerDh += places * (caseGrille.prix ?? 0)
+      // Vol et visa sont identiques pour tous : l'écart ne porte que sur l'hôtel.
+      costHotelsAllTravelersDh += places * (coutPlace - row.unitCostDh)
+      costVolHotelVisaAllTravelersDh += places * (coutPlace - row.unitCostDh)
+      agentLignes.push({
+        id: ligne.id,
+        libelle: caseGrille.libelle,
+        places,
+        prix: caseGrille.prix,
+        coutDh: coutPlace,
+      })
+    }
+
     const payingTravelers = Math.max(0, totalTravelersMax - agentPlaces)
-    const revenueAfterAgentsDh = payingTravelers * avgTicketDh
+    const revenueAfterAgentsDh = Math.max(0, revenueIfAllPayDh - agentManqueAGagnerDh)
     const agentCostPer = parseNum(simAgentCostPerPlaceDH, 0)
     const agentChargesTotalDh = agentPlaces * agentCostPer
     const autresChargesDh = parseNum(simAutresChargesDH, 0)
@@ -713,9 +809,10 @@ export default function NouveauProgramme() {
       byType,
       totalTravelersMax,
       revenueIfAllPayDh,
-      avgTicketDh,
       agentPlaces,
       agentOver,
+      agentLignes,
+      agentManqueAGagnerDh,
       payingTravelers,
       revenueAfterAgentsDh,
       costVolHotelVisaAllTravelersDh,
@@ -742,11 +839,15 @@ export default function NouveauProgramme() {
     formData.hotelsAutre,
     simIncludeAvion,
     simIncludeVisa,
-    simAgentPlaces,
+    simAgentLignes,
     simAgentCostPerPlaceDH,
     simAutresChargesDH,
     prixGrilleParCapacite,
+    casesGrilleAgents,
   ])
+
+  /** La simulation repose sur la grille : sans prix de brochure, pas de recettes à simuler. */
+  const grillePrete = grilleContientUnPrix(formules) && grilleRaisons.length === 0
 
   const canRunSimulation = useMemo(() => {
     if (!formData.nom.trim()) return false
@@ -773,8 +874,9 @@ export default function NouveauProgramme() {
       // chaque hôtel Autre doit avoir un nb de nuits valide
       if (formData.hotelsAutre.some(h => !String(h.nbJours ?? "").trim() || Number(h.nbJours) <= 0)) return false
     }
-    return true
+    return grillePrete
   }, [
+    grillePrete,
     formData.nom,
     formData.exchange,
     formData.nbJoursMadina,
@@ -785,6 +887,11 @@ export default function NouveauProgramme() {
     formData.hotelsMakkah,
     formData.hotelsAutre,
   ])
+
+  // La simulation vient APRÈS la grille : on l'ouvre dès que la grille la rend possible.
+  useEffect(() => {
+    if (canRunSimulation) setShowSimulationSection(true)
+  }, [canRunSimulation])
 
   const downloadSimulationReport = useCallback(async () => {
     if (!canRunSimulation) return
@@ -941,8 +1048,15 @@ export default function NouveauProgramme() {
       ...(formData.hotelsAutre.length > 0
         ? [["Hôtels Autre", `${formData.hotelsAutre.length} (nuits par hôtel)`] as [string, string]]
         : []),
-      ["Places agents", fmtNumFr(parseInt(simAgentPlaces || "0", 10) || 0)],
-      ["Charge par place agent (DH)", fmtDhFr(parseNum(simAgentCostPerPlaceDH, 0))],
+      ["Places agents", fmtNumFr(p.agentPlaces)],
+      ...p.agentLignes.map(
+        (l) =>
+          [`  Agents - ${l.libelle}`, `${fmtNumFr(l.places)} pl. (cout ${fmtDhFr(l.coutDh)} / pl.)`] as [
+            string,
+            string,
+          ]
+      ),
+      ["Frais supplementaires par agent (DH)", fmtDhFr(parseNum(simAgentCostPerPlaceDH, 0))],
       ["Autres charges fixes (DH)", fmtDhFr(parseNum(simAutresChargesDH, 0))],
     ])
 
@@ -950,16 +1064,18 @@ export default function NouveauProgramme() {
     sectionTitle("Détail par type de chambre")
     autoTable(doc, {
       startY: y,
-      head: [["Type", "Places", "Prix / pers. (DH)", "Sous-total (DH)"]],
+      head: [["Type", "Places", "Dont agents", "Prix / pers. (DH)", "Sous-total (DH)"]],
       body: p.byType.map((row) => [
         row.label,
         fmtNumFr(row.places),
+        fmtNumFr(row.agentPlaces),
         fmtNumFr(Math.round(row.unitDh)),
         fmtNumFr(Math.round(row.subtotalDh)),
       ]),
       foot: [[
         "Total",
         fmtNumFr(p.totalTravelersMax),
+        fmtNumFr(p.agentPlaces),
         "",
         fmtNumFr(Math.round(p.revenueIfAllPayDh)),
       ]],
@@ -973,10 +1089,11 @@ export default function NouveauProgramme() {
         lineWidth: 0.5,
       },
       columnStyles: {
-        0: { cellWidth: 120 },
-        1: { halign: "right", cellWidth: 80 },
-        2: { halign: "right", cellWidth: 150 },
-        3: { halign: "right", cellWidth: 150 },
+        0: { cellWidth: 110 },
+        1: { halign: "right", cellWidth: 70 },
+        2: { halign: "right", cellWidth: 80 },
+        3: { halign: "right", cellWidth: 125 },
+        4: { halign: "right", cellWidth: 130 },
       },
       margin: { left: marginX, right: marginX },
     })
@@ -1052,6 +1169,7 @@ export default function NouveauProgramme() {
         ["Capacité totale (voyageurs)", `${fmtNumFr(p.totalTravelersMax)} pers.`],
         ["Places payantes", `${fmtNumFr(p.payingTravelers)} pers.`],
         ["Places agents (non payantes)", `${fmtNumFr(p.agentPlaces)} pers.`],
+        ["Manque a gagner des places agents", fmtDhFr(p.agentManqueAGagnerDh)],
         ["Coût agence vol", fmtDhFr(p.costVolAllTravelersDh)],
         ["Coût agence hôtels", fmtDhFr(p.costHotelsAllTravelersDh)],
         ["Coût agence visa", fmtDhFr(p.costVisaAllTravelersDh)],
@@ -1133,7 +1251,6 @@ export default function NouveauProgramme() {
     formData,
     simIncludeAvion,
     simIncludeVisa,
-    simAgentPlaces,
     simAgentCostPerPlaceDH,
     simAutresChargesDH,
     toast,
@@ -2302,7 +2419,8 @@ export default function NouveauProgramme() {
                     </div>
                   </div>
 
-                  {/* Simulation : après infos de base, financier et hôtels — champs désactivés tant que les prérequis ne sont pas remplis */}
+                  {/* Simulation : APRÈS la grille tarifaire, dont elle tire les recettes —
+                      inactive tant que la grille n'a pas au moins un prix valide. */}
                   <div
                     id="simulation-rentabilite"
                     className={`scroll-mt-24 bg-gradient-to-br from-violet-50 to-indigo-100 p-6 rounded-xl border border-violet-200 mb-6 ring-1 ring-violet-200/50 ${!canRunSimulation ? "opacity-95" : ""}`}
@@ -2339,13 +2457,10 @@ export default function NouveauProgramme() {
                     <p className="text-sm text-violet-800/90 mb-4 flex gap-2 items-start">
                       <Info className="h-4 w-4 shrink-0 mt-0.5" />
                       <span>
-                        Remplissez d&apos;abord le nom du programme, les détails financiers (exchange, jours, avion, visa),
-                        puis sélectionnez au moins un hôtel (Madina, Makkah et/ou Autre) avec au moins une chambre
-                        (nombre et prix en Riyal). La simulation s&apos;adapte aux catégories réellement présentes dans le programme.
-                        Ensuite, ajustez les hypothèses ci-dessous (même logique que « Nouvelle réservation » pour le prix).
-                        Le total paiement prévu correspond aux voyageurs payants ; le total charges inclut le coût agence
-                        (vol + hôtel + visa, sans marge) pour tous les voyageurs de la capacité simulée, plus les charges
-                        agents et les autres charges saisies.
+                        La simulation se base sur la <strong>grille tarifaire</strong> ci-dessus : les recettes viennent
+                        des prix de la brochure, les charges du coût agence estimé (vol + hôtel + visa) pour toute la
+                        capacité. Indiquez ensuite dans quelle case de la grille (formule × type de chambre) sont logés
+                        les agents : leur place ne rapporte rien et coûte le prix des hôtels de cette formule.
                       </span>
                     </p>
 
@@ -2358,7 +2473,17 @@ export default function NouveauProgramme() {
                           <li>Au moins un hôtel (Madina, Makkah et/ou Autre)</li>
                           <li>NB jours pour chaque ville présente (et nb de nuits pour chaque hôtel Autre)</li>
                           <li>Pour chaque hôtel sélectionné : au moins une ligne chambre avec nombre de chambres et prix (Riyal) renseignés</li>
+                          <li className={grillePrete ? "" : "font-semibold"}>
+                            Grille tarifaire : au moins une formule avec un prix, sans erreur
+                          </li>
                         </ul>
+                        {grilleRaisons.length > 0 && (
+                          <ul className="mt-2 list-disc pl-5 space-y-0.5 text-xs text-amber-900">
+                            {grilleRaisons.map((raison) => (
+                              <li key={raison}>{raison}</li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
                     )}
 
@@ -2401,39 +2526,25 @@ export default function NouveauProgramme() {
                       </div>
 
                       <div className="space-y-4 rounded-lg border border-violet-200 bg-white/70 p-4">
-                        <p className="text-sm font-semibold text-violet-900">Agents (non payants) & autres charges</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="simAgentPlaces" className="text-violet-800 text-sm">
-                              Places agents (sans paiement client)
-                            </Label>
-                            <Input
-                              id="simAgentPlaces"
-                              type="number"
-                              min={0}
-                              disabled={!canRunSimulation}
-                              value={simAgentPlaces}
-                              onChange={(e) => setSimAgentPlaces(e.target.value)}
-                              placeholder="0"
-                              className="border-violet-200"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="simAgentCost" className="text-violet-800 text-sm">
-                              Charge par place agent (DH)
-                            </Label>
-                            <Input
-                              id="simAgentCost"
-                              type="number"
-                              min={0}
-                              step="0.01"
-                              disabled={!canRunSimulation}
-                              value={simAgentCostPerPlaceDH}
-                              onChange={(e) => setSimAgentCostPerPlaceDH(e.target.value)}
-                              placeholder="Ex: coût réel / place"
-                              className="border-violet-200"
-                            />
-                          </div>
+                        <p className="text-sm font-semibold text-violet-900">Charges supplémentaires</p>
+                        <div className="space-y-2">
+                          <Label htmlFor="simAgentCost" className="text-violet-800 text-sm">
+                            Frais supplémentaires par agent (DH)
+                          </Label>
+                          <Input
+                            id="simAgentCost"
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            disabled={!canRunSimulation}
+                            value={simAgentCostPerPlaceDH}
+                            onChange={(e) => setSimAgentCostPerPlaceDH(e.target.value)}
+                            placeholder="Ex : indemnités — 0 si aucun"
+                            className="border-violet-200"
+                          />
+                          <p className="text-[11px] text-violet-600 leading-snug">
+                            En plus du coût de la place (vol + hôtel + visa), déjà compté.
+                          </p>
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="simAutres" className="text-violet-800 text-sm">
@@ -2454,10 +2565,117 @@ export default function NouveauProgramme() {
                       </div>
                     </div>
 
+                    {/* Places agents : DANS QUELLE CASE de la grille chaque agent est logé */}
+                    <div className={`mb-6 space-y-3 rounded-lg border border-violet-200 bg-white/70 p-4 ${!canRunSimulation ? "pointer-events-none opacity-55" : ""}`}>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-violet-900">Places agents (non payantes)</p>
+                          <p className="text-xs text-violet-700/80">
+                            Choisissez la formule et le type de chambre où l&apos;agent sera réservé.
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="border-violet-300 text-violet-900 hover:bg-violet-100"
+                          disabled={!canRunSimulation || casesGrilleAgents.length === 0}
+                          onClick={() =>
+                            setSimAgentLignes((prev) => [
+                              ...prev,
+                              {
+                                id: `${Date.now()}-${prev.length}`,
+                                caseCle: casesGrilleAgents[0]?.cle ?? "",
+                                places: "1",
+                              },
+                            ])
+                          }
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Ajouter des agents
+                        </Button>
+                      </div>
+
+                      {simAgentLignes.length === 0 ? (
+                        <p className="text-xs text-violet-600">Aucune place agent dans cette simulation.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {simAgentLignes.map((ligne) => {
+                            const caseGrille = casesGrilleAgents.find((c) => c.cle === ligne.caseCle)
+                            const calcul = simulationPreview.agentLignes.find((l) => l.id === ligne.id)
+                            const majLigne = (patch: Partial<LignePlacesAgents>) =>
+                              setSimAgentLignes((prev) =>
+                                prev.map((l) => (l.id === ligne.id ? { ...l, ...patch } : l))
+                              )
+                            return (
+                              <div
+                                key={ligne.id}
+                                className="flex flex-col gap-2 rounded-md border border-violet-100 bg-white p-2 sm:flex-row sm:items-center"
+                              >
+                                <Select
+                                  value={caseGrille ? ligne.caseCle : undefined}
+                                  onValueChange={(v) => majLigne({ caseCle: v })}
+                                  disabled={!canRunSimulation}
+                                >
+                                  <SelectTrigger className="h-9 border-violet-200 sm:flex-1">
+                                    <SelectValue placeholder="Choisir la case de la grille" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {casesGrilleAgents.map((c) => (
+                                      <SelectItem key={c.cle} value={c.cle}>
+                                        {c.libelle}
+                                        {c.prix !== null ? ` · ${formatMontant(c.prix)}` : " · non proposé à la vente"}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    aria-label="Nombre de places agents"
+                                    disabled={!canRunSimulation}
+                                    value={ligne.places}
+                                    onChange={(e) => majLigne({ places: e.target.value })}
+                                    className="h-9 w-20 border-violet-200"
+                                  />
+                                  <span className="text-xs text-violet-700">place(s)</span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-9 px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                    aria-label="Retirer cette ligne d'agents"
+                                    onClick={() =>
+                                      setSimAgentLignes((prev) => prev.filter((l) => l.id !== ligne.id))
+                                    }
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                {calcul && (
+                                  <p className="text-[11px] leading-snug text-violet-700 sm:w-48 sm:text-right">
+                                    Manque à gagner {formatMontant((calcul.prix ?? 0) * calcul.places)}
+                                    <br />
+                                    Coût {formatMontant(calcul.coutDh)} / place
+                                  </p>
+                                )}
+                                {!caseGrille && (
+                                  <p className="text-[11px] text-amber-700 sm:w-48">
+                                    Case introuvable dans la grille : ligne ignorée.
+                                  </p>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+
                     {canRunSimulation && simulationPreview.agentOver && (
                       <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
-                        Le nombre de places agents dépasse la capacité simulée ({simulationPreview.totalTravelersMax}). La
-                        valeur est plafonnée pour le calcul.
+                        Des places agents dépassent la capacité de leur type de chambre. Elles sont plafonnées
+                        pour le calcul.
                       </p>
                     )}
 
@@ -2525,6 +2743,14 @@ export default function NouveauProgramme() {
                           </span>
                         </div>
                         <div className="flex flex-wrap justify-between gap-2">
+                          <span>Manque à gagner des places agents (prix de leur case)</span>
+                          <span className="font-medium">
+                            {canRunSimulation
+                              ? `${formatMontant(simulationPreview.agentManqueAGagnerDh)}`
+                              : "—"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap justify-between gap-2">
                           <span>Réf. CA si capacité pleine et tous payants</span>
                           <span className="font-medium">
                             {canRunSimulation
@@ -2557,7 +2783,7 @@ export default function NouveauProgramme() {
                           </span>
                         </div>
                         <div className="flex flex-wrap justify-between gap-2">
-                          <span>Charges agents (saisies)</span>
+                          <span>Frais supplémentaires agents (saisis)</span>
                           <span className="font-medium">
                             {canRunSimulation
                               ? `${formatMontant(simulationPreview.agentChargesTotalDh)}`
@@ -2602,6 +2828,7 @@ export default function NouveauProgramme() {
                             <tr className="border-b border-violet-100 text-left text-violet-800">
                               <th className="p-2 font-medium">Type chambre</th>
                               <th className="p-2 font-medium">Places (capacité min.)</th>
+                              <th className="p-2 font-medium">Dont agents</th>
                               <th className="p-2 font-medium">Prix grille / pers. (DH)</th>
                               <th className="p-2 font-medium">Sous-total (DH)</th>
                             </tr>
@@ -2611,6 +2838,7 @@ export default function NouveauProgramme() {
                               <tr key={row.typeKey} className="border-b border-violet-50">
                                 <td className="p-2">{row.label}</td>
                                 <td className="p-2">{row.places}</td>
+                                <td className="p-2">{row.agentPlaces > 0 ? row.agentPlaces : "—"}</td>
                                 <td className="p-2">{formatMontant(row.unitDh)}</td>
                                 <td className="p-2 font-medium">{formatMontant(Math.round(row.subtotalDh))}</td>
                               </tr>

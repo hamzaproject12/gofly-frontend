@@ -93,6 +93,10 @@ export interface ParamsCoutProgramme {
   prixAvionDH: number
   /** Prix du visa, en Riyal. */
   prixVisaRiyal: number
+  /** Simulation de rentabilité : exclure le vol du coût (inclus par défaut). */
+  includeAvion?: boolean
+  /** Simulation de rentabilité : exclure le visa du coût (inclus par défaut). */
+  includeVisa?: boolean
 }
 
 /**
